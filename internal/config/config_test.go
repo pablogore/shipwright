@@ -113,7 +113,7 @@ func TestConfig_Validate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "Go version is required",
+			errMsg:  "go version is required",
 		},
 		{
 			name: "invalid coverage - negative",
@@ -305,7 +305,11 @@ func TestConfigurationWrapper_GetFloat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
 			result := cfg.GetFloat(tt.key)
-			assert.InEpsilon(t, tt.expect, result, 0.0001)
+			if tt.expect == 0 {
+				assert.Zero(t, result)
+			} else {
+				assert.InEpsilon(t, tt.expect, result, 0.0001)
+			}
 		})
 	}
 }

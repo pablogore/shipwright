@@ -26,7 +26,7 @@ func TestNewConfig_DefaultValues(t *testing.T) {
 	assert.Empty(t, cfg.CommitSHA)
 	assert.Empty(t, cfg.BranchName)
 	assert.Empty(t, cfg.Token)
-	assert.InEpsilon(t, 0.0, cfg.Coverage, 0.0001)
+	assert.Zero(t, cfg.Coverage)
 	assert.Nil(t, cfg.Image)
 	assert.Empty(t, cfg.ImageRef)
 	assert.Nil(t, cfg.ImageContainer)

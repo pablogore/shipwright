@@ -194,7 +194,11 @@ func TestNew_ConfigHandling(t *testing.T) {
 			assert.NotNil(t, tester)
 
 			goTester := tester.(*GoTester)
-			assert.InEpsilon(t, tt.expected, goTester.MinCoverage, 0.001)
+			if tt.expected == 0.0 {
+				assert.Zero(t, goTester.MinCoverage)
+			} else {
+				assert.InEpsilon(t, tt.expected, goTester.MinCoverage, 0.001)
+			}
 		})
 	}
 }
