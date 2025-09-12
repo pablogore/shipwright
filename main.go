@@ -8,8 +8,6 @@ import (
 	"os"
 	"runtime"
 
-	"log/slog"
-
 	"github.com/getsyntegrity/syntegrity-dagger/internal/app"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
@@ -63,7 +61,7 @@ func (c *CLI) Run(args []string) error {
 	defer app.Reset()
 
 	// Log successful initialization using the global logger
-	slog.Info("Syntegrity Dagger initialized successfully",
+	log.Println("Syntegrity Dagger initialized successfully",
 		"pipeline", flags.pipelineName,
 		"environment", flags.env,
 		"verbose", flags.verbose)
@@ -211,17 +209,17 @@ func (c *CLI) listAvailableSteps(ctx context.Context, flags *Flags) error {
 	fmt.Printf("Available steps for pipeline '%s':\n", flags.pipelineName)
 
 	for i, step := range steps {
-		config, err := registry.GetStepConfig(step)
+		cfg, err := registry.GetStepConfig(step)
 		if err != nil {
 			fmt.Printf("  %d. %s (error getting config)\n", i+1, step)
 			continue
 		}
 
-		fmt.Printf("  %d. %s - %s\n", i+1, step, config.Description)
-		if config.Required {
-			fmt.Printf("     (Required: Yes, Timeout: %v)\n", config.Timeout)
+		fmt.Printf("  %d. %s - %s\n", i+1, step, cfg.Description)
+		if cfg.Required {
+			fmt.Printf("     (Required: Yes, Timeout: %v)\n", cfg.Timeout)
 		} else {
-			fmt.Printf("     (Required: No, Timeout: %v)\n", config.Timeout)
+			fmt.Printf("     (Required: No, Timeout: %v)\n", cfg.Timeout)
 		}
 	}
 
@@ -320,15 +318,15 @@ func (c *CLI) executeStepLocally(ctx context.Context, flags *Flags) error {
 		return fmt.Errorf("failed to get logger: %w", err)
 	}
 
-	config := container.GetConfiguration()
+
 
 	// Create local executor
-	localExecutor := app.NewLocalExecutor(logger, config)
+	localExecutor := app.NewLocalExecutor(logger,  container.GetConfiguration())
 
 	// Execute the step
 	logger.Info("Running pipeline step", "pipeline", flags.pipelineName, "step", flags.step)
 
-	if err := localExecutor.ExecuteStep(ctx, flags.step); err != nil {
+	if err = localExecutor.ExecuteStep(ctx, flags.step); err != nil {
 		return fmt.Errorf("pipeline step %s failed: %w", flags.step, err)
 	}
 
