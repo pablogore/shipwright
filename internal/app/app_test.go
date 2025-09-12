@@ -276,7 +276,7 @@ func TestApp_RunPipeline_LoggerError(t *testing.T) {
 
 	// Test RunPipeline with logger error
 	err := app.RunPipeline(context.Background(), "test-pipeline")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get logger")
 }
 

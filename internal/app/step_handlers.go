@@ -72,7 +72,7 @@ func (h *SetupStepHandler) CanHandle(stepName string) bool {
 	return stepName == "setup"
 }
 
-func (h *SetupStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *SetupStepHandler) Execute(_ context.Context, stepName string, config interfaces.StepConfig) error {
 	h.logger.Info("Starting setup step",
 		"step", stepName,
 		"timeout", config.Timeout,
@@ -95,7 +95,7 @@ func (h *SetupStepHandler) Execute(ctx context.Context, stepName string, config 
 	return nil
 }
 
-func (h *SetupStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *SetupStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "setup",
 		Description: "Initialize the pipeline environment and prepare source code",
@@ -151,7 +151,7 @@ func (h *BuildStepHandler) Execute(ctx context.Context, stepName string, config 
 	return nil
 }
 
-func (h *BuildStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *BuildStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "build",
 		Description: "Build the application binary or container image",
@@ -204,7 +204,7 @@ func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config i
 	return nil
 }
 
-func (h *TestStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *TestStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "test",
 		Description: "Run unit tests and generate coverage reports",

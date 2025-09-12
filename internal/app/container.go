@@ -363,7 +363,7 @@ func (v *VulnChecker) Check(_ context.Context, _ *dagger.Directory) error {
 }
 
 // GetReport returns the vulnerability report.
-func (v *VulnChecker) GetReport(ctx context.Context) (string, error) {
+func (v *VulnChecker) GetReport(_ context.Context) (string, error) {
 	// Implementation will be added later
 	return "", nil
 }
@@ -379,7 +379,7 @@ func NewLinter(config interfaces.Configuration) *Linter {
 }
 
 // Lint runs linting on the source code.
-func (l *Linter) Lint(ctx context.Context, src *dagger.Directory) error {
+func (l *Linter) Lint(_ context.Context, _ *dagger.Directory) error {
 	// Implementation will be added later
 	return nil
 }

@@ -48,7 +48,7 @@ func TestYAMLParser_ParseFile(t *testing.T) {
 			filePath: "test-config.yml",
 			wantErr:  false,
 			setup: func() func() {
-				os.WriteFile("test-config.yml", []byte("pipeline:\n  name: test-pipeline\n  environment: dev\n  coverage: 95.0\n  go_version: 1.21\nsteps:\n  - setup\n  - build\n  - test\nregistry:\n  base_url: registry.test.com\n  image: test-image\n  user: test-user\nsecurity:\n  enable_vuln_check: true\n  enable_linting: true\nrelease:\n  enabled: false\n  use_goreleaser: true\n  create_github_release: false\n  platforms:\n    - linux/amd64\nlogging:\n  level: info"), 0644)
+				_ = os.WriteFile("test-config.yml", []byte("pipeline:\n  name: test-pipeline\n  environment: dev\n  coverage: 95.0\n  go_version: 1.21\nsteps:\n  - setup\n  - build\n  - test\nregistry:\n  base_url: registry.test.com\n  image: test-image\n  user: test-user\nsecurity:\n  enable_vuln_check: true\n  enable_linting: true\nrelease:\n  enabled: false\n  use_goreleaser: true\n  create_github_release: false\n  platforms:\n    - linux/amd64\nlogging:\n  level: info"), 0644)
 				return func() { os.Remove("test-config.yml") }
 			},
 		},
@@ -356,7 +356,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find config in .github directory",
 			setup: func() func() {
-				os.MkdirAll(".github", 0755)
+				_ = os.MkdirAll(".github", 0755)
 				os.WriteFile(".github/syntegrity-dagger.yml", []byte("test"), 0644)
 				return func() {
 					os.Remove(".github/syntegrity-dagger.yml")

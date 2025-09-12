@@ -257,7 +257,7 @@ func (cw *ConfigurationWrapper) Load() error {
 }
 
 // LoadWithDefaults loads configuration with defaults.
-func (cw *ConfigurationWrapper) LoadWithDefaults(defaults map[string]any) error {
+func (cw *ConfigurationWrapper) LoadWithDefaults(_ map[string]any) error {
 	return nil // Not implemented for this wrapper
 }
 
@@ -393,7 +393,7 @@ func (cw *ConfigurationWrapper) Get(key string) any {
 }
 
 // Set sets a value.
-func (cw *ConfigurationWrapper) Set(key string, value any) {
+func (cw *ConfigurationWrapper) Set(_ string, _ any) {
 	// Not implemented for this wrapper - configuration is read-only
 }
 

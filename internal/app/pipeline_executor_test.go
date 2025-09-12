@@ -557,7 +557,7 @@ func TestPipelineExecutor_ClearPipelineStatus(t *testing.T) {
 	executor.ClearPipelineStatus("test-pipeline")
 
 	// Verify pipeline is cleared
-	status, err = executor.GetPipelineStatus("test-pipeline")
+	_, err = executor.GetPipelineStatus("test-pipeline")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline not found")
 }

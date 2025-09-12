@@ -474,7 +474,7 @@ func TestLoadDotEnv(t *testing.T) {
 			wantErr: false,
 			setup: func() func() {
 				// Create .env file
-				os.WriteFile(".env", []byte("TEST_VAR=test_value\nANOTHER_VAR=another_value"), 0644)
+				_ = os.WriteFile(".env", []byte("TEST_VAR=test_value\nANOTHER_VAR=another_value"), 0644)
 				return func() {
 					os.Remove(".env")
 				}
@@ -487,7 +487,7 @@ func TestLoadDotEnv(t *testing.T) {
 			wantErr: false, // godotenv.Load doesn't error on invalid content
 			setup: func() func() {
 				// Create invalid .env file
-				os.WriteFile(".env", []byte("INVALID_CONTENT_WITHOUT_EQUALS"), 0644)
+				_ = os.WriteFile(".env", []byte("INVALID_CONTENT_WITHOUT_EQUALS"), 0644)
 				return func() {
 					os.Remove(".env")
 				}

@@ -96,7 +96,7 @@ func TestSyntegrityInfraPipeline_Tag(t *testing.T) {
 
 	// Tag method panics with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Tag(ctx)
+		_ = pipeline.Tag(ctx)
 	}, "Tag method should panic with 'implement me'")
 }
 
@@ -113,7 +113,7 @@ func TestSyntegrityInfraPipeline_Push(t *testing.T) {
 
 	// Push method panics with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Push(ctx)
+		_ = pipeline.Push(ctx)
 	}, "Push method should panic with 'implement me'")
 }
 
@@ -197,11 +197,11 @@ func TestSyntegrityInfraPipeline_Integration(t *testing.T) {
 
 	// Tag and Push methods should panic with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Tag(ctx)
+		_ = pipeline.Tag(ctx)
 	}, "Tag method should panic with 'implement me'")
 
 	assert.Panics(t, func() {
-		pipeline.Push(ctx)
+		_ = pipeline.Push(ctx)
 	}, "Push method should panic with 'implement me'")
 }
 
@@ -250,11 +250,11 @@ func TestSyntegrityInfraPipeline_NoOpOperations(t *testing.T) {
 
 	// Tag and Push operations should panic with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Tag(ctx)
+		_ = pipeline.Tag(ctx)
 	}, "Tag method should panic with 'implement me'")
 
 	assert.Panics(t, func() {
-		pipeline.Push(ctx)
+		_ = pipeline.Push(ctx)
 	}, "Push method should panic with 'implement me'")
 
 	// Setup method requires real client, so it will return error for nil client

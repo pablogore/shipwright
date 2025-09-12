@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,7 +51,7 @@ func (le *LocalExecutor) executeSetup(ctx context.Context) error {
 
 	// Check if we're in a Go project
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - setup step requires Go modules")
+		return errors.New("not a Go project - setup step requires Go modules")
 	}
 
 	// Download dependencies

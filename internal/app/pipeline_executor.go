@@ -13,7 +13,6 @@ import (
 type PipelineExecutor struct {
 	stepRegistry interfaces.StepRegistry
 	hookManager  interfaces.HookManager
-	logger       interfaces.Logger
 	status       map[string]*PipelineStatus
 	mutex        sync.RWMutex
 }
@@ -144,7 +143,7 @@ func (pe *PipelineExecutor) ExecuteStep(ctx context.Context, pipelineName string
 }
 
 // executeStep is the internal method for executing a step.
-func (pe *PipelineExecutor) executeStep(ctx context.Context, pipelineName string, stepName string) (StepResult, error) {
+func (pe *PipelineExecutor) executeStep(ctx context.Context, _ string, stepName string) (StepResult, error) {
 	startTime := time.Now()
 
 	// Get step configuration
@@ -308,8 +307,8 @@ func (pe *PipelineExecutor) GetPipelineLogs(pipelineName string) ([]string, erro
 	logs = append(logs, "Start Time: "+status.StartTime.Format(time.RFC3339))
 
 	if status.EndTime != nil {
-		logs = append(logs, fmt.Sprintf("End Time: %s", status.EndTime.Format(time.RFC3339)))
-		logs = append(logs, fmt.Sprintf("Duration: %s", status.Duration))
+		logs = append(logs, "End Time: "+status.EndTime.Format(time.RFC3339))
+		logs = append(logs, "Duration: "+status.Duration.String())
 	}
 
 	logs = append(logs, "Steps:")

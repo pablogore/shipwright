@@ -281,7 +281,7 @@ func TestLocalExecutor_ExecuteStep_WithNilLogger(t *testing.T) {
 
 	// This should panic or handle gracefully
 	assert.Panics(t, func() {
-		executor.ExecuteStep(context.Background(), "setup")
+		_ = executor.ExecuteStep(context.Background(), "setup")
 	})
 }
 
