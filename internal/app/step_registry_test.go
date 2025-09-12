@@ -455,7 +455,7 @@ func TestStepRegistry_ExecuteStep_WithTimeout(t *testing.T) {
 
 	// Mock handler to take longer than timeout
 	mockHandler.EXPECT().Execute(gomock.Any(), "test-step", gomock.Any()).DoAndReturn(
-		func(_ context.Context, stepName string, config interfaces.StepConfig) error {
+		func(_ context.Context, _ string, _ interfaces.StepConfig) error {
 			// Simulate work that takes longer than timeout
 			time.Sleep(200 * time.Millisecond)
 			return nil

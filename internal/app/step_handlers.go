@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -82,7 +83,7 @@ func (h *SetupStepHandler) Execute(_ context.Context, stepName string, config in
 	// Example setup logic
 	if h.client == nil {
 		h.logger.Error("Dagger client not available")
-		return fmt.Errorf("dagger client not available")
+		return errors.New("dagger client not available")
 	}
 
 	// Create source directory

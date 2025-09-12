@@ -279,13 +279,13 @@ func TestSyntegrityInfraPipeline_ContextHandling(t *testing.T) {
 
 	// All operations should work with any context
 	err := pipeline.Test(ctx1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Test(ctx2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Build(ctx1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Build(ctx2)
 	assert.NoError(t, err)
