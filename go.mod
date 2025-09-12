@@ -9,7 +9,7 @@ require (
 	github.com/knadh/koanf/v2 v2.1.1
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.36.3
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.40.0
 )
 
