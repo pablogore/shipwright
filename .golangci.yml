@@ -41,5 +41,8 @@ issues:
         - noctx
         - perfsprint
     - path: third_party$
+      text: ".*"
     - path: builtin$
+      text: ".*"
     - path: examples$
+      text: ".*"
