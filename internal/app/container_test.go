@@ -1074,21 +1074,63 @@ func setupMockConfigForConvertConfig(mockConfig *mocks.MockConfiguration) {
 
 // Test pipeline factory functions
 func TestNewGoKitPipeline(t *testing.T) {
-	// Skip this test as it requires a real Dagger client
-	// The integration test covers this functionality
-	t.Skip("Skipping test that requires real Dagger client - covered by integration tests")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConfig := mocks.NewMockConfiguration(ctrl)
+
+	// Setup mock expectations for convertConfig
+	setupMockConfigForConvertConfig(mockConfig)
+
+	// Test with nil client - pipelines handle this gracefully
+	pipeline := NewGoKitPipeline(nil, mockConfig)
+
+	// Should return a PipelineAdapter, not nil
+	assert.NotNil(t, pipeline)
+	assert.IsType(t, &PipelineAdapter{}, pipeline)
+
+	// Test that the pipeline has a name
+	assert.NotEmpty(t, pipeline.Name())
 }
 
 func TestNewDockerGoPipeline(t *testing.T) {
-	// Skip this test as it requires a real Dagger client
-	// The integration test covers this functionality
-	t.Skip("Skipping test that requires real Dagger client - covered by integration tests")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConfig := mocks.NewMockConfiguration(ctrl)
+
+	// Setup mock expectations for convertConfig
+	setupMockConfigForConvertConfig(mockConfig)
+
+	// Test with nil client - pipelines handle this gracefully
+	pipeline := NewDockerGoPipeline(nil, mockConfig)
+
+	// Should return a PipelineAdapter, not nil
+	assert.NotNil(t, pipeline)
+	assert.IsType(t, &PipelineAdapter{}, pipeline)
+
+	// Test that the pipeline has a name
+	assert.NotEmpty(t, pipeline.Name())
 }
 
 func TestNewInfraPipeline(t *testing.T) {
-	// Skip this test as it requires a real Dagger client
-	// The integration test covers this functionality
-	t.Skip("Skipping test that requires real Dagger client - covered by integration tests")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConfig := mocks.NewMockConfiguration(ctrl)
+
+	// Setup mock expectations for convertConfig
+	setupMockConfigForConvertConfig(mockConfig)
+
+	// Test with nil client - pipelines handle this gracefully
+	pipeline := NewInfraPipeline(nil, mockConfig)
+
+	// Should return a PipelineAdapter, not nil
+	assert.NotNil(t, pipeline)
+	assert.IsType(t, &PipelineAdapter{}, pipeline)
+
+	// Test that the pipeline has a name
+	assert.NotEmpty(t, pipeline.Name())
 }
 
 // Test PipelineAdapter functionality
