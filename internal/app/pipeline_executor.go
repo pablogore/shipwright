@@ -183,7 +183,7 @@ func (pe *PipelineExecutor) executeStep(ctx context.Context, pipelineName string
 	// Execute appropriate hooks based on result
 	if stepErr != nil {
 		// Execute error hooks
-		pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeError)
+		_ = pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeError)
 
 		return StepResult{
 			StepName: stepName,
@@ -194,7 +194,7 @@ func (pe *PipelineExecutor) executeStep(ctx context.Context, pipelineName string
 	}
 
 	// Execute success hooks
-	pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeSuccess)
+	_ = pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeSuccess)
 
 	// Execute after hooks
 	if err := pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeAfter); err != nil {

@@ -121,13 +121,13 @@ func (c *Container) Get(name string) (any, error) {
 }
 
 // Start initializes all registered components.
-func (c *Container) Start(ctx context.Context) error {
+func (c *Container) Start(_ context.Context) error {
 	c.registerComponents()
 	return nil
 }
 
 // Stop stops the container and cleans up resources.
-func (c *Container) Stop(ctx context.Context) error {
+func (c *Container) Stop(_ context.Context) error {
 	// Clean up components that need cleanup
 	for name, component := range c.cache {
 		if closer, ok := component.(interface{ Close() error }); ok {
@@ -357,7 +357,7 @@ func NewVulnChecker(config interfaces.Configuration) *VulnChecker {
 }
 
 // Check runs vulnerability checks on the source code.
-func (v *VulnChecker) Check(ctx context.Context, src *dagger.Directory) error {
+func (v *VulnChecker) Check(_ context.Context, _ *dagger.Directory) error {
 	// Implementation will be added later
 	return nil
 }
@@ -427,13 +427,13 @@ func (l *Logger) Fatal(msg string, fields ...any) {
 }
 
 // WithField adds a field to the logger.
-func (l *Logger) WithField(key string, value any) interfaces.Logger {
+func (l *Logger) WithField(_ string, _ any) interfaces.Logger {
 	// Simple implementation - in real scenario would return a new logger instance
 	return l
 }
 
 // WithFields adds multiple fields to the logger.
-func (l *Logger) WithFields(fields map[string]any) interfaces.Logger {
+func (l *Logger) WithFields(_ map[string]any) interfaces.Logger {
 	// Simple implementation - in real scenario would return a new logger instance
 	return l
 }
@@ -465,12 +465,12 @@ func (c *Container) registerStepComponents() {
 		_ = registry.RegisterStep("setup", NewSetupStepHandler(c.config, daggerClient, log))
 		_ = registry.RegisterStep("build", NewBuildStepHandler(c.config, daggerClient, log))
 		_ = registry.RegisterStep("test", NewTestStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("lint", NewLintStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("security", NewSecurityStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("tag", NewTagStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("package", NewPackageStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("push", NewPushStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("release", NewReleaseStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("lint", NewLintStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("security", NewSecurityStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("tag", NewTagStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("package", NewPackageStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("push", NewPushStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("release", NewReleaseStepHandler(c.config, daggerClient, log))
 
 		return registry, nil
 	})
