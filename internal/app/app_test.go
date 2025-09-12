@@ -79,11 +79,11 @@ func TestApp_WithNilContainer(t *testing.T) {
 
 	// These should panic with nil container
 	assert.Panics(t, func() {
-		app.Start(context.Background())
+		_ = app.Start(context.Background())
 	})
 
 	assert.Panics(t, func() {
-		app.Stop(context.Background())
+		_ = app.Stop(context.Background())
 	})
 
 	container := app.GetContainer()
@@ -91,11 +91,11 @@ func TestApp_WithNilContainer(t *testing.T) {
 
 	// These should panic with nil container
 	assert.Panics(t, func() {
-		app.ListPipelines()
+		_, _ = app.ListPipelines()
 	})
 
 	assert.Panics(t, func() {
-		app.GetPipelineInfo("test")
+		_, _ = app.GetPipelineInfo("test")
 	})
 }
 

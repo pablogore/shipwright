@@ -134,7 +134,10 @@ func (c *CLI) parseFlags(args []string) *Flags {
 	fs.BoolVar(&flags.version, "version", false, "Show version information")
 	fs.BoolVar(&flags.local, "local", false, "Run pipeline locally without Docker")
 
-	fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
 	return flags
 }
 

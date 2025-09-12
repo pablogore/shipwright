@@ -197,21 +197,21 @@ func TestLocalExecutor_GetCoverageThreshold(t *testing.T) {
 		mockConfig.EXPECT().Get("pipeline.coverage").Return(85.0).Times(1)
 
 		threshold := executor.getCoverageThreshold()
-		assert.Equal(t, 85.0, threshold)
+		assert.InDelta(t, 85.0, threshold, 0.001)
 	})
 
 	t.Run("with invalid coverage from config", func(t *testing.T) {
 		mockConfig.EXPECT().Get("pipeline.coverage").Return("invalid").Times(1)
 
 		threshold := executor.getCoverageThreshold()
-		assert.Equal(t, 90.0, threshold) // Default value
+		assert.InDelta(t, 90.0, threshold, 0.001) // Default value
 	})
 
 	t.Run("with nil coverage from config", func(t *testing.T) {
 		mockConfig.EXPECT().Get("pipeline.coverage").Return(nil).Times(1)
 
 		threshold := executor.getCoverageThreshold()
-		assert.Equal(t, 90.0, threshold) // Default value
+		assert.InDelta(t, 90.0, threshold, 0.001) // Default value
 	})
 }
 
@@ -320,9 +320,11 @@ func TestLocalExecutor_executeTest_WithGoProject(t *testing.T) {
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -373,9 +375,11 @@ func TestLocalExecutor_executeLint_WithGoProject(t *testing.T) {
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -426,9 +430,11 @@ func TestLocalExecutor_executeSecurity_WithGoProject(t *testing.T) {
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -478,9 +484,11 @@ func TestLocalExecutor_executeSetup_WithGoProject(t *testing.T) {
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -527,9 +535,11 @@ func TestLocalExecutor_executeBuild_WithGoProject(t *testing.T) {
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -574,9 +584,11 @@ func TestLocalExecutor_executeSecurity_WithGoProject_WithGosec(t *testing.T) {
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project

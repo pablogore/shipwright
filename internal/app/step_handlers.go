@@ -18,12 +18,12 @@ type BaseStepHandler struct {
 }
 
 // CanHandle implements the StepHandler interface.
-func (h *BaseStepHandler) CanHandle(stepName string) bool {
+func (h *BaseStepHandler) CanHandle(_ string) bool {
 	return false // Base handler doesn't handle any specific steps
 }
 
 // Execute implements the StepHandler interface.
-func (h *BaseStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *BaseStepHandler) Execute(_ context.Context, stepName string, _ interfaces.StepConfig) error {
 	return fmt.Errorf("base step handler cannot execute step: %s", stepName)
 }
 
@@ -43,7 +43,7 @@ func (h *BaseStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
 }
 
 // Validate implements the StepHandler interface.
-func (h *BaseStepHandler) Validate(stepName string, config interfaces.StepConfig) error {
+func (h *BaseStepHandler) Validate(stepName string, _ interfaces.StepConfig) error {
 	return fmt.Errorf("base step handler cannot validate step: %s", stepName)
 }
 

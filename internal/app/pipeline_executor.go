@@ -303,9 +303,9 @@ func (pe *PipelineExecutor) GetPipelineLogs(pipelineName string) ([]string, erro
 	defer status.mutex.RUnlock()
 
 	var logs []string
-	logs = append(logs, fmt.Sprintf("Pipeline: %s", status.PipelineName))
-	logs = append(logs, fmt.Sprintf("Status: %s", status.Status))
-	logs = append(logs, fmt.Sprintf("Start Time: %s", status.StartTime.Format(time.RFC3339)))
+	logs = append(logs, "Pipeline: "+status.PipelineName)
+	logs = append(logs, "Status: "+status.Status)
+	logs = append(logs, "Start Time: "+status.StartTime.Format(time.RFC3339))
 
 	if status.EndTime != nil {
 		logs = append(logs, fmt.Sprintf("End Time: %s", status.EndTime.Format(time.RFC3339)))

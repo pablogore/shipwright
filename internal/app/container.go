@@ -58,14 +58,14 @@ func (l *LoggerAdapter) Fatal(msg string, fields ...any) {
 }
 
 // WithField adds a single field to the logger context
-func (l *LoggerAdapter) WithField(key string, value any) interfaces.Logger {
+func (l *LoggerAdapter) WithField(_ string, _ any) interfaces.Logger {
 	// For now, return the same logger since the API might be different
 	// This would need to be implemented based on the actual API
 	return l
 }
 
 // WithFields adds multiple fields to the logger context
-func (l *LoggerAdapter) WithFields(fields map[string]any) interfaces.Logger {
+func (l *LoggerAdapter) WithFields(_ map[string]any) interfaces.Logger {
 	// For now, return the same logger since the API might be different
 	// This would need to be implemented based on the actual API
 	return l
@@ -263,7 +263,7 @@ func (c *Container) GetDaggerClient() (*dagger.Client, error) {
 		return nil, err
 	}
 	if client == nil {
-		return nil, fmt.Errorf("dagger client is nil")
+		return nil, errors.New("dagger client is nil")
 	}
 	return client.(*dagger.Client), nil
 }
@@ -462,9 +462,9 @@ func (c *Container) registerStepComponents() {
 		}
 
 		// Register default steps with logger and client
-		registry.RegisterStep("setup", NewSetupStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("build", NewBuildStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("test", NewTestStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("setup", NewSetupStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("build", NewBuildStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("test", NewTestStepHandler(c.config, daggerClient, log))
 		registry.RegisterStep("lint", NewLintStepHandler(c.config, daggerClient, log))
 		registry.RegisterStep("security", NewSecurityStepHandler(c.config, daggerClient, log))
 		registry.RegisterStep("tag", NewTagStepHandler(c.config, daggerClient, log))
