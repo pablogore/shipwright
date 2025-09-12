@@ -200,11 +200,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
-<<<<<<< HEAD
-=======
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
->>>>>>> origin/main
       
     - name: Download all artifacts
       uses: actions/download-artifact@v4
@@ -227,7 +224,6 @@ jobs:
         cat > release-notes.md << EOF
         # Release ${{ needs.version.outputs.version }}
         
-<<<<<<< HEAD
         ## 📦 Binaries
         This release includes pre-compiled binaries for multiple platforms:
         
@@ -241,17 +237,6 @@ jobs:
         \`\`\`bash
         # Download the appropriate binary for your platform
         curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64 -o ${{ env.BINARY_NAME }}
-=======
-        ## 📦 Binary
-        This release includes a pre-compiled binary for Linux (pipeline environment):
-        
-        - **Linux AMD64**: \`${{ env.BINARY_NAME }}\`
-        
-        ## 🔧 Installation
-        \`\`\`bash
-        # Download the binary
-        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }} -o ${{ env.BINARY_NAME }}
->>>>>>> origin/main
         chmod +x ${{ env.BINARY_NAME }}
         \`\`\`
         
@@ -259,17 +244,10 @@ jobs:
         ${{ needs.version.outputs.changelog }}
         
         ## 🔗 Shared Library Usage
-<<<<<<< HEAD
         Other services can use this release as a shared library:
         \`\`\`bash
         # Download and use in CI/CD pipelines
         curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64 -o ${{ env.BINARY_NAME }}
-=======
-        Other services can use this release as a shared library in their CI/CD pipelines:
-        \`\`\`bash
-        # Download and use in CI/CD pipelines
-        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }} -o ${{ env.BINARY_NAME }}
->>>>>>> origin/main
         chmod +x ${{ env.BINARY_NAME }}
         ./${{ env.BINARY_NAME }} --help
         \`\`\`
@@ -292,8 +270,4 @@ jobs:
       run: |
         # Create a 'latest' release for easy access
         echo "🔗 Release created: https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}"
-<<<<<<< HEAD
         echo "📥 Direct download: https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64"
-=======
-        echo "📥 Direct download: https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}"
->>>>>>> origin/main
