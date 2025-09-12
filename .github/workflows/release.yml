@@ -179,7 +179,6 @@ jobs:
       
     - name: Build binary
       env:
-<<<<<<< HEAD
         GOOS: ${{ matrix.os }}
         GOARCH: ${{ matrix.arch }}
         CGO_ENABLED: 0
@@ -193,19 +192,6 @@ jobs:
       with:
         name: binary-${{ matrix.os }}-${{ matrix.arch }}
         path: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
-=======
-        CGO_ENABLED: 0
-      run: |
-        OUTPUT_NAME="${{ env.BINARY_NAME }}"
-        go build -ldflags="-X main.Version=${{ needs.version.outputs.version }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o "$OUTPUT_NAME" .
-        echo "Built: $OUTPUT_NAME"
-        
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: binary
-        path: ${{ env.BINARY_NAME }}
->>>>>>> origin/main
 
   # Job 3: Create GitHub Release
   release:
