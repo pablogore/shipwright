@@ -6,20 +6,21 @@ import (
 
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
 // Helper function to create a test YAMLConfig
-func createTestYAMLConfig(name string, steps []string) *YAMLConfig {
+func createTestYAMLConfig(steps []string) *YAMLConfig {
 	return &YAMLConfig{
 		Pipeline: struct {
 			Name        string   `yaml:"name"`
 			Environment string   `yaml:"environment"`
 			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"go_version"`
+			GoVersion   string   `yaml:"goVersion"`
 			Steps       []string `yaml:"steps"`
 		}{
-			Name:        name,
+			Name:        "test-pipeline",
 			Environment: "dev",
 			Coverage:    95.0,
 			GoVersion:   "1.21",
@@ -48,7 +49,7 @@ func TestYAMLParser_ParseFile(t *testing.T) {
 			filePath: "test-config.yml",
 			wantErr:  false,
 			setup: func() func() {
-				os.WriteFile("test-config.yml", []byte("pipeline:\n  name: test-pipeline\n  environment: dev\n  coverage: 95.0\n  go_version: 1.21\nsteps:\n  - setup\n  - build\n  - test\nregistry:\n  base_url: registry.test.com\n  image: test-image\n  user: test-user\nsecurity:\n  enable_vuln_check: true\n  enable_linting: true\nrelease:\n  enabled: false\n  use_goreleaser: true\n  create_github_release: false\n  platforms:\n    - linux/amd64\nlogging:\n  level: info"), 0644)
+				_ = os.WriteFile("test-config.yml", []byte("pipeline:\n  name: test-pipeline\n  environment: dev\n  coverage: 95.0\n  go_version: 1.21\nsteps:\n  - setup\n  - build\n  - test\nregistry:\n  base_url: registry.test.com\n  image: test-image\n  user: test-user\nsecurity:\n  enable_vuln_check: true\n  enable_linting: true\nrelease:\n  enabled: false\n  use_goreleaser: true\n  create_github_release: false\n  platforms:\n    - linux/amd64\nlogging:\n  level: info"), 0644)
 				return func() { os.Remove("test-config.yml") }
 			},
 		},
@@ -68,7 +69,7 @@ func TestYAMLParser_ParseFile(t *testing.T) {
 			wantErr:     true,
 			errContains: "failed to parse YAML configuration",
 			setup: func() func() {
-				os.WriteFile("invalid.yml", []byte("invalid: yaml: content: ["), 0644)
+				_ = os.WriteFile("invalid.yml", []byte("invalid: yaml: content: ["), 0644)
 				return func() { os.Remove("invalid.yml") }
 			},
 		},
@@ -78,7 +79,7 @@ func TestYAMLParser_ParseFile(t *testing.T) {
 			filePath: "empty.yml",
 			wantErr:  false,
 			setup: func() func() {
-				os.WriteFile("empty.yml", []byte(""), 0644)
+				_ = os.WriteFile("empty.yml", []byte(""), 0644)
 				return func() { os.Remove("empty.yml") }
 			},
 		},
@@ -93,13 +94,13 @@ func TestYAMLParser_ParseFile(t *testing.T) {
 			config, err := parser.ParseFile(tt.filePath)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, config)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, config)
 			}
 		})
@@ -118,7 +119,7 @@ func TestYAMLParser_ApplyToConfiguration(t *testing.T) {
 			Name        string   `yaml:"name"`
 			Environment string   `yaml:"environment"`
 			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"go_version"`
+			GoVersion   string   `yaml:"goVersion"`
 			Steps       []string `yaml:"steps"`
 		}{
 			Name:        "test-pipeline",
@@ -128,7 +129,7 @@ func TestYAMLParser_ApplyToConfiguration(t *testing.T) {
 			Steps:       []string{"setup", "build", "test"},
 		},
 		Registry: struct {
-			BaseURL string `yaml:"base_url"`
+			BaseURL string `yaml:"baseUrl"`
 			Image   string `yaml:"image"`
 			User    string `yaml:"user"`
 		}{
@@ -137,16 +138,16 @@ func TestYAMLParser_ApplyToConfiguration(t *testing.T) {
 			User:    "test-user",
 		},
 		Security: struct {
-			EnableVulnCheck bool `yaml:"enable_vuln_check"`
-			EnableLinting   bool `yaml:"enable_linting"`
+			EnableVulnCheck bool `yaml:"enableVulnCheck"`
+			EnableLinting   bool `yaml:"enableLinting"`
 		}{
 			EnableVulnCheck: true,
 			EnableLinting:   true,
 		},
 		Release: struct {
 			Enabled             bool     `yaml:"enabled"`
-			UseGoreleaser       bool     `yaml:"use_goreleaser"`
-			CreateGithubRelease bool     `yaml:"create_github_release"`
+			UseGoreleaser       bool     `yaml:"useGoreleaser"`
+			CreateGithubRelease bool     `yaml:"createGithubRelease"`
 			Platforms           []string `yaml:"platforms"`
 		}{
 			Enabled:             false,
@@ -177,7 +178,7 @@ func TestYAMLParser_ApplyToConfiguration(t *testing.T) {
 	mockConfig.EXPECT().Set("logging.level", "info").Times(1)
 
 	err := parser.ApplyToConfiguration(yamlConfig, mockConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestYAMLParser_ApplyToConfiguration_EmptyValues(t *testing.T) {
@@ -192,7 +193,7 @@ func TestYAMLParser_ApplyToConfiguration_EmptyValues(t *testing.T) {
 			Name        string   `yaml:"name"`
 			Environment string   `yaml:"environment"`
 			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"go_version"`
+			GoVersion   string   `yaml:"goVersion"`
 			Steps       []string `yaml:"steps"`
 		}{
 			Name:        "",
@@ -202,7 +203,7 @@ func TestYAMLParser_ApplyToConfiguration_EmptyValues(t *testing.T) {
 			Steps:       []string{},
 		},
 		Registry: struct {
-			BaseURL string `yaml:"base_url"`
+			BaseURL string `yaml:"baseUrl"`
 			Image   string `yaml:"image"`
 			User    string `yaml:"user"`
 		}{
@@ -225,12 +226,12 @@ func TestYAMLParser_ApplyToConfiguration_EmptyValues(t *testing.T) {
 	mockConfig.EXPECT().Set("release.create_github_release", false).Times(1)
 
 	err := parser.ApplyToConfiguration(yamlConfig, mockConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestYAMLParser_GetSteps(t *testing.T) {
 	parser := NewYAMLParser()
-	yamlConfig := createTestYAMLConfig("test-pipeline", []string{"setup", "build", "test", "lint"})
+	yamlConfig := createTestYAMLConfig([]string{"setup", "build", "test", "lint"})
 
 	steps := parser.GetSteps(yamlConfig)
 	assert.Equal(t, []string{"setup", "build", "test", "lint"}, steps)
@@ -238,7 +239,7 @@ func TestYAMLParser_GetSteps(t *testing.T) {
 
 func TestYAMLParser_GetSteps_Empty(t *testing.T) {
 	parser := NewYAMLParser()
-	yamlConfig := createTestYAMLConfig("test-pipeline", []string{})
+	yamlConfig := createTestYAMLConfig([]string{})
 
 	steps := parser.GetSteps(yamlConfig)
 	assert.Equal(t, []string{}, steps)
@@ -253,7 +254,7 @@ func TestYAMLParser_ValidateConfig(t *testing.T) {
 	}{
 		{
 			name:    "valid configuration",
-			config:  createTestYAMLConfig("test-pipeline", []string{"setup", "build", "test"}),
+			config:  createTestYAMLConfig([]string{"setup", "build", "test"}),
 			wantErr: false,
 		},
 		{
@@ -263,7 +264,7 @@ func TestYAMLParser_ValidateConfig(t *testing.T) {
 					Name        string   `yaml:"name"`
 					Environment string   `yaml:"environment"`
 					Coverage    float64  `yaml:"coverage"`
-					GoVersion   string   `yaml:"go_version"`
+					GoVersion   string   `yaml:"goVersion"`
 					Steps       []string `yaml:"steps"`
 				}{
 					Name:  "",
@@ -275,19 +276,19 @@ func TestYAMLParser_ValidateConfig(t *testing.T) {
 		},
 		{
 			name:        "no steps defined",
-			config:      createTestYAMLConfig("test-pipeline", []string{}),
+			config:      createTestYAMLConfig([]string{}),
 			wantErr:     true,
 			errContains: "at least one step must be defined",
 		},
 		{
 			name:        "invalid step",
-			config:      createTestYAMLConfig("test-pipeline", []string{"setup", "invalid-step", "test"}),
+			config:      createTestYAMLConfig([]string{"setup", "invalid-step", "test"}),
 			wantErr:     true,
 			errContains: "invalid step: invalid-step",
 		},
 		{
 			name:    "all valid steps",
-			config:  createTestYAMLConfig("test-pipeline", []string{"setup", "build", "test", "lint", "security", "tag", "package", "push", "release"}),
+			config:  createTestYAMLConfig([]string{"setup", "build", "test", "lint", "security", "tag", "package", "push", "release"}),
 			wantErr: false,
 		},
 	}
@@ -298,12 +299,12 @@ func TestYAMLParser_ValidateConfig(t *testing.T) {
 			err := parser.ValidateConfig(tt.config)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -320,7 +321,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find .syntegrity-dagger.yml in current directory",
 			setup: func() func() {
-				os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
+				_ = os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
 				return func() { os.Remove(".syntegrity-dagger.yml") }
 			},
 			wantErr:      false,
@@ -329,7 +330,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find .syntegrity-dagger.yaml in current directory",
 			setup: func() func() {
-				os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
+				_ = os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
 				return func() { os.Remove(".syntegrity-dagger.yaml") }
 			},
 			wantErr:      false,
@@ -338,7 +339,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find syntegrity-dagger.yml in current directory",
 			setup: func() func() {
-				os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
+				_ = os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
 				return func() { os.Remove("syntegrity-dagger.yml") }
 			},
 			wantErr:      false,
@@ -347,7 +348,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find syntegrity-dagger.yaml in current directory",
 			setup: func() func() {
-				os.WriteFile("syntegrity-dagger.yaml", []byte("test"), 0644)
+				_ = os.WriteFile("syntegrity-dagger.yaml", []byte("test"), 0644)
 				return func() { os.Remove("syntegrity-dagger.yaml") }
 			},
 			wantErr:      false,
@@ -356,8 +357,8 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find config in .github directory",
 			setup: func() func() {
-				os.MkdirAll(".github", 0755)
-				os.WriteFile(".github/syntegrity-dagger.yml", []byte("test"), 0644)
+				_ = os.MkdirAll(".github", 0755)
+				_ = os.WriteFile(".github/syntegrity-dagger.yml", []byte("test"), 0644)
 				return func() {
 					os.Remove(".github/syntegrity-dagger.yml")
 					os.Remove(".github")
@@ -439,7 +440,7 @@ release:
 dagger:
   log_output: false
   timeout: "1m"`
-					os.WriteFile(".syntegrity-dagger.yml", []byte(configContent), 0644)
+					_ = os.WriteFile(".syntegrity-dagger.yml", []byte(configContent), 0644)
 				}
 			},
 			wantErr:     true,
@@ -459,13 +460,13 @@ dagger:
 			filePath, err := parser.FindConfigFile()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Empty(t, filePath)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedFile, filePath)
 			}
 		})
@@ -477,14 +478,14 @@ func TestYAMLParser_FindConfigFile_Priority(t *testing.T) {
 	parser := NewYAMLParser()
 
 	// Create multiple config files to test priority
-	os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
+	_ = os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
 	defer os.Remove(".syntegrity-dagger.yaml")
 
-	os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
+	_ = os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
 	defer os.Remove("syntegrity-dagger.yml")
 
 	filePath, err := parser.FindConfigFile()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// Should find .syntegrity-dagger.yaml first (higher priority)
 	assert.Equal(t, ".syntegrity-dagger.yaml", filePath)
 }
@@ -495,11 +496,12 @@ func TestYAMLParser_FindConfigFile_ParentDirectories(t *testing.T) {
 	parser := NewYAMLParser()
 
 	// Create a config file in current directory
-	os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
+	err := os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
+	require.NoError(t, err)
 	defer os.Remove(".syntegrity-dagger.yml")
 
 	filePath, err := parser.FindConfigFile()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, ".syntegrity-dagger.yml", filePath)
 }
 
@@ -510,7 +512,7 @@ func TestYAMLConfig_Structure(t *testing.T) {
 			Name        string   `yaml:"name"`
 			Environment string   `yaml:"environment"`
 			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"go_version"`
+			GoVersion   string   `yaml:"goVersion"`
 			Steps       []string `yaml:"steps"`
 		}{
 			Name:        "test",
@@ -520,7 +522,7 @@ func TestYAMLConfig_Structure(t *testing.T) {
 			Steps:       []string{"setup", "build"},
 		},
 		Registry: struct {
-			BaseURL string `yaml:"base_url"`
+			BaseURL string `yaml:"baseUrl"`
 			Image   string `yaml:"image"`
 			User    string `yaml:"user"`
 		}{
@@ -529,16 +531,16 @@ func TestYAMLConfig_Structure(t *testing.T) {
 			User:    "test-user",
 		},
 		Security: struct {
-			EnableVulnCheck bool `yaml:"enable_vuln_check"`
-			EnableLinting   bool `yaml:"enable_linting"`
+			EnableVulnCheck bool `yaml:"enableVulnCheck"`
+			EnableLinting   bool `yaml:"enableLinting"`
 		}{
 			EnableVulnCheck: true,
 			EnableLinting:   true,
 		},
 		Release: struct {
 			Enabled             bool     `yaml:"enabled"`
-			UseGoreleaser       bool     `yaml:"use_goreleaser"`
-			CreateGithubRelease bool     `yaml:"create_github_release"`
+			UseGoreleaser       bool     `yaml:"useGoreleaser"`
+			CreateGithubRelease bool     `yaml:"createGithubRelease"`
 			Platforms           []string `yaml:"platforms"`
 		}{
 			Enabled:             false,
@@ -555,7 +557,7 @@ func TestYAMLConfig_Structure(t *testing.T) {
 
 	assert.Equal(t, "test", config.Pipeline.Name)
 	assert.Equal(t, "dev", config.Pipeline.Environment)
-	assert.Equal(t, 90.0, config.Pipeline.Coverage)
+	assert.InEpsilon(t, 90.0, config.Pipeline.Coverage, 0.001)
 	assert.Equal(t, "1.21", config.Pipeline.GoVersion)
 	assert.Equal(t, []string{"setup", "build"}, config.Pipeline.Steps)
 	assert.Equal(t, "registry.test.com", config.Registry.BaseURL)

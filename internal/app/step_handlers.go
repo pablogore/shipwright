@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,12 +19,12 @@ type BaseStepHandler struct {
 }
 
 // CanHandle implements the StepHandler interface.
-func (h *BaseStepHandler) CanHandle(stepName string) bool {
+func (h *BaseStepHandler) CanHandle(_ string) bool {
 	return false // Base handler doesn't handle any specific steps
 }
 
 // Execute implements the StepHandler interface.
-func (h *BaseStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *BaseStepHandler) Execute(_ context.Context, stepName string, _ interfaces.StepConfig) error {
 	return fmt.Errorf("base step handler cannot execute step: %s", stepName)
 }
 
@@ -43,7 +44,7 @@ func (h *BaseStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
 }
 
 // Validate implements the StepHandler interface.
-func (h *BaseStepHandler) Validate(stepName string, config interfaces.StepConfig) error {
+func (h *BaseStepHandler) Validate(stepName string, _ interfaces.StepConfig) error {
 	return fmt.Errorf("base step handler cannot validate step: %s", stepName)
 }
 
@@ -72,7 +73,7 @@ func (h *SetupStepHandler) CanHandle(stepName string) bool {
 	return stepName == "setup"
 }
 
-func (h *SetupStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *SetupStepHandler) Execute(_ context.Context, stepName string, config interfaces.StepConfig) error {
 	h.logger.Info("Starting setup step",
 		"step", stepName,
 		"timeout", config.Timeout,
@@ -82,7 +83,7 @@ func (h *SetupStepHandler) Execute(ctx context.Context, stepName string, config 
 	// Example setup logic
 	if h.client == nil {
 		h.logger.Error("Dagger client not available")
-		return fmt.Errorf("dagger client not available")
+		return errors.New("dagger client not available")
 	}
 
 	// Create source directory
@@ -95,7 +96,7 @@ func (h *SetupStepHandler) Execute(ctx context.Context, stepName string, config 
 	return nil
 }
 
-func (h *SetupStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *SetupStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "setup",
 		Description: "Initialize the pipeline environment and prepare source code",
@@ -137,7 +138,7 @@ func (h *BuildStepHandler) CanHandle(stepName string) bool {
 	return stepName == "build"
 }
 
-func (h *BuildStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *BuildStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🔨 Executing build step with config: %+v\n", config)
 
 	// Example build logic
@@ -151,7 +152,7 @@ func (h *BuildStepHandler) Execute(ctx context.Context, stepName string, config 
 	return nil
 }
 
-func (h *BuildStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *BuildStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "build",
 		Description: "Build the application binary or container image",
@@ -193,7 +194,7 @@ func (h *TestStepHandler) CanHandle(stepName string) bool {
 	return stepName == "test"
 }
 
-func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *TestStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🧪 Executing test step with config: %+v\n", config)
 
 	// Example test logic
@@ -204,7 +205,7 @@ func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config i
 	return nil
 }
 
-func (h *TestStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *TestStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "test",
 		Description: "Run unit tests and generate coverage reports",
@@ -246,7 +247,7 @@ func (h *LintStepHandler) CanHandle(stepName string) bool {
 	return stepName == "lint"
 }
 
-func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *LintStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🔍 Executing lint step with config: %+v\n", config)
 
 	// Example lint logic
@@ -257,7 +258,7 @@ func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config i
 	return nil
 }
 
-func (h *LintStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *LintStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "lint",
 		Description: "Run code linting and formatting checks",
@@ -299,7 +300,7 @@ func (h *SecurityStepHandler) CanHandle(stepName string) bool {
 	return stepName == "security"
 }
 
-func (h *SecurityStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *SecurityStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🔒 Executing security step with config: %+v\n", config)
 
 	// Example security logic
@@ -310,7 +311,7 @@ func (h *SecurityStepHandler) Execute(ctx context.Context, stepName string, conf
 	return nil
 }
 
-func (h *SecurityStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *SecurityStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "security",
 		Description: "Run security scans and vulnerability checks",

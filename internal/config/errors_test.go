@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestError_Error(t *testing.T) {
@@ -65,13 +66,13 @@ func TestErrNoPort(t *testing.T) {
 
 	// Test that it can be unwrapped
 	unwrapped := ErrNoPort.Unwrap()
-	assert.NotNil(t, unwrapped)
+	require.Error(t, unwrapped)
 	assert.Equal(t, "PORT is not defined", unwrapped.Error())
 }
 
 func TestError_ImplementsErrorInterface(t *testing.T) {
 	var err error = Error{Err: errors.New("test error")}
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "Environment variable: test error", err.Error())
 }
 
@@ -84,5 +85,5 @@ func TestError_CanBeWrapped(t *testing.T) {
 	assert.Equal(t, originalErr, unwrapped)
 
 	// Test that errors.Is works
-	assert.True(t, errors.Is(configErr, originalErr))
+	assert.ErrorIs(t, configErr, originalErr)
 }

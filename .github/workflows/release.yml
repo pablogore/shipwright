@@ -16,7 +16,7 @@ on:
         - major
 
 env:
-  GO_VERSION: '1.25.1'
+  GO_VERSION: '1.24.0'
 
 jobs:
   # Check if this is a release-worthy commit

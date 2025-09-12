@@ -155,8 +155,22 @@ vet: ## Run go vet
 	$(GOCMD) vet ./...
 	@echo -e "$(GREEN)✅ Go vet completed$(NC)"
 
+# Security check
+security: ## Run security vulnerability check
+	@echo -e "$(BLUE)Running security vulnerability check...$(NC)"
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@govulncheck ./... | tee vuln_report.txt
+	@if grep -q "Vulnerabilities found" vuln_report.txt; then \
+		echo -e "$(RED)❌ Security vulnerabilities detected! Please update dependencies.$(NC)"; \
+		cat vuln_report.txt; \
+		exit 1; \
+	else \
+		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
+	fi
+	@rm -f vuln_report.txt
+
 # Run all code quality checks
-quality: fmt vet lint test ## Run all code quality checks (fmt, vet, lint, test)
+quality: fmt vet lint test security ## Run all code quality checks (fmt, vet, lint, test, security)
 
 # Coverage targets
 coverage: ## Generate comprehensive ASCII coverage report with threshold validation

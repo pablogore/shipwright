@@ -12,7 +12,7 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
 )
 
-type DockerGoPipeline struct {
+type Pipeline struct {
 	Client *dagger.Client
 	Config pipelines.Config
 	Src    *dagger.Directory
@@ -21,13 +21,13 @@ type DockerGoPipeline struct {
 }
 
 func New(client *dagger.Client, cfg pipelines.Config) pipelines.Pipeline {
-	return &DockerGoPipeline{
+	return &Pipeline{
 		Client: client,
 		Config: cfg,
 	}
 }
 
-func (p *DockerGoPipeline) Test(ctx context.Context) error {
+func (p *Pipeline) Test(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
@@ -54,7 +54,7 @@ func (p *DockerGoPipeline) Test(ctx context.Context) error {
 	return nil
 }
 
-func (p *DockerGoPipeline) Build(ctx context.Context) error {
+func (p *Pipeline) Build(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
@@ -72,11 +72,11 @@ func (p *DockerGoPipeline) Build(ctx context.Context) error {
 	return nil
 }
 
-func (p *DockerGoPipeline) Package(_ context.Context) error {
+func (p *Pipeline) Package(_ context.Context) error {
 	return nil
 }
 
-func (p *DockerGoPipeline) Tag(_ context.Context) error {
+func (p *Pipeline) Tag(_ context.Context) error {
 	fmt.Println("🏷️ Tagging image in memory...")
 
 	if p.Image == nil {
@@ -103,11 +103,11 @@ func (p *DockerGoPipeline) Tag(_ context.Context) error {
 	return nil
 }
 
-func (p *DockerGoPipeline) Name() string {
+func (p *Pipeline) Name() string {
 	return "docker-go"
 }
 
-func (p *DockerGoPipeline) Setup(ctx context.Context) error {
+func (p *Pipeline) Setup(ctx context.Context) error {
 	if p.Cloner != nil {
 		dir, err := p.Cloner.Clone(ctx, p.Client, shared.GitCloneOpts{})
 		if err != nil {
@@ -118,7 +118,7 @@ func (p *DockerGoPipeline) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (p *DockerGoPipeline) Push(ctx context.Context) error {
+func (p *Pipeline) Push(ctx context.Context) error {
 	fmt.Println("📦 pushing an image to the GitLab Container registry...")
 
 	if p.Image == nil {
@@ -168,11 +168,11 @@ func (p *DockerGoPipeline) Push(ctx context.Context) error {
 	return nil
 }
 
-func (p *DockerGoPipeline) BeforeStep(_ context.Context, _ string) pipelines.HookFunc {
+func (p *Pipeline) BeforeStep(_ context.Context, _ string) pipelines.HookFunc {
 	return nil
 }
 
-func (p *DockerGoPipeline) AfterStep(_ context.Context, _ string) pipelines.HookFunc {
+func (p *Pipeline) AfterStep(_ context.Context, _ string) pipelines.HookFunc {
 	return nil
 }
 

@@ -55,12 +55,12 @@ func TestPipelineExecutor_ExecutePipeline(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step2", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step2", interfaces.HookTypeAfter).Return(nil)
 
-	err := executor.ExecutePipeline(context.Background(), "test-pipeline", []string{})
-	assert.NoError(t, err)
+	err := executor.ExecutePipeline(t.Context(), "test-pipeline", []string{})
+	require.NoError(t, err)
 
 	// Verify pipeline status
 	status, err := executor.GetPipelineStatus("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test-pipeline", status.PipelineName)
 	assert.Equal(t, "completed", status.Status)
 	assert.Len(t, status.Steps, 2)
@@ -96,8 +96,8 @@ func TestPipelineExecutor_ExecutePipeline_WithSteps(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step2", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step2", interfaces.HookTypeAfter).Return(nil)
 
-	err := executor.ExecutePipeline(context.Background(), "test-pipeline", steps)
-	assert.NoError(t, err)
+	err := executor.ExecutePipeline(t.Context(), "test-pipeline", steps)
+	require.NoError(t, err)
 }
 
 func TestPipelineExecutor_ExecutePipeline_GetExecutionOrderError(t *testing.T) {
@@ -112,13 +112,13 @@ func TestPipelineExecutor_ExecutePipeline_GetExecutionOrderError(t *testing.T) {
 	// Test ExecutePipeline with execution order error
 	mockStepRegistry.EXPECT().GetExecutionOrder().Return(nil, errors.New("execution order error"))
 
-	err := executor.ExecutePipeline(context.Background(), "test-pipeline", []string{})
-	assert.Error(t, err)
+	err := executor.ExecutePipeline(t.Context(), "test-pipeline", []string{})
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get execution order")
 
 	// Verify pipeline status is failed
 	status, err := executor.GetPipelineStatus("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "failed", status.Status)
 }
 
@@ -142,13 +142,13 @@ func TestPipelineExecutor_ExecutePipeline_StepError(t *testing.T) {
 	mockStepRegistry.EXPECT().ExecuteStep(gomock.Any(), "step1").Return(errors.New("step1 error"))
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeError).Return(nil)
 
-	err := executor.ExecutePipeline(context.Background(), "test-pipeline", steps)
-	assert.Error(t, err)
+	err := executor.ExecutePipeline(t.Context(), "test-pipeline", steps)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline test-pipeline failed at step step1")
 
 	// Verify pipeline status is failed
 	status, err := executor.GetPipelineStatus("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "failed", status.Status)
 }
 
@@ -162,17 +162,17 @@ func TestPipelineExecutor_ExecutePipeline_ContextCancelled(t *testing.T) {
 	executor := NewPipelineExecutor(mockStepRegistry, mockHookManager).(*PipelineExecutor)
 
 	// Test ExecutePipeline with cancelled context
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // Cancel immediately
 
 	steps := []string{"step1"}
 	err := executor.ExecutePipeline(ctx, "test-pipeline", steps)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "context canceled")
 
 	// Verify pipeline status is cancelled
 	status, err := executor.GetPipelineStatus("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "cancelled", status.Status)
 }
 
@@ -196,12 +196,12 @@ func TestPipelineExecutor_ExecuteStep(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil)
 
-	err := executor.ExecuteStep(context.Background(), "test-pipeline", "step1")
-	assert.NoError(t, err)
+	err := executor.ExecuteStep(t.Context(), "test-pipeline", "step1")
+	require.NoError(t, err)
 
 	// Verify step status
 	stepResult, err := executor.GetStepStatus("test-pipeline", "step1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "step1", stepResult.StepName)
 	assert.True(t, stepResult.Success)
 }
@@ -225,13 +225,13 @@ func TestPipelineExecutor_ExecuteStep_Error(t *testing.T) {
 	mockStepRegistry.EXPECT().ExecuteStep(gomock.Any(), "step1").Return(errors.New("step1 error"))
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeError).Return(nil)
 
-	err := executor.ExecuteStep(context.Background(), "test-pipeline", "step1")
-	assert.Error(t, err)
+	err := executor.ExecuteStep(t.Context(), "test-pipeline", "step1")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "step1 error")
 
 	// Verify step status
 	stepResult, err := executor.GetStepStatus("test-pipeline", "step1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "step1", stepResult.StepName)
 	assert.False(t, stepResult.Success)
 	assert.Error(t, stepResult.Error)
@@ -249,8 +249,8 @@ func TestPipelineExecutor_ExecuteStep_GetStepConfigError(t *testing.T) {
 	// Test ExecuteStep with GetStepConfig error
 	mockStepRegistry.EXPECT().GetStepConfig("step1").Return(interfaces.StepConfig{}, errors.New("config error"))
 
-	err := executor.ExecuteStep(context.Background(), "test-pipeline", "step1")
-	assert.Error(t, err)
+	err := executor.ExecuteStep(t.Context(), "test-pipeline", "step1")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config error")
 }
 
@@ -271,8 +271,8 @@ func TestPipelineExecutor_ExecuteStep_BeforeHooksError(t *testing.T) {
 	}, nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeBefore).Return(errors.New("before hooks error"))
 
-	err := executor.ExecuteStep(context.Background(), "test-pipeline", "step1")
-	assert.Error(t, err)
+	err := executor.ExecuteStep(t.Context(), "test-pipeline", "step1")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "before hooks error")
 }
 
@@ -296,8 +296,8 @@ func TestPipelineExecutor_ExecuteStep_AfterHooksError(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(errors.New("after hooks error"))
 
-	err := executor.ExecuteStep(context.Background(), "test-pipeline", "step1")
-	assert.Error(t, err)
+	err := executor.ExecuteStep(t.Context(), "test-pipeline", "step1")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "after hooks error")
 }
 
@@ -312,7 +312,7 @@ func TestPipelineExecutor_GetPipelineStatus(t *testing.T) {
 
 	// Test GetPipelineStatus with non-existent pipeline
 	status, err := executor.GetPipelineStatus("non-existent")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, interfaces.PipelineStatus{}, status)
 	assert.Contains(t, err.Error(), "pipeline not found")
 
@@ -328,12 +328,12 @@ func TestPipelineExecutor_GetPipelineStatus(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil)
 
-	err = executor.ExecutePipeline(context.Background(), "test-pipeline", []string{})
+	err = executor.ExecutePipeline(t.Context(), "test-pipeline", []string{})
 	require.NoError(t, err)
 
 	// Test GetPipelineStatus with existing pipeline
 	status, err = executor.GetPipelineStatus("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test-pipeline", status.PipelineName)
 	assert.Equal(t, "completed", status.Status)
 	assert.NotZero(t, status.StartTime)
@@ -353,7 +353,7 @@ func TestPipelineExecutor_GetStepStatus(t *testing.T) {
 
 	// Test GetStepStatus with non-existent pipeline
 	stepResult, err := executor.GetStepStatus("non-existent", "step1")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, interfaces.StepResult{}, stepResult)
 	assert.Contains(t, err.Error(), "pipeline not found")
 
@@ -368,19 +368,19 @@ func TestPipelineExecutor_GetStepStatus(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil)
 
-	err = executor.ExecuteStep(context.Background(), "test-pipeline", "step1")
+	err = executor.ExecuteStep(t.Context(), "test-pipeline", "step1")
 	require.NoError(t, err)
 
 	// Test GetStepStatus with existing step
 	stepResult, err = executor.GetStepStatus("test-pipeline", "step1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "step1", stepResult.StepName)
 	assert.True(t, stepResult.Success)
 	assert.NotZero(t, stepResult.Duration)
 
 	// Test GetStepStatus with non-existent step
 	stepResult, err = executor.GetStepStatus("test-pipeline", "non-existent")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, interfaces.StepResult{}, stepResult)
 	assert.Contains(t, err.Error(), "step not found")
 }
@@ -396,7 +396,7 @@ func TestPipelineExecutor_CancelPipeline(t *testing.T) {
 
 	// Test CancelPipeline with non-existent pipeline
 	err := executor.CancelPipeline("non-existent")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline not found")
 
 	// Execute a pipeline to create status
@@ -411,15 +411,15 @@ func TestPipelineExecutor_CancelPipeline(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil)
 
-	err = executor.ExecutePipeline(context.Background(), "test-pipeline", []string{})
+	err = executor.ExecutePipeline(t.Context(), "test-pipeline", []string{})
 	require.NoError(t, err)
 
 	// Test CancelPipeline with completed pipeline (should not change status)
 	err = executor.CancelPipeline("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	status, err := executor.GetPipelineStatus("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "completed", status.Status) // Should remain completed
 
 	// Test CancelPipeline with running pipeline
@@ -435,10 +435,10 @@ func TestPipelineExecutor_CancelPipeline(t *testing.T) {
 	executor.mutex.Unlock()
 
 	err = executor.CancelPipeline("running-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	status, err = executor.GetPipelineStatus("running-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "cancelled", status.Status)
 	assert.NotNil(t, status.EndTime)
 	assert.NotZero(t, status.Duration)
@@ -455,7 +455,7 @@ func TestPipelineExecutor_GetPipelineLogs(t *testing.T) {
 
 	// Test GetPipelineLogs with non-existent pipeline
 	logs, err := executor.GetPipelineLogs("non-existent")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, logs)
 	assert.Contains(t, err.Error(), "pipeline not found")
 
@@ -471,12 +471,12 @@ func TestPipelineExecutor_GetPipelineLogs(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil)
 
-	err = executor.ExecutePipeline(context.Background(), "test-pipeline", []string{})
+	err = executor.ExecutePipeline(t.Context(), "test-pipeline", []string{})
 	require.NoError(t, err)
 
 	// Test GetPipelineLogs with existing pipeline
 	logs, err = executor.GetPipelineLogs("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, logs)
 	assert.Contains(t, logs[0], "Pipeline: test-pipeline")
 	assert.Contains(t, logs[1], "Status: completed")
@@ -512,9 +512,9 @@ func TestPipelineExecutor_ListPipelines(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil).Times(2)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil).Times(2)
 
-	err := executor.ExecutePipeline(context.Background(), "pipeline1", []string{})
+	err := executor.ExecutePipeline(t.Context(), "pipeline1", []string{})
 	require.NoError(t, err)
-	err = executor.ExecutePipeline(context.Background(), "pipeline2", []string{})
+	err = executor.ExecutePipeline(t.Context(), "pipeline2", []string{})
 	require.NoError(t, err)
 
 	// Test ListPipelines
@@ -545,20 +545,20 @@ func TestPipelineExecutor_ClearPipelineStatus(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil)
 
-	err := executor.ExecutePipeline(context.Background(), "test-pipeline", []string{})
+	err := executor.ExecutePipeline(t.Context(), "test-pipeline", []string{})
 	require.NoError(t, err)
 
 	// Verify pipeline exists
 	status, err := executor.GetPipelineStatus("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test-pipeline", status.PipelineName)
 
 	// Clear pipeline status
 	executor.ClearPipelineStatus("test-pipeline")
 
 	// Verify pipeline is cleared
-	status, err = executor.GetPipelineStatus("test-pipeline")
-	assert.Error(t, err)
+	_, err = executor.GetPipelineStatus("test-pipeline")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline not found")
 }
 
@@ -583,9 +583,9 @@ func TestPipelineExecutor_ClearAllPipelineStatus(t *testing.T) {
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeSuccess).Return(nil).Times(2)
 	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "step1", interfaces.HookTypeAfter).Return(nil).Times(2)
 
-	err := executor.ExecutePipeline(context.Background(), "pipeline1", []string{})
+	err := executor.ExecutePipeline(t.Context(), "pipeline1", []string{})
 	require.NoError(t, err)
-	err = executor.ExecutePipeline(context.Background(), "pipeline2", []string{})
+	err = executor.ExecutePipeline(t.Context(), "pipeline2", []string{})
 	require.NoError(t, err)
 
 	// Verify pipelines exist
@@ -631,7 +631,7 @@ func TestConvertStepResults(t *testing.T) {
 	assert.Equal(t, "step1", stepResult.StepName)
 	assert.True(t, stepResult.Success)
 	assert.Equal(t, 5*time.Second, stepResult.Duration)
-	assert.NoError(t, stepResult.Error)
+	require.NoError(t, stepResult.Error)
 	assert.Equal(t, "step1 output", stepResult.Output)
 	assert.Equal(t, map[string]any{"key": "value"}, stepResult.Metadata)
 	assert.Len(t, stepResult.Artifacts, 1)

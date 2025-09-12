@@ -26,7 +26,7 @@ func TestNewConfig_DefaultValues(t *testing.T) {
 	assert.Empty(t, cfg.CommitSHA)
 	assert.Empty(t, cfg.BranchName)
 	assert.Empty(t, cfg.Token)
-	assert.Equal(t, 0.0, cfg.Coverage)
+	assert.Zero(t, cfg.Coverage)
 	assert.Nil(t, cfg.Image)
 	assert.Empty(t, cfg.ImageRef)
 	assert.Nil(t, cfg.ImageContainer)
@@ -139,7 +139,7 @@ func TestNewConfig_WithCoverage(t *testing.T) {
 	coverage := 95.5
 	cfg := NewConfig(WithCoverage(coverage))
 
-	assert.Equal(t, coverage, cfg.Coverage)
+	assert.InEpsilon(t, coverage, cfg.Coverage, 0.0001)
 }
 
 func TestNewConfig_WithGoVersion(t *testing.T) {
@@ -187,7 +187,7 @@ func TestNewConfig_MultipleOptions(t *testing.T) {
 	assert.Equal(t, "registry.example.com", cfg.RegistryURL)
 	assert.Equal(t, "token123", cfg.RegistryToken)
 	assert.Equal(t, "feature-branch", cfg.BranchName)
-	assert.Equal(t, 90.0, cfg.Coverage)
+	assert.InEpsilon(t, 90.0, cfg.Coverage, 0.0001)
 	assert.Equal(t, "1.21", cfg.GoVersion)
 
 	// Default values should remain

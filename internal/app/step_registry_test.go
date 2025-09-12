@@ -102,12 +102,12 @@ func TestStepRegistry_RegisterStep(t *testing.T) {
 			err := registry.RegisterStep(tt.stepName, tt.handler)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				// Verify step is registered
 				_, exists := registry.handlers[tt.stepName]
 				assert.True(t, exists)
@@ -162,13 +162,13 @@ func TestStepRegistry_GetStepHandler(t *testing.T) {
 			handler, err := registry.GetStepHandler(tt.stepName)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, handler)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, mockHandler, handler)
 			}
 		})
@@ -262,13 +262,13 @@ func TestStepRegistry_GetStepConfig(t *testing.T) {
 			config, err := registry.GetStepConfig(tt.stepName)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, interfaces.StepConfig{}, config)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, expectedConfig, config)
 			}
 		})
@@ -337,12 +337,12 @@ func TestStepRegistry_ValidateStep(t *testing.T) {
 			err := registry.ValidateStep(tt.stepName)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -417,15 +417,15 @@ func TestStepRegistry_ExecuteStep(t *testing.T) {
 				tt.setup()
 			}
 
-			err := registry.ExecuteStep(context.Background(), tt.stepName)
+			err := registry.ExecuteStep(t.Context(), tt.stepName)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -455,7 +455,7 @@ func TestStepRegistry_ExecuteStep_WithTimeout(t *testing.T) {
 
 	// Mock handler to take longer than timeout
 	mockHandler.EXPECT().Execute(gomock.Any(), "test-step", gomock.Any()).DoAndReturn(
-		func(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+		func(_ context.Context, _ string, _ interfaces.StepConfig) error {
 			// Simulate work that takes longer than timeout
 			time.Sleep(200 * time.Millisecond)
 			return nil
@@ -463,8 +463,8 @@ func TestStepRegistry_ExecuteStep_WithTimeout(t *testing.T) {
 	)
 
 	// Test execution with timeout
-	err = registry.ExecuteStep(context.Background(), "test-step")
-	assert.Error(t, err)
+	err = registry.ExecuteStep(t.Context(), "test-step")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "context deadline exceeded")
 }
 
@@ -519,13 +519,13 @@ func TestStepRegistry_GetStepInfo(t *testing.T) {
 			info, err := registry.GetStepInfo(tt.stepName)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, info)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, info)
 				assert.Equal(t, "test-step", info["name"])
 				assert.Equal(t, "Test step", info["description"])
@@ -564,7 +564,7 @@ func TestStepRegistry_UnregisterStep(t *testing.T) {
 
 	// Test UnregisterStep
 	err = registry.UnregisterStep("test-step")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify step is unregistered
 	_, exists = registry.handlers["test-step"]
@@ -574,7 +574,7 @@ func TestStepRegistry_UnregisterStep(t *testing.T) {
 
 	// Test unregistering non-existent step
 	err = registry.UnregisterStep("non-existent")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "step handler not found")
 }
 
@@ -773,7 +773,7 @@ func TestStepRegistry_ValidateDependencies(t *testing.T) {
 
 	// Test ValidateDependencies with valid dependencies
 	err = registry.ValidateDependencies()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test with invalid dependency - register a new step with invalid dependency
 	mockHandler3 := mocks.NewMockStepHandler(ctrl)
@@ -788,7 +788,7 @@ func TestStepRegistry_ValidateDependencies(t *testing.T) {
 	require.NoError(t, err)
 
 	err = registry.ValidateDependencies()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "step step3 depends on non-existent step: non-existent")
 }
 
@@ -832,7 +832,7 @@ func TestStepRegistry_GetExecutionOrder(t *testing.T) {
 
 	// Test GetExecutionOrder
 	order, err := registry.GetExecutionOrder()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"step1", "step2", "step3"}, order)
 }
 
@@ -866,7 +866,7 @@ func TestStepRegistry_GetExecutionOrder_CircularDependency(t *testing.T) {
 
 	// Test GetExecutionOrder with circular dependency
 	order, err := registry.GetExecutionOrder()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, order)
 	assert.Contains(t, err.Error(), "circular dependency detected")
 }
@@ -891,7 +891,7 @@ func TestStepRegistry_GetExecutionOrder_InvalidDependency(t *testing.T) {
 
 	// Test GetExecutionOrder with invalid dependency
 	order, err := registry.GetExecutionOrder()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, order)
 	assert.Contains(t, err.Error(), "step step1 depends on non-existent step: non-existent")
 }

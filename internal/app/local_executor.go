@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,7 +51,7 @@ func (le *LocalExecutor) executeSetup(ctx context.Context) error {
 
 	// Check if we're in a Go project
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - setup step requires Go modules")
+		return errors.New("not a Go project - setup step requires Go modules")
 	}
 
 	// Download dependencies
@@ -82,7 +83,7 @@ func (le *LocalExecutor) executeBuild(ctx context.Context) error {
 	le.logger.Info("Building application locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - build step requires Go modules")
+		return errors.New("not a Go project - build step requires Go modules")
 	}
 
 	// Build the application
@@ -103,7 +104,7 @@ func (le *LocalExecutor) executeTest(ctx context.Context) error {
 	le.logger.Info("Running tests locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - test step requires Go modules")
+		return errors.New("not a Go project - test step requires Go modules")
 	}
 
 	// Run tests with coverage
@@ -149,7 +150,7 @@ func (le *LocalExecutor) executeLint(ctx context.Context) error {
 	le.logger.Info("Running linters locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - lint step requires Go modules")
+		return errors.New("not a Go project - lint step requires Go modules")
 	}
 
 	// Run go vet
@@ -196,7 +197,7 @@ func (le *LocalExecutor) executeSecurity(ctx context.Context) error {
 	le.logger.Info("Running security checks locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - security step requires Go modules")
+		return errors.New("not a Go project - security step requires Go modules")
 	}
 
 	// Try to run gosec if available

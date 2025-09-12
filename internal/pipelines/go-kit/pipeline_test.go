@@ -1,7 +1,6 @@
 package gokit
 
 import (
-	"context"
 	"testing"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
@@ -21,9 +20,9 @@ func TestNew(t *testing.T) {
 	pipeline := New(nil, cfg)
 
 	assert.NotNil(t, pipeline)
-	assert.IsType(t, &GoKitPipeline{}, pipeline)
+	assert.IsType(t, &Pipeline{}, pipeline)
 
-	gokitPipeline := pipeline.(*GoKitPipeline)
+	gokitPipeline := pipeline.(*Pipeline)
 	assert.Nil(t, gokitPipeline.Client) // Should be nil when passed nil
 	assert.Equal(t, cfg, gokitPipeline.Config)
 	assert.Nil(t, gokitPipeline.Src)    // Should be nil when client is nil
@@ -40,13 +39,13 @@ func TestNew_SSHProtocol(t *testing.T) {
 	pipeline := New(nil, cfg)
 
 	assert.NotNil(t, pipeline)
-	gokitPipeline := pipeline.(*GoKitPipeline)
+	gokitPipeline := pipeline.(*Pipeline)
 	assert.Nil(t, gokitPipeline.Cloner) // Should be nil when client is nil
 }
 
-func TestGoKitPipeline_Name(t *testing.T) {
+func TestPipeline_Name(t *testing.T) {
 	// Test Name method directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil,
@@ -57,7 +56,7 @@ func TestGoKitPipeline_Name(t *testing.T) {
 	assert.Equal(t, "go-kit", name)
 }
 
-func TestGoKitPipeline_Setup(t *testing.T) {
+func TestPipeline_Setup(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -72,22 +71,22 @@ func TestGoKitPipeline_Setup(t *testing.T) {
 	}
 
 	// Create pipeline with mock client
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: mockDaggerClient,
 		Config: cfg,
 		Src:    nil,
 		Cloner: mockCloner,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Setup(ctx)
 
 	// Setup method requires real Dagger client, so it will return error for mock
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not mock")
 }
 
-func TestGoKitPipeline_Setup_Error(t *testing.T) {
+func TestPipeline_Setup_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -102,22 +101,22 @@ func TestGoKitPipeline_Setup_Error(t *testing.T) {
 	}
 
 	// Create pipeline with mock client
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: mockDaggerClient,
 		Config: cfg,
 		Src:    nil,
 		Cloner: mockCloner,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Setup(ctx)
 
 	// Setup method requires real Dagger client, so it will return error for mock
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not mock")
 }
 
-func TestGoKitPipeline_Test(t *testing.T) {
+func TestPipeline_Test(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -130,38 +129,38 @@ func TestGoKitPipeline_Test(t *testing.T) {
 	}
 
 	// Create pipeline with mock client and directory
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: mockDaggerClient,
 		Config: cfg,
 		Src:    mockDaggerDirectory,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Test(ctx)
 
 	// Test method requires real Dagger client, so it will return error for mock
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Test method requires real Dagger client, not mock")
 }
 
-func TestGoKitPipeline_Test_NoSrc(t *testing.T) {
+func TestPipeline_Test_NoSrc(t *testing.T) {
 	// Test Test method with nil Src directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil, // Force Src to be nil
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Test(ctx)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline not set up: source directory is nil")
 }
 
-func TestGoKitPipeline_Test_Error(t *testing.T) {
+func TestPipeline_Test_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -174,22 +173,22 @@ func TestGoKitPipeline_Test_Error(t *testing.T) {
 	}
 
 	// Create pipeline with mock client and directory
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: mockDaggerClient,
 		Config: cfg,
 		Src:    mockDaggerDirectory,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Test(ctx)
 
 	// Test method requires real Dagger client, so it will return error for mock
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Test method requires real Dagger client, not mock")
 }
 
-func TestGoKitPipeline_Build(t *testing.T) {
+func TestPipeline_Build(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -202,38 +201,38 @@ func TestGoKitPipeline_Build(t *testing.T) {
 	}
 
 	// Create pipeline with mock client and directory
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: mockDaggerClient,
 		Config: cfg,
 		Src:    mockDaggerDirectory,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Build(ctx)
 
 	// Build method requires real Dagger client, so it will return error for mock
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Build method requires real Dagger client, not mock")
 }
 
-func TestGoKitPipeline_Build_NoSrc(t *testing.T) {
+func TestPipeline_Build_NoSrc(t *testing.T) {
 	// Test Build method with nil Src directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil, // Force Src to be nil
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Build(ctx)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline not set up: source directory is nil")
 }
 
-func TestGoKitPipeline_Build_Error(t *testing.T) {
+func TestPipeline_Build_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -246,101 +245,101 @@ func TestGoKitPipeline_Build_Error(t *testing.T) {
 	}
 
 	// Create pipeline with mock client and directory
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: mockDaggerClient,
 		Config: cfg,
 		Src:    mockDaggerDirectory,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Build(ctx)
 
 	// Build method requires real Dagger client, so it will return error for mock
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Build method requires real Dagger client, not mock")
 }
 
-func TestGoKitPipeline_Package(t *testing.T) {
+func TestPipeline_Package(t *testing.T) {
 	// Test Package method directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Package(ctx)
 
-	assert.Error(t, err) // Package returns "not implemented" error
+	require.Error(t, err) // Package returns "not implemented" error
 	assert.Contains(t, err.Error(), "not implemented")
 }
 
-func TestGoKitPipeline_Tag(t *testing.T) {
+func TestPipeline_Tag(t *testing.T) {
 	// Test Tag method directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Tag method returns error for mock client
 	err := pipeline.Tag(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Tag method requires real Dagger client, not mock")
 }
 
-func TestGoKitPipeline_Push(t *testing.T) {
+func TestPipeline_Push(t *testing.T) {
 	// Test Push method directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Push(ctx)
 
-	assert.Error(t, err) // Push returns "not implemented" error
+	require.Error(t, err) // Push returns "not implemented" error
 	assert.Contains(t, err.Error(), "not implemented")
 }
 
-func TestGoKitPipeline_BeforeStep(t *testing.T) {
+func TestPipeline_BeforeStep(t *testing.T) {
 	// Test BeforeStep method directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	hook := pipeline.BeforeStep(ctx, "test-step")
 
 	assert.Nil(t, hook) // BeforeStep returns nil
 }
 
-func TestGoKitPipeline_AfterStep(t *testing.T) {
+func TestPipeline_AfterStep(t *testing.T) {
 	// Test AfterStep method directly without requiring New() function
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	hook := pipeline.AfterStep(ctx, "test-step")
 
 	assert.Nil(t, hook) // AfterStep returns nil
 }
 
-func TestGoKitPipeline_Integration(t *testing.T) {
+func TestPipeline_Integration(t *testing.T) {
 	// Test full pipeline execution using mocks
 	cfg := pipelines.Config{
 		GitRepo:     "https://gitlab.com/syntegrity/go-kit.git",
@@ -350,9 +349,9 @@ func TestGoKitPipeline_Integration(t *testing.T) {
 	}
 
 	// Create pipeline with nil client (handled gracefully by New())
-	pipeline := New(nil, cfg).(*GoKitPipeline)
+	pipeline := New(nil, cfg).(*Pipeline)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test full pipeline execution - all methods should handle nil client appropriately
 	err := pipeline.Setup(ctx)
@@ -381,16 +380,16 @@ func TestGoKitPipeline_Integration(t *testing.T) {
 }
 
 // Test methods that don't require Dagger client
-func TestGoKitPipeline_SimpleMethods(t *testing.T) {
+func TestPipeline_SimpleMethods(t *testing.T) {
 	// Create a pipeline instance without calling New() to avoid Dagger client requirement
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: nil,
 		Config: pipelines.Config{},
 		Src:    nil,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Name method - doesn't require client
 	name := pipeline.Name()
@@ -398,32 +397,32 @@ func TestGoKitPipeline_SimpleMethods(t *testing.T) {
 
 	// Test Package method - returns "not implemented" error
 	err := pipeline.Package(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 
 	// Test Push method - returns "not implemented" error
 	err = pipeline.Push(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 
 	// Test Cleanup method - returns "not implemented" error
 	err = pipeline.Cleanup(ctx, nil)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 
 	// Test Test method with nil Src - should return error
 	err = pipeline.Test(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline not set up: source directory is nil")
 
 	// Test Build method with nil Src - should return error
 	err = pipeline.Build(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline not set up: source directory is nil")
 }
 
 // Test methods with mocks
-func TestGoKitPipeline_WithMocks(t *testing.T) {
+func TestPipeline_WithMocks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -432,14 +431,14 @@ func TestGoKitPipeline_WithMocks(t *testing.T) {
 
 	cfg := pipelines.Config{}
 
-	pipeline := &GoKitPipeline{
+	pipeline := &Pipeline{
 		Client: mockClient,
 		Config: cfg,
 		Src:    mockDirectory,
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Name method
 	name := pipeline.Name()
@@ -447,26 +446,26 @@ func TestGoKitPipeline_WithMocks(t *testing.T) {
 
 	// Test Package method - returns "not implemented" error
 	err := pipeline.Package(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 
 	// Test Push method - returns "not implemented" error
 	err = pipeline.Push(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 
 	// Test Cleanup method - returns "not implemented" error
 	err = pipeline.Cleanup(ctx, nil)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 
 	// Test Test method with mock Src - should return error for mock client
 	err = pipeline.Test(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Test method requires real Dagger client, not mock")
 
 	// Test Build method with mock Src - should return error for mock client
 	err = pipeline.Build(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Build method requires real Dagger client, not mock")
 }

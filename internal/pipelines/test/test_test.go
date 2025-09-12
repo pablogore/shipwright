@@ -9,6 +9,7 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -30,7 +31,7 @@ func TestNew_GoLanguage(t *testing.T) {
 	assert.Nil(t, goTester.Client) // Should be nil since mockClient is nil
 	assert.Nil(t, goTester.Src)    // Should be nil since mockDirectory is nil
 	assert.Equal(t, cfg, goTester.Config)
-	assert.Equal(t, 90.0, goTester.MinCoverage)
+	assert.InEpsilon(t, 90.0, goTester.MinCoverage, 0.001)
 }
 
 func TestNew_UnknownLanguage(t *testing.T) {
@@ -81,7 +82,7 @@ func TestNew_CaseInsensitive(t *testing.T) {
 func TestNoopTester_RunTests(t *testing.T) {
 	tester := &noopTester{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := tester.RunTests(ctx)
 
 	assert.NoError(t, err)
@@ -91,11 +92,12 @@ func TestNoopTester_RunTests_WithContext(t *testing.T) {
 	tester := &noopTester{}
 
 	// Test with different contexts
-	ctx1 := context.Background()
-	ctx2 := context.WithValue(context.Background(), "key", "value")
+	ctx1 := t.Context()
+	type testKey string
+	ctx2 := context.WithValue(t.Context(), testKey("key"), "value")
 
 	err1 := tester.RunTests(ctx1)
-	assert.NoError(t, err1)
+	require.NoError(t, err1)
 
 	err2 := tester.RunTests(ctx2)
 	assert.NoError(t, err2)
@@ -106,7 +108,7 @@ func TestNoopTester_ImplementsTestable(t *testing.T) {
 	var tester Testable = &noopTester{}
 	assert.NotNil(t, tester)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := tester.RunTests(ctx)
 	assert.NoError(t, err)
 }
@@ -192,7 +194,11 @@ func TestNew_ConfigHandling(t *testing.T) {
 			assert.NotNil(t, tester)
 
 			goTester := tester.(*GoTester)
-			assert.Equal(t, tt.expected, goTester.MinCoverage)
+			if tt.expected == 0.0 {
+				assert.Zero(t, goTester.MinCoverage)
+			} else {
+				assert.InEpsilon(t, tt.expected, goTester.MinCoverage, 0.001)
+			}
 		})
 	}
 }
@@ -236,7 +242,7 @@ func TestNoopTester_Consistency(t *testing.T) {
 	// Test that noopTester returns consistent results
 	tester := &noopTester{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Multiple calls should return the same result
 	for i := 0; i < 10; i++ {

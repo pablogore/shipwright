@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -9,12 +8,13 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
 func TestNewApp(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	app := NewApp(container)
 
@@ -24,7 +24,7 @@ func TestNewApp(t *testing.T) {
 
 func TestApp_GetContainer(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 	app := NewApp(container)
 
 	retrievedContainer := app.GetContainer()
@@ -33,41 +33,41 @@ func TestApp_GetContainer(t *testing.T) {
 
 func TestApp_RunPipeline(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 	app := NewApp(container)
 
 	// This will fail because we don't have a real pipeline executor, but we can test the structure
-	err := app.RunPipeline(context.Background(), "test-pipeline")
-	assert.Error(t, err) // Expected to fail due to no real pipeline executor
+	err := app.RunPipeline(t.Context(), "test-pipeline")
+	require.Error(t, err) // Expected to fail due to no real pipeline executor
 }
 
 func TestApp_RunPipelineStep(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 	app := NewApp(container)
 
 	// This will fail because we don't have a real pipeline executor, but we can test the structure
-	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
-	assert.Error(t, err) // Expected to fail due to no real pipeline executor
+	err := app.RunPipelineStep(t.Context(), "test-pipeline", "test-step")
+	require.Error(t, err) // Expected to fail due to no real pipeline executor
 }
 
 func TestApp_ListPipelines(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 	app := NewApp(container)
 
 	pipelines, err := app.ListPipelines()
-	assert.Error(t, err) // Expected to fail due to no real pipeline registry
+	require.Error(t, err) // Expected to fail due to no real pipeline registry
 	assert.Empty(t, pipelines)
 }
 
 func TestApp_GetPipelineInfo(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 	app := NewApp(container)
 
 	steps, err := app.GetPipelineInfo("test-pipeline")
-	assert.Error(t, err) // Expected to fail due to no real pipeline registry
+	require.Error(t, err) // Expected to fail due to no real pipeline registry
 	assert.Empty(t, steps)
 }
 
@@ -79,11 +79,11 @@ func TestApp_WithNilContainer(t *testing.T) {
 
 	// These should panic with nil container
 	assert.Panics(t, func() {
-		app.Start(context.Background())
+		_ = app.Start(t.Context())
 	})
 
 	assert.Panics(t, func() {
-		app.Stop(context.Background())
+		_ = app.Stop(t.Context())
 	})
 
 	container := app.GetContainer()
@@ -91,11 +91,11 @@ func TestApp_WithNilContainer(t *testing.T) {
 
 	// These should panic with nil container
 	assert.Panics(t, func() {
-		app.ListPipelines()
+		_, _ = app.ListPipelines()
 	})
 
 	assert.Panics(t, func() {
-		app.GetPipelineInfo("test")
+		_, _ = app.GetPipelineInfo("test")
 	})
 }
 
@@ -115,11 +115,11 @@ func TestGetContainer_Initialized(t *testing.T) {
 	Reset()
 
 	cfg, _ := config.NewConfigurationWrapper()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initialize container
 	err := Initialize(ctx, cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test getting container
 	container := GetContainer()
@@ -131,11 +131,11 @@ func TestInitialize_Success(t *testing.T) {
 	Reset()
 
 	cfg, _ := config.NewConfigurationWrapper()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test successful initialization
 	err := Initialize(ctx, cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify container is set
 	container := GetContainer()
@@ -147,17 +147,17 @@ func TestInitialize_MultipleCalls(t *testing.T) {
 	Reset()
 
 	cfg, _ := config.NewConfigurationWrapper()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First initialization
 	err := Initialize(ctx, cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	container1 := GetContainer()
 
 	// Second initialization should not change the container
 	err = Initialize(ctx, cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	container2 := GetContainer()
 	assert.Equal(t, container1, container2)
@@ -168,11 +168,11 @@ func TestReset(t *testing.T) {
 	Reset()
 
 	cfg, _ := config.NewConfigurationWrapper()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initialize container
 	err := Initialize(ctx, cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	container := GetContainer()
 	assert.NotNil(t, container)
@@ -188,38 +188,38 @@ func TestReset(t *testing.T) {
 
 func TestApp_Start_Success(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Start the container to register all components
-	err := container.Start(context.Background())
-	assert.NoError(t, err)
+	err := container.Start(t.Context())
+	require.NoError(t, err)
 
 	app := NewApp(container)
 
 	// Test successful start
-	err = app.Start(context.Background())
-	assert.NoError(t, err)
+	err = app.Start(t.Context())
+	require.NoError(t, err)
 }
 
 func TestApp_Stop_Success(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Start the container to register all components
-	err := container.Start(context.Background())
-	assert.NoError(t, err)
+	err := container.Start(t.Context())
+	require.NoError(t, err)
 
 	app := NewApp(container)
 
 	// Test successful stop
-	err = app.Stop(context.Background())
-	assert.NoError(t, err)
+	err = app.Stop(t.Context())
+	require.NoError(t, err)
 }
 
 func TestApp_Start_WithLoggerError(t *testing.T) {
 	// Create a container that will fail to get logger
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Remove logger registration to cause error
 	delete(container.once, "logger")
@@ -227,15 +227,15 @@ func TestApp_Start_WithLoggerError(t *testing.T) {
 	app := NewApp(container)
 
 	// Test start with logger error
-	err := app.Start(context.Background())
-	assert.Error(t, err)
+	err := app.Start(t.Context())
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get logger")
 }
 
 func TestApp_Stop_WithLoggerError(t *testing.T) {
 	// Create a container that will fail to get logger
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Remove logger registration to cause error
 	delete(container.once, "logger")
@@ -243,31 +243,31 @@ func TestApp_Stop_WithLoggerError(t *testing.T) {
 	app := NewApp(container)
 
 	// Test stop with logger error
-	err := app.Stop(context.Background())
-	assert.Error(t, err)
+	err := app.Stop(t.Context())
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get logger")
 }
 
 // Test App pipeline methods
 func TestApp_RunPipeline_Success(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Start the container to register all components
-	err := container.Start(context.Background())
-	assert.NoError(t, err)
+	err := container.Start(t.Context())
+	require.NoError(t, err)
 
 	app := NewApp(container)
 
 	// Test RunPipeline - this will fail because we don't have a real pipeline
-	err = app.RunPipeline(context.Background(), "test-pipeline")
-	assert.Error(t, err)
+	err = app.RunPipeline(t.Context(), "test-pipeline")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get pipeline")
 }
 
 func TestApp_RunPipeline_LoggerError(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Remove logger registration to cause error
 	delete(container.once, "logger")
@@ -275,30 +275,30 @@ func TestApp_RunPipeline_LoggerError(t *testing.T) {
 	app := NewApp(container)
 
 	// Test RunPipeline with logger error
-	err := app.RunPipeline(context.Background(), "test-pipeline")
-	assert.Error(t, err)
+	err := app.RunPipeline(t.Context(), "test-pipeline")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get logger")
 }
 
 func TestApp_RunPipelineStep_Success(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Start the container to register all components
-	err := container.Start(context.Background())
-	assert.NoError(t, err)
+	err := container.Start(t.Context())
+	require.NoError(t, err)
 
 	app := NewApp(container)
 
 	// Test RunPipelineStep - this will fail because we don't have a real pipeline
-	err = app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
-	assert.Error(t, err)
+	err = app.RunPipelineStep(t.Context(), "test-pipeline", "test-step")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get pipeline")
 }
 
 func TestApp_RunPipelineStep_LoggerError(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Remove logger registration to cause error
 	delete(container.once, "logger")
@@ -306,24 +306,24 @@ func TestApp_RunPipelineStep_LoggerError(t *testing.T) {
 	app := NewApp(container)
 
 	// Test RunPipelineStep with logger error
-	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
-	assert.Error(t, err)
+	err := app.RunPipelineStep(t.Context(), "test-pipeline", "test-step")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get logger")
 }
 
 func TestApp_ListPipelines_Success(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Start the container to register all components
-	err := container.Start(context.Background())
-	assert.NoError(t, err)
+	err := container.Start(t.Context())
+	require.NoError(t, err)
 
 	app := NewApp(container)
 
 	// Test ListPipelines - this should succeed and return the registered pipelines
 	pipelines, err := app.ListPipelines()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, pipelines)
 	assert.Contains(t, pipelines, "go-kit")
 	assert.Contains(t, pipelines, "docker-go")
@@ -332,44 +332,44 @@ func TestApp_ListPipelines_Success(t *testing.T) {
 
 func TestApp_ListPipelines_RegistryError(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Don't start the container so pipeline registry is not registered
 	app := NewApp(container)
 
 	// Test ListPipelines with registry error
 	pipelines, err := app.ListPipelines()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Empty(t, pipelines)
 	assert.Contains(t, err.Error(), "failed to get pipeline registry")
 }
 
 func TestApp_GetPipelineInfo_Success(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Start the container to register all components
-	err := container.Start(context.Background())
-	assert.NoError(t, err)
+	err := container.Start(t.Context())
+	require.NoError(t, err)
 
 	app := NewApp(container)
 
 	// Test GetPipelineInfo - this will fail because we don't have a real pipeline registry
 	steps, err := app.GetPipelineInfo("test-pipeline")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Empty(t, steps)
 }
 
 func TestApp_GetPipelineInfo_RegistryError(t *testing.T) {
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Don't start the container so pipeline registry is not registered
 	app := NewApp(container)
 
 	// Test GetPipelineInfo with registry error
 	steps, err := app.GetPipelineInfo("test-pipeline")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Empty(t, steps)
 	assert.Contains(t, err.Error(), "failed to get pipeline")
 }
@@ -385,7 +385,7 @@ func TestApp_GetPipelineInfo_SuccessfulExecution(t *testing.T) {
 
 	// Create a test container that we can control
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Create mock pipeline registry
 	mockRegistry := mocks.NewMockPipelineRegistry(ctrl)
@@ -407,7 +407,7 @@ func TestApp_GetPipelineInfo_SuccessfulExecution(t *testing.T) {
 
 	// Test successful GetPipelineInfo execution
 	info, err := app.GetPipelineInfo("test-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, info)
 
 	// Verify the returned info structure
@@ -448,7 +448,7 @@ func TestApp_RunPipeline_SuccessfulExecution(t *testing.T) {
 
 	// Create a test container that we can control
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Create mock pipeline registry
 	mockRegistry := mocks.NewMockPipelineRegistry(ctrl)
@@ -472,8 +472,8 @@ func TestApp_RunPipeline_SuccessfulExecution(t *testing.T) {
 	app := NewApp(container)
 
 	// Test successful pipeline execution
-	err := app.RunPipeline(context.Background(), "test-pipeline")
-	assert.NoError(t, err)
+	err := app.RunPipeline(t.Context(), "test-pipeline")
+	require.NoError(t, err)
 }
 
 func TestApp_RunPipeline_StepExecutionError(t *testing.T) {
@@ -493,7 +493,7 @@ func TestApp_RunPipeline_StepExecutionError(t *testing.T) {
 
 	// Create a test container that we can control
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Create mock pipeline registry
 	mockRegistry := mocks.NewMockPipelineRegistry(ctrl)
@@ -517,8 +517,8 @@ func TestApp_RunPipeline_StepExecutionError(t *testing.T) {
 	app := NewApp(container)
 
 	// Test pipeline execution with step error
-	err := app.RunPipeline(context.Background(), "test-pipeline")
-	assert.Error(t, err)
+	err := app.RunPipeline(t.Context(), "test-pipeline")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline step build failed")
 }
 
@@ -538,7 +538,7 @@ func TestApp_RunPipelineStep_SuccessfulExecution(t *testing.T) {
 
 	// Create a test container that we can control
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Create mock pipeline registry
 	mockRegistry := mocks.NewMockPipelineRegistry(ctrl)
@@ -562,8 +562,8 @@ func TestApp_RunPipelineStep_SuccessfulExecution(t *testing.T) {
 	app := NewApp(container)
 
 	// Test successful step execution
-	err := app.RunPipelineStep(context.Background(), "test-pipeline", "build")
-	assert.NoError(t, err)
+	err := app.RunPipelineStep(t.Context(), "test-pipeline", "build")
+	require.NoError(t, err)
 }
 
 func TestApp_RunPipelineStep_StepExecutionError(t *testing.T) {
@@ -581,7 +581,7 @@ func TestApp_RunPipelineStep_StepExecutionError(t *testing.T) {
 
 	// Create a test container that we can control
 	cfg, _ := config.NewConfigurationWrapper()
-	container := NewContainer(context.Background(), cfg)
+	container := NewContainer(t.Context(), cfg)
 
 	// Create mock pipeline registry
 	mockRegistry := mocks.NewMockPipelineRegistry(ctrl)
@@ -605,7 +605,7 @@ func TestApp_RunPipelineStep_StepExecutionError(t *testing.T) {
 	app := NewApp(container)
 
 	// Test step execution with error
-	err := app.RunPipelineStep(context.Background(), "test-pipeline", "build")
-	assert.Error(t, err)
+	err := app.RunPipelineStep(t.Context(), "test-pipeline", "build")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline step build failed")
 }

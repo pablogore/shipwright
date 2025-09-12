@@ -15,12 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMain(m *testing.M) {
+func TestMain(_ *testing.M) {
 	// Skip all tests in this package as they require Docker daemon to be running
 	os.Exit(0)
 }
 
-func TestDockerGoPipeline_Setup(t *testing.T) {
+func TestPipeline_Setup(t *testing.T) {
 	t.Skip("Skipping Docker Go pipeline tests - requires Docker daemon to be running")
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
@@ -52,14 +52,14 @@ func TestExample(t *testing.T) {
 		return dir, nil
 	}
 
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	pipeline.Cloner = mockCloner
 
 	err = pipeline.Setup(ctx)
 	require.NoError(t, err)
 }
 
-func TestDockerGoPipeline_Setup_Error(t *testing.T) {
+func TestPipeline_Setup_Error(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -79,7 +79,7 @@ func TestDockerGoPipeline_Setup_Error(t *testing.T) {
 		return nil, errors.New("mock clone error")
 	}
 
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	pipeline.Cloner = mockCloner
 
 	err = pipeline.Setup(ctx)
@@ -87,7 +87,7 @@ func TestDockerGoPipeline_Setup_Error(t *testing.T) {
 	require.Contains(t, err.Error(), "mock clone error")
 }
 
-func TestDockerGoPipeline_Test(t *testing.T) {
+func TestPipeline_Test(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -127,14 +127,14 @@ go 1.21`
 
 	// Set source directory
 	src := client.Host().Directory(tmpDir)
-	pipeline.(*DockerGoPipeline).Src = src
+	pipeline.(*Pipeline).Src = src
 
 	// Run test
 	err = pipeline.Test(ctx)
 	require.NoError(t, err)
 }
 
-func TestDockerGoPipeline_Test_Error_NoSrc(t *testing.T) {
+func TestPipeline_Test_Error_NoSrc(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -155,7 +155,7 @@ func TestDockerGoPipeline_Test_Error_NoSrc(t *testing.T) {
 	require.Contains(t, err.Error(), "pipeline not set up: source directory is nil")
 }
 
-func TestDockerGoPipeline_Build(t *testing.T) {
+func TestPipeline_Build(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -178,7 +178,7 @@ func TestDockerGoPipeline_Build(t *testing.T) {
 		return dir, nil
 	}
 
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	pipeline.Cloner = mockCloner
 	_ = pipeline.Setup(ctx)
 
@@ -187,7 +187,7 @@ func TestDockerGoPipeline_Build(t *testing.T) {
 	require.NotNil(t, pipeline.Image)
 }
 
-func TestDockerGoPipeline_Build_Error_NoSrc(t *testing.T) {
+func TestPipeline_Build_Error_NoSrc(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -196,14 +196,14 @@ func TestDockerGoPipeline_Build_Error_NoSrc(t *testing.T) {
 	defer client.Close()
 
 	cfg := pipelines.Config{}
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	// No setup, Src es nil
 	err = pipeline.Build(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "pipeline not set up: source directory is nil")
 }
 
-func TestDockerGoPipeline_Package(t *testing.T) {
+func TestPipeline_Package(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -225,7 +225,7 @@ func TestDockerGoPipeline_Package(t *testing.T) {
 		return dir, nil
 	}
 
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	pipeline.Cloner = mockCloner
 	_ = pipeline.Setup(ctx)
 	_ = pipeline.Build(ctx)
@@ -234,7 +234,7 @@ func TestDockerGoPipeline_Package(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDockerGoPipeline_Tag_Error_NoImage(t *testing.T) {
+func TestPipeline_Tag_Error_NoImage(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -243,13 +243,13 @@ func TestDockerGoPipeline_Tag_Error_NoImage(t *testing.T) {
 	defer client.Close()
 
 	cfg := pipelines.Config{}
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	err = pipeline.Tag(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "image not built")
 }
 
-func TestDockerGoPipeline_Tag_Error_InvalidConfig(t *testing.T) {
+func TestPipeline_Tag_Error_InvalidConfig(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -258,14 +258,14 @@ func TestDockerGoPipeline_Tag_Error_InvalidConfig(t *testing.T) {
 	defer client.Close()
 
 	cfg := pipelines.Config{}
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	pipeline.Image = client.Container()
 	err = pipeline.Tag(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid configuration")
 }
 
-func TestDockerGoPipeline_Push(t *testing.T) {
+func TestPipeline_Push(t *testing.T) {
 	// Setup
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
@@ -285,7 +285,7 @@ func TestDockerGoPipeline_Push(t *testing.T) {
 		RegistryToken: "test-token",
 	}
 
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	pipeline.Src = client.Directory()
 
 	// Test
@@ -294,7 +294,7 @@ func TestDockerGoPipeline_Push(t *testing.T) {
 	require.Contains(t, err.Error(), "no image built to push")
 }
 
-func TestDockerGoPipeline_Push_Error_NoRegistryUser(t *testing.T) {
+func TestPipeline_Push_Error_NoRegistryUser(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	require.NoError(t, err)
@@ -309,7 +309,7 @@ func TestDockerGoPipeline_Push_Error_NoRegistryUser(t *testing.T) {
 		ImageTag:   "test-tag",
 		// No RegistryUser set
 	}
-	pipeline := New(client, cfg).(*DockerGoPipeline)
+	pipeline := New(client, cfg).(*Pipeline)
 	pipeline.Image = client.Container().From("alpine")
 
 	err = pipeline.Push(ctx)
@@ -317,7 +317,7 @@ func TestDockerGoPipeline_Push_Error_NoRegistryUser(t *testing.T) {
 	require.Contains(t, err.Error(), "CI_REGISTRY_USER empty in local environment")
 }
 
-func TestDockerGoPipeline_Push_Error_NoLocalPassword(t *testing.T) {
+func TestPipeline_Push_Error_NoLocalPassword(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	require.NoError(t, err)
@@ -333,7 +333,7 @@ func TestDockerGoPipeline_Push_Error_NoLocalPassword(t *testing.T) {
 		RegistryUser: "test-user",
 		// No RegistryToken set
 	}
-	p := New(client, cfg).(*DockerGoPipeline)
+	p := New(client, cfg).(*Pipeline)
 	p.Image = client.Container().From("alpine")
 
 	err = p.Push(ctx)
@@ -341,7 +341,7 @@ func TestDockerGoPipeline_Push_Error_NoLocalPassword(t *testing.T) {
 	require.Contains(t, err.Error(), "CI_REGISTRY_USER empty in local environment")
 }
 
-func TestDockerGoPipeline_Push_Error_Publish(t *testing.T) {
+func TestPipeline_Push_Error_Publish(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestDockerGoPipeline_Push_Error_Publish(t *testing.T) {
 		RegistryUser:  "test-user",
 		RegistryToken: "test-token",
 	}
-	p := New(client, cfg).(*DockerGoPipeline)
+	p := New(client, cfg).(*Pipeline)
 	p.Image = client.Container().From("alpine")
 
 	// Mock the container to fail on publish
@@ -365,7 +365,7 @@ func TestDockerGoPipeline_Push_Error_Publish(t *testing.T) {
 	require.Contains(t, err.Error(), "error when pushing the image")
 }
 
-func TestDockerGoPipeline_Push_Success_GitLabCI(t *testing.T) {
+func TestPipeline_Push_Success_GitLabCI(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	require.NoError(t, err)
@@ -383,7 +383,7 @@ func TestDockerGoPipeline_Push_Success_GitLabCI(t *testing.T) {
 		Registry:   "registry.example.com",
 		ImageTag:   "test-tag",
 	}
-	p := New(client, cfg).(*DockerGoPipeline)
+	p := New(client, cfg).(*Pipeline)
 	p.Image = client.Container().From("alpine")
 
 	err = p.Push(ctx)
@@ -391,7 +391,7 @@ func TestDockerGoPipeline_Push_Success_GitLabCI(t *testing.T) {
 	require.Contains(t, err.Error(), "error when pushing the image")
 }
 
-func TestDockerGoPipeline_Push_Success_Local(t *testing.T) {
+func TestPipeline_Push_Success_Local(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	require.NoError(t, err)
@@ -407,7 +407,7 @@ func TestDockerGoPipeline_Push_Success_Local(t *testing.T) {
 		RegistryUser:  "test-user",
 		RegistryToken: "test-token",
 	}
-	p := New(client, cfg).(*DockerGoPipeline)
+	p := New(client, cfg).(*Pipeline)
 	p.Image = client.Container().From("alpine")
 
 	err = p.Push(ctx)
@@ -471,7 +471,7 @@ func TestValidateConfig(t *testing.T) {
 	}
 }
 
-func TestDockerGoPipeline_BeforeStep(t *testing.T) {
+func TestPipeline_BeforeStep(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	require.NoError(t, err)
@@ -487,7 +487,7 @@ func TestDockerGoPipeline_BeforeStep(t *testing.T) {
 	assert.Nil(t, hook)
 }
 
-func TestDockerGoPipeline_AfterStep(t *testing.T) {
+func TestPipeline_AfterStep(t *testing.T) {
 	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	require.NoError(t, err)

@@ -97,7 +97,8 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 		netrc := fmt.Sprintf("machine gitlab.com login %s password %s", creds.User, creds.Token)
 		container = container.
 			WithEnvVariable("HOME", "/root").
-			WithNewFile("/root/.netrc", netrc, dagger.ContainerWithNewFileOpts{
+			WithNewFile("/root/.netrc", dagger.ContainerWithNewFileOpts{
+				Contents:    netrc,
 				Permissions: 0o600,
 				Owner:       "root",
 			}).
@@ -136,10 +137,12 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 		entries, err := dir.Entries(ctx)
 		if err != nil {
 			lastErr = fmt.Errorf("error accessing repository files: %w", err)
+
 			continue
 		}
 		if len(entries) == 0 {
 			lastErr = errors.New("repository cloned but is empty")
+
 			continue
 		}
 

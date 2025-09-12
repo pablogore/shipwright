@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,25 +16,25 @@ type YAMLConfig struct {
 		Name        string   `yaml:"name"`
 		Environment string   `yaml:"environment"`
 		Coverage    float64  `yaml:"coverage"`
-		GoVersion   string   `yaml:"go_version"`
+		GoVersion   string   `yaml:"goVersion"`
 		Steps       []string `yaml:"steps"`
 	} `yaml:"pipeline"`
 
 	Registry struct {
-		BaseURL string `yaml:"base_url"`
+		BaseURL string `yaml:"baseUrl"`
 		Image   string `yaml:"image"`
 		User    string `yaml:"user"`
 	} `yaml:"registry"`
 
 	Security struct {
-		EnableVulnCheck bool `yaml:"enable_vuln_check"`
-		EnableLinting   bool `yaml:"enable_linting"`
+		EnableVulnCheck bool `yaml:"enableVulnCheck"`
+		EnableLinting   bool `yaml:"enableLinting"`
 	} `yaml:"security"`
 
 	Release struct {
 		Enabled             bool     `yaml:"enabled"`
-		UseGoreleaser       bool     `yaml:"use_goreleaser"`
-		CreateGithubRelease bool     `yaml:"create_github_release"`
+		UseGoreleaser       bool     `yaml:"useGoreleaser"`
+		CreateGithubRelease bool     `yaml:"createGithubRelease"`
 		Platforms           []string `yaml:"platforms"`
 	} `yaml:"release"`
 
@@ -124,11 +125,11 @@ func (p *YAMLParser) GetSteps(yamlConfig *YAMLConfig) []string {
 // ValidateConfig validates the YAML configuration
 func (p *YAMLParser) ValidateConfig(yamlConfig *YAMLConfig) error {
 	if yamlConfig.Pipeline.Name == "" {
-		return fmt.Errorf("pipeline name is required")
+		return errors.New("pipeline name is required")
 	}
 
 	if len(yamlConfig.Pipeline.Steps) == 0 {
-		return fmt.Errorf("at least one step must be defined")
+		return errors.New("at least one step must be defined")
 	}
 
 	// Validate steps
@@ -189,5 +190,5 @@ func (p *YAMLParser) FindConfigFile() (string, error) {
 		currentDir = parentDir
 	}
 
-	return "", fmt.Errorf("no configuration file found")
+	return "", errors.New("no configuration file found")
 }

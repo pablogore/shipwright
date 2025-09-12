@@ -1,0 +1,2001 @@
+internal/config/yaml_parser_test.go:498:14: Error return value of `os.WriteFile` is not checked (errcheck)
+	os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
+	            ^
+internal/config/yaml_parser.go:19:24: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+		GoVersion   string   `yaml:"go_version"`
+		                     ^
+internal/config/yaml_parser.go:24:18: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+		BaseURL string `yaml:"base_url"`
+		               ^
+internal/config/yaml_parser.go:30:24: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+		EnableVulnCheck bool `yaml:"enable_vuln_check"`
+		                     ^
+internal/config/yaml_parser.go:31:24: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+		EnableLinting   bool `yaml:"enable_linting"`
+		                     ^
+internal/config/yaml_parser.go:36:32: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+		UseGoreleaser       bool     `yaml:"use_goreleaser"`
+		                             ^
+internal/config/yaml_parser.go:37:32: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+		CreateGithubRelease bool     `yaml:"create_github_release"`
+		                             ^
+internal/config/yaml_parser_test.go:19:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:121:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:131:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:140:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:141:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:148:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:149:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/yaml_parser_test.go:205:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:532:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:533:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:540:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:541:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/config_test.go:314:4: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+			assert.Equal(t, tt.expect, result)
+			^
+internal/config/config_test.go:407:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, DefaultCoverage, pipeline.Coverage)
+	^
+internal/config/config_test.go:440:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 0.1, logging.SamplingRate)
+	^
+internal/config/errors_test.go:68:2: error-nil: use assert.Error (testifylint)
+	assert.NotNil(t, unwrapped)
+	^
+internal/config/errors_test.go:74:2: error-nil: use assert.Error (testifylint)
+	assert.NotNil(t, err)
+	^
+internal/config/errors_test.go:87:2: error-is-as: use assert.ErrorIs (testifylint)
+	assert.True(t, errors.Is(configErr, originalErr))
+	^
+internal/config/config_test.go:51:5: require-error: for error assertions use require (testifylint)
+				assert.Error(t, err)
+				^
+internal/config/config_test.go:54:5: require-error: for error assertions use require (testifylint)
+				assert.NoError(t, err)
+				^
+internal/config/yaml_parser_test.go:487:2: require-error: for error assertions use require (testifylint)
+	assert.NoError(t, err)
+	^
+internal/config/yaml_parser_test.go:13:27: `createTestYAMLConfig` - `name` always receives `"test-pipeline"` (unparam)
+func createTestYAMLConfig(name string, steps []string) *YAMLConfig {
+                          ^
+internal/config/config_test.go:40:5: os.Setenv() could be replaced by t.Setenv() in TestNew (usetesting)
+				os.Setenv(key, value)
+				^
+internal/interfaces/interfaces_test.go:150:2: redefines-builtin-id: redefinition of the built-in type error (revive)
+	error := ConfigurationError{
+		Key:   "test.key",
+		Value: 123, // non-string value
+		Cause: errors.New("type error"),
+	}
+internal/interfaces/interfaces_test.go:170:2: redefines-builtin-id: redefinition of the built-in type error (revive)
+	error := ConfigurationError{
+		Key:   "test.key",
+		Value: "test-value",
+		Cause: errors.New("validation error"),
+	}
+internal/interfaces/interfaces.go:41:22: json(camel): got 'skip_push' want 'skipPush' (tagliatelle)
+	SkipPush    bool    `yaml:"skip_push" json:"skip_push"`
+	                    ^
+internal/interfaces/interfaces.go:42:22: json(camel): got 'only_build' want 'onlyBuild' (tagliatelle)
+	OnlyBuild   bool    `yaml:"only_build" json:"only_build"`
+	                    ^
+internal/interfaces/interfaces.go:43:22: json(camel): got 'only_test' want 'onlyTest' (tagliatelle)
+	OnlyTest    bool    `yaml:"only_test" json:"only_test"`
+	                    ^
+internal/interfaces/interfaces.go:45:22: json(camel): got 'go_version' want 'goVersion' (tagliatelle)
+	GoVersion   string  `yaml:"go_version" json:"go_version"`
+	                    ^
+internal/interfaces/interfaces.go:46:22: json(camel): got 'java_version' want 'javaVersion' (tagliatelle)
+	JavaVersion string  `yaml:"java_version" json:"java_version"`
+	                    ^
+internal/interfaces/interfaces.go:51:17: json(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+	BaseURL string `yaml:"base_url" json:"base_url"`
+	               ^
+internal/interfaces/interfaces.go:60:27: json(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+	EnableVulnCheck bool     `yaml:"enable_vuln_check" json:"enable_vuln_check"`
+	                         ^
+internal/interfaces/interfaces.go:61:27: json(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+	EnableLinting   bool     `yaml:"enable_linting" json:"enable_linting"`
+	                         ^
+internal/interfaces/interfaces.go:62:27: json(camel): got 'lint_timeout' want 'lintTimeout' (tagliatelle)
+	LintTimeout     string   `yaml:"lint_timeout" json:"lint_timeout"`
+	                         ^
+internal/interfaces/interfaces.go:63:27: json(camel): got 'exclude_patterns' want 'excludePatterns' (tagliatelle)
+	ExcludePatterns []string `yaml:"exclude_patterns" json:"exclude_patterns"`
+	                         ^
+internal/interfaces/interfaces.go:70:33: yaml(camel): got 'sampling_enable' want 'samplingEnable' (tagliatelle)
+	SamplingEnable   bool          `yaml:"sampling_enable" json:"sampling_enable"`
+	                               ^
+internal/interfaces/interfaces.go:71:33: json(camel): got 'sampling_rate' want 'samplingRate' (tagliatelle)
+	SamplingRate     float64       `yaml:"sampling_rate" json:"sampling_rate"`
+	                               ^
+internal/interfaces/interfaces.go:72:33: json(camel): got 'sampling_interval' want 'samplingInterval' (tagliatelle)
+	SamplingInterval time.Duration `yaml:"sampling_interval" json:"sampling_interval"`
+	                               ^
+internal/interfaces/interfaces.go:80:19: json(camel): got 'user_email' want 'userEmail' (tagliatelle)
+	UserEmail string `yaml:"user_email" json:"user_email"`
+	                 ^
+internal/interfaces/interfaces.go:81:19: json(camel): got 'user_name' want 'userName' (tagliatelle)
+	UserName  string `yaml:"user_name" json:"user_name"`
+	                 ^
+internal/interfaces/interfaces.go:82:19: json(camel): got 'ssh_key' want 'sshKey' (tagliatelle)
+	SSHKey    string `yaml:"ssh_key" json:"ssh_key"`
+	                 ^
+internal/interfaces/interfaces.go:88:26: json(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+	UseGoreleaser  bool     `yaml:"use_goreleaser" json:"use_goreleaser"`
+	                        ^
+internal/interfaces/interfaces.go:89:26: json(camel): got 'build_targets' want 'buildTargets' (tagliatelle)
+	BuildTargets   []string `yaml:"build_targets" json:"build_targets"`
+	                        ^
+internal/interfaces/interfaces.go:90:26: json(camel): got 'archive_formats' want 'archiveFormats' (tagliatelle)
+	ArchiveFormats []string `yaml:"archive_formats" json:"archive_formats"`
+	                        ^
+internal/interfaces/interfaces.go:154:32: json(camel): got 'depends_on' want 'dependsOn' (tagliatelle)
+	DependsOn   []string          `yaml:"depends_on" json:"depends_on"`
+	                              ^
+internal/interfaces/interfaces.go:168:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/interfaces/interfaces.go:269:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/interfaces/interfaces.go:271:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/interfaces/interfaces.go:272:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/interfaces/interfaces_test.go:51:2: error-nil: use assert.Error (testifylint)
+	assert.NotNil(t, err)
+	^
+internal/pipelines/go-kit/pipeline.go:22:6: exported: type name will be used as gokit.GoKitPipeline by other packages, and that stutters; consider calling this Pipeline (revive)
+type GoKitPipeline struct {
+     ^
+internal/pipelines/go-kit/pipeline_test.go:82:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Setup (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:112:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Setup_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:140:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Test (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:157:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Test_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:184:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Test_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:212:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Build (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:229:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Build_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:256:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Build_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:273:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Package (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:289:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Tag (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:306:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Push (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:322:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_BeforeStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:337:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_AfterStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:355:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_Integration (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:393:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_SimpleMethods (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:442:9: context.Background() could be replaced by t.Context() in TestGoKitPipeline_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/docker-go/pipeline.go:15:6: exported: type name will be used as dockergo.DockerGoPipeline by other packages, and that stutters; consider calling this Pipeline (revive)
+type DockerGoPipeline struct {
+     ^
+internal/pipelines/utils_test.go:117:9: var-declaration: should omit type ReturnType from declaration of var rt; it will be inferred from the right-hand side (revive)
+	var rt ReturnType = []int{0, 1, 2}
+	       ^
+internal/pipelines/utils_test.go:223:9: var-declaration: should omit type ReturnType from declaration of var rt; it will be inferred from the right-hand side (revive)
+	var rt ReturnType = []int{0, 1, 2, 3, 4}
+	       ^
+internal/pipelines/utils_test.go:248:9: var-declaration: should omit type ReturnType from declaration of var rt; it will be inferred from the right-hand side (revive)
+	var rt ReturnType = result
+	       ^
+internal/pipelines/dagger_adapter_test.go:36:19: var-declaration: should omit type DaggerClient from declaration of var daggerClient; it will be inferred from the right-hand side (revive)
+	var daggerClient DaggerClient = adapter
+	                 ^
+internal/pipelines/registry_test.go:112:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (m *mockPipeline) BeforeStep(ctx context.Context, stepName string) HookFunc { return nil }
+                                  ^
+internal/pipelines/registry_test.go:113:34: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (m *mockPipeline) AfterStep(ctx context.Context, stepName string) HookFunc  { return nil }
+                                 ^
+internal/pipelines/utils_test.go:90:2: negative-positive: use assert.Positive (testifylint)
+	assert.True(t, len(result) > 0)
+	^
+internal/pipelines/dagger_adapter_test.go:98:9: context.Background() could be replaced by t.Context() in TestDaggerAdapter_WithRealClient (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/dagger_adapter_test.go:349:9: context.Background() could be replaced by t.Context() in TestDaggerFileAdapter_Contents (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:95:10: context-keys-type: should not use basic type untyped string as key in context.WithValue (revive)
+	ctx2 := context.WithValue(context.Background(), "key", "value")
+	        ^
+internal/pipelines/test/gotester_test.go:176:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:224:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_FileContentsError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:273:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_InsufficientCoverage (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:324:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_NoTotalLine (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:373:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_CoverageParsingError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:84:9: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:94:10: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests_WithContext (usetesting)
+	ctx1 := context.Background()
+	        ^
+internal/pipelines/test/test_test.go:109:9: context.Background() could be replaced by t.Context() in TestNoopTester_ImplementsTestable (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:239:9: context.Background() could be replaced by t.Context() in TestNoopTester_Consistency (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/infra/pipeline_test.go:278:10: context-keys-type: should not use basic type untyped string as key in context.WithValue (revive)
+	ctx2 := context.WithValue(context.Background(), "test-key", "value")
+	        ^
+internal/app/hook_manager_test.go:84:16: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+	hook1 := func(ctx context.Context) error { return nil }
+	              ^
+internal/app/step_registry.go:33:10: fmt.Errorf can be replaced with errors.New (perfsprint)
+		return fmt.Errorf("step name cannot be empty")
+		       ^
+internal/app/step_registry.go:37:10: fmt.Errorf can be replaced with errors.New (perfsprint)
+		return fmt.Errorf("step handler cannot be nil")
+		       ^
+internal/app/pipeline_executor.go:22:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/app/pipeline_executor.go:24:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/app/pipeline_executor.go:25:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/app/pipeline_executor.go:34:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/app/app_test.go:18:28: context.Background() could be replaced by t.Context() in TestNewApp (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:28:28: context.Background() could be replaced by t.Context() in TestApp_GetContainer (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:37:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:41:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:47:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:51:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:57:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:67:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:83:17: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Start(context.Background())
+		              ^
+internal/app/app_test.go:87:16: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Stop(context.Background())
+		             ^
+internal/app/app_test.go:119:9: context.Background() could be replaced by t.Context() in TestGetContainer_Initialized (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:135:9: context.Background() could be replaced by t.Context() in TestInitialize_Success (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:151:9: context.Background() could be replaced by t.Context() in TestInitialize_MultipleCalls (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:172:9: context.Background() could be replaced by t.Context() in TestReset (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:192:28: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:195:25: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:201:18: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err = app.Start(context.Background())
+	                ^
+internal/app/app_test.go:207:28: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:210:25: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:216:17: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err = app.Stop(context.Background())
+	               ^
+internal/app/app_test.go:223:28: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:231:19: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	err := app.Start(context.Background())
+	                 ^
+internal/config/yaml_parser.go:19:24: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+		GoVersion   string   `yaml:"go_version"`
+		                     ^
+internal/config/yaml_parser.go:24:18: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+		BaseURL string `yaml:"base_url"`
+		               ^
+internal/config/yaml_parser.go:30:24: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+		EnableVulnCheck bool `yaml:"enable_vuln_check"`
+		                     ^
+internal/config/yaml_parser.go:31:24: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+		EnableLinting   bool `yaml:"enable_linting"`
+		                     ^
+internal/config/yaml_parser.go:36:32: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+		UseGoreleaser       bool     `yaml:"use_goreleaser"`
+		                             ^
+internal/config/yaml_parser.go:37:32: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+		CreateGithubRelease bool     `yaml:"create_github_release"`
+		                             ^
+internal/config/yaml_parser_test.go:20:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:122:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:132:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:141:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:142:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:149:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:150:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/yaml_parser_test.go:206:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:534:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:535:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:542:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:543:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/config_test.go:314:4: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+			assert.Equal(t, tt.expect, result)
+			^
+internal/config/config_test.go:407:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, DefaultCoverage, pipeline.Coverage)
+	^
+internal/config/config_test.go:440:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 0.1, logging.SamplingRate)
+	^
+internal/config/config_test.go:160:5: require-error: for error assertions use require (testifylint)
+				assert.Error(t, err)
+				^
+internal/config/errors_test.go:68:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, unwrapped)
+	^
+internal/config/yaml_parser_test.go:488:2: require-error: for error assertions use require (testifylint)
+	assert.NoError(t, err)
+	^
+internal/config/yaml_parser_test.go:14:27: `createTestYAMLConfig` - `name` always receives `"test-pipeline"` (unparam)
+func createTestYAMLConfig(name string, steps []string) *YAMLConfig {
+                          ^
+internal/config/config_test.go:40:5: os.Setenv() could be replaced by t.Setenv() in TestNew (usetesting)
+				os.Setenv(key, value)
+				^
+internal/pipelines/utils_test.go:261:9: var-declaration: should omit type ReturnType from declaration of var rt; it will be inferred from the right-hand side (revive)
+	var rt ReturnType = result
+	       ^
+internal/pipelines/dagger_adapter_test.go:36:30: unnecessary conversion (unconvert)
+	daggerClient := DaggerClient(adapter)
+	                            ^
+internal/pipelines/utils_test.go:90:2: negative-positive: use assert.Positive (testifylint)
+	assert.True(t, len(result) > 0)
+	^
+internal/pipelines/dagger_adapter_test.go:98:9: context.Background() could be replaced by t.Context() in TestDaggerAdapter_WithRealClient (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/dagger_adapter_test.go:349:9: context.Background() could be replaced by t.Context() in TestDaggerFileAdapter_Contents (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/step_handlers.go:141:36: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *BuildStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                   ^
+internal/app/step_handlers.go:197:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/step_handlers.go:250:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/pipeline_executor.go:22:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/app/pipeline_executor.go:24:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/app/pipeline_executor.go:25:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/app/pipeline_executor.go:34:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/app/app_test.go:18:28: context.Background() could be replaced by t.Context() in TestNewApp (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:28:28: context.Background() could be replaced by t.Context() in TestApp_GetContainer (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:37:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:41:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:47:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:51:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:57:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:67:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:83:17: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Start(context.Background())
+		              ^
+internal/app/app_test.go:87:16: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Stop(context.Background())
+		             ^
+internal/app/app_test.go:119:9: context.Background() could be replaced by t.Context() in TestGetContainer_Initialized (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:135:9: context.Background() could be replaced by t.Context() in TestInitialize_Success (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:151:9: context.Background() could be replaced by t.Context() in TestInitialize_MultipleCalls (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:172:9: context.Background() could be replaced by t.Context() in TestReset (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:192:28: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:195:25: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:201:18: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err = app.Start(context.Background())
+	                ^
+internal/app/app_test.go:207:28: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:210:25: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:216:17: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err = app.Stop(context.Background())
+	               ^
+internal/app/app_test.go:223:28: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:231:19: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	err := app.Start(context.Background())
+	                 ^
+internal/app/app_test.go:239:28: context.Background() could be replaced by t.Context() in TestApp_Stop_WithLoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:247:18: context.Background() could be replaced by t.Context() in TestApp_Stop_WithLoggerError (usetesting)
+	err := app.Stop(context.Background())
+	                ^
+internal/app/app_test.go:255:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:258:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:264:24: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_Success (usetesting)
+	err = app.RunPipeline(context.Background(), "test-pipeline")
+	                      ^
+internal/app/app_test.go:271:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_LoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:279:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_LoggerError (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:286:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:289:25: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:295:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_Success (usetesting)
+	err = app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                          ^
+internal/app/app_test.go:302:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_LoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:310:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_LoggerError (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:317:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:320:25: context.Background() could be replaced by t.Context() in TestApp_ListPipelines_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:336:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines_RegistryError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:350:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:353:25: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:366:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_RegistryError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:389:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_SuccessfulExecution (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:452:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_SuccessfulExecution (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:476:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_SuccessfulExecution (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:497:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_StepExecutionError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:521:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_StepExecutionError (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:542:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_SuccessfulExecution (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:566:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_SuccessfulExecution (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "build")
+	                           ^
+internal/interfaces/interfaces.go:41:22: json(camel): got 'skip_push' want 'skipPush' (tagliatelle)
+	SkipPush    bool    `yaml:"skip_push" json:"skip_push"`
+	                    ^
+internal/interfaces/interfaces.go:42:22: yaml(camel): got 'only_build' want 'onlyBuild' (tagliatelle)
+	OnlyBuild   bool    `yaml:"only_build" json:"only_build"`
+	                    ^
+internal/interfaces/interfaces.go:43:22: json(camel): got 'only_test' want 'onlyTest' (tagliatelle)
+	OnlyTest    bool    `yaml:"only_test" json:"only_test"`
+	                    ^
+internal/interfaces/interfaces.go:45:22: json(camel): got 'go_version' want 'goVersion' (tagliatelle)
+	GoVersion   string  `yaml:"go_version" json:"go_version"`
+	                    ^
+internal/interfaces/interfaces.go:46:22: json(camel): got 'java_version' want 'javaVersion' (tagliatelle)
+	JavaVersion string  `yaml:"java_version" json:"java_version"`
+	                    ^
+internal/interfaces/interfaces.go:60:27: json(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+	EnableVulnCheck bool     `yaml:"enable_vuln_check" json:"enable_vuln_check"`
+	                         ^
+internal/interfaces/interfaces.go:61:27: json(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+	EnableLinting   bool     `yaml:"enable_linting" json:"enable_linting"`
+	                         ^
+internal/interfaces/interfaces.go:62:27: json(camel): got 'lint_timeout' want 'lintTimeout' (tagliatelle)
+	LintTimeout     string   `yaml:"lint_timeout" json:"lint_timeout"`
+	                         ^
+internal/interfaces/interfaces.go:63:27: json(camel): got 'exclude_patterns' want 'excludePatterns' (tagliatelle)
+	ExcludePatterns []string `yaml:"exclude_patterns" json:"exclude_patterns"`
+	                         ^
+internal/interfaces/interfaces.go:70:33: json(camel): got 'sampling_enable' want 'samplingEnable' (tagliatelle)
+	SamplingEnable   bool          `yaml:"sampling_enable" json:"sampling_enable"`
+	                               ^
+internal/interfaces/interfaces.go:71:33: json(camel): got 'sampling_rate' want 'samplingRate' (tagliatelle)
+	SamplingRate     float64       `yaml:"sampling_rate" json:"sampling_rate"`
+	                               ^
+internal/interfaces/interfaces.go:72:33: json(camel): got 'sampling_interval' want 'samplingInterval' (tagliatelle)
+	SamplingInterval time.Duration `yaml:"sampling_interval" json:"sampling_interval"`
+	                               ^
+internal/interfaces/interfaces.go:80:19: yaml(camel): got 'user_email' want 'userEmail' (tagliatelle)
+	UserEmail string `yaml:"user_email" json:"user_email"`
+	                 ^
+internal/interfaces/interfaces.go:81:19: yaml(camel): got 'user_name' want 'userName' (tagliatelle)
+	UserName  string `yaml:"user_name" json:"user_name"`
+	                 ^
+internal/interfaces/interfaces.go:82:19: yaml(camel): got 'ssh_key' want 'sshKey' (tagliatelle)
+	SSHKey    string `yaml:"ssh_key" json:"ssh_key"`
+	                 ^
+internal/interfaces/interfaces.go:88:26: json(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+	UseGoreleaser  bool     `yaml:"use_goreleaser" json:"use_goreleaser"`
+	                        ^
+internal/interfaces/interfaces.go:89:26: json(camel): got 'build_targets' want 'buildTargets' (tagliatelle)
+	BuildTargets   []string `yaml:"build_targets" json:"build_targets"`
+	                        ^
+internal/interfaces/interfaces.go:90:26: json(camel): got 'archive_formats' want 'archiveFormats' (tagliatelle)
+	ArchiveFormats []string `yaml:"archive_formats" json:"archive_formats"`
+	                        ^
+internal/interfaces/interfaces.go:154:32: json(camel): got 'depends_on' want 'dependsOn' (tagliatelle)
+	DependsOn   []string          `yaml:"depends_on" json:"depends_on"`
+	                              ^
+internal/interfaces/interfaces.go:168:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/interfaces/interfaces.go:269:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/interfaces/interfaces.go:271:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/interfaces/interfaces.go:272:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/config/yaml_parser.go:19:24: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+		GoVersion   string   `yaml:"go_version"`
+		                     ^
+internal/config/yaml_parser.go:24:18: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+		BaseURL string `yaml:"base_url"`
+		               ^
+internal/config/yaml_parser.go:30:24: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+		EnableVulnCheck bool `yaml:"enable_vuln_check"`
+		                     ^
+internal/config/yaml_parser.go:31:24: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+		EnableLinting   bool `yaml:"enable_linting"`
+		                     ^
+internal/config/yaml_parser.go:36:32: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+		UseGoreleaser       bool     `yaml:"use_goreleaser"`
+		                             ^
+internal/config/yaml_parser.go:37:32: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+		CreateGithubRelease bool     `yaml:"create_github_release"`
+		                             ^
+internal/config/yaml_parser_test.go:20:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:122:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:132:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:141:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:142:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:149:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:150:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/yaml_parser_test.go:206:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:534:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:535:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:542:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:543:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/config_test.go:314:4: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+			assert.Equal(t, tt.expect, result)
+			^
+internal/config/config_test.go:407:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, DefaultCoverage, pipeline.Coverage)
+	^
+internal/config/config_test.go:440:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 0.1, logging.SamplingRate)
+	^
+internal/config/config_test.go:160:5: require-error: for error assertions use require (testifylint)
+				assert.Error(t, err)
+				^
+internal/config/errors_test.go:68:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, unwrapped)
+	^
+internal/config/yaml_parser_test.go:488:2: require-error: for error assertions use require (testifylint)
+	assert.NoError(t, err)
+	^
+internal/config/yaml_parser_test.go:14:27: `createTestYAMLConfig` - `name` always receives `"test-pipeline"` (unparam)
+func createTestYAMLConfig(name string, steps []string) *YAMLConfig {
+                          ^
+internal/config/config_test.go:40:5: os.Setenv() could be replaced by t.Setenv() in TestNew (usetesting)
+				os.Setenv(key, value)
+				^
+internal/interfaces/interfaces.go:41:22: json(camel): got 'skip_push' want 'skipPush' (tagliatelle)
+	SkipPush    bool    `yaml:"skip_push" json:"skip_push"`
+	                    ^
+internal/interfaces/interfaces.go:42:22: yaml(camel): got 'only_build' want 'onlyBuild' (tagliatelle)
+	OnlyBuild   bool    `yaml:"only_build" json:"only_build"`
+	                    ^
+internal/interfaces/interfaces.go:43:22: json(camel): got 'only_test' want 'onlyTest' (tagliatelle)
+	OnlyTest    bool    `yaml:"only_test" json:"only_test"`
+	                    ^
+internal/interfaces/interfaces.go:45:22: json(camel): got 'go_version' want 'goVersion' (tagliatelle)
+	GoVersion   string  `yaml:"go_version" json:"go_version"`
+	                    ^
+internal/interfaces/interfaces.go:46:22: json(camel): got 'java_version' want 'javaVersion' (tagliatelle)
+	JavaVersion string  `yaml:"java_version" json:"java_version"`
+	                    ^
+internal/interfaces/interfaces.go:60:27: json(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+	EnableVulnCheck bool     `yaml:"enable_vuln_check" json:"enable_vuln_check"`
+	                         ^
+internal/interfaces/interfaces.go:61:27: json(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+	EnableLinting   bool     `yaml:"enable_linting" json:"enable_linting"`
+	                         ^
+internal/interfaces/interfaces.go:62:27: json(camel): got 'lint_timeout' want 'lintTimeout' (tagliatelle)
+	LintTimeout     string   `yaml:"lint_timeout" json:"lint_timeout"`
+	                         ^
+internal/interfaces/interfaces.go:63:27: json(camel): got 'exclude_patterns' want 'excludePatterns' (tagliatelle)
+	ExcludePatterns []string `yaml:"exclude_patterns" json:"exclude_patterns"`
+	                         ^
+internal/interfaces/interfaces.go:70:33: json(camel): got 'sampling_enable' want 'samplingEnable' (tagliatelle)
+	SamplingEnable   bool          `yaml:"sampling_enable" json:"sampling_enable"`
+	                               ^
+internal/interfaces/interfaces.go:71:33: json(camel): got 'sampling_rate' want 'samplingRate' (tagliatelle)
+	SamplingRate     float64       `yaml:"sampling_rate" json:"sampling_rate"`
+	                               ^
+internal/interfaces/interfaces.go:72:33: json(camel): got 'sampling_interval' want 'samplingInterval' (tagliatelle)
+	SamplingInterval time.Duration `yaml:"sampling_interval" json:"sampling_interval"`
+	                               ^
+internal/interfaces/interfaces.go:80:19: yaml(camel): got 'user_email' want 'userEmail' (tagliatelle)
+	UserEmail string `yaml:"user_email" json:"user_email"`
+	                 ^
+internal/interfaces/interfaces.go:81:19: yaml(camel): got 'user_name' want 'userName' (tagliatelle)
+	UserName  string `yaml:"user_name" json:"user_name"`
+	                 ^
+internal/interfaces/interfaces.go:82:19: yaml(camel): got 'ssh_key' want 'sshKey' (tagliatelle)
+	SSHKey    string `yaml:"ssh_key" json:"ssh_key"`
+	                 ^
+internal/interfaces/interfaces.go:88:26: json(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+	UseGoreleaser  bool     `yaml:"use_goreleaser" json:"use_goreleaser"`
+	                        ^
+internal/interfaces/interfaces.go:89:26: json(camel): got 'build_targets' want 'buildTargets' (tagliatelle)
+	BuildTargets   []string `yaml:"build_targets" json:"build_targets"`
+	                        ^
+internal/interfaces/interfaces.go:90:26: json(camel): got 'archive_formats' want 'archiveFormats' (tagliatelle)
+	ArchiveFormats []string `yaml:"archive_formats" json:"archive_formats"`
+	                        ^
+internal/interfaces/interfaces.go:154:32: json(camel): got 'depends_on' want 'dependsOn' (tagliatelle)
+	DependsOn   []string          `yaml:"depends_on" json:"depends_on"`
+	                              ^
+internal/interfaces/interfaces.go:168:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/interfaces/interfaces.go:269:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/interfaces/interfaces.go:271:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/interfaces/interfaces.go:272:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/pipelines/utils_test.go:261:9: var-declaration: should omit type ReturnType from declaration of var rt; it will be inferred from the right-hand side (revive)
+	var rt ReturnType = result
+	       ^
+internal/pipelines/dagger_adapter_test.go:36:30: unnecessary conversion (unconvert)
+	daggerClient := DaggerClient(adapter)
+	                            ^
+internal/pipelines/utils_test.go:90:2: negative-positive: use assert.Positive (testifylint)
+	assert.True(t, len(result) > 0)
+	^
+internal/pipelines/dagger_adapter_test.go:98:9: context.Background() could be replaced by t.Context() in TestDaggerAdapter_WithRealClient (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/dagger_adapter_test.go:349:9: context.Background() could be replaced by t.Context() in TestDaggerFileAdapter_Contents (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:82:9: context.Background() could be replaced by t.Context() in TestPipeline_Setup (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:112:9: context.Background() could be replaced by t.Context() in TestPipeline_Setup_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:140:9: context.Background() could be replaced by t.Context() in TestPipeline_Test (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:157:9: context.Background() could be replaced by t.Context() in TestPipeline_Test_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:184:9: context.Background() could be replaced by t.Context() in TestPipeline_Test_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:212:9: context.Background() could be replaced by t.Context() in TestPipeline_Build (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:229:9: context.Background() could be replaced by t.Context() in TestPipeline_Build_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:256:9: context.Background() could be replaced by t.Context() in TestPipeline_Build_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:273:9: context.Background() could be replaced by t.Context() in TestPipeline_Package (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:289:9: context.Background() could be replaced by t.Context() in TestPipeline_Tag (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:306:9: context.Background() could be replaced by t.Context() in TestPipeline_Push (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:322:9: context.Background() could be replaced by t.Context() in TestPipeline_BeforeStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:337:9: context.Background() could be replaced by t.Context() in TestPipeline_AfterStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:355:9: context.Background() could be replaced by t.Context() in TestPipeline_Integration (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:393:9: context.Background() could be replaced by t.Context() in TestPipeline_SimpleMethods (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:442:9: context.Background() could be replaced by t.Context() in TestPipeline_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/infra/pipeline_test.go:277:10: context.Background() could be replaced by t.Context() in TestSyntegrityInfraPipeline_ContextHandling (usetesting)
+	ctx1 := context.Background()
+	        ^
+internal/pipelines/infra/pipeline_test.go:279:28: context.Background() could be replaced by t.Context() in TestSyntegrityInfraPipeline_ContextHandling (usetesting)
+	ctx2 := context.WithValue(context.Background(), testKey("test-key"), "value")
+	                          ^
+internal/pipelines/test/gotester_test.go:176:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:224:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_FileContentsError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:273:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_InsufficientCoverage (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:324:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_NoTotalLine (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:373:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_CoverageParsingError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:84:9: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:94:10: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests_WithContext (usetesting)
+	ctx1 := context.Background()
+	        ^
+internal/pipelines/test/test_test.go:96:28: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests_WithContext (usetesting)
+	ctx2 := context.WithValue(context.Background(), testKey("key"), "value")
+	                          ^
+internal/pipelines/test/test_test.go:110:9: context.Background() could be replaced by t.Context() in TestNoopTester_ImplementsTestable (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:240:9: context.Background() could be replaced by t.Context() in TestNoopTester_Consistency (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/step_handlers.go:141:36: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *BuildStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                   ^
+internal/app/step_handlers.go:197:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/step_handlers.go:250:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/pipeline_executor.go:22:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/app/pipeline_executor.go:24:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/app/pipeline_executor.go:25:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/app/pipeline_executor.go:34:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/app/app_test.go:18:28: context.Background() could be replaced by t.Context() in TestNewApp (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:28:28: context.Background() could be replaced by t.Context() in TestApp_GetContainer (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:37:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:41:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:47:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:51:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:57:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:67:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:83:17: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Start(context.Background())
+		              ^
+internal/app/app_test.go:87:16: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Stop(context.Background())
+		             ^
+internal/app/app_test.go:119:9: context.Background() could be replaced by t.Context() in TestGetContainer_Initialized (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:135:9: context.Background() could be replaced by t.Context() in TestInitialize_Success (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:151:9: context.Background() could be replaced by t.Context() in TestInitialize_MultipleCalls (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:172:9: context.Background() could be replaced by t.Context() in TestReset (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:192:28: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:195:25: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:201:18: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err = app.Start(context.Background())
+	                ^
+internal/app/app_test.go:207:28: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:210:25: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/pipelines/test/gotester_test.go:57:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 90.0, tester.MinCoverage)
+	^
+internal/pipelines/test/gotester_test.go:77:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 80.0, tester.MinCoverage)
+	^
+internal/pipelines/test/gotester_test.go:130:4: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+			assert.Equal(t, tt.expected, tester.MinCoverage)
+			^
+internal/pipelines/test/gotester_test.go:328:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, err)
+	^
+internal/pipelines/test/gotester_test.go:228:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, err)
+	^
+internal/pipelines/test/gotester_test.go:277:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, err)
+	^
+internal/pipelines/test/gotester_test.go:176:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:224:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_FileContentsError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:273:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_InsufficientCoverage (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:324:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_NoTotalLine (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:373:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_CoverageParsingError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:84:9: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:94:10: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests_WithContext (usetesting)
+	ctx1 := context.Background()
+	        ^
+internal/pipelines/test/test_test.go:96:28: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests_WithContext (usetesting)
+	ctx2 := context.WithValue(context.Background(), testKey("key"), "value")
+	                          ^
+internal/pipelines/test/test_test.go:110:9: context.Background() could be replaced by t.Context() in TestNoopTester_ImplementsTestable (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:240:9: context.Background() could be replaced by t.Context() in TestNoopTester_Consistency (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/utils_test.go:261:9: var-declaration: should omit type ReturnType from declaration of var rt; it will be inferred from the right-hand side (revive)
+	var rt ReturnType = result
+	       ^
+internal/pipelines/dagger_adapter_test.go:36:30: unnecessary conversion (unconvert)
+	daggerClient := DaggerClient(adapter)
+	                            ^
+internal/pipelines/utils_test.go:90:2: negative-positive: use assert.Positive (testifylint)
+	assert.True(t, len(result) > 0)
+	^
+internal/pipelines/dagger_adapter_test.go:98:9: context.Background() could be replaced by t.Context() in TestDaggerAdapter_WithRealClient (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/dagger_adapter_test.go:349:9: context.Background() could be replaced by t.Context() in TestDaggerFileAdapter_Contents (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:82:9: context.Background() could be replaced by t.Context() in TestPipeline_Setup (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:112:9: context.Background() could be replaced by t.Context() in TestPipeline_Setup_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:140:9: context.Background() could be replaced by t.Context() in TestPipeline_Test (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:157:9: context.Background() could be replaced by t.Context() in TestPipeline_Test_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:184:9: context.Background() could be replaced by t.Context() in TestPipeline_Test_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:212:9: context.Background() could be replaced by t.Context() in TestPipeline_Build (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:229:9: context.Background() could be replaced by t.Context() in TestPipeline_Build_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:256:9: context.Background() could be replaced by t.Context() in TestPipeline_Build_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:273:9: context.Background() could be replaced by t.Context() in TestPipeline_Package (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:289:9: context.Background() could be replaced by t.Context() in TestPipeline_Tag (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:306:9: context.Background() could be replaced by t.Context() in TestPipeline_Push (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:322:9: context.Background() could be replaced by t.Context() in TestPipeline_BeforeStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:337:9: context.Background() could be replaced by t.Context() in TestPipeline_AfterStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:355:9: context.Background() could be replaced by t.Context() in TestPipeline_Integration (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:393:9: context.Background() could be replaced by t.Context() in TestPipeline_SimpleMethods (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:442:9: context.Background() could be replaced by t.Context() in TestPipeline_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/interfaces/interfaces.go:41:22: json(camel): got 'skip_push' want 'skipPush' (tagliatelle)
+	SkipPush    bool    `yaml:"skip_push" json:"skip_push"`
+	                    ^
+internal/interfaces/interfaces.go:42:22: yaml(camel): got 'only_build' want 'onlyBuild' (tagliatelle)
+	OnlyBuild   bool    `yaml:"only_build" json:"only_build"`
+	                    ^
+internal/interfaces/interfaces.go:43:22: json(camel): got 'only_test' want 'onlyTest' (tagliatelle)
+	OnlyTest    bool    `yaml:"only_test" json:"only_test"`
+	                    ^
+internal/interfaces/interfaces.go:45:22: json(camel): got 'go_version' want 'goVersion' (tagliatelle)
+	GoVersion   string  `yaml:"go_version" json:"go_version"`
+	                    ^
+internal/interfaces/interfaces.go:46:22: json(camel): got 'java_version' want 'javaVersion' (tagliatelle)
+	JavaVersion string  `yaml:"java_version" json:"java_version"`
+	                    ^
+internal/interfaces/interfaces.go:51:17: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+	BaseURL string `yaml:"base_url" json:"base_url"`
+	               ^
+internal/interfaces/interfaces.go:60:27: json(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+	EnableVulnCheck bool     `yaml:"enable_vuln_check" json:"enable_vuln_check"`
+	                         ^
+internal/interfaces/interfaces.go:61:27: json(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+	EnableLinting   bool     `yaml:"enable_linting" json:"enable_linting"`
+	                         ^
+internal/interfaces/interfaces.go:62:27: json(camel): got 'lint_timeout' want 'lintTimeout' (tagliatelle)
+	LintTimeout     string   `yaml:"lint_timeout" json:"lint_timeout"`
+	                         ^
+internal/interfaces/interfaces.go:63:27: json(camel): got 'exclude_patterns' want 'excludePatterns' (tagliatelle)
+	ExcludePatterns []string `yaml:"exclude_patterns" json:"exclude_patterns"`
+	                         ^
+internal/interfaces/interfaces.go:70:33: json(camel): got 'sampling_enable' want 'samplingEnable' (tagliatelle)
+	SamplingEnable   bool          `yaml:"sampling_enable" json:"sampling_enable"`
+	                               ^
+internal/interfaces/interfaces.go:71:33: json(camel): got 'sampling_rate' want 'samplingRate' (tagliatelle)
+	SamplingRate     float64       `yaml:"sampling_rate" json:"sampling_rate"`
+	                               ^
+internal/interfaces/interfaces.go:72:33: json(camel): got 'sampling_interval' want 'samplingInterval' (tagliatelle)
+	SamplingInterval time.Duration `yaml:"sampling_interval" json:"sampling_interval"`
+	                               ^
+internal/interfaces/interfaces.go:80:19: yaml(camel): got 'user_email' want 'userEmail' (tagliatelle)
+	UserEmail string `yaml:"user_email" json:"user_email"`
+	                 ^
+internal/interfaces/interfaces.go:81:19: yaml(camel): got 'user_name' want 'userName' (tagliatelle)
+	UserName  string `yaml:"user_name" json:"user_name"`
+	                 ^
+internal/interfaces/interfaces.go:82:19: yaml(camel): got 'ssh_key' want 'sshKey' (tagliatelle)
+	SSHKey    string `yaml:"ssh_key" json:"ssh_key"`
+	                 ^
+internal/interfaces/interfaces.go:88:26: json(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+	UseGoreleaser  bool     `yaml:"use_goreleaser" json:"use_goreleaser"`
+	                        ^
+internal/interfaces/interfaces.go:89:26: json(camel): got 'build_targets' want 'buildTargets' (tagliatelle)
+	BuildTargets   []string `yaml:"build_targets" json:"build_targets"`
+	                        ^
+internal/interfaces/interfaces.go:90:26: json(camel): got 'archive_formats' want 'archiveFormats' (tagliatelle)
+	ArchiveFormats []string `yaml:"archive_formats" json:"archive_formats"`
+	                        ^
+internal/interfaces/interfaces.go:154:32: json(camel): got 'depends_on' want 'dependsOn' (tagliatelle)
+	DependsOn   []string          `yaml:"depends_on" json:"depends_on"`
+	                              ^
+internal/interfaces/interfaces.go:168:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/interfaces/interfaces.go:269:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/interfaces/interfaces.go:271:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/interfaces/interfaces.go:272:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/pipelines/infra/pipeline_test.go:277:10: context.Background() could be replaced by t.Context() in TestSyntegrityInfraPipeline_ContextHandling (usetesting)
+	ctx1 := context.Background()
+	        ^
+internal/pipelines/infra/pipeline_test.go:279:28: context.Background() could be replaced by t.Context() in TestSyntegrityInfraPipeline_ContextHandling (usetesting)
+	ctx2 := context.WithValue(context.Background(), testKey("test-key"), "value")
+	                          ^
+internal/app/container.go:556:15: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+		return func(ctx context.Context) error { return nil }
+		            ^
+internal/app/step_handlers.go:141:36: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *BuildStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                   ^
+internal/app/step_handlers.go:197:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/hook_manager_test.go:122:2: ineffectual assignment to hooks2 (ineffassign)
+	hooks2 = append(hooks2, func(_ context.Context) error { return nil })
+	^
+internal/app/pipeline_executor.go:22:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/app/pipeline_executor.go:24:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/app/pipeline_executor.go:25:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/app/pipeline_executor.go:34:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/config/yaml_parser.go:19:24: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+		GoVersion   string   `yaml:"go_version"`
+		                     ^
+internal/config/yaml_parser.go:24:18: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+		BaseURL string `yaml:"base_url"`
+		               ^
+internal/config/yaml_parser.go:30:24: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+		EnableVulnCheck bool `yaml:"enable_vuln_check"`
+		                     ^
+internal/config/yaml_parser.go:31:24: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+		EnableLinting   bool `yaml:"enable_linting"`
+		                     ^
+internal/config/yaml_parser.go:36:32: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+		UseGoreleaser       bool     `yaml:"use_goreleaser"`
+		                             ^
+internal/config/yaml_parser.go:37:32: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+		CreateGithubRelease bool     `yaml:"create_github_release"`
+		                             ^
+internal/config/yaml_parser_test.go:20:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:122:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:132:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:141:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:142:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:149:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:150:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/yaml_parser_test.go:534:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:535:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:542:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:543:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/yaml_parser_test.go:14:27: `createTestYAMLConfig` - `name` always receives `"test-pipeline"` (unparam)
+func createTestYAMLConfig(name string, steps []string) *YAMLConfig {
+                          ^
+internal/app/app_test.go:18:28: context.Background() could be replaced by t.Context() in TestNewApp (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:28:28: context.Background() could be replaced by t.Context() in TestApp_GetContainer (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:37:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:41:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:47:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:51:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:57:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:67:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:83:17: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Start(context.Background())
+		              ^
+internal/app/app_test.go:87:16: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Stop(context.Background())
+		             ^
+internal/app/app_test.go:119:9: context.Background() could be replaced by t.Context() in TestGetContainer_Initialized (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:135:9: context.Background() could be replaced by t.Context() in TestInitialize_Success (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:151:9: context.Background() could be replaced by t.Context() in TestInitialize_MultipleCalls (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:172:9: context.Background() could be replaced by t.Context() in TestReset (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:192:28: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:195:25: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:201:18: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err = app.Start(context.Background())
+	                ^
+internal/app/app_test.go:207:28: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:210:25: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:216:17: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err = app.Stop(context.Background())
+	               ^
+internal/pipelines/test/gotester_test.go:57:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 90.0, tester.MinCoverage)
+	^
+internal/pipelines/test/gotester_test.go:77:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 80.0, tester.MinCoverage)
+	^
+internal/pipelines/test/gotester_test.go:130:4: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+			assert.Equal(t, tt.expected, tester.MinCoverage)
+			^
+internal/pipelines/test/gotester_test.go:328:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, err)
+	^
+internal/pipelines/test/gotester_test.go:228:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, err)
+	^
+internal/pipelines/test/gotester_test.go:277:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, err)
+	^
+internal/pipelines/test/gotester_test.go:176:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:224:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_FileContentsError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:273:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_InsufficientCoverage (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:324:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_NoTotalLine (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/gotester_test.go:373:9: context.Background() could be replaced by t.Context() in TestGoTester_RunTests_CoverageParsingError (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:84:9: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:94:10: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests_WithContext (usetesting)
+	ctx1 := context.Background()
+	        ^
+internal/pipelines/test/test_test.go:96:28: context.Background() could be replaced by t.Context() in TestNoopTester_RunTests_WithContext (usetesting)
+	ctx2 := context.WithValue(context.Background(), testKey("key"), "value")
+	                          ^
+internal/pipelines/test/test_test.go:110:9: context.Background() could be replaced by t.Context() in TestNoopTester_ImplementsTestable (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/test/test_test.go:240:9: context.Background() could be replaced by t.Context() in TestNoopTester_Consistency (usetesting)
+	ctx := context.Background()
+	       ^
+internal/interfaces/interfaces.go:41:22: json(camel): got 'skip_push' want 'skipPush' (tagliatelle)
+	SkipPush    bool    `yaml:"skip_push" json:"skip_push"`
+	                    ^
+internal/interfaces/interfaces.go:42:22: yaml(camel): got 'only_build' want 'onlyBuild' (tagliatelle)
+	OnlyBuild   bool    `yaml:"only_build" json:"only_build"`
+	                    ^
+internal/interfaces/interfaces.go:43:22: json(camel): got 'only_test' want 'onlyTest' (tagliatelle)
+	OnlyTest    bool    `yaml:"only_test" json:"only_test"`
+	                    ^
+internal/interfaces/interfaces.go:45:22: json(camel): got 'go_version' want 'goVersion' (tagliatelle)
+	GoVersion   string  `yaml:"go_version" json:"go_version"`
+	                    ^
+internal/interfaces/interfaces.go:46:22: json(camel): got 'java_version' want 'javaVersion' (tagliatelle)
+	JavaVersion string  `yaml:"java_version" json:"java_version"`
+	                    ^
+internal/interfaces/interfaces.go:51:17: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+	BaseURL string `yaml:"base_url" json:"base_url"`
+	               ^
+internal/interfaces/interfaces.go:60:27: json(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+	EnableVulnCheck bool     `yaml:"enable_vuln_check" json:"enable_vuln_check"`
+	                         ^
+internal/interfaces/interfaces.go:61:27: json(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+	EnableLinting   bool     `yaml:"enable_linting" json:"enable_linting"`
+	                         ^
+internal/interfaces/interfaces.go:62:27: json(camel): got 'lint_timeout' want 'lintTimeout' (tagliatelle)
+	LintTimeout     string   `yaml:"lint_timeout" json:"lint_timeout"`
+	                         ^
+internal/interfaces/interfaces.go:63:27: json(camel): got 'exclude_patterns' want 'excludePatterns' (tagliatelle)
+	ExcludePatterns []string `yaml:"exclude_patterns" json:"exclude_patterns"`
+	                         ^
+internal/interfaces/interfaces.go:70:33: json(camel): got 'sampling_enable' want 'samplingEnable' (tagliatelle)
+	SamplingEnable   bool          `yaml:"sampling_enable" json:"sampling_enable"`
+	                               ^
+internal/interfaces/interfaces.go:71:33: json(camel): got 'sampling_rate' want 'samplingRate' (tagliatelle)
+	SamplingRate     float64       `yaml:"sampling_rate" json:"sampling_rate"`
+	                               ^
+internal/interfaces/interfaces.go:72:33: json(camel): got 'sampling_interval' want 'samplingInterval' (tagliatelle)
+	SamplingInterval time.Duration `yaml:"sampling_interval" json:"sampling_interval"`
+	                               ^
+internal/interfaces/interfaces.go:80:19: yaml(camel): got 'user_email' want 'userEmail' (tagliatelle)
+	UserEmail string `yaml:"user_email" json:"user_email"`
+	                 ^
+internal/interfaces/interfaces.go:81:19: yaml(camel): got 'user_name' want 'userName' (tagliatelle)
+	UserName  string `yaml:"user_name" json:"user_name"`
+	                 ^
+internal/interfaces/interfaces.go:82:19: yaml(camel): got 'ssh_key' want 'sshKey' (tagliatelle)
+	SSHKey    string `yaml:"ssh_key" json:"ssh_key"`
+	                 ^
+internal/interfaces/interfaces.go:88:26: json(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+	UseGoreleaser  bool     `yaml:"use_goreleaser" json:"use_goreleaser"`
+	                        ^
+internal/interfaces/interfaces.go:89:26: json(camel): got 'build_targets' want 'buildTargets' (tagliatelle)
+	BuildTargets   []string `yaml:"build_targets" json:"build_targets"`
+	                        ^
+internal/interfaces/interfaces.go:90:26: json(camel): got 'archive_formats' want 'archiveFormats' (tagliatelle)
+	ArchiveFormats []string `yaml:"archive_formats" json:"archive_formats"`
+	                        ^
+internal/interfaces/interfaces.go:154:32: json(camel): got 'depends_on' want 'dependsOn' (tagliatelle)
+	DependsOn   []string          `yaml:"depends_on" json:"depends_on"`
+	                              ^
+internal/interfaces/interfaces.go:168:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/interfaces/interfaces.go:269:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/interfaces/interfaces.go:271:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/interfaces/interfaces.go:272:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/pipelines/go-kit/pipeline_test.go:82:9: context.Background() could be replaced by t.Context() in TestPipeline_Setup (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:112:9: context.Background() could be replaced by t.Context() in TestPipeline_Setup_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:140:9: context.Background() could be replaced by t.Context() in TestPipeline_Test (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:157:9: context.Background() could be replaced by t.Context() in TestPipeline_Test_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:184:9: context.Background() could be replaced by t.Context() in TestPipeline_Test_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:212:9: context.Background() could be replaced by t.Context() in TestPipeline_Build (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:229:9: context.Background() could be replaced by t.Context() in TestPipeline_Build_NoSrc (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:256:9: context.Background() could be replaced by t.Context() in TestPipeline_Build_Error (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:273:9: context.Background() could be replaced by t.Context() in TestPipeline_Package (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:289:9: context.Background() could be replaced by t.Context() in TestPipeline_Tag (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:306:9: context.Background() could be replaced by t.Context() in TestPipeline_Push (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:322:9: context.Background() could be replaced by t.Context() in TestPipeline_BeforeStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:337:9: context.Background() could be replaced by t.Context() in TestPipeline_AfterStep (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:355:9: context.Background() could be replaced by t.Context() in TestPipeline_Integration (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:393:9: context.Background() could be replaced by t.Context() in TestPipeline_SimpleMethods (usetesting)
+	ctx := context.Background()
+	       ^
+internal/pipelines/go-kit/pipeline_test.go:442:9: context.Background() could be replaced by t.Context() in TestPipeline_WithMocks (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/step_handlers.go:141:55: unused-parameter: parameter 'stepName' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *BuildStepHandler) Execute(_ context.Context, stepName string, config interfaces.StepConfig) error {
+                                                      ^
+internal/app/step_handlers.go:197:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/step_handlers.go:250:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/step_handlers.go:303:39: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *SecurityStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                      ^
+internal/app/hook_manager_test.go:123:2: SA4006: this value of `hooks2` is never used (staticcheck)
+	hooks2 = append(hooks2, func(_ context.Context) error { return nil })
+	^
+internal/app/pipeline_executor.go:22:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/app/pipeline_executor.go:24:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/app/pipeline_executor.go:25:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/app/pipeline_executor.go:34:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/config/yaml_parser.go:19:24: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+		GoVersion   string   `yaml:"go_version"`
+		                     ^
+internal/config/yaml_parser.go:24:18: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+		BaseURL string `yaml:"base_url"`
+		               ^
+internal/config/yaml_parser.go:30:24: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+		EnableVulnCheck bool `yaml:"enable_vuln_check"`
+		                     ^
+internal/config/yaml_parser.go:31:24: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+		EnableLinting   bool `yaml:"enable_linting"`
+		                     ^
+internal/config/yaml_parser.go:36:32: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+		UseGoreleaser       bool     `yaml:"use_goreleaser"`
+		                             ^
+internal/config/yaml_parser.go:37:32: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+		CreateGithubRelease bool     `yaml:"create_github_release"`
+		                             ^
+internal/config/yaml_parser_test.go:20:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:122:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:132:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:141:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:142:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:149:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:150:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/yaml_parser_test.go:534:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:535:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:542:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:543:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/pipelines/utils_test.go:90:2: empty: use assert.NotEmpty (testifylint)
+	assert.Positive(t, len(result))
+	^
+internal/config/yaml_parser_test.go:14:27: `createTestYAMLConfig` - `name` always receives `"test-pipeline"` (unparam)
+func createTestYAMLConfig(name string, steps []string) *YAMLConfig {
+                          ^
+internal/app/app_test.go:18:28: context.Background() could be replaced by t.Context() in TestNewApp (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:28:28: context.Background() could be replaced by t.Context() in TestApp_GetContainer (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:37:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:41:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:47:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:51:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:57:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:67:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:83:17: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Start(context.Background())
+		              ^
+internal/app/app_test.go:87:16: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Stop(context.Background())
+		             ^
+internal/app/app_test.go:119:9: context.Background() could be replaced by t.Context() in TestGetContainer_Initialized (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:135:9: context.Background() could be replaced by t.Context() in TestInitialize_Success (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:151:9: context.Background() could be replaced by t.Context() in TestInitialize_MultipleCalls (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:172:9: context.Background() could be replaced by t.Context() in TestReset (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:192:28: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:195:25: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:201:18: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err = app.Start(context.Background())
+	                ^
+internal/app/app_test.go:207:28: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:210:25: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:216:17: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err = app.Stop(context.Background())
+	               ^
+internal/app/app_test.go:223:28: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:231:19: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	err := app.Start(context.Background())
+	                 ^
+internal/app/app_test.go:239:28: context.Background() could be replaced by t.Context() in TestApp_Stop_WithLoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:247:18: context.Background() could be replaced by t.Context() in TestApp_Stop_WithLoggerError (usetesting)
+	err := app.Stop(context.Background())
+	                ^
+internal/config/yaml_parser.go:19:24: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+		GoVersion   string   `yaml:"go_version"`
+		                     ^
+internal/config/yaml_parser.go:24:18: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+		BaseURL string `yaml:"base_url"`
+		               ^
+internal/config/yaml_parser.go:30:24: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+		EnableVulnCheck bool `yaml:"enable_vuln_check"`
+		                     ^
+internal/config/yaml_parser.go:31:24: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+		EnableLinting   bool `yaml:"enable_linting"`
+		                     ^
+internal/config/yaml_parser.go:36:32: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+		UseGoreleaser       bool     `yaml:"use_goreleaser"`
+		                             ^
+internal/config/yaml_parser.go:37:32: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+		CreateGithubRelease bool     `yaml:"create_github_release"`
+		                             ^
+internal/config/yaml_parser_test.go:20:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:122:25: yaml(camel): got 'go_version' want 'goVersion' (tagliatelle)
+			GoVersion   string   `yaml:"go_version"`
+			                     ^
+internal/config/yaml_parser_test.go:132:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:141:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:142:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:149:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:150:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/yaml_parser_test.go:206:19: yaml(camel): got 'base_url' want 'baseUrl' (tagliatelle)
+			BaseURL string `yaml:"base_url"`
+			               ^
+internal/config/yaml_parser_test.go:534:25: yaml(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+			EnableVulnCheck bool `yaml:"enable_vuln_check"`
+			                     ^
+internal/config/yaml_parser_test.go:535:25: yaml(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+			EnableLinting   bool `yaml:"enable_linting"`
+			                     ^
+internal/config/yaml_parser_test.go:542:33: yaml(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+			UseGoreleaser       bool     `yaml:"use_goreleaser"`
+			                             ^
+internal/config/yaml_parser_test.go:543:33: yaml(camel): got 'create_github_release' want 'createGithubRelease' (tagliatelle)
+			CreateGithubRelease bool     `yaml:"create_github_release"`
+			                             ^
+internal/config/config_test.go:518:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, DefaultCoverage, cfg.Pipeline.Coverage)
+	^
+internal/config/yaml_parser_test.go:560:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 90.0, config.Pipeline.Coverage)
+	^
+internal/config/config_test.go:160:5: require-error: for error assertions use require (testifylint)
+				assert.Error(t, err)
+				^
+internal/config/errors_test.go:69:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, unwrapped)
+	^
+internal/config/yaml_parser_test.go:14:27: `createTestYAMLConfig` - `name` always receives `"test-pipeline"` (unparam)
+func createTestYAMLConfig(name string, steps []string) *YAMLConfig {
+                          ^
+internal/config/config_test.go:40:5: os.Setenv() could be replaced by t.Setenv() in TestNew (usetesting)
+				os.Setenv(key, value)
+				^
+internal/app/step_handlers.go:141:55: unused-parameter: parameter 'stepName' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *BuildStepHandler) Execute(_ context.Context, stepName string, config interfaces.StepConfig) error {
+                                                      ^
+internal/app/step_handlers.go:197:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/step_handlers.go:250:35: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                  ^
+internal/app/step_handlers.go:303:39: unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _ (revive)
+func (h *SecurityStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+                                      ^
+internal/app/hook_manager_test.go:123:2: SA4006: this value of `hooks2` is never used (staticcheck)
+	hooks2 = append(hooks2, func(_ context.Context) error { return nil })
+	^
+internal/app/pipeline_executor.go:22:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/app/pipeline_executor.go:24:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/app/pipeline_executor.go:25:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/app/pipeline_executor.go:34:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/app/app_test.go:71:2: require-error: for error assertions use require (testifylint)
+	assert.Error(t, err) // Expected to fail due to no real pipeline registry
+	^
+internal/app/app_test.go:18:28: context.Background() could be replaced by t.Context() in TestNewApp (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:28:28: context.Background() could be replaced by t.Context() in TestApp_GetContainer (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:37:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:41:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:47:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:51:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:57:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:67:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:83:17: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Start(context.Background())
+		              ^
+internal/app/app_test.go:87:16: context.Background() could be replaced by t.Context() in TestApp_WithNilContainer (usetesting)
+		_ = app.Stop(context.Background())
+		             ^
+internal/app/app_test.go:119:9: context.Background() could be replaced by t.Context() in TestGetContainer_Initialized (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:135:9: context.Background() could be replaced by t.Context() in TestInitialize_Success (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:151:9: context.Background() could be replaced by t.Context() in TestInitialize_MultipleCalls (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:172:9: context.Background() could be replaced by t.Context() in TestReset (usetesting)
+	ctx := context.Background()
+	       ^
+internal/app/app_test.go:192:28: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:195:25: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:201:18: context.Background() could be replaced by t.Context() in TestApp_Start_Success (usetesting)
+	err = app.Start(context.Background())
+	                ^
+internal/app/app_test.go:207:28: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:210:25: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:216:17: context.Background() could be replaced by t.Context() in TestApp_Stop_Success (usetesting)
+	err = app.Stop(context.Background())
+	               ^
+internal/app/app_test.go:223:28: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:231:19: context.Background() could be replaced by t.Context() in TestApp_Start_WithLoggerError (usetesting)
+	err := app.Start(context.Background())
+	                 ^
+internal/app/app_test.go:239:28: context.Background() could be replaced by t.Context() in TestApp_Stop_WithLoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:247:18: context.Background() could be replaced by t.Context() in TestApp_Stop_WithLoggerError (usetesting)
+	err := app.Stop(context.Background())
+	                ^
+internal/app/app_test.go:255:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:258:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:264:24: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_Success (usetesting)
+	err = app.RunPipeline(context.Background(), "test-pipeline")
+	                      ^
+internal/app/app_test.go:271:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_LoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:279:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_LoggerError (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:286:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:289:25: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:295:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_Success (usetesting)
+	err = app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                          ^
+internal/app/app_test.go:302:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_LoggerError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:310:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_LoggerError (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "test-step")
+	                           ^
+internal/app/app_test.go:317:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:320:25: context.Background() could be replaced by t.Context() in TestApp_ListPipelines_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:336:28: context.Background() could be replaced by t.Context() in TestApp_ListPipelines_RegistryError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:350:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_Success (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:353:25: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_Success (usetesting)
+	err := container.Start(context.Background())
+	                       ^
+internal/app/app_test.go:366:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_RegistryError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:389:28: context.Background() could be replaced by t.Context() in TestApp_GetPipelineInfo_SuccessfulExecution (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:452:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_SuccessfulExecution (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:476:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_SuccessfulExecution (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:497:28: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_StepExecutionError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:521:25: context.Background() could be replaced by t.Context() in TestApp_RunPipeline_StepExecutionError (usetesting)
+	err := app.RunPipeline(context.Background(), "test-pipeline")
+	                       ^
+internal/app/app_test.go:542:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_SuccessfulExecution (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:566:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_SuccessfulExecution (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "build")
+	                           ^
+internal/app/app_test.go:585:28: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_StepExecutionError (usetesting)
+	container := NewContainer(context.Background(), cfg)
+	                          ^
+internal/app/app_test.go:609:29: context.Background() could be replaced by t.Context() in TestApp_RunPipelineStep_StepExecutionError (usetesting)
+	err := app.RunPipelineStep(context.Background(), "test-pipeline", "build")
+	                           ^
+internal/pipelines/test/gotester_test.go:57:2: float-compare: use assert.InEpsilon (or InDelta) (testifylint)
+	assert.Equal(t, 90.0, tester.MinCoverage)
+	^
+internal/interfaces/interfaces.go:41:22: json(camel): got 'skip_push' want 'skipPush' (tagliatelle)
+	SkipPush    bool    `yaml:"skip_push" json:"skip_push"`
+	                    ^
+internal/interfaces/interfaces.go:42:22: yaml(camel): got 'only_build' want 'onlyBuild' (tagliatelle)
+	OnlyBuild   bool    `yaml:"only_build" json:"only_build"`
+	                    ^
+internal/interfaces/interfaces.go:43:22: json(camel): got 'only_test' want 'onlyTest' (tagliatelle)
+	OnlyTest    bool    `yaml:"only_test" json:"only_test"`
+	                    ^
+internal/interfaces/interfaces.go:45:22: json(camel): got 'go_version' want 'goVersion' (tagliatelle)
+	GoVersion   string  `yaml:"go_version" json:"go_version"`
+	                    ^
+internal/interfaces/interfaces.go:46:22: json(camel): got 'java_version' want 'javaVersion' (tagliatelle)
+	JavaVersion string  `yaml:"java_version" json:"java_version"`
+	                    ^
+internal/interfaces/interfaces.go:60:27: json(camel): got 'enable_vuln_check' want 'enableVulnCheck' (tagliatelle)
+	EnableVulnCheck bool     `yaml:"enable_vuln_check" json:"enable_vuln_check"`
+	                         ^
+internal/interfaces/interfaces.go:61:27: json(camel): got 'enable_linting' want 'enableLinting' (tagliatelle)
+	EnableLinting   bool     `yaml:"enable_linting" json:"enable_linting"`
+	                         ^
+internal/interfaces/interfaces.go:62:27: json(camel): got 'lint_timeout' want 'lintTimeout' (tagliatelle)
+	LintTimeout     string   `yaml:"lint_timeout" json:"lint_timeout"`
+	                         ^
+internal/interfaces/interfaces.go:63:27: json(camel): got 'exclude_patterns' want 'excludePatterns' (tagliatelle)
+	ExcludePatterns []string `yaml:"exclude_patterns" json:"exclude_patterns"`
+	                         ^
+internal/interfaces/interfaces.go:70:33: json(camel): got 'sampling_enable' want 'samplingEnable' (tagliatelle)
+	SamplingEnable   bool          `yaml:"sampling_enable" json:"sampling_enable"`
+	                               ^
+internal/interfaces/interfaces.go:71:33: json(camel): got 'sampling_rate' want 'samplingRate' (tagliatelle)
+	SamplingRate     float64       `yaml:"sampling_rate" json:"sampling_rate"`
+	                               ^
+internal/interfaces/interfaces.go:72:33: json(camel): got 'sampling_interval' want 'samplingInterval' (tagliatelle)
+	SamplingInterval time.Duration `yaml:"sampling_interval" json:"sampling_interval"`
+	                               ^
+internal/interfaces/interfaces.go:80:19: yaml(camel): got 'user_email' want 'userEmail' (tagliatelle)
+	UserEmail string `yaml:"user_email" json:"user_email"`
+	                 ^
+internal/interfaces/interfaces.go:81:19: yaml(camel): got 'user_name' want 'userName' (tagliatelle)
+	UserName  string `yaml:"user_name" json:"user_name"`
+	                 ^
+internal/interfaces/interfaces.go:82:19: yaml(camel): got 'ssh_key' want 'sshKey' (tagliatelle)
+	SSHKey    string `yaml:"ssh_key" json:"ssh_key"`
+	                 ^
+internal/interfaces/interfaces.go:88:26: json(camel): got 'use_goreleaser' want 'useGoreleaser' (tagliatelle)
+	UseGoreleaser  bool     `yaml:"use_goreleaser" json:"use_goreleaser"`
+	                        ^
+internal/interfaces/interfaces.go:89:26: json(camel): got 'build_targets' want 'buildTargets' (tagliatelle)
+	BuildTargets   []string `yaml:"build_targets" json:"build_targets"`
+	                        ^
+internal/interfaces/interfaces.go:90:26: json(camel): got 'archive_formats' want 'archiveFormats' (tagliatelle)
+	ArchiveFormats []string `yaml:"archive_formats" json:"archive_formats"`
+	                        ^
+internal/interfaces/interfaces.go:154:32: json(camel): got 'depends_on' want 'dependsOn' (tagliatelle)
+	DependsOn   []string          `yaml:"depends_on" json:"depends_on"`
+	                              ^
+internal/interfaces/interfaces.go:168:27: json(camel): got 'step_name' want 'stepName' (tagliatelle)
+	StepName  string         `json:"step_name"`
+	                         ^
+internal/interfaces/interfaces.go:269:37: json(camel): got 'pipeline_name' want 'pipelineName' (tagliatelle)
+	PipelineName string                `json:"pipeline_name"`
+	                                   ^
+internal/interfaces/interfaces.go:271:37: json(camel): got 'start_time' want 'startTime' (tagliatelle)
+	StartTime    time.Time             `json:"start_time"`
+	                                   ^
+internal/interfaces/interfaces.go:272:37: json(camel): got 'end_time' want 'endTime' (tagliatelle)
+	EndTime      *time.Time            `json:"end_time,omitempty"`
+	                                   ^
+internal/pipelines/utils_test.go:90:2: empty: use assert.NotEmpty (testifylint)
+	assert.Positive(t, len(result))
+	^

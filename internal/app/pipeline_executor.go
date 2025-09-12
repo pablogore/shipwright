@@ -13,17 +13,16 @@ import (
 type PipelineExecutor struct {
 	stepRegistry interfaces.StepRegistry
 	hookManager  interfaces.HookManager
-	logger       interfaces.Logger
 	status       map[string]*PipelineStatus
 	mutex        sync.RWMutex
 }
 
 // PipelineStatus represents the current status of a pipeline execution.
 type PipelineStatus struct {
-	PipelineName string                `json:"pipeline_name"`
+	PipelineName string                `json:"pipelineName"`
 	Status       string                `json:"status"` // running, completed, failed, cancelled
-	StartTime    time.Time             `json:"start_time"`
-	EndTime      *time.Time            `json:"end_time,omitempty"`
+	StartTime    time.Time             `json:"startTime"`
+	EndTime      *time.Time            `json:"endTime,omitempty"`
 	Duration     time.Duration         `json:"duration"`
 	Steps        map[string]StepResult `json:"steps"`
 	Metadata     map[string]any        `json:"metadata,omitempty"`
@@ -32,7 +31,7 @@ type PipelineStatus struct {
 
 // StepResult contains the result of a step execution.
 type StepResult struct {
-	StepName  string         `json:"step_name"`
+	StepName  string         `json:"stepName"`
 	Success   bool           `json:"success"`
 	Duration  time.Duration  `json:"duration"`
 	Error     error          `json:"error,omitempty"`
@@ -144,7 +143,7 @@ func (pe *PipelineExecutor) ExecuteStep(ctx context.Context, pipelineName string
 }
 
 // executeStep is the internal method for executing a step.
-func (pe *PipelineExecutor) executeStep(ctx context.Context, pipelineName string, stepName string) (StepResult, error) {
+func (pe *PipelineExecutor) executeStep(ctx context.Context, _ string, stepName string) (StepResult, error) {
 	startTime := time.Now()
 
 	// Get step configuration
@@ -183,7 +182,7 @@ func (pe *PipelineExecutor) executeStep(ctx context.Context, pipelineName string
 	// Execute appropriate hooks based on result
 	if stepErr != nil {
 		// Execute error hooks
-		pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeError)
+		_ = pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeError)
 
 		return StepResult{
 			StepName: stepName,
@@ -194,7 +193,7 @@ func (pe *PipelineExecutor) executeStep(ctx context.Context, pipelineName string
 	}
 
 	// Execute success hooks
-	pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeSuccess)
+	_ = pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeSuccess)
 
 	// Execute after hooks
 	if err := pe.hookManager.ExecuteHooks(stepCtx, stepName, interfaces.HookTypeAfter); err != nil {
@@ -302,14 +301,14 @@ func (pe *PipelineExecutor) GetPipelineLogs(pipelineName string) ([]string, erro
 	status.mutex.RLock()
 	defer status.mutex.RUnlock()
 
-	var logs []string
-	logs = append(logs, fmt.Sprintf("Pipeline: %s", status.PipelineName))
-	logs = append(logs, fmt.Sprintf("Status: %s", status.Status))
-	logs = append(logs, fmt.Sprintf("Start Time: %s", status.StartTime.Format(time.RFC3339)))
+	logs := make([]string, 0, 6) // Pre-allocate with estimated capacity
+	logs = append(logs, "Pipeline: "+status.PipelineName)
+	logs = append(logs, "Status: "+status.Status)
+	logs = append(logs, "Start Time: "+status.StartTime.Format(time.RFC3339))
 
 	if status.EndTime != nil {
-		logs = append(logs, fmt.Sprintf("End Time: %s", status.EndTime.Format(time.RFC3339)))
-		logs = append(logs, fmt.Sprintf("Duration: %s", status.Duration))
+		logs = append(logs, "End Time: "+status.EndTime.Format(time.RFC3339))
+		logs = append(logs, "Duration: "+status.Duration.String())
 	}
 
 	logs = append(logs, "Steps:")
@@ -332,7 +331,7 @@ func (pe *PipelineExecutor) ListPipelines() []string {
 	pe.mutex.RLock()
 	defer pe.mutex.RUnlock()
 
-	var pipelines []string
+	pipelines := make([]string, 0, len(pe.status))
 	for pipelineName := range pe.status {
 		pipelines = append(pipelines, pipelineName)
 	}

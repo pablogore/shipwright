@@ -1,12 +1,12 @@
 package test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -54,7 +54,7 @@ func TestGoTester_Fields(t *testing.T) {
 	assert.Equal(t, mockClient, tester.Client)
 	assert.Equal(t, mockDirectory, tester.Src)
 	assert.Equal(t, cfg, tester.Config)
-	assert.Equal(t, 90.0, tester.MinCoverage)
+	assert.InEpsilon(t, 90.0, tester.MinCoverage, 0.001)
 }
 
 func TestGoTester_WithNilValues(t *testing.T) {
@@ -74,7 +74,7 @@ func TestGoTester_WithNilValues(t *testing.T) {
 	assert.Nil(t, tester.Client)
 	assert.Nil(t, tester.Src)
 	assert.Equal(t, cfg, tester.Config)
-	assert.Equal(t, 80.0, tester.MinCoverage)
+	assert.InEpsilon(t, 80.0, tester.MinCoverage, 0.001)
 }
 
 func TestGoTester_ConfigHandling(t *testing.T) {
@@ -127,7 +127,11 @@ func TestGoTester_ConfigHandling(t *testing.T) {
 			}
 
 			assert.NotNil(t, tester)
-			assert.Equal(t, tt.expected, tester.MinCoverage)
+			if tt.expected == 0.0 {
+				assert.Zero(t, tester.MinCoverage)
+			} else {
+				assert.InEpsilon(t, tt.expected, tester.MinCoverage, 0.001)
+			}
 		})
 	}
 }
@@ -173,7 +177,7 @@ func TestGoTester_RunTests_WithMocks(t *testing.T) {
 	}
 
 	// Test RunTests method
-	ctx := context.Background()
+	ctx := t.Context()
 	err := tester.RunTests(ctx)
 
 	// Should succeed since coverage (90%) is above threshold (85%)
@@ -221,11 +225,11 @@ func TestGoTester_RunTests_FileContentsError(t *testing.T) {
 	}
 
 	// Test RunTests method
-	ctx := context.Background()
+	ctx := t.Context()
 	err := tester.RunTests(ctx)
 
 	// Should fail with file contents error
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Error generating coverage report")
 }
 
@@ -270,11 +274,11 @@ func TestGoTester_RunTests_InsufficientCoverage(t *testing.T) {
 	}
 
 	// Test RunTests method
-	ctx := context.Background()
+	ctx := t.Context()
 	err := tester.RunTests(ctx)
 
 	// Should fail with insufficient coverage error
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Insufficient coverage")
 	assert.Contains(t, err.Error(), "80.0%")
 	assert.Contains(t, err.Error(), "85.0%")
@@ -321,11 +325,11 @@ func TestGoTester_RunTests_NoTotalLine(t *testing.T) {
 	}
 
 	// Test RunTests method
-	ctx := context.Background()
+	ctx := t.Context()
 	err := tester.RunTests(ctx)
 
 	// Should fail with no total line error
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "No line with total coverage found")
 }
 
@@ -370,10 +374,10 @@ func TestGoTester_RunTests_CoverageParsingError(t *testing.T) {
 	}
 
 	// Test RunTests method
-	ctx := context.Background()
+	ctx := t.Context()
 	err := tester.RunTests(ctx)
 
 	// Should fail with coverage parsing error
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Error parsing coverage")
 }

@@ -37,21 +37,15 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variables
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				t.Setenv(key, value)
 			}
-			defer func() {
-				// Clean up environment variables
-				for key := range tt.envVars {
-					os.Unsetenv(key)
-				}
-			}()
 
 			cfg, err := New()
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, cfg)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, cfg)
 				assert.Equal(t, DefaultEnvironment, cfg.Environment)
 			}
@@ -119,7 +113,7 @@ func TestConfig_Validate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "Go version is required",
+			errMsg:  "go version is required",
 		},
 		{
 			name: "invalid coverage - negative",
@@ -157,7 +151,7 @@ func TestConfig_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errMsg)
 			} else {
 				assert.NoError(t, err)
@@ -311,7 +305,11 @@ func TestConfigurationWrapper_GetFloat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
 			result := cfg.GetFloat(tt.key)
-			assert.Equal(t, tt.expect, result)
+			if tt.expect == 0 {
+				assert.Zero(t, result)
+			} else {
+				assert.InEpsilon(t, tt.expect, result, 0.0001)
+			}
 		})
 	}
 }
@@ -404,7 +402,7 @@ func TestConfigurationWrapper_Pipeline(t *testing.T) {
 	pipeline := cfg.Pipeline()
 	assert.Equal(t, DefaultPipelineName, pipeline.Name)
 	assert.Equal(t, DefaultEnvironment, pipeline.Environment)
-	assert.Equal(t, DefaultCoverage, pipeline.Coverage)
+	assert.InEpsilon(t, DefaultCoverage, pipeline.Coverage, 0.0001)
 	assert.Equal(t, DefaultGoVersion, pipeline.GoVersion)
 	assert.Equal(t, DefaultJavaVersion, pipeline.JavaVersion)
 }
@@ -437,7 +435,7 @@ func TestConfigurationWrapper_Logging(t *testing.T) {
 	assert.Equal(t, DefaultLogLevel, logging.Level)
 	assert.Equal(t, DefaultLogFormat, logging.Format)
 	assert.False(t, logging.SamplingEnable)
-	assert.Equal(t, 0.1, logging.SamplingRate)
+	assert.InEpsilon(t, 0.1, logging.SamplingRate, 0.0001)
 	assert.Equal(t, 1*time.Second, logging.SamplingInterval)
 }
 
@@ -474,7 +472,7 @@ func TestLoadDotEnv(t *testing.T) {
 			wantErr: false,
 			setup: func() func() {
 				// Create .env file
-				os.WriteFile(".env", []byte("TEST_VAR=test_value\nANOTHER_VAR=another_value"), 0644)
+				_ = os.WriteFile(".env", []byte("TEST_VAR=test_value\nANOTHER_VAR=another_value"), 0644)
 				return func() {
 					os.Remove(".env")
 				}
@@ -487,7 +485,7 @@ func TestLoadDotEnv(t *testing.T) {
 			wantErr: false, // godotenv.Load doesn't error on invalid content
 			setup: func() func() {
 				// Create invalid .env file
-				os.WriteFile(".env", []byte("INVALID_CONTENT_WITHOUT_EQUALS"), 0644)
+				_ = os.WriteFile(".env", []byte("INVALID_CONTENT_WITHOUT_EQUALS"), 0644)
 				return func() {
 					os.Remove(".env")
 				}
@@ -502,7 +500,7 @@ func TestLoadDotEnv(t *testing.T) {
 
 			err := loadDotEnv()
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -515,7 +513,7 @@ func TestDefaultConfig(t *testing.T) {
 	assert.NotNil(t, cfg)
 	assert.Equal(t, DefaultEnvironment, cfg.Environment)
 	assert.Equal(t, DefaultPipelineName, cfg.Pipeline.Name)
-	assert.Equal(t, DefaultCoverage, cfg.Pipeline.Coverage)
+	assert.InEpsilon(t, DefaultCoverage, cfg.Pipeline.Coverage, 0.001)
 	assert.Equal(t, DefaultGoVersion, cfg.Pipeline.GoVersion)
 	assert.Equal(t, DefaultJavaVersion, cfg.Pipeline.JavaVersion)
 	assert.Equal(t, DefaultRegistryBaseURL, cfg.Registry.BaseURL)

@@ -1,8 +1,6 @@
 package shared
 
 import (
-	"fmt"
-
 	"dagger.io/dagger"
 	"golang.org/x/net/context"
 )
@@ -54,7 +52,7 @@ func NewGoBuilder(client *dagger.Client, src *dagger.Directory, version string) 
 //   - A string representing the path to the exported binary.
 //   - An error if the build process fails.
 func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, env map[string]string) (string, error) {
-	goImage := fmt.Sprintf("golang:%s", b.GoVersion)
+	goImage := "golang:" + b.GoVersion
 
 	// Initialize the container with the specified Go version and mount directories
 	container := b.Client.Container().

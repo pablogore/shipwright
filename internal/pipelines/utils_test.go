@@ -87,7 +87,7 @@ func TestGitlabNetrc_Format(t *testing.T) {
 	assert.Contains(t, result, "password")
 
 	// Should end with newline
-	assert.True(t, len(result) > 0)
+	assert.NotEmpty(t, result)
 	assert.Equal(t, byte('\n'), result[len(result)-1])
 
 	// Should contain the user and token
@@ -114,13 +114,13 @@ func TestExitOkOrTestFail(t *testing.T) {
 
 func TestReturnType(t *testing.T) {
 	// Test that ReturnType is properly defined as []int
-	var rt ReturnType = []int{0, 1, 2}
+	returnType := ReturnType{0, 1, 2}
 
-	assert.NotNil(t, rt)
-	assert.Len(t, rt, 3)
-	assert.Equal(t, 0, rt[0])
-	assert.Equal(t, 1, rt[1])
-	assert.Equal(t, 2, rt[2])
+	assert.NotNil(t, returnType)
+	assert.Len(t, returnType, 3)
+	assert.Equal(t, 0, returnType[0])
+	assert.Equal(t, 1, returnType[1])
+	assert.Equal(t, 2, returnType[2])
 }
 
 func TestExitOk_Consistency(t *testing.T) {
@@ -220,21 +220,21 @@ func TestGitlabNetrc_Performance(t *testing.T) {
 
 func TestReturnType_SliceOperations(t *testing.T) {
 	// Test that ReturnType can be used as a regular []int slice
-	var rt ReturnType = []int{0, 1, 2, 3, 4}
+	returnType := ReturnType{0, 1, 2, 3, 4}
 
 	// Test append
-	rt = append(rt, 5)
-	assert.Len(t, rt, 6)
-	assert.Equal(t, 5, rt[5])
+	returnType = append(returnType, 5)
+	assert.Len(t, returnType, 6)
+	assert.Equal(t, 5, returnType[5])
 
 	// Test slice operations
-	subSlice := rt[1:4]
+	subSlice := returnType[1:4]
 	assert.Len(t, subSlice, 3)
 	assert.Equal(t, []int{1, 2, 3}, subSlice)
 
 	// Test iteration
 	sum := 0
-	for _, v := range rt {
+	for _, v := range returnType {
 		sum += v
 	}
 	assert.Equal(t, 15, sum) // 0+1+2+3+4+5 = 15
@@ -245,7 +245,7 @@ func TestExitOk_TypeCompatibility(t *testing.T) {
 	result := ExitOk()
 
 	// Should be assignable to ReturnType
-	var rt ReturnType = result
+	rt := result
 	assert.Equal(t, result, rt)
 
 	// Should be comparable
@@ -258,7 +258,7 @@ func TestExitOkOrTestFail_TypeCompatibility(t *testing.T) {
 	result := ExitOkOrTestFail()
 
 	// Should be assignable to ReturnType
-	var rt ReturnType = result
+	rt := result
 	assert.Equal(t, result, rt)
 
 	// Should be comparable

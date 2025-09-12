@@ -74,7 +74,7 @@ func TestAdd(t *testing.T) {
 	})
 
 	ginkgo.It("should setup the pipeline", func() {
-		pipeline := goKit.New(client, cfg).(*goKit.GoKitPipeline)
+		pipeline := goKit.New(client, cfg).(*goKit.Pipeline)
 		pipeline.Cloner = mockCloner
 
 		err := pipeline.Setup(testCtx)

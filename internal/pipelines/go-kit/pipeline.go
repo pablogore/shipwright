@@ -12,28 +12,28 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
 )
 
-// GoKitPipeline represents a pipeline for the go-kit project.
+// Pipeline represents a pipeline for the go-kit project.
 //
 // Fields:
 //   - Client: The Dagger client used for container operations.
 //   - Config: The configuration for the pipeline.
 //   - Src: The source directory of the cloned repository.
 //   - Cloner: The cloner used for cloning the repository.
-type GoKitPipeline struct {
+type Pipeline struct {
 	Client pipelines.DaggerClient
 	Config pipelines.Config
 	Src    pipelines.DaggerDirectory
 	Cloner shared.Cloner
 }
 
-// New creates a new instance of GoKitPipeline.
+// New creates a new instance of Pipeline.
 //
 // Parameters:
 //   - client: The Dagger client used for container operations.
 //   - cfg: The configuration for the pipeline.
 //
 // Returns:
-//   - A new instance of GoKitPipeline.
+//   - A new instance of Pipeline.
 func New(client *dagger.Client, cfg pipelines.Config) pipelines.Pipeline {
 	var daggerClient pipelines.DaggerClient
 	var src pipelines.DaggerDirectory
@@ -55,7 +55,7 @@ func New(client *dagger.Client, cfg pipelines.Config) pipelines.Pipeline {
 	}
 	// If client is nil, all fields will remain nil
 
-	return &GoKitPipeline{
+	return &Pipeline{
 		Client: daggerClient,
 		Config: cfg,
 		Src:    src,
@@ -67,7 +67,7 @@ func New(client *dagger.Client, cfg pipelines.Config) pipelines.Pipeline {
 //
 // Returns:
 //   - A string representing the name of the pipeline.
-func (p *GoKitPipeline) Name() string {
+func (p *Pipeline) Name() string {
 	return "go-kit"
 }
 
@@ -78,10 +78,10 @@ func (p *GoKitPipeline) Name() string {
 //
 // Returns:
 //   - An error if the cloning process fails, otherwise nil.
-func (p *GoKitPipeline) Setup(ctx context.Context) error {
+func (p *Pipeline) Setup(ctx context.Context) error {
 	// Check if client is nil or not an adapter
 	if p.Client == nil {
-		return fmt.Errorf("Setup method requires real Dagger client, not nil")
+		return errors.New("Setup method requires real Dagger client, not nil")
 	}
 
 	if p.Cloner != nil {
@@ -97,7 +97,7 @@ func (p *GoKitPipeline) Setup(ctx context.Context) error {
 			p.Src = pipelines.NewDaggerAdapter(realClient).Host().Directory(".", pipelines.DaggerHostDirectoryOpts{})
 		} else {
 			// This is a mock client, return error
-			return fmt.Errorf("Setup method requires real Dagger client, not mock")
+			return errors.New("Setup method requires real Dagger client, not mock")
 		}
 	}
 	return nil
@@ -110,7 +110,7 @@ func (p *GoKitPipeline) Setup(ctx context.Context) error {
 //
 // Returns:
 //   - An error if the tests fail, otherwise nil.
-func (p *GoKitPipeline) Test(ctx context.Context) error {
+func (p *Pipeline) Test(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
@@ -124,7 +124,7 @@ func (p *GoKitPipeline) Test(ctx context.Context) error {
 		}
 	}
 	// For mocks, return an error indicating this requires real client
-	return fmt.Errorf("Test method requires real Dagger client, not mock")
+	return errors.New("Test method requires real Dagger client, not mock")
 }
 
 // Build is a placeholder for the build step of the pipeline.
@@ -134,7 +134,7 @@ func (p *GoKitPipeline) Test(ctx context.Context) error {
 //
 // Returns:
 //   - Always returns nil as it is not implemented.
-func (p *GoKitPipeline) Build(ctx context.Context) error {
+func (p *Pipeline) Build(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
@@ -154,7 +154,7 @@ func (p *GoKitPipeline) Build(ctx context.Context) error {
 		}
 	}
 	// For mocks, return an error indicating this requires real client
-	return fmt.Errorf("Build method requires real Dagger client, not mock")
+	return errors.New("Build method requires real Dagger client, not mock")
 }
 
 // Package is a placeholder for the packaging step of the pipeline.
@@ -164,7 +164,7 @@ func (p *GoKitPipeline) Build(ctx context.Context) error {
 //
 // Returns:
 //   - Always returns nil as it is not implemented.
-func (p *GoKitPipeline) Package(_ context.Context) error {
+func (p *Pipeline) Package(_ context.Context) error {
 	return errors.New("not implemented")
 }
 
@@ -175,7 +175,7 @@ func (p *GoKitPipeline) Package(_ context.Context) error {
 //
 // Returns:
 //   - An error if the tagging process fails, otherwise nil.
-func (p *GoKitPipeline) Tag(ctx context.Context) error {
+func (p *Pipeline) Tag(ctx context.Context) error {
 	fmt.Println("🧪 Generating tag for go-kit...")
 	// Extract real types for shared functions (only if using adapter, not mocks)
 	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
@@ -191,7 +191,7 @@ func (p *GoKitPipeline) Tag(ctx context.Context) error {
 		}
 	}
 	// For mocks, return an error indicating this requires real client
-	return fmt.Errorf("Tag method requires real Dagger client, not mock")
+	return errors.New("Tag method requires real Dagger client, not mock")
 }
 
 // Push is a placeholder for the push step of the pipeline.
@@ -201,7 +201,7 @@ func (p *GoKitPipeline) Tag(ctx context.Context) error {
 //
 // Returns:
 //   - Always returns nil as it is not implemented.
-func (p *GoKitPipeline) Push(_ context.Context) error {
+func (p *Pipeline) Push(_ context.Context) error {
 	return errors.New("not implemented")
 }
 
@@ -213,7 +213,7 @@ func (p *GoKitPipeline) Push(_ context.Context) error {
 //
 // Returns:
 //   - Always returns nil as it is not implemented.
-func (p *GoKitPipeline) BeforeStep(_ context.Context, _ string) pipelines.HookFunc {
+func (p *Pipeline) BeforeStep(_ context.Context, _ string) pipelines.HookFunc {
 	return nil
 }
 
@@ -225,10 +225,10 @@ func (p *GoKitPipeline) BeforeStep(_ context.Context, _ string) pipelines.HookFu
 //
 // Returns:
 //   - Always returns nil as it is not implemented.
-func (p *GoKitPipeline) AfterStep(_ context.Context, _ string) pipelines.HookFunc {
+func (p *Pipeline) AfterStep(_ context.Context, _ string) pipelines.HookFunc {
 	return nil
 }
 
-func (p *GoKitPipeline) Cleanup(_ context.Context, _ *dagger.Client) error {
+func (p *Pipeline) Cleanup(_ context.Context, _ *dagger.Client) error {
 	return errors.New("not implemented")
 }

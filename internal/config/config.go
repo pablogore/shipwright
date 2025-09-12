@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 var (
 	ErrPipelineNameRequired    = errors.New("pipeline name is required")
 	ErrRegistryBaseURLRequired = errors.New("registry base URL is required")
-	ErrGoVersionRequired       = errors.New("Go version is required")
+	ErrGoVersionRequired       = errors.New("go version is required")
 	ErrInvalidCoverage         = errors.New("coverage must be between 0 and 100")
 )
 
@@ -256,7 +257,7 @@ func (cw *ConfigurationWrapper) Load() error {
 }
 
 // LoadWithDefaults loads configuration with defaults.
-func (cw *ConfigurationWrapper) LoadWithDefaults(defaults map[string]any) error {
+func (cw *ConfigurationWrapper) LoadWithDefaults(_ map[string]any) error {
 	return nil // Not implemented for this wrapper
 }
 
@@ -289,7 +290,7 @@ func (cw *ConfigurationWrapper) getStringConfigMap() map[string]string {
 		KeySecurityLintTimeout: cw.Config.Security.LintTimeout,
 		KeyLogLevel:            cw.Config.Logging.Level,
 		KeyLogFormat:           cw.Config.Logging.Format,
-		KeyDaggerLogOutput:     fmt.Sprintf("%t", cw.Config.Dagger.LogOutput),
+		KeyDaggerLogOutput:     strconv.FormatBool(cw.Config.Dagger.LogOutput),
 	}
 }
 
@@ -392,7 +393,7 @@ func (cw *ConfigurationWrapper) Get(key string) any {
 }
 
 // Set sets a value.
-func (cw *ConfigurationWrapper) Set(key string, value any) {
+func (cw *ConfigurationWrapper) Set(_ string, _ any) {
 	// Not implemented for this wrapper - configuration is read-only
 }
 

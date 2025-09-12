@@ -3,6 +3,7 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"dagger.io/dagger"
@@ -81,7 +82,7 @@ func (s *SyntegrityInfraPipeline) Setup(ctx context.Context) error {
 
 	// Check if client is nil
 	if s.Client == nil {
-		return fmt.Errorf("Setup method requires real Dagger client, not nil")
+		return errors.New("Setup method requires real Dagger client, not nil")
 	}
 
 	if s.Cloner != nil {
@@ -103,7 +104,7 @@ func (s *SyntegrityInfraPipeline) Setup(ctx context.Context) error {
 		}
 	}
 	// For mocks, return an error indicating this requires real client
-	return fmt.Errorf("Setup method requires real Dagger client, not mock")
+	return errors.New("Setup method requires real Dagger client, not mock")
 }
 
 func (s *SyntegrityInfraPipeline) Push(_ context.Context) error {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -27,11 +28,11 @@ func (hm *HookManager) RegisterHook(stepName string, hookType interfaces.HookTyp
 	defer hm.mutex.Unlock()
 
 	if stepName == "" {
-		return fmt.Errorf("step name cannot be empty")
+		return errors.New("step name cannot be empty")
 	}
 
 	if hook == nil {
-		return fmt.Errorf("hook function cannot be nil")
+		return errors.New("hook function cannot be nil")
 	}
 
 	// Initialize step hooks if not exists

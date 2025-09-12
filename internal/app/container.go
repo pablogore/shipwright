@@ -58,14 +58,14 @@ func (l *LoggerAdapter) Fatal(msg string, fields ...any) {
 }
 
 // WithField adds a single field to the logger context
-func (l *LoggerAdapter) WithField(key string, value any) interfaces.Logger {
+func (l *LoggerAdapter) WithField(_ string, _ any) interfaces.Logger {
 	// For now, return the same logger since the API might be different
 	// This would need to be implemented based on the actual API
 	return l
 }
 
 // WithFields adds multiple fields to the logger context
-func (l *LoggerAdapter) WithFields(fields map[string]any) interfaces.Logger {
+func (l *LoggerAdapter) WithFields(_ map[string]any) interfaces.Logger {
 	// For now, return the same logger since the API might be different
 	// This would need to be implemented based on the actual API
 	return l
@@ -121,13 +121,13 @@ func (c *Container) Get(name string) (any, error) {
 }
 
 // Start initializes all registered components.
-func (c *Container) Start(ctx context.Context) error {
+func (c *Container) Start(_ context.Context) error {
 	c.registerComponents()
 	return nil
 }
 
 // Stop stops the container and cleans up resources.
-func (c *Container) Stop(ctx context.Context) error {
+func (c *Container) Stop(_ context.Context) error {
 	// Clean up components that need cleanup
 	for name, component := range c.cache {
 		if closer, ok := component.(interface{ Close() error }); ok {
@@ -263,7 +263,7 @@ func (c *Container) GetDaggerClient() (*dagger.Client, error) {
 		return nil, err
 	}
 	if client == nil {
-		return nil, fmt.Errorf("dagger client is nil")
+		return nil, errors.New("dagger client is nil")
 	}
 	return client.(*dagger.Client), nil
 }
@@ -339,7 +339,7 @@ func (r *PipelineRegistry) Get(name string, client *dagger.Client, cfg interface
 
 // List returns the names of all registered pipelines.
 func (r *PipelineRegistry) List() []string {
-	var names []string
+	names := make([]string, 0, len(r.pipelines))
 	for name := range r.pipelines {
 		names = append(names, name)
 	}
@@ -357,13 +357,13 @@ func NewVulnChecker(config interfaces.Configuration) *VulnChecker {
 }
 
 // Check runs vulnerability checks on the source code.
-func (v *VulnChecker) Check(ctx context.Context, src *dagger.Directory) error {
+func (v *VulnChecker) Check(_ context.Context, _ *dagger.Directory) error {
 	// Implementation will be added later
 	return nil
 }
 
 // GetReport returns the vulnerability report.
-func (v *VulnChecker) GetReport(ctx context.Context) (string, error) {
+func (v *VulnChecker) GetReport(_ context.Context) (string, error) {
 	// Implementation will be added later
 	return "", nil
 }
@@ -379,13 +379,13 @@ func NewLinter(config interfaces.Configuration) *Linter {
 }
 
 // Lint runs linting on the source code.
-func (l *Linter) Lint(ctx context.Context, src *dagger.Directory) error {
+func (l *Linter) Lint(_ context.Context, _ *dagger.Directory) error {
 	// Implementation will be added later
 	return nil
 }
 
 // GetReport returns the linting report.
-func (l *Linter) GetReport(ctx context.Context) (string, error) {
+func (l *Linter) GetReport(_ context.Context) (string, error) {
 	// Implementation will be added later
 	return "", nil
 }
@@ -427,13 +427,13 @@ func (l *Logger) Fatal(msg string, fields ...any) {
 }
 
 // WithField adds a field to the logger.
-func (l *Logger) WithField(key string, value any) interfaces.Logger {
+func (l *Logger) WithField(_ string, _ any) interfaces.Logger {
 	// Simple implementation - in real scenario would return a new logger instance
 	return l
 }
 
 // WithFields adds multiple fields to the logger.
-func (l *Logger) WithFields(fields map[string]any) interfaces.Logger {
+func (l *Logger) WithFields(_ map[string]any) interfaces.Logger {
 	// Simple implementation - in real scenario would return a new logger instance
 	return l
 }
@@ -462,15 +462,15 @@ func (c *Container) registerStepComponents() {
 		}
 
 		// Register default steps with logger and client
-		registry.RegisterStep("setup", NewSetupStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("build", NewBuildStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("test", NewTestStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("lint", NewLintStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("security", NewSecurityStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("tag", NewTagStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("package", NewPackageStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("push", NewPushStepHandler(c.config, daggerClient, log))
-		registry.RegisterStep("release", NewReleaseStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("setup", NewSetupStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("build", NewBuildStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("test", NewTestStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("lint", NewLintStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("security", NewSecurityStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("tag", NewTagStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("package", NewPackageStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("push", NewPushStepHandler(c.config, daggerClient, log))
+		_ = registry.RegisterStep("release", NewReleaseStepHandler(c.config, daggerClient, log))
 
 		return registry, nil
 	})
@@ -543,7 +543,7 @@ func (p *PipelineAdapter) ExecuteStep(ctx context.Context, stepName string) erro
 func (p *PipelineAdapter) BeforeStep(ctx context.Context, stepName string) interfaces.HookFunc {
 	hook := p.pipeline.BeforeStep(ctx, stepName)
 	if hook == nil {
-		return func(ctx context.Context) error { return nil }
+		return func(_ context.Context) error { return nil }
 	}
 	// Convert pipelines.HookFunc to interfaces.HookFunc
 	return interfaces.HookFunc(hook)
@@ -553,7 +553,7 @@ func (p *PipelineAdapter) BeforeStep(ctx context.Context, stepName string) inter
 func (p *PipelineAdapter) AfterStep(ctx context.Context, stepName string) interfaces.HookFunc {
 	hook := p.pipeline.AfterStep(ctx, stepName)
 	if hook == nil {
-		return func(ctx context.Context) error { return nil }
+		return func(_ context.Context) error { return nil }
 	}
 	// Convert pipelines.HookFunc to interfaces.HookFunc
 	return interfaces.HookFunc(hook)

@@ -7,6 +7,7 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -47,10 +48,10 @@ func TestSyntegrityInfraPipeline_Test(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Test(ctx)
 
-	assert.NoError(t, err) // Test method returns nil
+	require.NoError(t, err) // Test method returns nil
 }
 
 func TestSyntegrityInfraPipeline_Build(t *testing.T) {
@@ -62,10 +63,10 @@ func TestSyntegrityInfraPipeline_Build(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Build(ctx)
 
-	assert.NoError(t, err) // Build method returns nil
+	require.NoError(t, err) // Build method returns nil
 }
 
 func TestSyntegrityInfraPipeline_Package(t *testing.T) {
@@ -77,10 +78,10 @@ func TestSyntegrityInfraPipeline_Package(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Package(ctx)
 
-	assert.NoError(t, err) // Package method returns nil
+	require.NoError(t, err) // Package method returns nil
 }
 
 func TestSyntegrityInfraPipeline_Tag(t *testing.T) {
@@ -92,11 +93,11 @@ func TestSyntegrityInfraPipeline_Tag(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Tag method panics with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Tag(ctx)
+		_ = pipeline.Tag(ctx)
 	}, "Tag method should panic with 'implement me'")
 }
 
@@ -109,11 +110,11 @@ func TestSyntegrityInfraPipeline_Push(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Push method panics with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Push(ctx)
+		_ = pipeline.Push(ctx)
 	}, "Push method should panic with 'implement me'")
 }
 
@@ -126,11 +127,11 @@ func TestSyntegrityInfraPipeline_Setup(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Setup(ctx)
 
 	// Setup method requires real Dagger client, so it will return error for nil client
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not nil")
 }
 
@@ -143,7 +144,7 @@ func TestSyntegrityInfraPipeline_BeforeStep(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// BeforeStep method panics with "implement me"
 	assert.Panics(t, func() {
@@ -160,7 +161,7 @@ func TestSyntegrityInfraPipeline_AfterStep(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// AfterStep method panics with "implement me"
 	assert.Panics(t, func() {
@@ -179,29 +180,29 @@ func TestSyntegrityInfraPipeline_Integration(t *testing.T) {
 	// Create pipeline with nil client (handled gracefully by New())
 	pipeline := New(nil, cfg).(*SyntegrityInfraPipeline)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test full pipeline execution - all methods should handle nil client appropriately
 	err := pipeline.Setup(ctx)
-	assert.Error(t, err) // Setup will fail due to nil client
+	require.Error(t, err) // Setup will fail due to nil client
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not nil")
 
 	err = pipeline.Test(ctx)
-	assert.NoError(t, err) // Test returns nil (no-op implementation)
+	require.NoError(t, err) // Test returns nil (no-op implementation)
 
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err) // Build returns nil (no-op implementation)
+	require.NoError(t, err) // Build returns nil (no-op implementation)
 
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err) // Package returns nil (no-op implementation)
+	require.NoError(t, err) // Package returns nil (no-op implementation)
 
 	// Tag and Push methods should panic with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Tag(ctx)
+		_ = pipeline.Tag(ctx)
 	}, "Tag method should panic with 'implement me'")
 
 	assert.Panics(t, func() {
-		pipeline.Push(ctx)
+		_ = pipeline.Push(ctx)
 	}, "Push method should panic with 'implement me'")
 }
 
@@ -236,30 +237,30 @@ func TestSyntegrityInfraPipeline_NoOpOperations(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test and Build operations should return nil (no-op implementation)
 	err := pipeline.Test(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Tag and Push operations should panic with "implement me"
 	assert.Panics(t, func() {
-		pipeline.Tag(ctx)
+		_ = pipeline.Tag(ctx)
 	}, "Tag method should panic with 'implement me'")
 
 	assert.Panics(t, func() {
-		pipeline.Push(ctx)
+		_ = pipeline.Push(ctx)
 	}, "Push method should panic with 'implement me'")
 
 	// Setup method requires real client, so it will return error for nil client
 	err = pipeline.Setup(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not nil")
 }
 
@@ -273,21 +274,22 @@ func TestSyntegrityInfraPipeline_ContextHandling(t *testing.T) {
 	}
 
 	// Test with different contexts
-	ctx1 := context.Background()
-	ctx2 := context.WithValue(context.Background(), "key", "value")
+	ctx1 := t.Context()
+	type testKey string
+	ctx2 := context.WithValue(t.Context(), testKey("test-key"), "value")
 
 	// All operations should work with any context
 	err := pipeline.Test(ctx1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Test(ctx2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Build(ctx1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Build(ctx2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestSyntegrityInfraPipeline_StepNames(t *testing.T) {
@@ -299,7 +301,7 @@ func TestSyntegrityInfraPipeline_StepNames(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test with different step names
 	stepNames := []string{"setup", "test", "build", "package", "tag", "push", "deploy", "unknown"}
@@ -326,7 +328,7 @@ func TestSyntegrityInfraPipeline_SimpleMethods(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Name method - doesn't require client
 	name := pipeline.Name()
@@ -334,15 +336,15 @@ func TestSyntegrityInfraPipeline_SimpleMethods(t *testing.T) {
 
 	// Test Test method - returns nil, doesn't require client
 	err := pipeline.Test(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Build method - returns nil, doesn't require client
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Package method - returns nil, doesn't require client
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // Test methods with mocks
@@ -362,7 +364,7 @@ func TestSyntegrityInfraPipeline_WithMocks(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Name method
 	name := pipeline.Name()
@@ -370,13 +372,13 @@ func TestSyntegrityInfraPipeline_WithMocks(t *testing.T) {
 
 	// Test Test method
 	err := pipeline.Test(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Build method
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Package method
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

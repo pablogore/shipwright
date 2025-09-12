@@ -110,7 +110,7 @@ type Flags struct {
 
 // parseFlags parses command line arguments.
 func (c *CLI) parseFlags(args []string) *Flags {
-	fs := flag.NewFlagSet("syntegrity-dagger", flag.ExitOnError)
+	flagSet := flag.NewFlagSet("syntegrity-dagger", flag.ExitOnError)
 
 	defaultGitAuth := "ssh"
 	if os.Getenv("CI_JOB_TOKEN") != "" {
@@ -119,24 +119,27 @@ func (c *CLI) parseFlags(args []string) *Flags {
 
 	flags := &Flags{}
 
-	fs.StringVar(&flags.pipelineName, "pipeline", "go-kit", "Name of the pipeline to be executed")
-	fs.Float64Var(&flags.coverage, "coverage", 90, "Minimum coverage percentage required (in: 90 for 90%)")
-	fs.StringVar(&flags.branch, "branch", "develop", "Branch name")
-	fs.StringVar(&flags.env, "env", "dev", "Environment: dev, staging, prod")
-	fs.BoolVar(&flags.skipPush, "skip-push", false, "Skip image push")
-	fs.BoolVar(&flags.onlyBuild, "only-build", false, "Run build only")
-	fs.BoolVar(&flags.onlyTest, "only-test", false, "Run only tests")
-	fs.BoolVar(&flags.verbose, "verbose", false, "Verbose mode")
-	fs.StringVar(&flags.gitRef, "git-ref", "main", "Branch name (default: main)")
-	fs.StringVar(&flags.step, "step", "", "Individual pipeline step to execute")
-	fs.StringVar(&flags.gitAuth, "git-auth", defaultGitAuth, "Git authentication method: ssh or https")
-	fs.BoolVar(&flags.listSteps, "list-steps", false, "List available steps for a pipeline")
-	fs.BoolVar(&flags.listPipelines, "list-pipelines", false, "List available pipelines")
-	fs.StringVar(&flags.configFile, "config", ".syntegrity-dagger.yml", "Configuration file path")
-	fs.BoolVar(&flags.version, "version", false, "Show version information")
-	fs.BoolVar(&flags.local, "local", false, "Run pipeline locally without Docker")
+	flagSet.StringVar(&flags.pipelineName, "pipeline", "go-kit", "Name of the pipeline to be executed")
+	flagSet.Float64Var(&flags.coverage, "coverage", 90, "Minimum coverage percentage required (in: 90 for 90%)")
+	flagSet.StringVar(&flags.branch, "branch", "develop", "Branch name")
+	flagSet.StringVar(&flags.env, "env", "dev", "Environment: dev, staging, prod")
+	flagSet.BoolVar(&flags.skipPush, "skip-push", false, "Skip image push")
+	flagSet.BoolVar(&flags.onlyBuild, "only-build", false, "Run build only")
+	flagSet.BoolVar(&flags.onlyTest, "only-test", false, "Run only tests")
+	flagSet.BoolVar(&flags.verbose, "verbose", false, "Verbose mode")
+	flagSet.StringVar(&flags.gitRef, "git-ref", "main", "Branch name (default: main)")
+	flagSet.StringVar(&flags.step, "step", "", "Individual pipeline step to execute")
+	flagSet.StringVar(&flags.gitAuth, "git-auth", defaultGitAuth, "Git authentication method: ssh or https")
+	flagSet.BoolVar(&flags.listSteps, "list-steps", false, "List available steps for a pipeline")
+	flagSet.BoolVar(&flags.listPipelines, "list-pipelines", false, "List available pipelines")
+	flagSet.StringVar(&flags.configFile, "config", ".syntegrity-dagger.yml", "Configuration file path")
+	flagSet.BoolVar(&flags.version, "version", false, "Show version information")
+	flagSet.BoolVar(&flags.local, "local", false, "Run pipeline locally without Docker")
 
-	fs.Parse(args)
+	if err := flagSet.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
 	return flags
 }
 
@@ -175,6 +178,7 @@ func (c *CLI) executePipeline(ctx context.Context, flags *Flags) error {
 		fmt.Printf("🏠 Running pipeline locally: %s (%s)\n", flags.pipelineName, flags.env)
 		fmt.Printf("📊 Coverage threshold: %.1f%%\n", flags.coverage)
 		fmt.Printf("🌿 Git ref: %s\n", flags.gitRef)
+
 		return c.executePipelineLocally(ctx, flags)
 	}
 
@@ -198,7 +202,7 @@ func (c *CLI) executeSingleStep(ctx context.Context, flags *Flags) error {
 }
 
 // listAvailableSteps lists available steps for a pipeline.
-func (c *CLI) listAvailableSteps(ctx context.Context, flags *Flags) error {
+func (c *CLI) listAvailableSteps(_ context.Context, flags *Flags) error {
 	container := c.app.GetContainer()
 	stepRegistry, err := container.Get("stepRegistry")
 	if err != nil {
@@ -211,17 +215,18 @@ func (c *CLI) listAvailableSteps(ctx context.Context, flags *Flags) error {
 	fmt.Printf("Available steps for pipeline '%s':\n", flags.pipelineName)
 
 	for i, step := range steps {
-		config, err := registry.GetStepConfig(step)
+		cfg, err := registry.GetStepConfig(step)
 		if err != nil {
 			fmt.Printf("  %d. %s (error getting config)\n", i+1, step)
+
 			continue
 		}
 
-		fmt.Printf("  %d. %s - %s\n", i+1, step, config.Description)
-		if config.Required {
-			fmt.Printf("     (Required: Yes, Timeout: %v)\n", config.Timeout)
+		fmt.Printf("  %d. %s - %s\n", i+1, step, cfg.Description)
+		if cfg.Required {
+			fmt.Printf("     (Required: Yes, Timeout: %v)\n", cfg.Timeout)
 		} else {
-			fmt.Printf("     (Required: No, Timeout: %v)\n", config.Timeout)
+			fmt.Printf("     (Required: No, Timeout: %v)\n", cfg.Timeout)
 		}
 	}
 
@@ -229,7 +234,7 @@ func (c *CLI) listAvailableSteps(ctx context.Context, flags *Flags) error {
 }
 
 // listAvailablePipelines lists available pipelines.
-func (c *CLI) listAvailablePipelines(ctx context.Context) error {
+func (c *CLI) listAvailablePipelines(_ context.Context) error {
 	container := c.app.GetContainer()
 	registry, err := container.Get("pipelineRegistry")
 	if err != nil {
@@ -240,8 +245,8 @@ func (c *CLI) listAvailablePipelines(ctx context.Context) error {
 	pipelines := pipelineRegistry.List()
 
 	fmt.Println("Available pipelines:")
-	for i, pipelineName := range pipelines {
-		fmt.Printf("  %d. %s\n", i+1, pipelineName)
+	for index, pipelineName := range pipelines {
+		fmt.Printf("  %d. %s\n", index+1, pipelineName)
 	}
 
 	return nil
@@ -320,15 +325,13 @@ func (c *CLI) executeStepLocally(ctx context.Context, flags *Flags) error {
 		return fmt.Errorf("failed to get logger: %w", err)
 	}
 
-	config := container.GetConfiguration()
-
 	// Create local executor
-	localExecutor := app.NewLocalExecutor(logger, config)
+	localExecutor := app.NewLocalExecutor(logger, container.GetConfiguration())
 
 	// Execute the step
 	logger.Info("Running pipeline step", "pipeline", flags.pipelineName, "step", flags.step)
 
-	if err := localExecutor.ExecuteStep(ctx, flags.step); err != nil {
+	if err = localExecutor.ExecuteStep(ctx, flags.step); err != nil {
 		return fmt.Errorf("pipeline step %s failed: %w", flags.step, err)
 	}
 
