@@ -97,11 +97,7 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 		netrc := fmt.Sprintf("machine gitlab.com login %s password %s", creds.User, creds.Token)
 		container = container.
 			WithEnvVariable("HOME", "/root").
-			WithNewFile("/root/.netrc", dagger.ContainerWithNewFileOpts{
-				Contents:    netrc,
-				Permissions: 0o600,
-				Owner:       "root",
-			}).
+			WithNewFile("/root/.netrc", netrc).
 			WithExec([]string{"chmod", "600", "/root/.netrc"}).
 			WithExec([]string{"git", "config", "--global", "credential.helper", "store"}).
 			WithExec([]string{"git", "config", "--global", "http.sslVerify", "false"})
