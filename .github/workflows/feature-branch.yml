@@ -3,8 +3,6 @@ name: Feature Branch CI
 on:
   push:
     branches: [ 'feature/*', 'hotfix/*', 'bugfix/*' ]
-  pull_request:
-    branches: [ develop, main ]
 
 env:
   GO_VERSION: '1.24.0'
