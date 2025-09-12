@@ -60,7 +60,7 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
+        cache: false  # Disable default cache to use our custom one
         
     - name: Configure Git and Go for private repos
       env:
@@ -81,13 +81,13 @@ jobs:
         
     - name: Clean Go module cache
       run: |
+        echo "🧹 Cleaning Go module cache..."
         # Clean any existing module cache to avoid conflicts
-        chmod -R u+w ~/go/pkg/mod 2>/dev/null || true
-        rm -rf ~/go/pkg/mod
+        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
+        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
-        # Also clean build cache
-        rm -rf ~/.cache/go-build
         mkdir -p ~/.cache/go-build
+        echo "✅ Go module cache cleaned"
         
     - name: Cache Go modules                                                      
       uses: actions/cache@v4
@@ -105,10 +105,16 @@ jobs:
     - name: Download dependencies
       env:
         ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
-      run: go mod download
+      run: |
+        echo "📦 Downloading Go dependencies..."
+        go mod download
+        echo "✅ Dependencies downloaded"
       
     - name: Verify dependencies
-      run: go mod verify
+      run: |
+        echo "🔍 Verifying dependencies..."
+        go mod verify
+        echo "✅ Dependencies verified"
 
   # Stage 3: Build (runs in parallel with tests and lint)
   build:
@@ -122,7 +128,7 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
+        cache: false  # Disable default cache to use our custom one
         
     - name: Configure Git and Go for private repos
       env:
@@ -140,6 +146,15 @@ jobs:
         # Configure Git authentication
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        
+    - name: Clean Go module cache
+      run: |
+        echo "🧹 Cleaning Go module cache..."
+        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
+        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        mkdir -p ~/go/pkg/mod
+        mkdir -p ~/.cache/go-build
+        echo "✅ Go module cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -171,7 +186,7 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
+        cache: false  # Disable default cache to use our custom one
         
     - name: Configure Git and Go for private repos
       env:
@@ -189,6 +204,15 @@ jobs:
         # Configure Git authentication
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        
+    - name: Clean Go module cache
+      run: |
+        echo "🧹 Cleaning Go module cache..."
+        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
+        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        mkdir -p ~/go/pkg/mod
+        mkdir -p ~/.cache/go-build
+        echo "✅ Go module cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -233,7 +257,7 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
+        cache: false  # Disable default cache to use our custom one
         
     - name: Configure Git and Go for private repos
       env:
@@ -251,6 +275,15 @@ jobs:
         # Configure Git authentication
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        
+    - name: Clean Go module cache
+      run: |
+        echo "🧹 Cleaning Go module cache..."
+        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
+        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        mkdir -p ~/go/pkg/mod
+        mkdir -p ~/.cache/go-build
+        echo "✅ Go module cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -285,7 +318,7 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
+        cache: false  # Disable default cache to use our custom one
         
     - name: Configure Git and Go for private repos
       env:
@@ -303,6 +336,15 @@ jobs:
         # Configure Git authentication
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        
+    - name: Clean Go module cache
+      run: |
+        echo "🧹 Cleaning Go module cache..."
+        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
+        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        mkdir -p ~/go/pkg/mod
+        mkdir -p ~/.cache/go-build
+        echo "✅ Go module cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
