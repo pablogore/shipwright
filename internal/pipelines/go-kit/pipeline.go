@@ -81,7 +81,7 @@ func (p *GoKitPipeline) Name() string {
 func (p *GoKitPipeline) Setup(ctx context.Context) error {
 	// Check if client is nil or not an adapter
 	if p.Client == nil {
-		return fmt.Errorf("Setup method requires real Dagger client, not nil")
+		return errors.New("Setup method requires real Dagger client, not nil")
 	}
 
 	if p.Cloner != nil {
@@ -97,7 +97,7 @@ func (p *GoKitPipeline) Setup(ctx context.Context) error {
 			p.Src = pipelines.NewDaggerAdapter(realClient).Host().Directory(".", pipelines.DaggerHostDirectoryOpts{})
 		} else {
 			// This is a mock client, return error
-			return fmt.Errorf("Setup method requires real Dagger client, not mock")
+			return errors.New("Setup method requires real Dagger client, not mock")
 		}
 	}
 	return nil
@@ -124,7 +124,7 @@ func (p *GoKitPipeline) Test(ctx context.Context) error {
 		}
 	}
 	// For mocks, return an error indicating this requires real client
-	return fmt.Errorf("Test method requires real Dagger client, not mock")
+	return errors.New("Test method requires real Dagger client, not mock")
 }
 
 // Build is a placeholder for the build step of the pipeline.

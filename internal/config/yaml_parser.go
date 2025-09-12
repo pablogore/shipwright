@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -124,11 +125,11 @@ func (p *YAMLParser) GetSteps(yamlConfig *YAMLConfig) []string {
 // ValidateConfig validates the YAML configuration
 func (p *YAMLParser) ValidateConfig(yamlConfig *YAMLConfig) error {
 	if yamlConfig.Pipeline.Name == "" {
-		return fmt.Errorf("pipeline name is required")
+		return errors.New("pipeline name is required")
 	}
 
 	if len(yamlConfig.Pipeline.Steps) == 0 {
-		return fmt.Errorf("at least one step must be defined")
+		return errors.New("at least one step must be defined")
 	}
 
 	// Validate steps
@@ -189,5 +190,5 @@ func (p *YAMLParser) FindConfigFile() (string, error) {
 		currentDir = parentDir
 	}
 
-	return "", fmt.Errorf("no configuration file found")
+	return "", errors.New("no configuration file found")
 }

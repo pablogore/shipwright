@@ -321,10 +321,8 @@ func (c *CLI) executeStepLocally(ctx context.Context, flags *Flags) error {
 		return fmt.Errorf("failed to get logger: %w", err)
 	}
 
-
-
 	// Create local executor
-	localExecutor := app.NewLocalExecutor(logger,  container.GetConfiguration())
+	localExecutor := app.NewLocalExecutor(logger, container.GetConfiguration())
 
 	// Execute the step
 	logger.Info("Running pipeline step", "pipeline", flags.pipelineName, "step", flags.step)

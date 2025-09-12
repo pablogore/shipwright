@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -289,7 +290,7 @@ func (cw *ConfigurationWrapper) getStringConfigMap() map[string]string {
 		KeySecurityLintTimeout: cw.Config.Security.LintTimeout,
 		KeyLogLevel:            cw.Config.Logging.Level,
 		KeyLogFormat:           cw.Config.Logging.Format,
-		KeyDaggerLogOutput:     fmt.Sprintf("%t", cw.Config.Dagger.LogOutput),
+		KeyDaggerLogOutput:     strconv.FormatBool(cw.Config.Dagger.LogOutput),
 	}
 }
 
