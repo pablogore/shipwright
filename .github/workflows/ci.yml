@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, 'feature/*', 'hotfix/*', 'bugfix/*' ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
 
@@ -29,18 +29,18 @@ jobs:
         echo "Base ref: ${{ github.base_ref }}"
         
         # Determine pipeline type based on context
-        if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
-          echo "type=main" >> $GITHUB_OUTPUT
-          echo "security=true" >> $GITHUB_OUTPUT
-          echo "coverage=true" >> $GITHUB_OUTPUT
-          echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Main branch (full pipeline)"
-        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           echo "type=pr" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
           echo "coverage=true" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Pull Request (full pipeline)"
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          echo "type=main" >> $GITHUB_OUTPUT
+          echo "security=true" >> $GITHUB_OUTPUT
+          echo "coverage=true" >> $GITHUB_OUTPUT
+          echo "release=false" >> $GITHUB_OUTPUT
+          echo "📋 Pipeline: Main branch (full pipeline)"
         else
           echo "type=feature" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT
