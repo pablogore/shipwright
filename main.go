@@ -199,7 +199,7 @@ func (c *CLI) executeSingleStep(ctx context.Context, flags *Flags) error {
 }
 
 // listAvailableSteps lists available steps for a pipeline.
-func (c *CLI) listAvailableSteps(ctx context.Context, flags *Flags) error {
+func (c *CLI) listAvailableSteps(_ context.Context, _ *Flags) error {
 	container := c.app.GetContainer()
 	stepRegistry, err := container.Get("stepRegistry")
 	if err != nil {
@@ -230,7 +230,7 @@ func (c *CLI) listAvailableSteps(ctx context.Context, flags *Flags) error {
 }
 
 // listAvailablePipelines lists available pipelines.
-func (c *CLI) listAvailablePipelines(ctx context.Context) error {
+func (c *CLI) listAvailablePipelines(_ context.Context) error {
 	container := c.app.GetContainer()
 	registry, err := container.Get("pipelineRegistry")
 	if err != nil {

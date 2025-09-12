@@ -329,7 +329,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find .syntegrity-dagger.yaml in current directory",
 			setup: func() func() {
-				os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
+				_ = os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
 				return func() { os.Remove(".syntegrity-dagger.yaml") }
 			},
 			wantErr:      false,
@@ -338,7 +338,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find syntegrity-dagger.yml in current directory",
 			setup: func() func() {
-				os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
+				_ = os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
 				return func() { os.Remove("syntegrity-dagger.yml") }
 			},
 			wantErr:      false,
@@ -347,7 +347,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find syntegrity-dagger.yaml in current directory",
 			setup: func() func() {
-				os.WriteFile("syntegrity-dagger.yaml", []byte("test"), 0644)
+				_ = os.WriteFile("syntegrity-dagger.yaml", []byte("test"), 0644)
 				return func() { os.Remove("syntegrity-dagger.yaml") }
 			},
 			wantErr:      false,

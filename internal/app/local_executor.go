@@ -104,7 +104,7 @@ func (le *LocalExecutor) executeTest(ctx context.Context) error {
 	le.logger.Info("Running tests locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - test step requires Go modules")
+		return errors.New("not a Go project - test step requires Go modules")
 	}
 
 	// Run tests with coverage
@@ -150,7 +150,7 @@ func (le *LocalExecutor) executeLint(ctx context.Context) error {
 	le.logger.Info("Running linters locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - lint step requires Go modules")
+		return errors.New("not a Go project - lint step requires Go modules")
 	}
 
 	// Run go vet
@@ -197,7 +197,7 @@ func (le *LocalExecutor) executeSecurity(ctx context.Context) error {
 	le.logger.Info("Running security checks locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - security step requires Go modules")
+		return errors.New("not a Go project - security step requires Go modules")
 	}
 
 	// Try to run gosec if available

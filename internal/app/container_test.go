@@ -545,7 +545,7 @@ func TestPipelineRegistry_Register(t *testing.T) {
 	registry := NewPipelineRegistry()
 
 	// Test registering a pipeline
-	factory := func(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
+	factory := func(_ *dagger.Client, _ interfaces.Configuration) interfaces.Pipeline {
 		return nil
 	}
 
@@ -565,7 +565,7 @@ func TestPipelineRegistry_Get(t *testing.T) {
 	registry := NewPipelineRegistry()
 
 	// Register a pipeline
-	factory := func(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
+	factory := func(_ *dagger.Client, _ interfaces.Configuration) interfaces.Pipeline {
 		return mockPipeline
 	}
 
@@ -597,7 +597,7 @@ func TestPipelineRegistry_List(t *testing.T) {
 	registry := NewPipelineRegistry()
 
 	// Register some pipelines
-	factory := func(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
+	factory := func(_ *dagger.Client, _ interfaces.Configuration) interfaces.Pipeline {
 		return nil
 	}
 
