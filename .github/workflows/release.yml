@@ -142,57 +142,6 @@ jobs:
         git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git "${{ steps.version.outputs.tag }}"
         echo "🏷️ Created and pushed tag: ${{ steps.version.outputs.tag }}"
 
-  # Job 2: Build binary for Linux (pipeline OS)
-  build:
-    runs-on: ubuntu-latest
-    needs: version
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-      
-    - name: Set up Go
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        
-    - name: Configure Git and Go for private repos
-      env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
-      run: |
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
-        chmod 600 ~/.netrc
-        # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
-        
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Build binary
-      env:
-        GOOS: ${{ matrix.os }}
-        GOARCH: ${{ matrix.arch }}
-        CGO_ENABLED: 0
-      run: |
-        OUTPUT_NAME="${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
-        go build -ldflags="-X main.Version=${{ needs.version.outputs.version }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o "$OUTPUT_NAME" .
-        echo "Built: $OUTPUT_NAME"
-        
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: binary-${{ matrix.os }}-${{ matrix.arch }}
-        path: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
-
   # Job 3: Create GitHub Release
   release:
     runs-on: ubuntu-latest
