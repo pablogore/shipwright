@@ -357,7 +357,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 			name: "find config in .github directory",
 			setup: func() func() {
 				_ = os.MkdirAll(".github", 0755)
-				os.WriteFile(".github/syntegrity-dagger.yml", []byte("test"), 0644)
+				_ = os.WriteFile(".github/syntegrity-dagger.yml", []byte("test"), 0644)
 				return func() {
 					os.Remove(".github/syntegrity-dagger.yml")
 					os.Remove(".github")
@@ -439,7 +439,7 @@ release:
 dagger:
   log_output: false
   timeout: "1m"`
-					os.WriteFile(".syntegrity-dagger.yml", []byte(configContent), 0644)
+					_ = os.WriteFile(".syntegrity-dagger.yml", []byte(configContent), 0644)
 				}
 			},
 			wantErr:     true,
@@ -477,10 +477,10 @@ func TestYAMLParser_FindConfigFile_Priority(t *testing.T) {
 	parser := NewYAMLParser()
 
 	// Create multiple config files to test priority
-	os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
+	_ = os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
 	defer os.Remove(".syntegrity-dagger.yaml")
 
-	os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
+	_ = os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
 	defer os.Remove("syntegrity-dagger.yml")
 
 	filePath, err := parser.FindConfigFile()
