@@ -6,6 +6,7 @@ import (
 
 	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewRegistry(t *testing.T) {
@@ -48,7 +49,7 @@ func TestRegistry_Get_Success(t *testing.T) {
 	pipeline, err := registry.Get(expectedName, client, cfg)
 
 	// Verify success
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, pipeline)
 	assert.Equal(t, expectedName, pipeline.Name())
 }
@@ -63,7 +64,7 @@ func TestRegistry_Get_NotFound(t *testing.T) {
 	pipeline, err := registry.Get("nonexistent-pipeline", client, cfg)
 
 	// Verify error
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, pipeline)
 	assert.Contains(t, err.Error(), "pipeline not found")
 	assert.Contains(t, err.Error(), "nonexistent-pipeline")
@@ -102,12 +103,12 @@ type mockPipeline struct {
 	name string
 }
 
-func (m *mockPipeline) Test(_ context.Context) error                             { return nil }
-func (m *mockPipeline) Build(_ context.Context) error                            { return nil }
-func (m *mockPipeline) Package(_ context.Context) error                          { return nil }
-func (m *mockPipeline) Tag(_ context.Context) error                              { return nil }
-func (m *mockPipeline) Name() string                                             { return m.name }
-func (m *mockPipeline) Setup(_ context.Context) error                            { return nil }
-func (m *mockPipeline) Push(_ context.Context) error                             { return nil }
-func (m *mockPipeline) BeforeStep(ctx context.Context, stepName string) HookFunc { return nil }
-func (m *mockPipeline) AfterStep(ctx context.Context, stepName string) HookFunc  { return nil }
+func (m *mockPipeline) Test(_ context.Context) error                    { return nil }
+func (m *mockPipeline) Build(_ context.Context) error                   { return nil }
+func (m *mockPipeline) Package(_ context.Context) error                 { return nil }
+func (m *mockPipeline) Tag(_ context.Context) error                     { return nil }
+func (m *mockPipeline) Name() string                                    { return m.name }
+func (m *mockPipeline) Setup(_ context.Context) error                   { return nil }
+func (m *mockPipeline) Push(_ context.Context) error                    { return nil }
+func (m *mockPipeline) BeforeStep(_ context.Context, _ string) HookFunc { return nil }
+func (m *mockPipeline) AfterStep(_ context.Context, _ string) HookFunc  { return nil }

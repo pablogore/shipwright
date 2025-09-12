@@ -35,61 +35,61 @@ type Configuration interface {
 
 // PipelineConfig defines pipeline configuration.
 type PipelineConfig struct {
-	Name        string  `yaml:"name" json:"name"`
-	Environment string  `yaml:"environment" json:"environment"`
-	Coverage    float64 `yaml:"coverage" json:"coverage"`
-	SkipPush    bool    `yaml:"skip_push" json:"skip_push"`
-	OnlyBuild   bool    `yaml:"only_build" json:"only_build"`
-	OnlyTest    bool    `yaml:"only_test" json:"only_test"`
-	Verbose     bool    `yaml:"verbose" json:"verbose"`
-	GoVersion   string  `yaml:"go_version" json:"go_version"`
-	JavaVersion string  `yaml:"java_version" json:"java_version"`
+	Name        string  `json:"name"         yaml:"name"`
+	Environment string  `json:"environment"  yaml:"environment"`
+	Coverage    float64 `json:"coverage"     yaml:"coverage"`
+	SkipPush    bool    `json:"skipPush"    yaml:"skipPush"`
+	OnlyBuild   bool    `json:"onlyBuild"   yaml:"onlyBuild"`
+	OnlyTest    bool    `json:"onlyTest"    yaml:"onlyTest"`
+	Verbose     bool    `json:"verbose"      yaml:"verbose"`
+	GoVersion   string  `json:"goVersion"   yaml:"goVersion"`
+	JavaVersion string  `json:"javaVersion" yaml:"javaVersion"`
 }
 
 // RegistryConfig defines container registry configuration.
 type RegistryConfig struct {
-	BaseURL string `yaml:"base_url" json:"base_url"`
-	User    string `yaml:"user" json:"user"`
-	Pass    string `yaml:"pass" json:"pass"`
-	Image   string `yaml:"image" json:"image"`
-	Tag     string `yaml:"tag" json:"tag"`
+	BaseURL string `json:"baseUrl" yaml:"baseUrl"`
+	User    string `json:"user"     yaml:"user"`
+	Pass    string `json:"pass"     yaml:"pass"`
+	Image   string `json:"image"    yaml:"image"`
+	Tag     string `json:"tag"      yaml:"tag"`
 }
 
 // SecurityConfig defines security configuration.
 type SecurityConfig struct {
-	EnableVulnCheck bool     `yaml:"enable_vuln_check" json:"enable_vuln_check"`
-	EnableLinting   bool     `yaml:"enable_linting" json:"enable_linting"`
-	LintTimeout     string   `yaml:"lint_timeout" json:"lint_timeout"`
-	ExcludePatterns []string `yaml:"exclude_patterns" json:"exclude_patterns"`
+	EnableVulnCheck bool     `json:"enableVulnCheck" yaml:"enableVulnCheck"`
+	EnableLinting   bool     `json:"enableLinting"    yaml:"enableLinting"`
+	LintTimeout     string   `json:"lintTimeout"      yaml:"lintTimeout"`
+	ExcludePatterns []string `json:"excludePatterns"  yaml:"excludePatterns"`
 }
 
 // LoggingConfig defines logging configuration.
 type LoggingConfig struct {
-	Level            string        `yaml:"level" json:"level"`
-	Format           string        `yaml:"format" json:"format"`
-	SamplingEnable   bool          `yaml:"sampling_enable" json:"sampling_enable"`
-	SamplingRate     float64       `yaml:"sampling_rate" json:"sampling_rate"`
-	SamplingInterval time.Duration `yaml:"sampling_interval" json:"sampling_interval"`
+	Level            string        `json:"level"             yaml:"level"`
+	Format           string        `json:"format"            yaml:"format"`
+	SamplingEnable   bool          `json:"samplingEnable"   yaml:"samplingEnable"`
+	SamplingRate     float64       `json:"samplingRate"     yaml:"samplingRate"`
+	SamplingInterval time.Duration `json:"samplingInterval" yaml:"samplingInterval"`
 }
 
 // GitConfig defines Git configuration.
 type GitConfig struct {
-	Repo      string `yaml:"repo" json:"repo"`
-	Ref       string `yaml:"ref" json:"ref"`
-	Protocol  string `yaml:"protocol" json:"protocol"`
-	UserEmail string `yaml:"user_email" json:"user_email"`
-	UserName  string `yaml:"user_name" json:"user_name"`
-	SSHKey    string `yaml:"ssh_key" json:"ssh_key"`
+	Repo      string `json:"repo"       yaml:"repo"`
+	Ref       string `json:"ref"        yaml:"ref"`
+	Protocol  string `json:"protocol"   yaml:"protocol"`
+	UserEmail string `json:"userEmail" yaml:"userEmail"`
+	UserName  string `json:"userName"  yaml:"userName"`
+	SSHKey    string `json:"sshKey"    yaml:"sshKey"`
 }
 
 // ReleaseConfig defines release configuration.
 type ReleaseConfig struct {
-	Enabled        bool     `yaml:"enabled" json:"enabled"`
-	UseGoreleaser  bool     `yaml:"use_goreleaser" json:"use_goreleaser"`
-	BuildTargets   []string `yaml:"build_targets" json:"build_targets"`
-	ArchiveFormats []string `yaml:"archive_formats" json:"archive_formats"`
-	Checksum       bool     `yaml:"checksum" json:"checksum"`
-	Sign           bool     `yaml:"sign" json:"sign"`
+	Enabled        bool     `json:"enabled"         yaml:"enabled"`
+	UseGoreleaser  bool     `json:"useGoreleaser"  yaml:"useGoreleaser"`
+	BuildTargets   []string `json:"buildTargets"   yaml:"buildTargets"`
+	ArchiveFormats []string `json:"archiveFormats" yaml:"archiveFormats"`
+	Checksum       bool     `json:"checksum"        yaml:"checksum"`
+	Sign           bool     `json:"sign"            yaml:"sign"`
 }
 
 // Container defines the interface for the dependency injection container.
@@ -145,15 +145,15 @@ type Pipeline interface {
 
 // StepConfig defines configuration for a pipeline step.
 type StepConfig struct {
-	Name        string            `yaml:"name" json:"name"`
-	Description string            `yaml:"description" json:"description"`
-	Required    bool              `yaml:"required" json:"required"`
-	Parallel    bool              `yaml:"parallel" json:"parallel"`
-	Timeout     time.Duration     `yaml:"timeout" json:"timeout"`
-	Retries     int               `yaml:"retries" json:"retries"`
-	DependsOn   []string          `yaml:"depends_on" json:"depends_on"`
-	Conditions  map[string]string `yaml:"conditions" json:"conditions"`
-	Metadata    map[string]any    `yaml:"metadata" json:"metadata"`
+	Name        string            `json:"name"        yaml:"name"`
+	Description string            `json:"description" yaml:"description"`
+	Required    bool              `json:"required"    yaml:"required"`
+	Parallel    bool              `json:"parallel"    yaml:"parallel"`
+	Timeout     time.Duration     `json:"timeout"     yaml:"timeout"`
+	Retries     int               `json:"retries"     yaml:"retries"`
+	DependsOn   []string          `json:"dependsOn"  yaml:"dependsOn"`
+	Conditions  map[string]string `json:"conditions"  yaml:"conditions"`
+	Metadata    map[string]any    `json:"metadata"    yaml:"metadata"`
 }
 
 // StepExecutor defines the interface for executing pipeline steps.
@@ -165,7 +165,7 @@ type StepExecutor interface {
 
 // StepResult contains the result of a step execution.
 type StepResult struct {
-	StepName  string         `json:"step_name"`
+	StepName  string         `json:"stepName"`
 	Success   bool           `json:"success"`
 	Duration  time.Duration  `json:"duration"`
 	Error     error          `json:"error,omitempty"`
@@ -266,10 +266,10 @@ type PipelineExecutor interface {
 
 // PipelineStatus represents the current status of a pipeline.
 type PipelineStatus struct {
-	PipelineName string                `json:"pipeline_name"`
+	PipelineName string                `json:"pipelineName"`
 	Status       string                `json:"status"` // running, completed, failed, cancelled
-	StartTime    time.Time             `json:"start_time"`
-	EndTime      *time.Time            `json:"end_time,omitempty"`
+	StartTime    time.Time             `json:"startTime"`
+	EndTime      *time.Time            `json:"endTime,omitempty"`
 	Duration     time.Duration         `json:"duration"`
 	Steps        map[string]StepResult `json:"steps"`
 	Metadata     map[string]any        `json:"metadata,omitempty"`

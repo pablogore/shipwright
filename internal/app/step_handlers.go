@@ -138,7 +138,7 @@ func (h *BuildStepHandler) CanHandle(stepName string) bool {
 	return stepName == "build"
 }
 
-func (h *BuildStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *BuildStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🔨 Executing build step with config: %+v\n", config)
 
 	// Example build logic
@@ -194,7 +194,7 @@ func (h *TestStepHandler) CanHandle(stepName string) bool {
 	return stepName == "test"
 }
 
-func (h *TestStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *TestStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🧪 Executing test step with config: %+v\n", config)
 
 	// Example test logic
@@ -247,7 +247,7 @@ func (h *LintStepHandler) CanHandle(stepName string) bool {
 	return stepName == "lint"
 }
 
-func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *LintStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🔍 Executing lint step with config: %+v\n", config)
 
 	// Example lint logic
@@ -300,7 +300,7 @@ func (h *SecurityStepHandler) CanHandle(stepName string) bool {
 	return stepName == "security"
 }
 
-func (h *SecurityStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *SecurityStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🔒 Executing security step with config: %+v\n", config)
 
 	// Example security logic

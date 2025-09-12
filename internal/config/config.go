@@ -19,7 +19,7 @@ import (
 var (
 	ErrPipelineNameRequired    = errors.New("pipeline name is required")
 	ErrRegistryBaseURLRequired = errors.New("registry base URL is required")
-	ErrGoVersionRequired       = errors.New("Go version is required")
+	ErrGoVersionRequired       = errors.New("go version is required")
 	ErrInvalidCoverage         = errors.New("coverage must be between 0 and 100")
 )
 

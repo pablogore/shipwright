@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -30,11 +31,11 @@ func (sr *StepRegistry) RegisterStep(stepName string, handler interfaces.StepHan
 	defer sr.mutex.Unlock()
 
 	if stepName == "" {
-		return fmt.Errorf("step name cannot be empty")
+		return errors.New("step name cannot be empty")
 	}
 
 	if handler == nil {
-		return fmt.Errorf("step handler cannot be nil")
+		return errors.New("step handler cannot be nil")
 	}
 
 	// Validate that the handler can handle this step

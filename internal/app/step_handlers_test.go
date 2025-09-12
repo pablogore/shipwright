@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -52,8 +52,8 @@ func TestBaseStepHandler_Execute(t *testing.T) {
 
 	// Base handler should return error for any step
 	config := interfaces.StepConfig{Name: "test-step"}
-	err := handler.Execute(context.Background(), "test-step", config)
-	assert.Error(t, err)
+	err := handler.Execute(t.Context(), "test-step", config)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "base step handler cannot execute step")
 }
 
@@ -91,7 +91,7 @@ func TestBaseStepHandler_Validate(t *testing.T) {
 	// Base handler should return error for any validation
 	config := interfaces.StepConfig{Name: "test-step"}
 	err := handler.Validate("test-step", config)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "base step handler cannot validate step")
 }
 
@@ -141,8 +141,8 @@ func TestSetupStepHandler_Execute(t *testing.T) {
 	mockLogger.EXPECT().Info("Starting setup step", "step", "setup", "timeout", config.Timeout, "required", config.Required).Return()
 	mockLogger.EXPECT().Error("Dagger client not available").Return()
 
-	err := handler.Execute(context.Background(), "setup", config)
-	assert.Error(t, err)
+	err := handler.Execute(t.Context(), "setup", config)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dagger client not available")
 }
 
@@ -167,8 +167,8 @@ func TestSetupStepHandler_Execute_WithClient(t *testing.T) {
 	mockLogger.EXPECT().Info("Starting setup step", "step", "setup", "timeout", config.Timeout, "required", config.Required).Return()
 	mockLogger.EXPECT().Error("Dagger client not available").Return()
 
-	err := handler.Execute(context.Background(), "setup", config)
-	assert.Error(t, err)
+	err := handler.Execute(t.Context(), "setup", config)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dagger client not available")
 }
 
@@ -210,12 +210,12 @@ func TestSetupStepHandler_Validate(t *testing.T) {
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "setup"}
 	err := handler.Validate("setup", config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Validate with incorrect step name
 	config = interfaces.StepConfig{Name: "build"}
 	err = handler.Validate("setup", config)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid step name for setup handler")
 }
 
@@ -261,8 +261,8 @@ func TestBuildStepHandler_Execute(t *testing.T) {
 	// Mock config calls
 	mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.21")
 
-	err := handler.Execute(context.Background(), "build", config)
-	assert.NoError(t, err)
+	err := handler.Execute(t.Context(), "build", config)
+	require.NoError(t, err)
 }
 
 func TestBuildStepHandler_Execute_DefaultGoVersion(t *testing.T) {
@@ -280,8 +280,8 @@ func TestBuildStepHandler_Execute_DefaultGoVersion(t *testing.T) {
 	// Mock config calls
 	mockConfig.EXPECT().GetString("pipeline.go_version").Return("")
 
-	err := handler.Execute(context.Background(), "build", config)
-	assert.NoError(t, err)
+	err := handler.Execute(t.Context(), "build", config)
+	require.NoError(t, err)
 }
 
 func TestBuildStepHandler_GetStepInfo(t *testing.T) {
@@ -322,12 +322,12 @@ func TestBuildStepHandler_Validate(t *testing.T) {
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "build"}
 	err := handler.Validate("build", config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Validate with incorrect step name
 	config = interfaces.StepConfig{Name: "setup"}
 	err = handler.Validate("build", config)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid step name for build handler")
 }
 
@@ -373,8 +373,8 @@ func TestTestStepHandler_Execute(t *testing.T) {
 	// Mock config calls
 	mockConfig.EXPECT().GetFloat("pipeline.coverage").Return(90.0)
 
-	err := handler.Execute(context.Background(), "test", config)
-	assert.NoError(t, err)
+	err := handler.Execute(t.Context(), "test", config)
+	require.NoError(t, err)
 }
 
 func TestTestStepHandler_GetStepInfo(t *testing.T) {
@@ -415,12 +415,12 @@ func TestTestStepHandler_Validate(t *testing.T) {
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "test"}
 	err := handler.Validate("test", config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Validate with incorrect step name
 	config = interfaces.StepConfig{Name: "build"}
 	err = handler.Validate("test", config)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid step name for test handler")
 }
 
@@ -466,8 +466,8 @@ func TestLintStepHandler_Execute(t *testing.T) {
 	// Mock config calls
 	mockConfig.EXPECT().GetString("security.lint_timeout").Return("5m")
 
-	err := handler.Execute(context.Background(), "lint", config)
-	assert.NoError(t, err)
+	err := handler.Execute(t.Context(), "lint", config)
+	require.NoError(t, err)
 }
 
 func TestLintStepHandler_GetStepInfo(t *testing.T) {
@@ -508,12 +508,12 @@ func TestLintStepHandler_Validate(t *testing.T) {
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "lint"}
 	err := handler.Validate("lint", config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Validate with incorrect step name
 	config = interfaces.StepConfig{Name: "build"}
 	err = handler.Validate("lint", config)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid step name for lint handler")
 }
 
@@ -559,8 +559,8 @@ func TestSecurityStepHandler_Execute(t *testing.T) {
 	// Mock config calls
 	mockConfig.EXPECT().GetBool("security.enable_vuln_check").Return(true)
 
-	err := handler.Execute(context.Background(), "security", config)
-	assert.NoError(t, err)
+	err := handler.Execute(t.Context(), "security", config)
+	require.NoError(t, err)
 }
 
 func TestSecurityStepHandler_GetStepInfo(t *testing.T) {
@@ -601,12 +601,12 @@ func TestSecurityStepHandler_Validate(t *testing.T) {
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "security"}
 	err := handler.Validate("security", config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Validate with incorrect step name
 	config = interfaces.StepConfig{Name: "build"}
 	err = handler.Validate("security", config)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid step name for security handler")
 }
 

@@ -339,7 +339,7 @@ func (r *PipelineRegistry) Get(name string, client *dagger.Client, cfg interface
 
 // List returns the names of all registered pipelines.
 func (r *PipelineRegistry) List() []string {
-	var names []string
+	names := make([]string, 0, len(r.pipelines))
 	for name := range r.pipelines {
 		names = append(names, name)
 	}
@@ -385,7 +385,7 @@ func (l *Linter) Lint(_ context.Context, _ *dagger.Directory) error {
 }
 
 // GetReport returns the linting report.
-func (l *Linter) GetReport(ctx context.Context) (string, error) {
+func (l *Linter) GetReport(_ context.Context) (string, error) {
 	// Implementation will be added later
 	return "", nil
 }
@@ -543,7 +543,7 @@ func (p *PipelineAdapter) ExecuteStep(ctx context.Context, stepName string) erro
 func (p *PipelineAdapter) BeforeStep(ctx context.Context, stepName string) interfaces.HookFunc {
 	hook := p.pipeline.BeforeStep(ctx, stepName)
 	if hook == nil {
-		return func(ctx context.Context) error { return nil }
+		return func(_ context.Context) error { return nil }
 	}
 	// Convert pipelines.HookFunc to interfaces.HookFunc
 	return interfaces.HookFunc(hook)
@@ -553,7 +553,7 @@ func (p *PipelineAdapter) BeforeStep(ctx context.Context, stepName string) inter
 func (p *PipelineAdapter) AfterStep(ctx context.Context, stepName string) interfaces.HookFunc {
 	hook := p.pipeline.AfterStep(ctx, stepName)
 	if hook == nil {
-		return func(ctx context.Context) error { return nil }
+		return func(_ context.Context) error { return nil }
 	}
 	// Convert pipelines.HookFunc to interfaces.HookFunc
 	return interfaces.HookFunc(hook)

@@ -56,7 +56,7 @@ func (r *Registry) Get(name string, client *dagger.Client, cfg Config) (Pipeline
 // Returns:
 //   - A slice of strings containing the names of all registered pipelines.
 func (r *Registry) List() []string {
-	var names []string
+	names := make([]string, 0, len(r.pipelines))
 	for name := range r.pipelines {
 		names = append(names, name)
 	}

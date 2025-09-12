@@ -19,10 +19,10 @@ type PipelineExecutor struct {
 
 // PipelineStatus represents the current status of a pipeline execution.
 type PipelineStatus struct {
-	PipelineName string                `json:"pipeline_name"`
+	PipelineName string                `json:"pipelineName"`
 	Status       string                `json:"status"` // running, completed, failed, cancelled
-	StartTime    time.Time             `json:"start_time"`
-	EndTime      *time.Time            `json:"end_time,omitempty"`
+	StartTime    time.Time             `json:"startTime"`
+	EndTime      *time.Time            `json:"endTime,omitempty"`
 	Duration     time.Duration         `json:"duration"`
 	Steps        map[string]StepResult `json:"steps"`
 	Metadata     map[string]any        `json:"metadata,omitempty"`
@@ -31,7 +31,7 @@ type PipelineStatus struct {
 
 // StepResult contains the result of a step execution.
 type StepResult struct {
-	StepName  string         `json:"step_name"`
+	StepName  string         `json:"stepName"`
 	Success   bool           `json:"success"`
 	Duration  time.Duration  `json:"duration"`
 	Error     error          `json:"error,omitempty"`
@@ -301,7 +301,7 @@ func (pe *PipelineExecutor) GetPipelineLogs(pipelineName string) ([]string, erro
 	status.mutex.RLock()
 	defer status.mutex.RUnlock()
 
-	var logs []string
+	logs := make([]string, 0, 6) // Pre-allocate with estimated capacity
 	logs = append(logs, "Pipeline: "+status.PipelineName)
 	logs = append(logs, "Status: "+status.Status)
 	logs = append(logs, "Start Time: "+status.StartTime.Format(time.RFC3339))
@@ -331,7 +331,7 @@ func (pe *PipelineExecutor) ListPipelines() []string {
 	pe.mutex.RLock()
 	defer pe.mutex.RUnlock()
 
-	var pipelines []string
+	pipelines := make([]string, 0, len(pe.status))
 	for pipelineName := range pe.status {
 		pipelines = append(pipelines, pipelineName)
 	}

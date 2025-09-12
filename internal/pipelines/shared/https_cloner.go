@@ -137,10 +137,12 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 		entries, err := dir.Entries(ctx)
 		if err != nil {
 			lastErr = fmt.Errorf("error accessing repository files: %w", err)
+
 			continue
 		}
 		if len(entries) == 0 {
 			lastErr = errors.New("repository cloned but is empty")
+
 			continue
 		}
 

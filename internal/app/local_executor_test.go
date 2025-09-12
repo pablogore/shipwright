@@ -7,6 +7,7 @@ import (
 
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -38,10 +39,10 @@ func TestLocalExecutor_ExecuteStep_Setup(t *testing.T) {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// This will fail because we don't have a real Go project, but we can test the structure
-	err := executor.ExecuteStep(context.Background(), "setup")
+	err := executor.ExecuteStep(t.Context(), "setup")
 
 	// We expect an error because we're not in a real Go project
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a Go project")
 }
 
@@ -59,10 +60,10 @@ func TestLocalExecutor_ExecuteStep_Build(t *testing.T) {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// This will fail because we don't have a real Go project, but we can test the structure
-	err := executor.ExecuteStep(context.Background(), "build")
+	err := executor.ExecuteStep(t.Context(), "build")
 
 	// We expect an error because we're not in a real Go project
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a Go project")
 }
 
@@ -81,10 +82,10 @@ func TestLocalExecutor_ExecuteStep_Test(t *testing.T) {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// This will fail because we don't have a real Go project, but we can test the structure
-	err := executor.ExecuteStep(context.Background(), "test")
+	err := executor.ExecuteStep(t.Context(), "test")
 
 	// We expect an error because we're not in a real Go project
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a Go project")
 }
 
@@ -102,10 +103,10 @@ func TestLocalExecutor_ExecuteStep_Lint(t *testing.T) {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// This will fail because we don't have a real Go project, but we can test the structure
-	err := executor.ExecuteStep(context.Background(), "lint")
+	err := executor.ExecuteStep(t.Context(), "lint")
 
 	// We expect an error because we're not in a real Go project
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a Go project")
 }
 
@@ -123,10 +124,10 @@ func TestLocalExecutor_ExecuteStep_Security(t *testing.T) {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// This will fail because we don't have a real Go project, but we can test the structure
-	err := executor.ExecuteStep(context.Background(), "security")
+	err := executor.ExecuteStep(t.Context(), "security")
 
 	// We expect an error because we're not in a real Go project
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a Go project")
 }
 
@@ -142,9 +143,9 @@ func TestLocalExecutor_ExecuteStep_Unknown(t *testing.T) {
 
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
-	err := executor.ExecuteStep(context.Background(), "unknown")
+	err := executor.ExecuteStep(t.Context(), "unknown")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported step")
 }
 
@@ -228,24 +229,24 @@ func TestLocalExecutor_CheckCoverageThreshold(t *testing.T) {
 		// Mock logger call for coverage file not found
 		mockLogger.EXPECT().Warn("Coverage file not found - skipping threshold check").Times(1)
 
-		err := executor.checkCoverageThreshold(context.Background(), 90.0)
-		assert.NoError(t, err) // Should pass because coverage file doesn't exist
+		err := executor.checkCoverageThreshold(t.Context(), 90.0)
+		require.NoError(t, err) // Should pass because coverage file doesn't exist
 	})
 
 	t.Run("coverage equals threshold", func(t *testing.T) {
 		// Mock logger call for coverage file not found
 		mockLogger.EXPECT().Warn("Coverage file not found - skipping threshold check").Times(1)
 
-		err := executor.checkCoverageThreshold(context.Background(), 90.0)
-		assert.NoError(t, err) // Should pass because coverage file doesn't exist
+		err := executor.checkCoverageThreshold(t.Context(), 90.0)
+		require.NoError(t, err) // Should pass because coverage file doesn't exist
 	})
 
 	t.Run("coverage below threshold", func(t *testing.T) {
 		// Mock logger call for coverage file not found
 		mockLogger.EXPECT().Warn("Coverage file not found - skipping threshold check").Times(1)
 
-		err := executor.checkCoverageThreshold(context.Background(), 90.0)
-		assert.NoError(t, err) // Should pass because coverage file doesn't exist
+		err := executor.checkCoverageThreshold(t.Context(), 90.0)
+		require.NoError(t, err) // Should pass because coverage file doesn't exist
 	})
 }
 
@@ -263,13 +264,13 @@ func TestLocalExecutor_ExecuteStep_ContextCancellation(t *testing.T) {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// Create a cancelled context
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // Cancel immediately
 
 	err := executor.ExecuteStep(ctx, "setup")
 
 	// We expect an error due to context cancellation or command execution
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestLocalExecutor_ExecuteStep_WithNilLogger(t *testing.T) {
@@ -281,7 +282,7 @@ func TestLocalExecutor_ExecuteStep_WithNilLogger(t *testing.T) {
 
 	// This should panic or handle gracefully
 	assert.Panics(t, func() {
-		_ = executor.ExecuteStep(context.Background(), "setup")
+		_ = executor.ExecuteStep(t.Context(), "setup")
 	})
 }
 
@@ -302,10 +303,10 @@ func TestLocalExecutor_ExecuteStep_WithNilConfig(t *testing.T) {
 	// Note: The coverage log won't happen because the step fails early
 
 	// This should use default threshold when config is nil
-	err := executor.ExecuteStep(context.Background(), "test")
+	err := executor.ExecuteStep(t.Context(), "test")
 
 	// We expect an error because we're not in a real Go project
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a Go project")
 }
 
@@ -321,10 +322,10 @@ func TestLocalExecutor_executeTest_WithGoProject(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer func() {
-		_ = os.Chdir(originalDir)
+		t.Chdir(originalDir)
 	}()
 
-	_ = os.Chdir(tempDir)
+	t.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -332,7 +333,7 @@ func TestLocalExecutor_executeTest_WithGoProject(t *testing.T) {
 go 1.21
 `
 	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a simple Go file for testing
 	goFileContent := `package main
@@ -344,7 +345,7 @@ func main() {
 }
 `
 	err = os.WriteFile("main.go", []byte(goFileContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Mock logger calls for execution (will fail at coverage check)
 	mockLogger.EXPECT().Info("Running tests locally").Times(1)
@@ -358,10 +359,10 @@ func main() {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// Test executeTest method directly
-	err = executor.executeTest(context.Background())
+	err = executor.executeTest(t.Context())
 
 	// Should fail due to low coverage (0% vs 80% threshold)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "coverage threshold not met")
 }
 
@@ -376,10 +377,10 @@ func TestLocalExecutor_executeLint_WithGoProject(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer func() {
-		_ = os.Chdir(originalDir)
+		t.Chdir(originalDir)
 	}()
 
-	_ = os.Chdir(tempDir)
+	t.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -387,7 +388,7 @@ func TestLocalExecutor_executeLint_WithGoProject(t *testing.T) {
 go 1.21
 `
 	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a simple Go file for testing
 	goFileContent := `package main
@@ -399,7 +400,7 @@ func main() {
 }
 `
 	err = os.WriteFile("main.go", []byte(goFileContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Mock logger calls for successful execution
 	mockLogger.EXPECT().Info("Running linters locally").Times(1)
@@ -414,10 +415,10 @@ func main() {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// Test executeLint method directly
-	err = executor.executeLint(context.Background())
+	err = executor.executeLint(t.Context())
 
 	// Should succeed since we have a Go project
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestLocalExecutor_executeSecurity_WithGoProject(t *testing.T) {
@@ -431,10 +432,10 @@ func TestLocalExecutor_executeSecurity_WithGoProject(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer func() {
-		_ = os.Chdir(originalDir)
+		t.Chdir(originalDir)
 	}()
 
-	_ = os.Chdir(tempDir)
+	t.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -442,7 +443,7 @@ func TestLocalExecutor_executeSecurity_WithGoProject(t *testing.T) {
 go 1.21
 `
 	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a simple Go file for testing
 	goFileContent := `package main
@@ -454,7 +455,7 @@ func main() {
 }
 `
 	err = os.WriteFile("main.go", []byte(goFileContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Mock logger calls for successful execution
 	mockLogger.EXPECT().Info("Running security checks locally").Times(1)
@@ -468,10 +469,10 @@ func main() {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// Test executeSecurity method directly
-	err = executor.executeSecurity(context.Background())
+	err = executor.executeSecurity(t.Context())
 
 	// Should succeed since we have a Go project
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestLocalExecutor_executeSetup_WithGoProject(t *testing.T) {
@@ -485,10 +486,10 @@ func TestLocalExecutor_executeSetup_WithGoProject(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer func() {
-		_ = os.Chdir(originalDir)
+		t.Chdir(originalDir)
 	}()
 
-	_ = os.Chdir(tempDir)
+	t.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -496,7 +497,7 @@ func TestLocalExecutor_executeSetup_WithGoProject(t *testing.T) {
 go 1.21
 `
 	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a simple Go file for testing
 	goFileContent := `package main
@@ -508,7 +509,7 @@ func main() {
 }
 `
 	err = os.WriteFile("main.go", []byte(goFileContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Mock logger calls for successful execution
 	mockLogger.EXPECT().Info("Setting up local environment").Times(1)
@@ -519,10 +520,10 @@ func main() {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// Test executeSetup method directly
-	err = executor.executeSetup(context.Background())
+	err = executor.executeSetup(t.Context())
 
 	// Should succeed since we have a Go project
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestLocalExecutor_executeBuild_WithGoProject(t *testing.T) {
@@ -536,10 +537,10 @@ func TestLocalExecutor_executeBuild_WithGoProject(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer func() {
-		_ = os.Chdir(originalDir)
+		t.Chdir(originalDir)
 	}()
 
-	_ = os.Chdir(tempDir)
+	t.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -547,7 +548,7 @@ func TestLocalExecutor_executeBuild_WithGoProject(t *testing.T) {
 go 1.21
 `
 	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a simple Go file for testing
 	goFileContent := `package main
@@ -559,7 +560,7 @@ func main() {
 }
 `
 	err = os.WriteFile("main.go", []byte(goFileContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Mock logger calls for successful execution
 	mockLogger.EXPECT().Info("Building application locally").Times(1)
@@ -568,10 +569,10 @@ func main() {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// Test executeBuild method directly
-	err = executor.executeBuild(context.Background())
+	err = executor.executeBuild(t.Context())
 
 	// Should succeed since we have a Go project
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestLocalExecutor_executeSecurity_WithGoProject_WithGosec(t *testing.T) {
@@ -585,10 +586,10 @@ func TestLocalExecutor_executeSecurity_WithGoProject_WithGosec(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer func() {
-		_ = os.Chdir(originalDir)
+		t.Chdir(originalDir)
 	}()
 
-	_ = os.Chdir(tempDir)
+	t.Chdir(tempDir)
 
 	// Create go.mod file
 	goModContent := `module test-project
@@ -596,7 +597,7 @@ func TestLocalExecutor_executeSecurity_WithGoProject_WithGosec(t *testing.T) {
 go 1.21
 `
 	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a simple Go file for testing
 	goFileContent := `package main
@@ -608,7 +609,7 @@ func main() {
 }
 `
 	err = os.WriteFile("main.go", []byte(goFileContent), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Mock logger calls for execution (gosec not available, govulncheck might not be available in CI)
 	mockLogger.EXPECT().Info("Running security checks locally").Times(1)
@@ -622,8 +623,8 @@ func main() {
 	executor := NewLocalExecutor(mockLogger, mockConfig)
 
 	// Test executeSecurity method directly
-	err = executor.executeSecurity(context.Background())
+	err = executor.executeSecurity(t.Context())
 
 	// Should succeed since we have a Go project
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

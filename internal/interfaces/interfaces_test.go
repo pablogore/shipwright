@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContainerError_Error(t *testing.T) {
@@ -48,7 +49,7 @@ func TestContainerError_ImplementsErrorInterface(t *testing.T) {
 		Cause:     errors.New("test error"),
 	}
 
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "container error")
 }
 
@@ -96,7 +97,7 @@ func TestPipelineError_ImplementsErrorInterface(t *testing.T) {
 		Cause:    errors.New("test error"),
 	}
 
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline error")
 }
 
@@ -141,13 +142,13 @@ func TestConfigurationError_ImplementsErrorInterface(t *testing.T) {
 		Cause: errors.New("test error"),
 	}
 
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "configuration error")
 }
 
 func TestConfigurationError_Error_WithNonStringValue(t *testing.T) {
 	// Test with a non-string value to ensure type assertion works
-	error := ConfigurationError{
+	configErr := ConfigurationError{
 		Key:   "test.key",
 		Value: 123, // non-string value
 		Cause: errors.New("type error"),
@@ -162,18 +163,18 @@ func TestConfigurationError_Error_WithNonStringValue(t *testing.T) {
 		}
 	}()
 
-	_ = error.Error()
+	_ = configErr.Error()
 }
 
 func TestConfigurationError_Error_WithStringValue(t *testing.T) {
 	// Test with a string value to ensure it works correctly
-	error := ConfigurationError{
+	configErr := ConfigurationError{
 		Key:   "test.key",
 		Value: "test-value",
 		Cause: errors.New("validation error"),
 	}
 
-	result := error.Error()
+	result := configErr.Error()
 	expected := "configuration error for key test.key with value test-value: validation error"
 	assert.Equal(t, expected, result)
 }

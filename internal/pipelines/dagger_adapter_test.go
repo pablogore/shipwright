@@ -1,7 +1,6 @@
 package pipelines
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -33,7 +32,7 @@ func TestNewDaggerAdapter(t *testing.T) {
 	assert.IsType(t, &DaggerAdapter{}, adapter)
 
 	// Test that it implements the interface
-	var daggerClient DaggerClient = adapter
+	daggerClient := adapter
 	assert.NotNil(t, daggerClient)
 }
 
@@ -95,7 +94,7 @@ func TestDaggerAdapter_WithRealClient(t *testing.T) {
 		t.Skip("Skipping integration test - set DAGGER_INTEGRATION_TEST=1 to run")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
 		t.Skip("Skipping test - cannot connect to Dagger:", err)
@@ -346,7 +345,7 @@ func TestDaggerFileAdapter_Contents(t *testing.T) {
 	fileAdapter := &DaggerFileAdapter{file: (*dagger.File)(nil)}
 
 	// Test that the method can be called (it will panic with nil file, but we're testing the method exists)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Use a function to test the panic
 	func() {

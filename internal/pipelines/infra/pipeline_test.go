@@ -51,7 +51,7 @@ func TestSyntegrityInfraPipeline_Test(t *testing.T) {
 	ctx := t.Context()
 	err := pipeline.Test(ctx)
 
-	assert.NoError(t, err) // Test method returns nil
+	require.NoError(t, err) // Test method returns nil
 }
 
 func TestSyntegrityInfraPipeline_Build(t *testing.T) {
@@ -66,7 +66,7 @@ func TestSyntegrityInfraPipeline_Build(t *testing.T) {
 	ctx := t.Context()
 	err := pipeline.Build(ctx)
 
-	assert.NoError(t, err) // Build method returns nil
+	require.NoError(t, err) // Build method returns nil
 }
 
 func TestSyntegrityInfraPipeline_Package(t *testing.T) {
@@ -81,7 +81,7 @@ func TestSyntegrityInfraPipeline_Package(t *testing.T) {
 	ctx := t.Context()
 	err := pipeline.Package(ctx)
 
-	assert.NoError(t, err) // Package method returns nil
+	require.NoError(t, err) // Package method returns nil
 }
 
 func TestSyntegrityInfraPipeline_Tag(t *testing.T) {
@@ -131,7 +131,7 @@ func TestSyntegrityInfraPipeline_Setup(t *testing.T) {
 	err := pipeline.Setup(ctx)
 
 	// Setup method requires real Dagger client, so it will return error for nil client
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not nil")
 }
 
@@ -184,17 +184,17 @@ func TestSyntegrityInfraPipeline_Integration(t *testing.T) {
 
 	// Test full pipeline execution - all methods should handle nil client appropriately
 	err := pipeline.Setup(ctx)
-	assert.Error(t, err) // Setup will fail due to nil client
+	require.Error(t, err) // Setup will fail due to nil client
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not nil")
 
 	err = pipeline.Test(ctx)
-	assert.NoError(t, err) // Test returns nil (no-op implementation)
+	require.NoError(t, err) // Test returns nil (no-op implementation)
 
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err) // Build returns nil (no-op implementation)
+	require.NoError(t, err) // Build returns nil (no-op implementation)
 
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err) // Package returns nil (no-op implementation)
+	require.NoError(t, err) // Package returns nil (no-op implementation)
 
 	// Tag and Push methods should panic with "implement me"
 	assert.Panics(t, func() {
@@ -260,7 +260,7 @@ func TestSyntegrityInfraPipeline_NoOpOperations(t *testing.T) {
 
 	// Setup method requires real client, so it will return error for nil client
 	err = pipeline.Setup(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Setup method requires real Dagger client, not nil")
 }
 
@@ -274,8 +274,9 @@ func TestSyntegrityInfraPipeline_ContextHandling(t *testing.T) {
 	}
 
 	// Test with different contexts
-	ctx1 := context.Background()
-	ctx2 := context.WithValue(context.Background(), "test-key", "value")
+	ctx1 := t.Context()
+	type testKey string
+	ctx2 := context.WithValue(t.Context(), testKey("test-key"), "value")
 
 	// All operations should work with any context
 	err := pipeline.Test(ctx1)
@@ -288,7 +289,7 @@ func TestSyntegrityInfraPipeline_ContextHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	err = pipeline.Build(ctx2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestSyntegrityInfraPipeline_StepNames(t *testing.T) {
@@ -335,15 +336,15 @@ func TestSyntegrityInfraPipeline_SimpleMethods(t *testing.T) {
 
 	// Test Test method - returns nil, doesn't require client
 	err := pipeline.Test(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Build method - returns nil, doesn't require client
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Package method - returns nil, doesn't require client
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // Test methods with mocks
@@ -371,13 +372,13 @@ func TestSyntegrityInfraPipeline_WithMocks(t *testing.T) {
 
 	// Test Test method
 	err := pipeline.Test(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Build method
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Package method
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

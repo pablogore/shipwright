@@ -16,25 +16,25 @@ type YAMLConfig struct {
 		Name        string   `yaml:"name"`
 		Environment string   `yaml:"environment"`
 		Coverage    float64  `yaml:"coverage"`
-		GoVersion   string   `yaml:"go_version"`
+		GoVersion   string   `yaml:"goVersion"`
 		Steps       []string `yaml:"steps"`
 	} `yaml:"pipeline"`
 
 	Registry struct {
-		BaseURL string `yaml:"base_url"`
+		BaseURL string `yaml:"baseUrl"`
 		Image   string `yaml:"image"`
 		User    string `yaml:"user"`
 	} `yaml:"registry"`
 
 	Security struct {
-		EnableVulnCheck bool `yaml:"enable_vuln_check"`
-		EnableLinting   bool `yaml:"enable_linting"`
+		EnableVulnCheck bool `yaml:"enableVulnCheck"`
+		EnableLinting   bool `yaml:"enableLinting"`
 	} `yaml:"security"`
 
 	Release struct {
 		Enabled             bool     `yaml:"enabled"`
-		UseGoreleaser       bool     `yaml:"use_goreleaser"`
-		CreateGithubRelease bool     `yaml:"create_github_release"`
+		UseGoreleaser       bool     `yaml:"useGoreleaser"`
+		CreateGithubRelease bool     `yaml:"createGithubRelease"`
 		Platforms           []string `yaml:"platforms"`
 	} `yaml:"release"`
 
