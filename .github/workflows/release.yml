@@ -1,5 +1,6 @@
 name: Release Pipeline
 
+# GitHub Actions workflow for automated releases
 on:
   push:
     branches: [ main ]
