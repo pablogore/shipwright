@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: '1.24.0'
+  GO_VERSION: '1.25.1'
   CACHE_VERSION: v1
 
 jobs:
