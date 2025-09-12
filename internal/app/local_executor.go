@@ -83,7 +83,7 @@ func (le *LocalExecutor) executeBuild(ctx context.Context) error {
 	le.logger.Info("Building application locally")
 
 	if !le.isGoProject() {
-		return fmt.Errorf("not a Go project - build step requires Go modules")
+		return errors.New("not a Go project - build step requires Go modules")
 	}
 
 	// Build the application

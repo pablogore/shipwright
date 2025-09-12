@@ -102,12 +102,12 @@ type mockPipeline struct {
 	name string
 }
 
-func (m *mockPipeline) Test(_ context.Context) error                           { return nil }
-func (m *mockPipeline) Build(_ context.Context) error                          { return nil }
-func (m *mockPipeline) Package(_ context.Context) error                        { return nil }
-func (m *mockPipeline) Tag(ctx context.Context) error                            { return nil }
+func (m *mockPipeline) Test(_ context.Context) error                             { return nil }
+func (m *mockPipeline) Build(_ context.Context) error                            { return nil }
+func (m *mockPipeline) Package(_ context.Context) error                          { return nil }
+func (m *mockPipeline) Tag(_ context.Context) error                              { return nil }
 func (m *mockPipeline) Name() string                                             { return m.name }
-func (m *mockPipeline) Setup(ctx context.Context) error                          { return nil }
-func (m *mockPipeline) Push(ctx context.Context) error                           { return nil }
+func (m *mockPipeline) Setup(_ context.Context) error                            { return nil }
+func (m *mockPipeline) Push(_ context.Context) error                             { return nil }
 func (m *mockPipeline) BeforeStep(ctx context.Context, stepName string) HookFunc { return nil }
 func (m *mockPipeline) AfterStep(ctx context.Context, stepName string) HookFunc  { return nil }

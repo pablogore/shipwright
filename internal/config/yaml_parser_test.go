@@ -68,7 +68,7 @@ func TestYAMLParser_ParseFile(t *testing.T) {
 			wantErr:     true,
 			errContains: "failed to parse YAML configuration",
 			setup: func() func() {
-				os.WriteFile("invalid.yml", []byte("invalid: yaml: content: ["), 0644)
+				_ = os.WriteFile("invalid.yml", []byte("invalid: yaml: content: ["), 0644)
 				return func() { os.Remove("invalid.yml") }
 			},
 		},
@@ -78,7 +78,7 @@ func TestYAMLParser_ParseFile(t *testing.T) {
 			filePath: "empty.yml",
 			wantErr:  false,
 			setup: func() func() {
-				os.WriteFile("empty.yml", []byte(""), 0644)
+				_ = os.WriteFile("empty.yml", []byte(""), 0644)
 				return func() { os.Remove("empty.yml") }
 			},
 		},
@@ -320,7 +320,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		{
 			name: "find .syntegrity-dagger.yml in current directory",
 			setup: func() func() {
-				os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
+				_ = os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
 				return func() { os.Remove(".syntegrity-dagger.yml") }
 			},
 			wantErr:      false,

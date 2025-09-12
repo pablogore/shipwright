@@ -257,7 +257,7 @@ func (h *LintStepHandler) Execute(ctx context.Context, stepName string, config i
 	return nil
 }
 
-func (h *LintStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *LintStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "lint",
 		Description: "Run code linting and formatting checks",
@@ -310,7 +310,7 @@ func (h *SecurityStepHandler) Execute(ctx context.Context, stepName string, conf
 	return nil
 }
 
-func (h *SecurityStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *SecurityStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "security",
 		Description: "Run security scans and vulnerability checks",

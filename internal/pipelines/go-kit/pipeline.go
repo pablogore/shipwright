@@ -154,7 +154,7 @@ func (p *GoKitPipeline) Build(ctx context.Context) error {
 		}
 	}
 	// For mocks, return an error indicating this requires real client
-	return fmt.Errorf("Build method requires real Dagger client, not mock")
+	return errors.New("Build method requires real Dagger client, not mock")
 }
 
 // Package is a placeholder for the packaging step of the pipeline.
@@ -191,7 +191,7 @@ func (p *GoKitPipeline) Tag(ctx context.Context) error {
 		}
 	}
 	// For mocks, return an error indicating this requires real client
-	return fmt.Errorf("Tag method requires real Dagger client, not mock")
+	return errors.New("Tag method requires real Dagger client, not mock")
 }
 
 // Push is a placeholder for the push step of the pipeline.
