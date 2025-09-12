@@ -105,7 +105,7 @@ deps: ## Download and tidy dependencies
 tools-install: ## Install development tools (golangci-lint, goreleaser)
 	@echo -e "$(BLUE)Installing development tools...$(NC)"
 	@echo -e "$(YELLOW)Installing golangci-lint via install script...$(NC)"
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.4.0
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.65.0
 	@echo -e "$(YELLOW)Verifying golangci-lint installation...$(NC)"
 	@golangci-lint --version
 	@echo -e "$(YELLOW)Installing goreleaser...$(NC)"
