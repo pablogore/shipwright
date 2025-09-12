@@ -19,7 +19,7 @@ func TestRegistry_Register(t *testing.T) {
 	registry := NewRegistry()
 
 	// Create a mock factory function
-	factory := func(client *dagger.Client, cfg Config) Pipeline {
+	factory := func(_ *dagger.Client, _ Config) Pipeline {
 		return &mockPipeline{name: "test-pipeline"}
 	}
 
@@ -36,7 +36,7 @@ func TestRegistry_Get_Success(t *testing.T) {
 
 	// Register a pipeline
 	expectedName := "test-pipeline"
-	factory := func(client *dagger.Client, cfg Config) Pipeline {
+	factory := func(_ *dagger.Client, _ Config) Pipeline {
 		return &mockPipeline{name: expectedName}
 	}
 	registry.Register(expectedName, factory)
@@ -77,13 +77,13 @@ func TestRegistry_List(t *testing.T) {
 	assert.Empty(t, names)
 
 	// Register some pipelines
-	registry.Register("pipeline-1", func(client *dagger.Client, cfg Config) Pipeline {
+	registry.Register("pipeline-1", func(_ *dagger.Client, _ Config) Pipeline {
 		return &mockPipeline{name: "pipeline-1"}
 	})
-	registry.Register("pipeline-2", func(client *dagger.Client, cfg Config) Pipeline {
+	registry.Register("pipeline-2", func(_ *dagger.Client, _ Config) Pipeline {
 		return &mockPipeline{name: "pipeline-2"}
 	})
-	registry.Register("pipeline-3", func(client *dagger.Client, cfg Config) Pipeline {
+	registry.Register("pipeline-3", func(_ *dagger.Client, _ Config) Pipeline {
 		return &mockPipeline{name: "pipeline-3"}
 	})
 
@@ -102,9 +102,9 @@ type mockPipeline struct {
 	name string
 }
 
-func (m *mockPipeline) Test(ctx context.Context) error                           { return nil }
-func (m *mockPipeline) Build(ctx context.Context) error                          { return nil }
-func (m *mockPipeline) Package(ctx context.Context) error                        { return nil }
+func (m *mockPipeline) Test(_ context.Context) error                           { return nil }
+func (m *mockPipeline) Build(_ context.Context) error                          { return nil }
+func (m *mockPipeline) Package(_ context.Context) error                        { return nil }
 func (m *mockPipeline) Tag(ctx context.Context) error                            { return nil }
 func (m *mockPipeline) Name() string                                             { return m.name }
 func (m *mockPipeline) Setup(ctx context.Context) error                          { return nil }

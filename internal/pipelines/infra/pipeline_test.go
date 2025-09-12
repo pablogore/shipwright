@@ -7,6 +7,7 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -47,7 +48,7 @@ func TestSyntegrityInfraPipeline_Test(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Test(ctx)
 
 	assert.NoError(t, err) // Test method returns nil
@@ -62,7 +63,7 @@ func TestSyntegrityInfraPipeline_Build(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Build(ctx)
 
 	assert.NoError(t, err) // Build method returns nil
@@ -77,7 +78,7 @@ func TestSyntegrityInfraPipeline_Package(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Package(ctx)
 
 	assert.NoError(t, err) // Package method returns nil
@@ -92,7 +93,7 @@ func TestSyntegrityInfraPipeline_Tag(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Tag method panics with "implement me"
 	assert.Panics(t, func() {
@@ -109,7 +110,7 @@ func TestSyntegrityInfraPipeline_Push(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Push method panics with "implement me"
 	assert.Panics(t, func() {
@@ -126,7 +127,7 @@ func TestSyntegrityInfraPipeline_Setup(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := pipeline.Setup(ctx)
 
 	// Setup method requires real Dagger client, so it will return error for nil client
@@ -143,7 +144,7 @@ func TestSyntegrityInfraPipeline_BeforeStep(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// BeforeStep method panics with "implement me"
 	assert.Panics(t, func() {
@@ -160,7 +161,7 @@ func TestSyntegrityInfraPipeline_AfterStep(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// AfterStep method panics with "implement me"
 	assert.Panics(t, func() {
@@ -179,7 +180,7 @@ func TestSyntegrityInfraPipeline_Integration(t *testing.T) {
 	// Create pipeline with nil client (handled gracefully by New())
 	pipeline := New(nil, cfg).(*SyntegrityInfraPipeline)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test full pipeline execution - all methods should handle nil client appropriately
 	err := pipeline.Setup(ctx)
@@ -236,17 +237,17 @@ func TestSyntegrityInfraPipeline_NoOpOperations(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test and Build operations should return nil (no-op implementation)
 	err := pipeline.Test(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Build(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pipeline.Package(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Tag and Push operations should panic with "implement me"
 	assert.Panics(t, func() {
@@ -274,7 +275,7 @@ func TestSyntegrityInfraPipeline_ContextHandling(t *testing.T) {
 
 	// Test with different contexts
 	ctx1 := context.Background()
-	ctx2 := context.WithValue(context.Background(), "key", "value")
+	ctx2 := context.WithValue(context.Background(), "test-key", "value")
 
 	// All operations should work with any context
 	err := pipeline.Test(ctx1)
@@ -299,7 +300,7 @@ func TestSyntegrityInfraPipeline_StepNames(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test with different step names
 	stepNames := []string{"setup", "test", "build", "package", "tag", "push", "deploy", "unknown"}
@@ -326,7 +327,7 @@ func TestSyntegrityInfraPipeline_SimpleMethods(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Name method - doesn't require client
 	name := pipeline.Name()
@@ -362,7 +363,7 @@ func TestSyntegrityInfraPipeline_WithMocks(t *testing.T) {
 		Cloner: nil,
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Name method
 	name := pipeline.Name()

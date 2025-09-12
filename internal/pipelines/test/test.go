@@ -16,7 +16,7 @@ type Testable interface {
 
 // New returns a Testable implementation based on the configured language.
 // Extend this switch to support other languages.
-func New(client *dagger.Client, src *dagger.Directory, cfg pipelines.Config, language string) Testable {
+func New(client *dagger.Client, _ *dagger.Directory, cfg pipelines.Config, language string) Testable {
 	switch language {
 	case "go":
 		// Only create adapter if client is not nil
