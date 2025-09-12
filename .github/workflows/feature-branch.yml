@@ -47,6 +47,9 @@ jobs:
         chmod -R u+w ~/go/pkg/mod 2>/dev/null || true
         rm -rf ~/go/pkg/mod
         mkdir -p ~/go/pkg/mod
+        # Also clean build cache
+        rm -rf ~/.cache/go-build
+        mkdir -p ~/.cache/go-build
         
     - name: Cache Go modules                                                      
       uses: actions/cache@v4
@@ -54,10 +57,12 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}
+        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
         restore-keys: |
+          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
+        fail-on-cache-miss: false
           
     - name: Download dependencies
       env:
@@ -104,10 +109,12 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}
+        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
         restore-keys: |
+          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
+        fail-on-cache-miss: false
           
     - name: Build
       run: go build ./...
@@ -149,10 +156,12 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}
+        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
         restore-keys: |
+          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
+        fail-on-cache-miss: false
           
     - name: Run tests
       run: go test -race -coverprofile=coverage.out ./...
@@ -194,10 +203,12 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}
+        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
         restore-keys: |
+          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
+        fail-on-cache-miss: false
           
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
