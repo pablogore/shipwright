@@ -1,13 +1,14 @@
-# GoReleaser configuration for Syntegrity Dagger
+# GoReleaser configuration for syntegrity-dagger
 # https://goreleaser.com/
 
-project_name: syntegrity-dagger
+before:
+  hooks:
+    - go mod download
+    - go mod verify
 
-# Build configuration
 builds:
-  - id: syntegrity-dagger
-    binary: syntegrity-dagger
-    main: ./main.go
+  - env:
+      - CGO_ENABLED=0
     goos:
       - linux
       - darwin
@@ -22,77 +23,76 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
-    env:
-      - CGO_ENABLED=0
+    binary: syntegrity-dagger
 
-# Archive configuration
 archives:
-  - id: syntegrity-dagger
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
-      - LICENSE
-      - examples/
-      - .syntegrity-dagger.yml
+      - LICENSE*
+      - CHANGELOG*
 
-# Checksums
 checksum:
   name_template: 'checksums.txt'
-  algorithm: sha256
 
-# Snapshots
 snapshot:
   name_template: "{{ .Tag }}-next"
 
-# Changelog
 changelog:
   sort: asc
   filters:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^ci:'
+      - '^build:'
+  use: git
+  git:
+    format: |
+      ## {{ .Tag }}
+      
+      {{ range .Commits -}}
+      - {{ .Subject }} ({{ .Hash.Short }})
+      {{ end }}
 
-# Release configuration
 release:
   github:
     owner: getsyntegrity
     name: syntegrity-dagger
   draft: false
   prerelease: auto
-  mode: replace
+  name_template: "Release {{ .Tag }}"
   header: |
-    ## 🚀 Syntegrity Dagger Release {{ .Tag }}
+    ## 🚀 Release {{ .Tag }}
     
     This release includes the following changes:
   footer: |
     ## 📦 Installation
     
-    ### Using Go
+    Download the appropriate binary for your platform and architecture.
+    
+    ### Quick Install
+    
     ```bash
-    go install gitlab.com/syntegrity/syntegrity-infra@{{ .Tag }}
+    # Linux/macOS
+    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/{{ .Tag }}/syntegrity-dagger_{{ .Version }}_$(uname -s)_$(uname -m).tar.gz | tar xz
+    sudo mv syntegrity-dagger /usr/local/bin/
+    
+    # Windows
+    # Download the .zip file and extract syntegrity-dagger.exe
     ```
-    
-    ### Using Binary
-    Download the appropriate binary for your platform from the assets below.
-    
-    ## 🔧 Usage
-    
-    See the [examples](examples/) directory for usage examples.
-    
-    ## 📚 Documentation
-    
-    For more information, visit the [project documentation](https://github.com/getsyntegrity/syntegrity-dagger).
 
-# Docker configuration (optional)
 dockers:
-  - id: syntegrity-dagger
-    image_templates:
-      - "getsyntegrity/syntegrity-dagger:{{ .Version }}"
-      - "getsyntegrity/syntegrity-dagger:latest"
+  - image_templates:
+      - "ghcr.io/getsyntegrity/syntegrity-dagger:{{ .Version }}"
+      - "ghcr.io/getsyntegrity/syntegrity-dagger:latest"
     dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
     build_flag_templates:
       - --label=org.opencontainers.image.title={{ .ProjectName }}
       - --label=org.opencontainers.image.description={{ .ProjectName }}
@@ -102,54 +102,3 @@ dockers:
       - --label=org.opencontainers.image.created={{ .Date }}
       - --label=org.opencontainers.image.revision={{ .FullCommit }}
       - --label=org.opencontainers.image.licenses=MIT
-
-# Homebrew formula (optional)
-brews:
-  - name: syntegrity-dagger
-    tap:
-      owner: getsyntegrity
-      name: homebrew-tap
-    folder: Formula
-    description: "Syntegrity Dagger - CI/CD Pipeline Tool"
-    homepage: "https://github.com/getsyntegrity/syntegrity-dagger"
-    license: "MIT"
-    skip_upload: auto
-    dependencies:
-      - name: go
-        type: build
-    test: |
-      system "#{bin}/syntegrity-dagger --version"
-
-# Scoop manifest (optional)
-scoops:
-  - name: syntegrity-dagger
-    bucket:
-      owner: getsyntegrity
-      name: scoop-bucket
-    description: "Syntegrity Dagger - CI/CD Pipeline Tool"
-    homepage: "https://github.com/getsyntegrity/syntegrity-dagger"
-    license: "MIT"
-    skip_upload: auto
-
-# NFPM (for .deb, .rpm packages)
-nfpms:
-  - id: syntegrity-dagger
-    package_name: syntegrity-dagger
-    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    description: "Syntegrity Dagger - CI/CD Pipeline Tool"
-    homepage: "https://github.com/getsyntegrity/syntegrity-dagger"
-    license: "MIT"
-    maintainer: "Syntegrity Team <team@syntegrity.com>"
-    vendor: "Syntegrity"
-    formats:
-      - deb
-      - rpm
-    contents:
-      - src: syntegrity-dagger
-        dst: /usr/local/bin/syntegrity-dagger
-      - src: README.md
-        dst: /usr/share/doc/syntegrity-dagger/README.md
-      - src: examples/
-        dst: /usr/share/doc/syntegrity-dagger/examples/
-      - src: .syntegrity-dagger.yml
-        dst: /etc/syntegrity-dagger/config.yml
