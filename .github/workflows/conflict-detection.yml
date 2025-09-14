@@ -107,6 +107,9 @@ jobs:
             echo "⚠️ Multiple workflow files modified ($WORKFLOW_COUNT files)"
             CONFLICT_RISK="high"
           fi
+        else
+          # Para push events, no hay análisis de archivos modificados
+          echo "ℹ️ Push event - skipping file modification analysis"
         fi
         
         echo "conflict-risk=$CONFLICT_RISK" >> $GITHUB_OUTPUT
