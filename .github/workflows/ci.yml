@@ -119,17 +119,28 @@ jobs:
           echo "Using provided version: $VERSION"
         else
           # Get latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           echo "Latest tag: $LATEST_TAG"
           
-          # Extract version number
-          VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-          echo "Version number: $VERSION_NUMBER"
-          
-          # Determine version bump based on commit messages
-          COMMITS=$(git log --oneline $LATEST_TAG..HEAD)
-          echo "Commits since $LATEST_TAG:"
-          echo "$COMMITS"
+          if [[ -n "$LATEST_TAG" ]]; then
+            # Extract version number
+            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+            echo "Version number: $VERSION_NUMBER"
+            
+            # Determine version bump based on commit messages
+            COMMITS=$(git log --oneline $LATEST_TAG..HEAD)
+            echo "Commits since $LATEST_TAG:"
+            echo "$COMMITS"
+          else
+            # No tags exist, start from v0.0.0
+            VERSION_NUMBER="0.0.0"
+            echo "No tags found, starting from v0.0.0"
+            
+            # Get all commits
+            COMMITS=$(git log --oneline --max-count=10)
+            echo "Recent commits:"
+            echo "$COMMITS"
+          fi
           
           # Check for conventional commits
           if echo "$COMMITS" | grep -q "feat!:\|BREAKING CHANGE"; then
