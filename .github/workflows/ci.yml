@@ -88,13 +88,18 @@ jobs:
           echo "coverage=true" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Pull Request (full pipeline)"
-        elif [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
-          # Main/Develop branches: full pipeline only (no release)
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           echo "type=main" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
           echo "coverage=true" >> $GITHUB_OUTPUT
+          echo "release=true" >> $GITHUB_OUTPUT
+          echo "📋 Pipeline: Main branch (full pipeline + release)"
+        elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          echo "type=develop" >> $GITHUB_OUTPUT
+          echo "security=true" >> $GITHUB_OUTPUT
+          echo "coverage=true" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Main/Develop branch (full pipeline)"
+          echo "📋 Pipeline: Develop branch (CI/CD only, no releases)"
         else
           echo "type=feature" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT
@@ -105,6 +110,7 @@ jobs:
         
     - name: Determine version
       id: version
+      if: ${{ steps.determine.outputs.is-release == 'true' }}
       run: |
         echo "🏷️ Determining version..."
         
@@ -185,6 +191,7 @@ jobs:
         
     - name: Generate changelog
       id: changelog
+      if: ${{ steps.determine.outputs.is-release == 'true' }}
       run: |
         echo "📝 Generating changelog..."
         
