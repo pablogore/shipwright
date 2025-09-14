@@ -1,29 +1,25 @@
-name: Release Pipeline
+name: Pre-release Pipeline
 
-# GitHub Actions workflow for automated releases
+# GitHub Actions workflow for pre-releases from develop branch
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
-    types: [ closed ]
+    branches: [ develop ]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.0.0)'
+        description: 'Pre-release version (e.g., v0.1.0-beta.1)'
         required: false
         default: ''
-      version_type:
-        description: 'Version bump type'
+      prerelease_type:
+        description: 'Pre-release type'
         required: false
-        default: 'auto'
+        default: 'beta'
         type: choice
         options:
-          - auto
-          - major
-          - minor
-          - patch
+          - alpha
+          - beta
+          - rc
+
 permissions:
   contents: write
   packages: write
@@ -33,12 +29,11 @@ env:
   GO_VERSION: '1.25.1'
   BINARY_NAME: 'syntegrity-dagger'
   RELEASE_DIR: 'release'
+
 jobs:
-  # Job 1: Determine version and create tag
+  # Job 1: Determine pre-release version and create tag
   version:
     runs-on: ubuntu-latest
-    # Only run on main branch pushes, tag pushes, or manual dispatch
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.base_ref == 'main')
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -55,83 +50,72 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Configure Git
+    - name: Configure Git and Go for private repos
+      env:
+        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
       run: |
+        # Configure Go to treat getsyntegrity repos as private
+        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        # Create .netrc file for authentication
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        chmod 600 ~/.netrc
+        # Configure Git authentication
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
-    - name: Determine version
+    - name: Determine pre-release version
       id: version
       run: |
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           if [[ -n "${{ github.event.inputs.version }}" ]]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            # Use version_type input for manual bump
-            VERSION_TYPE="${{ github.event.inputs.version_type }}"
+            # Generate pre-release version based on type
+            PRERELEASE_TYPE="${{ github.event.inputs.prerelease_type }}"
             LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-            VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//')
+            VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//' | sed 's/-.*//')
             MAJOR=$(echo $VERSION_NUM | cut -d. -f1)
             MINOR=$(echo $VERSION_NUM | cut -d. -f2)
             PATCH=$(echo $VERSION_NUM | cut -d. -f3)
             
-            case $VERSION_TYPE in
-              "major")
-                MAJOR=$((MAJOR + 1))
-                MINOR=0
-                PATCH=0
-                ;;
-              "minor")
-                MINOR=$((MINOR + 1))
-                PATCH=0
-                ;;
-              "patch"|"auto")
-                PATCH=$((PATCH + 1))
-                ;;
-            esac
-            VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+            # For pre-releases, increment minor version
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            
+            # Find existing pre-release number for this type
+            EXISTING_PRERELEASES=$(git tag -l "v${MAJOR}.${MINOR}.${PATCH}-${PRERELEASE_TYPE}.*" | wc -l)
+            PRERELEASE_NUM=$((EXISTING_PRERELEASES + 1))
+            
+            VERSION="v${MAJOR}.${MINOR}.${PATCH}-${PRERELEASE_TYPE}.${PRERELEASE_NUM}"
           fi
         else
-          # Auto-increment version based on conventional commits
+          # Auto-generate pre-release version from develop
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
-          
-          # Extract version numbers
-          VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//')
+          VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//' | sed 's/-.*//')
           MAJOR=$(echo $VERSION_NUM | cut -d. -f1)
           MINOR=$(echo $VERSION_NUM | cut -d. -f2)
           PATCH=$(echo $VERSION_NUM | cut -d. -f3)
           
-          # Determine version bump based on conventional commits since last tag
-          if [[ -n "$LATEST_TAG" ]]; then
-            COMMITS=$(git log --pretty=format:"%s" $LATEST_TAG..HEAD)
-          else
-            COMMITS=$(git log --pretty=format:"%s" --max-count=50)
-          fi
+          # For develop branch, increment minor version
+          MINOR=$((MINOR + 1))
+          PATCH=0
           
-          # Check for breaking changes (major version bump)
-          if echo "$COMMITS" | grep -qE "^(feat|fix|perf|refactor)(\(.+\))?!:"; then
-            echo "🚨 Breaking changes detected - major version bump"
-            MAJOR=$((MAJOR + 1))
-            MINOR=0
-            PATCH=0
-          # Check for new features (minor version bump)
-          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
-            echo "✨ New features detected - minor version bump"
-            MINOR=$((MINOR + 1))
-            PATCH=0
-          # Default to patch version bump
-          else
-            echo "🔧 Bug fixes and improvements - patch version bump"
-            PATCH=$((PATCH + 1))
-          fi
+          # Find existing beta pre-releases for this version
+          EXISTING_BETAS=$(git tag -l "v${MAJOR}.${MINOR}.${PATCH}-beta.*" | wc -l)
+          BETA_NUM=$((EXISTING_BETAS + 1))
           
-          VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          VERSION="v${MAJOR}.${MINOR}.${PATCH}-beta.${BETA_NUM}"
         fi
         
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$VERSION" >> $GITHUB_OUTPUT
-        echo "🎯 Determined version: $VERSION"
+        echo "🎯 Determined pre-release version: $VERSION"
         
     - name: Generate changelog
       id: changelog
@@ -147,9 +131,9 @@ jobs:
         
         # Create changelog file
         cat > CHANGELOG.md << EOF
-        # Changelog - ${{ steps.version.outputs.version }}
+        # Pre-release Changelog - ${{ steps.version.outputs.version }}
         
-        ## Changes in this release:
+        ## Changes in this pre-release:
         $CHANGELOG
         
         ## Full Changelog
@@ -160,13 +144,13 @@ jobs:
         cat CHANGELOG.md >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
         
-        echo "📝 Generated changelog"
+        echo "📝 Generated pre-release changelog"
         
     - name: Create and push tag
       run: |
-        git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+        git tag -a "${{ steps.version.outputs.tag }}" -m "Pre-release ${{ steps.version.outputs.tag }}"
         git push origin "${{ steps.version.outputs.tag }}"
-        echo "🏷️ Created and pushed tag: ${{ steps.version.outputs.tag }}"
+        echo "🏷️ Created and pushed pre-release tag: ${{ steps.version.outputs.tag }}"
 
   # Job 2: Build binaries for multiple platforms
   build-binaries:
@@ -202,27 +186,36 @@ jobs:
     - name: Configure Git and Go for private repos
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
       run: |
-        # Tag is already created by the version job, no need to create it again
-        echo "🏷️ Using tag from version job: ${{ needs.version.outputs.tag }}"
-<<<<<<< HEAD
-=======
+        # Configure Go to treat getsyntegrity repos as private
+        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        # Create .netrc file for authentication
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        chmod 600 ~/.netrc
+        # Configure Git authentication
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        echo "🏷️ Using pre-release tag from version job: ${{ needs.version.outputs.tag }}"
         
     - name: Build binary
       run: |
-        echo "🔨 Building binary for ${{ matrix.os }}/${{ matrix.arch }}..."
+        echo "🔨 Building pre-release binary for ${{ matrix.os }}/${{ matrix.arch }}..."
         GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w -X main.version=${{ needs.version.outputs.version }}" -o ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./main.go
-        echo "✅ Binary built: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
+        echo "✅ Pre-release binary built: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
         
     - name: Upload binary artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+        name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}-prerelease
         path: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
         retention-days: 30
->>>>>>> develop
 
-  # Job 3: Create GitHub Release
+  # Job 3: Create GitHub Pre-release
   release:
     runs-on: ubuntu-latest
     needs: [version, build-binaries]
@@ -251,13 +244,15 @@ jobs:
         echo "Generated checksums:"
         cat checksums.txt
         
-    - name: Create release notes
+    - name: Create pre-release notes
       run: |
         cat > release-notes.md << EOF
-        # Release ${{ needs.version.outputs.version }}
+        # Pre-release ${{ needs.version.outputs.version }}
+        
+        ⚠️ **This is a pre-release version. Use with caution in production environments.**
         
         ## 📦 Binaries
-        This release includes pre-compiled binaries for multiple platforms:
+        This pre-release includes pre-compiled binaries for multiple platforms:
         
         - **Linux AMD64**: \`${{ env.BINARY_NAME }}-linux-amd64\`
         - **Linux ARM64**: \`${{ env.BINARY_NAME }}-linux-arm64\`
@@ -275,31 +270,24 @@ jobs:
         ## 📋 Changelog
         ${{ needs.version.outputs.changelog }}
         
-        ## 🔗 Shared Library Usage
-        Other services can use this release as a shared library:
-        \`\`\`bash
-        # Download and use in CI/CD pipelines
-        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64 -o ${{ env.BINARY_NAME }}
-        chmod +x ${{ env.BINARY_NAME }}
-        ./${{ env.BINARY_NAME }} --help
-        \`\`\`
+        ## 🚀 Testing
+        Please test this pre-release and report any issues in the [Issues](https://github.com/${{ github.repository }}/issues) section.
         EOF
         
-    - name: Create GitHub Release
+    - name: Create GitHub Pre-release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ needs.version.outputs.tag }}
-        name: Release ${{ needs.version.outputs.tag }}
+        name: Pre-release ${{ needs.version.outputs.tag }}
         body_path: release-notes.md
         files: |
           ${{ env.RELEASE_DIR }}/*
         draft: false
-        prerelease: false
+        prerelease: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Update latest symlink
+    - name: Update pre-release info
       run: |
-        # Create a 'latest' release for easy access
-        echo "🔗 Release created: https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}"
+        echo "🔗 Pre-release created: https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}"
         echo "📥 Direct download: https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64"

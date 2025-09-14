@@ -15,6 +15,8 @@ jobs:
   # Stage 1: Determine pipeline type and configuration
   determine-pipeline:
     runs-on: ubuntu-latest
+    # Skip CI for tag pushes (handled by release workflow)
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     outputs:
       pipeline-type: ${{ steps.determine.outputs.type }}
       run-security: ${{ steps.determine.outputs.security }}
