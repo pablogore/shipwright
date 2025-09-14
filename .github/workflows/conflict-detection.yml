@@ -216,7 +216,7 @@ jobs:
 
   notify-team:
     runs-on: ubuntu-latest
-    if: always() && (steps.detect-conflicts.outputs.conflicts == 'true' || steps.potential-conflicts.outputs.conflict-risk == 'high')
+    if: always() && (needs.detect-conflicts.outputs.conflicts == 'true' || needs.detect-conflicts.outputs.conflict-risk == 'high')
     needs: [detect-conflicts, validate-workflow-syntax]
     
     steps:
@@ -232,8 +232,8 @@ jobs:
         *Branch:* ${{ github.head_ref }} → ${{ github.base_ref }}
         
         *Issues Detected:*
-        ${{ steps.detect-conflicts.outputs.conflicts == 'true' && '❌ Active merge conflicts' || '' }}
-        ${{ steps.potential-conflicts.outputs.conflict-risk == 'high' && '🔴 High conflict risk' || '' }}
+        ${{ needs.detect-conflicts.outputs.conflicts == 'true' && '❌ Active merge conflicts' || '' }}
+        ${{ needs.detect-conflicts.outputs.conflict-risk == 'high' && '🔴 High conflict risk' || '' }}
         
         *Link:* ${{ github.event.pull_request.html_url }}"
         
@@ -242,7 +242,7 @@ jobs:
           ${{ secrets.SLACK_WEBHOOK }}
           
     - name: Create issue for tracking
-      if: steps.detect-conflicts.outputs.conflicts == 'true'
+      if: needs.detect-conflicts.outputs.conflicts == 'true'
       uses: actions/github-script@v7
       with:
         script: |
@@ -254,7 +254,7 @@ jobs:
           **Branch:** ${{ github.head_ref }} → ${{ github.base_ref }}
           
           **Files with conflicts:**
-          ${{ steps.detect-conflicts.outputs.conflict-files }}
+          ${{ needs.detect-conflicts.outputs.conflict-files }}
           
           ## Action Required
           - [ ] Resolve merge conflicts
