@@ -205,8 +205,6 @@ jobs:
       run: |
         # Tag is already created by the version job, no need to create it again
         echo "🏷️ Using tag from version job: ${{ needs.version.outputs.tag }}"
-<<<<<<< HEAD
-=======
         
     - name: Build binary
       run: |
@@ -220,7 +218,6 @@ jobs:
         name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
         path: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
         retention-days: 30
->>>>>>> develop
 
   # Job 3: Create GitHub Release
   release:
