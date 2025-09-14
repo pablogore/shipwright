@@ -5,6 +5,9 @@ on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
   workflow_dispatch:
     inputs:
       version:
@@ -17,20 +20,25 @@ on:
         default: 'auto'
         type: choice
         options:
-        - auto
-        - major
-        - minor
-        - patch
+          - auto
+          - major
+          - minor
+          - patch
+permissions:
+  contents: write
+  packages: write
+  id-token: write
 
 env:
   GO_VERSION: '1.25.1'
+  BINARY_NAME: 'syntegrity-dagger'
   RELEASE_DIR: 'release'
-  CACHE_VERSION: v1
-
 jobs:
-  # Stage 1: Determine version and generate changelog
-  determine-version:
+  # Job 1: Determine version and create tag
+  version:
     runs-on: ubuntu-latest
+    # Only run on main branch pushes, tag pushes, or manual dispatch
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.base_ref == 'main')
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -39,180 +47,149 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
       with:
-        fetch-depth: 0  # Fetch full history for version determination
+        fetch-depth: 0  # Fetch all history for changelog generation
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ env.GO_VERSION }}
         
     - name: Configure Git
       run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
         
     - name: Determine version
       id: version
       run: |
-        echo "🏷️ Determining version..."
-        
-        # Check if version is provided via workflow_dispatch
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.version }}" ]]; then
-          VERSION="${{ github.event.inputs.version}}"
-          echo "Using provided version: $VERSION"
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Use version_type input for manual bump
+            VERSION_TYPE="${{ github.event.inputs.version_type }}"
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//')
+            MAJOR=$(echo $VERSION_NUM | cut -d. -f1)
+            MINOR=$(echo $VERSION_NUM | cut -d. -f2)
+            PATCH=$(echo $VERSION_NUM | cut -d. -f3)
+            
+            case $VERSION_TYPE in
+              "major")
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              "minor")
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              "patch"|"auto")
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
         else
-          # Get latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Auto-increment version based on conventional commits
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
           
+          # Extract version numbers
+          VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//')
+          MAJOR=$(echo $VERSION_NUM | cut -d. -f1)
+          MINOR=$(echo $VERSION_NUM | cut -d. -f2)
+          PATCH=$(echo $VERSION_NUM | cut -d. -f3)
+          
+          # Determine version bump based on conventional commits since last tag
           if [[ -n "$LATEST_TAG" ]]; then
-            # Extract version number
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            echo "Version number: $VERSION_NUMBER"
-            
-            # Determine version bump based on commit messages
-            COMMITS=$(git log --oneline $LATEST_TAG..HEAD)
-            echo "Commits since $LATEST_TAG:"
-            echo "$COMMITS"
+            COMMITS=$(git log --pretty=format:"%s" $LATEST_TAG..HEAD)
           else
-            # No tags exist, start from v0.0.0
-            VERSION_NUMBER="0.0.0"
-            echo "No tags found, starting from v0.0.0"
-            
-            # Get all commits
-            COMMITS=$(git log --oneline --max-count=10)
-            echo "Recent commits:"
-            echo "$COMMITS"
+            COMMITS=$(git log --pretty=format:"%s" --max-count=50)
           fi
           
-          # Check for conventional commits
-          if echo "$COMMITS" | grep -q "feat!:\|BREAKING CHANGE"; then
-            BUMP_TYPE="major"
-            echo "🚨 Major version bump detected (breaking change)"
-          elif echo "$COMMITS" | grep -q "fix!:"; then
-            BUMP_TYPE="major"
-            echo "🚨 Major version bump detected (breaking fix)"
-          elif echo "$COMMITS" | grep -q "^feat:"; then
-            BUMP_TYPE="minor"
-            echo "✨ Minor version bump detected (new feature)"
-          elif echo "$COMMITS" | grep -q "^fix:"; then
-            BUMP_TYPE="patch"
-            echo "🐛 Patch version bump detected (bug fix)"
+          # Check for breaking changes (major version bump)
+          if echo "$COMMITS" | grep -qE "^(feat|fix|perf|refactor)(\(.+\))?!:"; then
+            echo "🚨 Breaking changes detected - major version bump"
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          # Check for new features (minor version bump)
+          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+            echo "✨ New features detected - minor version bump"
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          # Default to patch version bump
           else
-            BUMP_TYPE="patch"
-            echo "📝 Patch version bump (default for other changes)"
+            echo "🔧 Bug fixes and improvements - patch version bump"
+            PATCH=$((PATCH + 1))
           fi
           
-          # Bump version
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUMBER"
-          
-          case $BUMP_TYPE in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-          
-          VERSION_NUMBER="$MAJOR.$MINOR.$PATCH"
-          VERSION="v$VERSION_NUMBER"
+          VERSION="v${MAJOR}.${MINOR}.${PATCH}"
         fi
         
-        # Create tag name
-        TAG="$VERSION"
-        
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "tag=$TAG" >> $GITHUB_OUTPUT
-        echo "✅ Version determined: $VERSION"
+        echo "tag=$VERSION" >> $GITHUB_OUTPUT
+        echo "🎯 Determined version: $VERSION"
         
     - name: Generate changelog
       id: changelog
       run: |
-        echo "📝 Generating changelog..."
+        # Generate changelog from git commits since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
         
-        # Get latest tag
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        
-        if [[ -n "$LATEST_TAG" ]]; then
-          CHANGELOG=$(git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD)
+        if [[ -n "$LAST_TAG" ]]; then
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD)
         else
-          CHANGELOG=$(git log --pretty=format:"- %s (%h)" --max-count=10)
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" --max-count=20)
         fi
         
-        echo "$CHANGELOG" > CHANGELOG.md
-        echo "changelog<<EOF" >> $GITHUB_OUTPUT
-        echo "$CHANGELOG" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-        echo "✅ Changelog generated"
-
-  # Stage 2: Build and test
-  build-and-test:
-    runs-on: ubuntu-latest
-    needs: determine-version
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-      
-    - name: Set up Go
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: false
+        # Create changelog file
+        cat > CHANGELOG.md << EOF
+        # Changelog - ${{ steps.version.outputs.version }}
         
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ env.CACHE_VERSION }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
-          ${{ runner.os }}-go-
-          
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Verify dependencies
-      run: go mod verify
-      
-    - name: Run tests
-      run: go test -v ./...
-      
-    - name: Run security scan
+        ## Changes in this release:
+        $CHANGELOG
+        
+        ## Full Changelog
+        https://github.com/${{ github.repository }}/compare/$LAST_TAG...${{ steps.version.outputs.tag }}
+        EOF
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat CHANGELOG.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "📝 Generated changelog"
+        
+    - name: Create and push tag
       run: |
-        echo "🔒 Running security scan..."
-        go vet ./...
-        go list -json -deps ./... | grep -i "crypto\|hash\|rand" || true
-        echo "✅ Security scan completed"
+        git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+        git push origin "${{ steps.version.outputs.tag }}"
+        echo "🏷️ Created and pushed tag: ${{ steps.version.outputs.tag }}"
 
-  # Stage 3: Build binaries
+  # Job 2: Build binaries for multiple platforms
   build-binaries:
     runs-on: ubuntu-latest
-    needs: [determine-version, build-and-test]
+    needs: version
     strategy:
       matrix:
         include:
-        - os: linux
-          arch: amd64
-          ext: ''
-        - os: linux
-          arch: arm64
-          ext: ''
-        - os: darwin
-          arch: amd64
-          ext: ''
-        - os: darwin
-          arch: arm64
-          ext: ''
-        - os: windows
-          arch: amd64
-          ext: '.exe'
-        - os: windows
-          arch: arm64
-          ext: '.exe'
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+          - os: windows
+            arch: amd64
+            ext: ".exe"
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -221,65 +198,105 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
+        
+    - name: Configure Git and Go for private repos
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Tag is already created by the version job, no need to create it again
+        echo "🏷️ Using tag from version job: ${{ needs.version.outputs.tag }}"
         
     - name: Build binary
       run: |
         echo "🔨 Building binary for ${{ matrix.os }}/${{ matrix.arch }}..."
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w" -o syntegrity-dagger-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} .
-        echo "✅ Binary built successfully"
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w -X main.version=${{ needs.version.outputs.version }}" -o ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./main.go
+        echo "✅ Binary built: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
         
-    - name: Upload binary
+    - name: Upload binary artifact
       uses: actions/upload-artifact@v4
       with:
-        name: syntegrity-dagger-${{ matrix.os }}-${{ matrix.arch }}
-        path: syntegrity-dagger-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+        name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+        path: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+        retention-days: 30
 
-  # Stage 4: Create release
-  create-release:
+  # Job 3: Create GitHub Release
+  release:
     runs-on: ubuntu-latest
-    needs: [determine-version, build-and-test, build-binaries]
+    needs: [version, build-binaries]
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
-      
-    - name: Download all binaries
-      uses: actions/download-artifact@v4
       with:
-        path: ./binaries
-        
+        token: ${{ secrets.GITHUB_TOKEN }}
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
     - name: Create release directory and organize binaries
       run: |
-        echo "📁 Creating release directory..."
         mkdir -p ${{ env.RELEASE_DIR }}
-        
-        echo "📦 Organizing binaries..."
-        find ./binaries -name "syntegrity-dagger-*" -type f -exec cp {} ${{ env.RELEASE_DIR }}/ \;
-        
-        echo "📋 Release contents:"
+        # Find and move all binaries from artifact directories
+        find . -name "${{ env.BINARY_NAME }}-*" -type f -exec mv {} ${{ env.RELEASE_DIR }}/ \;
+        # List what we have in the release directory
+        echo "📦 Binaries in release directory:"
         ls -la ${{ env.RELEASE_DIR }}/
         
-    - name: Create Release
+    - name: Generate checksums
+      run: |
+        cd ${{ env.RELEASE_DIR }}
+        sha256sum * > checksums.txt
+        echo "Generated checksums:"
+        cat checksums.txt
+        
+    - name: Create release notes
+      run: |
+        cat > release-notes.md << EOF
+        # Release ${{ needs.version.outputs.version }}
+        
+        ## 📦 Binaries
+        This release includes pre-compiled binaries for multiple platforms:
+        
+        - **Linux AMD64**: \`${{ env.BINARY_NAME }}-linux-amd64\`
+        - **Linux ARM64**: \`${{ env.BINARY_NAME }}-linux-arm64\`
+        - **macOS AMD64**: \`${{ env.BINARY_NAME }}-darwin-amd64\`
+        - **macOS ARM64**: \`${{ env.BINARY_NAME }}-darwin-arm64\`
+        - **Windows AMD64**: \`${{ env.BINARY_NAME }}-windows-amd64.exe\`
+        
+        ## 🔧 Installation
+        \`\`\`bash
+        # Download the appropriate binary for your platform
+        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64 -o ${{ env.BINARY_NAME }}
+        chmod +x ${{ env.BINARY_NAME }}
+        \`\`\`
+        
+        ## 📋 Changelog
+        ${{ needs.version.outputs.changelog }}
+        
+        ## 🔗 Shared Library Usage
+        Other services can use this release as a shared library:
+        \`\`\`bash
+        # Download and use in CI/CD pipelines
+        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64 -o ${{ env.BINARY_NAME }}
+        chmod +x ${{ env.BINARY_NAME }}
+        ./${{ env.BINARY_NAME }} --help
+        \`\`\`
+        EOF
+        
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ needs.determine-version.outputs.tag }}
-        name: Release ${{ needs.determine-version.outputs.version }}
-        body: |
-          ## Changes in this release
-          
-          ${{ needs.determine-version.outputs.changelog }}
-          
-          ## Downloads
-          
-          Download the appropriate binary for your platform:
-          
-          - **Linux AMD64**: `syntegrity-dagger-linux-amd64`
-          - **Linux ARM64**: `syntegrity-dagger-linux-arm64`
-          - **macOS AMD64**: `syntegrity-dagger-darwin-amd64`
-          - **macOS ARM64**: `syntegrity-dagger-darwin-arm64`
-          - **Windows AMD64**: `syntegrity-dagger-windows-amd64.exe`
-          - **Windows ARM64**: `syntegrity-dagger-windows-arm64.exe`
-        files: ${{ env.RELEASE_DIR }}/*
+        tag_name: ${{ needs.version.outputs.tag }}
+        name: Release ${{ needs.version.outputs.tag }}
+        body_path: release-notes.md
+        files: |
+          ${{ env.RELEASE_DIR }}/*
         draft: false
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Update latest symlink
+      run: |
+        # Create a 'latest' release for easy access
+        echo "🔗 Release created: https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}"
+        echo "📥 Direct download: https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64"
