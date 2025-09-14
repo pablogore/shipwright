@@ -228,11 +228,14 @@ jobs:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       
-    - name: Create release directory
+    - name: Create release directory and organize binaries
       run: |
         mkdir -p ${{ env.RELEASE_DIR }}
-        # Move all binaries to release directory
-        find . -name "${{ env.BINARY_NAME }}-*" -exec mv {} ${{ env.RELEASE_DIR }}/ \;
+        # Find and move all binaries from artifact directories
+        find . -name "${{ env.BINARY_NAME }}-*" -type f -exec mv {} ${{ env.RELEASE_DIR }}/ \;
+        # List what we have in the release directory
+        echo "📦 Binaries in release directory:"
+        ls -la ${{ env.RELEASE_DIR }}/
         
     - name: Generate checksums
       run: |
