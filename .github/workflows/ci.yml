@@ -89,17 +89,19 @@ jobs:
           echo "release=false" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Pull Request (full pipeline)"
         elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # Main branch: full pipeline + release
           echo "type=main" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
           echo "coverage=true" >> $GITHUB_OUTPUT
           echo "release=true" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Main branch (full pipeline + release)"
         elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          # Develop branch: full pipeline only
           echo "type=develop" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
           echo "coverage=true" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Develop branch (CI/CD only, no releases)"
+          echo "📋 Pipeline: Develop branch (full pipeline)"
         else
           echo "type=feature" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT

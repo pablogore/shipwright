@@ -23,7 +23,7 @@ on:
         - patch
 
 env:
-  GO_VERSION: '1.25.1'
+  GO_VERSION: '1.21'
   RELEASE_DIR: 'release'
   CACHE_VERSION: v1
 
