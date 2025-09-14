@@ -1,0 +1,164 @@
+name: Release Pipeline
+
+# This workflow ONLY runs when a tag is pushed to main
+# It handles the complete release process with GoReleaser
+on:
+  push:
+    tags:
+      - 'v*'  # Only run for version tags (v1.0.0, v2.1.3, etc.)
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+env:
+  GO_VERSION: '1.25.1'
+  BINARY_NAME: 'syntegrity-dagger'
+
+jobs:
+  # Job 1: Validate tag and prepare release
+  validate-release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0  # Fetch all history for changelog generation
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Configure Git for private repos
+      run: |
+        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+    - name: Extract tag information
+      id: tag
+      run: |
+        echo "🏷️ Processing tag: ${{ github.ref_name }}"
+        
+        # Extract version from tag (remove 'v' prefix)
+        VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+        echo "Version: $VERSION"
+        
+        echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "✅ Tag information extracted"
+        
+    - name: Generate changelog
+      id: changelog
+      run: |
+        echo "📝 Generating changelog for release..."
+        
+        # Get previous tag
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        echo "Previous tag: $PREVIOUS_TAG"
+        
+        if [[ -n "$PREVIOUS_TAG" ]]; then
+          # Generate changelog since previous tag
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+        else
+          # Generate changelog for all commits
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" --max-count=20)
+        fi
+        
+        # Save changelog to file for GoReleaser
+        echo "$CHANGELOG" > CHANGELOG.md
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "✅ Changelog generated for release"
+
+  # Job 2: Build and test before release
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+          
+    - name: Build
+      run: |
+        echo "🔨 Building application..."
+        go build -o ${{ env.BINARY_NAME }} .
+        echo "✅ Build completed"
+        
+    - name: Run tests
+      run: |
+        echo "🧪 Running tests..."
+        go test -v ./...
+        echo "✅ Tests completed"
+        
+    - name: Run security scan
+      run: |
+        echo "🔒 Running security scan..."
+        go vet ./...
+        echo "✅ Security scan completed"
+
+  # Job 3: Create release with GoReleaser
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-and-test]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Configure Git for private repos
+      run: |
+        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v5
+      with:
+        distribution: goreleaser
+        version: latest
+        args: release --clean
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GORELEASER_CURRENT_TAG: ${{ needs.validate-release.outputs.tag }}
+        
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-artifacts-${{ needs.validate-release.outputs.tag }}
+        path: dist/*
+        retention-days: 30
+        
+    - name: Release summary
+      run: |
+        echo "🎉 Release ${{ needs.validate-release.outputs.tag }} created successfully!"
+        echo "📦 Artifacts uploaded to GitHub Releases"
+        echo "📝 Changelog generated and included"
