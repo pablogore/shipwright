@@ -55,11 +55,31 @@ jobs:
           BASE_BRANCH="${{ github.base_ref }}"
           HEAD_BRANCH="${{ github.head_ref }}"
           
-          # Verificar si hay commits nuevos en la base branch
-          git fetch origin $BASE_BRANCH
-          BEHIND_COUNT=$(git rev-list --count $HEAD_BRANCH..origin/$BASE_BRANCH)
+          echo "🔍 Checking branch status: $HEAD_BRANCH vs $BASE_BRANCH"
           
-          if [ $BEHIND_COUNT -gt 0 ]; then
+          # Verificar si hay commits nuevos en la base branch
+          git fetch origin $BASE_BRANCH || {
+            echo "⚠️ Failed to fetch $BASE_BRANCH, setting behind=false"
+            echo "behind=false" >> $GITHUB_OUTPUT
+            exit 0
+          }
+          
+          # Verificar que las ramas existen antes de comparar
+          if ! git rev-parse --verify $HEAD_BRANCH >/dev/null 2>&1; then
+            echo "⚠️ HEAD branch $HEAD_BRANCH not found, setting behind=false"
+            echo "behind=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          if ! git rev-parse --verify origin/$BASE_BRANCH >/dev/null 2>&1; then
+            echo "⚠️ Base branch origin/$BASE_BRANCH not found, setting behind=false"
+            echo "behind=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          BEHIND_COUNT=$(git rev-list --count $HEAD_BRANCH..origin/$BASE_BRANCH 2>/dev/null || echo "0")
+          
+          if [ "$BEHIND_COUNT" -gt 0 ]; then
             echo "⚠️ Branch is $BEHIND_COUNT commits behind $BASE_BRANCH"
             echo "behind=true" >> $GITHUB_OUTPUT
             echo "behind-count=$BEHIND_COUNT" >> $GITHUB_OUTPUT
@@ -69,6 +89,7 @@ jobs:
           fi
         else
           # Para push events, no hay comparación de ramas
+          echo "ℹ️ Push event - skipping branch comparison"
           echo "behind=false" >> $GITHUB_OUTPUT
         fi
         
