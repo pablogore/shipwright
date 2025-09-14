@@ -1,0 +1,276 @@
+name: Conflict Detection & Prevention
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [develop, main]
+  schedule:
+    # Ejecutar cada 6 horas para detectar conflictos potenciales
+    - cron: '0 */6 * * *'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  detect-conflicts:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Detect merge conflicts
+      id: detect-conflicts
+      run: |
+        echo "🔍 Checking for potential merge conflicts..."
+        
+        # Verificar si hay conflictos activos
+        if git diff --name-only --diff-filter=U | grep -q .; then
+          echo "❌ Active merge conflicts detected!"
+          echo "conflicts=true" >> $GITHUB_OUTPUT
+          echo "conflict-files<<EOF" >> $GITHUB_OUTPUT
+          git diff --name-only --diff-filter=U >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "✅ No active merge conflicts found"
+          echo "conflicts=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Verificar si la rama está desactualizada
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          BASE_BRANCH="${{ github.base_ref }}"
+          HEAD_BRANCH="${{ github.head_ref }}"
+          
+          # Verificar si hay commits nuevos en la base branch
+          git fetch origin $BASE_BRANCH
+          BEHIND_COUNT=$(git rev-list --count $HEAD_BRANCH..origin/$BASE_BRANCH)
+          
+          if [ $BEHIND_COUNT -gt 0 ]; then
+            echo "⚠️ Branch is $BEHIND_COUNT commits behind $BASE_BRANCH"
+            echo "behind=true" >> $GITHUB_OUTPUT
+            echo "behind-count=$BEHIND_COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Branch is up to date with $BASE_BRANCH"
+            echo "behind=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+    - name: Check for potential conflicts
+      id: potential-conflicts
+      run: |
+        echo "🔍 Analyzing potential conflict areas..."
+        
+        # Archivos críticos que suelen tener conflictos
+        CRITICAL_FILES=(
+          ".github/workflows/ci.yml"
+          ".github/workflows/release.yml"
+          "go.mod"
+          "go.sum"
+          "main.go"
+        )
+        
+        CONFLICT_RISK="low"
+        RISKY_FILES=""
+        
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # Obtener archivos modificados en el PR
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          for file in "${CRITICAL_FILES[@]}"; do
+            if echo "$CHANGED_FILES" | grep -q "^$file$"; then
+              echo "⚠️ Critical file modified: $file"
+              CONFLICT_RISK="high"
+              RISKY_FILES="$RISKY_FILES $file"
+            fi
+          done
+          
+          # Verificar si múltiples archivos de workflow fueron modificados
+          WORKFLOW_COUNT=$(echo "$CHANGED_FILES" | grep -c "\.github/workflows/" || true)
+          if [ $WORKFLOW_COUNT -gt 1 ]; then
+            echo "⚠️ Multiple workflow files modified ($WORKFLOW_COUNT files)"
+            CONFLICT_RISK="high"
+          fi
+        fi
+        
+        echo "conflict-risk=$CONFLICT_RISK" >> $GITHUB_OUTPUT
+        echo "risky-files=$RISKY_FILES" >> $GITHUB_OUTPUT
+        
+    - name: Comment on PR
+      if: github.event_name == 'pull_request' && (steps.detect-conflicts.outputs.conflicts == 'true' || steps.detect-conflicts.outputs.behind == 'true' || steps.potential-conflicts.outputs.conflict-risk == 'high')
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          // Verificar si ya existe un comentario de conflictos
+          const existingComment = comments.find(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('🚨 Conflict Detection Alert')
+          );
+          
+          if (existingComment) {
+            console.log('Updating existing conflict detection comment');
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existingComment.id,
+              body: `🚨 **Conflict Detection Alert**
+              
+              ${process.env.CONFLICTS === 'true' ? '❌ **Active merge conflicts detected!**\n\n**Files with conflicts:**\n' + process.env.CONFLICT_FILES + '\n\n' : ''}${process.env.BEHIND === 'true' ? '⚠️ **Branch is ' + process.env.BEHIND_COUNT + ' commits behind** the base branch.\n\n' : ''}${process.env.CONFLICT_RISK === 'high' ? '🔴 **High conflict risk detected!**\n\n**Risky files:**' + process.env.RISKY_FILES + '\n\n' : ''}
+              
+              ## 🔧 Recommended Actions:
+              
+              ${process.env.CONFLICTS === 'true' ? '1. **Resolve merge conflicts** in the files listed above\n2. **Test thoroughly** after resolution\n3. **Request review** from team members\n\n' : ''}${process.env.BEHIND === 'true' ? '1. **Sync with base branch**: \`git checkout ' + process.env.BASE_REF + ' && git pull && git checkout ' + process.env.HEAD_REF + ' && git rebase ' + process.env.BASE_REF + '\`\n2. **Resolve any conflicts** that arise\n3. **Test the changes** after sync\n\n' : ''}${process.env.CONFLICT_RISK === 'high' ? '1. **Coordinate with team** before making changes to critical files\n2. **Consider breaking changes** into smaller PRs\n3. **Request early review** from maintainers\n\n' : ''}
+              
+              ## 📚 Resources:
+              - [Merge Conflict Resolution Guide](https://github.com/getsyntegrity/syntegrity-dagger/blob/develop/docs/MERGE_CONFLICT_RESOLUTION.md)
+              - [Branching Strategy](https://github.com/getsyntegrity/syntegrity-dagger/blob/develop/docs/BRANCHING_STRATEGY.md)
+              
+              ---
+              *This is an automated message from the Conflict Detection workflow*`
+            });
+          } else {
+            console.log('Creating new conflict detection comment');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🚨 **Conflict Detection Alert**
+              
+              ${process.env.CONFLICTS === 'true' ? '❌ **Active merge conflicts detected!**\n\n**Files with conflicts:**\n' + process.env.CONFLICT_FILES + '\n\n' : ''}${process.env.BEHIND === 'true' ? '⚠️ **Branch is ' + process.env.BEHIND_COUNT + ' commits behind** the base branch.\n\n' : ''}${process.env.CONFLICT_RISK === 'high' ? '🔴 **High conflict risk detected!**\n\n**Risky files:**' + process.env.RISKY_FILES + '\n\n' : ''}
+              
+              ## 🔧 Recommended Actions:
+              
+              ${process.env.CONFLICTS === 'true' ? '1. **Resolve merge conflicts** in the files listed above\n2. **Test thoroughly** after resolution\n3. **Request review** from team members\n\n' : ''}${process.env.BEHIND === 'true' ? '1. **Sync with base branch**: \`git checkout ' + process.env.BASE_REF + ' && git pull && git checkout ' + process.env.HEAD_REF + ' && git rebase ' + process.env.BASE_REF + '\`\n2. **Resolve any conflicts** that arise\n3. **Test the changes** after sync\n\n' : ''}${process.env.CONFLICT_RISK === 'high' ? '1. **Coordinate with team** before making changes to critical files\n2. **Consider breaking changes** into smaller PRs\n3. **Request early review** from maintainers\n\n' : ''}
+              
+              ## 📚 Resources:
+              - [Merge Conflict Resolution Guide](https://github.com/getsyntegrity/syntegrity-dagger/blob/develop/docs/MERGE_CONFLICT_RESOLUTION.md)
+              - [Branching Strategy](https://github.com/getsyntegrity/syntegrity-dagger/blob/develop/docs/BRANCHING_STRATEGY.md)
+              
+              ---
+              *This is an automated message from the Conflict Detection workflow*`
+            });
+          }
+      env:
+        CONFLICTS: ${{ steps.detect-conflicts.outputs.conflicts }}
+        CONFLICT_FILES: ${{ steps.detect-conflicts.outputs.conflict-files }}
+        BEHIND: ${{ steps.detect-conflicts.outputs.behind }}
+        BEHIND_COUNT: ${{ steps.detect-conflicts.outputs.behind-count }}
+        CONFLICT_RISK: ${{ steps.potential-conflicts.outputs.conflict-risk }}
+        RISKY_FILES: ${{ steps.potential-conflicts.outputs.risky-files }}
+        BASE_REF: ${{ github.base_ref }}
+        HEAD_REF: ${{ github.head_ref }}
+
+  validate-workflow-syntax:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      
+    - name: Install yamllint
+      run: |
+        pip install yamllint
+        
+    - name: Validate workflow syntax
+      run: |
+        echo "🔍 Validating workflow syntax..."
+        
+        # Validar sintaxis de todos los workflows
+        for workflow in .github/workflows/*.yml; do
+          if [ -f "$workflow" ]; then
+            echo "Validating $workflow"
+            yamllint "$workflow" || {
+              echo "❌ Syntax error in $workflow"
+              exit 1
+            }
+          fi
+        done
+        
+        echo "✅ All workflows have valid syntax"
+        
+    - name: Check for workflow conflicts
+      run: |
+        echo "🔍 Checking for potential workflow conflicts..."
+        
+        # Verificar que no hay conflictos de merge en workflows
+        if git diff --name-only --diff-filter=U .github/workflows/ | grep -q .; then
+          echo "❌ Merge conflicts detected in workflow files!"
+          git diff --name-only --diff-filter=U .github/workflows/
+          exit 1
+        fi
+        
+        echo "✅ No workflow conflicts detected"
+
+  notify-team:
+    runs-on: ubuntu-latest
+    if: always() && (steps.detect-conflicts.outputs.conflicts == 'true' || steps.potential-conflicts.outputs.conflict-risk == 'high')
+    needs: [detect-conflicts, validate-workflow-syntax]
+    
+    steps:
+    - name: Notify team via Slack
+      if: env.SLACK_WEBHOOK != ''
+      run: |
+        echo "📢 Notifying team about conflict detection..."
+        
+        MESSAGE="🚨 *Conflict Detection Alert* in ${{ github.repository }}
+        
+        *PR:* #${{ github.event.number }} - ${{ github.event.pull_request.title }}
+        *Author:* ${{ github.event.pull_request.user.login }}
+        *Branch:* ${{ github.head_ref }} → ${{ github.base_ref }}
+        
+        *Issues Detected:*
+        ${{ steps.detect-conflicts.outputs.conflicts == 'true' && '❌ Active merge conflicts' || '' }}
+        ${{ steps.potential-conflicts.outputs.conflict-risk == 'high' && '🔴 High conflict risk' || '' }}
+        
+        *Link:* ${{ github.event.pull_request.html_url }}"
+        
+        curl -X POST -H 'Content-type: application/json' \
+          --data "{\"text\":\"$MESSAGE\"}" \
+          ${{ secrets.SLACK_WEBHOOK }}
+          
+    - name: Create issue for tracking
+      if: steps.detect-conflicts.outputs.conflicts == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = `🚨 Merge conflicts in PR #${{ github.event.number }}`;
+          const body = `## Conflict Detection Alert
+          
+          **PR:** #${{ github.event.number }} - ${{ github.event.pull_request.title }}
+          **Author:** @${{ github.event.pull_request.user.login }}
+          **Branch:** ${{ github.head_ref }} → ${{ github.base_ref }}
+          
+          **Files with conflicts:**
+          ${{ steps.detect-conflicts.outputs.conflict-files }}
+          
+          ## Action Required
+          - [ ] Resolve merge conflicts
+          - [ ] Test changes thoroughly
+          - [ ] Request code review
+          - [ ] Merge PR
+          
+          **Link to PR:** ${{ github.event.pull_request.html_url }}
+          
+          ---
+          *This issue was created automatically by the Conflict Detection workflow*`;
+          
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['conflict', 'urgent', 'automated']
+          });
