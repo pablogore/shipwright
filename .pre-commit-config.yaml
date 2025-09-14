@@ -1,0 +1,91 @@
+# Pre-commit hooks para prevenir conflictos y mantener calidad de código
+# Instalar con: pip install pre-commit && pre-commit install
+
+repos:
+  # Hooks generales
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        description: "Remover espacios en blanco al final de líneas"
+      - id: end-of-file-fixer
+        description: "Asegurar que archivos terminen con nueva línea"
+      - id: check-yaml
+        description: "Verificar sintaxis de archivos YAML"
+        args: ['--unsafe']  # Permitir tags personalizados de GitHub Actions
+      - id: check-json
+        description: "Verificar sintaxis de archivos JSON"
+      - id: check-merge-conflict
+        description: "Detectar marcadores de conflicto de merge"
+      - id: check-added-large-files
+        description: "Detectar archivos grandes"
+        args: ['--maxkb=10240']  # 10MB
+      - id: check-case-conflict
+        description: "Detectar conflictos de mayúsculas/minúsculas"
+      - id: check-merge-conflict
+        description: "Detectar marcadores de conflicto de merge"
+      - id: mixed-line-ending
+        description: "Verificar terminaciones de línea consistentes"
+        args: ['--fix=lf']
+
+  # Hooks específicos para Go
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        description: "Formatear código Go"
+      - id: go-vet
+        description: "Verificar código Go con go vet"
+      - id: go-imports
+        description: "Organizar imports de Go"
+      - id: go-mod-tidy
+        description: "Limpiar go.mod y go.sum"
+      - id: go-unit-tests
+        description: "Ejecutar tests unitarios"
+        args: ['-race', '-short']
+
+  # Hooks para YAML (especialmente workflows de GitHub Actions)
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        description: "Linter para archivos YAML"
+        args: ['-c', '.yamllint']
+
+  # Hooks para detectar secretos
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        description: "Detectar secretos en el código"
+        args: ['--baseline', '.secrets.baseline']
+        exclude: '\.secrets\.baseline$'
+
+  # Hooks personalizados para el proyecto
+  - repo: local
+    hooks:
+      - id: check-workflow-conflicts
+        name: "Verificar conflictos en workflows"
+        entry: ./scripts/check-workflow-conflicts.sh
+        language: script
+        files: '\.github/workflows/.*\.yml$'
+        description: "Verificar que no hay conflictos en workflows de GitHub Actions"
+
+      - id: check-go-mod-conflicts
+        name: "Verificar conflictos en go.mod"
+        entry: ./scripts/check-go-mod-conflicts.sh
+        language: script
+        files: 'go\.mod$|go\.sum$'
+        description: "Verificar que no hay conflictos en archivos de dependencias"
+
+      - id: validate-workflow-syntax
+        name: "Validar sintaxis de workflows"
+        entry: ./scripts/validate-workflow-syntax.sh
+        language: script
+        files: '\.github/workflows/.*\.yml$'
+        description: "Validar sintaxis específica de workflows de GitHub Actions"
+
+# Configuración global
+default_stages: [commit]
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'
