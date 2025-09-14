@@ -1,0 +1,77 @@
+{
+  "name": "Individual Developer Rules",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "exclude": [],
+      "include": [
+        "refs/heads/main",
+        "refs/heads/develop"
+      ]
+    },
+    "repository_name": {
+      "exclude": [],
+      "include": [
+        "~ALL"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion",
+      "parameters": {
+        "allow_force_pushes": false,
+        "allow_deletions": false
+      }
+    },
+    {
+      "type": "required_linear_history"
+    },
+    {
+      "type": "update",
+      "parameters": {
+        "allow_force_pushes": false
+      }
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false,
+        "automatic_copilot_code_review_enabled": false,
+        "allowed_merge_methods": [
+          "squash",
+          "rebase"
+        ]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [
+          {
+            "context": "build",
+            "integration_id": null
+          },
+          {
+            "context": "test", 
+            "integration_id": null
+          }
+        ],
+        "strict_required_status_checks_policy": true,
+        "require_branches_to_be_up_to_date": true
+      }
+    }
+  ],
+  "bypass_actors": [
+    {
+      "actor_id": 173299984,
+      "actor_type": "User",
+      "bypass_mode": "always"
+    }
+  ]
+}
