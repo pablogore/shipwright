@@ -65,14 +65,14 @@ jobs:
         # Determine context based on branch and event
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           if [[ "${{ github.base_ref }}" == "main" ]]; then
-            # PR to main: Full pipeline
+            # PR to main: Full pipeline (NO release - releases only on direct push to main)
             echo "type=pr-main" >> $GITHUB_OUTPUT
             echo "skip_build=false" >> $GITHUB_OUTPUT
             echo "skip_test=false" >> $GITHUB_OUTPUT
             echo "skip_security=false" >> $GITHUB_OUTPUT
-            echo "skip_release=false" >> $GITHUB_OUTPUT
+            echo "skip_release=true" >> $GITHUB_OUTPUT
             echo "cache_key=pr-main-${{ github.sha }}" >> $GITHUB_OUTPUT
-            echo "📋 Pipeline: PR to main (full pipeline)"
+            echo "📋 Pipeline: PR to main (full pipeline, no release)"
           else
             # PR to develop: Build + Test only
             echo "type=pr-develop" >> $GITHUB_OUTPUT
@@ -84,14 +84,14 @@ jobs:
             echo "📋 Pipeline: PR to develop (build + test)"
           fi
         elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          # Push to main: Full pipeline + Release
+          # Push to main: Full pipeline + Release (ONLY direct pushes to main create releases)
           echo "type=main" >> $GITHUB_OUTPUT
           echo "skip_build=false" >> $GITHUB_OUTPUT
           echo "skip_test=false" >> $GITHUB_OUTPUT
           echo "skip_security=false" >> $GITHUB_OUTPUT
           echo "skip_release=false" >> $GITHUB_OUTPUT
           echo "cache_key=main-${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Main branch (full + release)"
+          echo "📋 Pipeline: Main branch (full + release - ONLY for direct pushes)"
         elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
           # Push to develop: Build + Test + Security
           echo "type=develop" >> $GITHUB_OUTPUT
