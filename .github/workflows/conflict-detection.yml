@@ -67,6 +67,9 @@ jobs:
             echo "✅ Branch is up to date with $BASE_BRANCH"
             echo "behind=false" >> $GITHUB_OUTPUT
           fi
+        else
+          # Para push events, no hay comparación de ramas
+          echo "behind=false" >> $GITHUB_OUTPUT
         fi
         
     - name: Check for potential conflicts
