@@ -325,3 +325,4 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ---
 
 **Syntegrity Dagger** - Unified CI/CD pipelines for modern Go applications.
+# Test commit to verify GoReleaser fix
