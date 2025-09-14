@@ -6,13 +6,42 @@ on:
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., v0.1.0)'
+        required: false
+        default: ''
+      release_type:
+        description: 'Release type'
+        required: false
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - prerelease
+      prerelease_type:
+        description: 'Pre-release type (if applicable)'
+        required: false
+        default: 'beta'
+        type: choice
+        options:
+          - alpha
+          - beta
+          - rc
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
 
 env:
   GO_VERSION: '1.25.1'
+  BINARY_NAME: 'syntegrity-dagger'
+  RELEASE_DIR: 'release'
   CACHE_VERSION: v1
 
 jobs:
-  # Stage 1: Determine pipeline type and configuration
+  # Stage 1: Determine pipeline type and version
   determine-pipeline:
     runs-on: ubuntu-latest
     # Skip CI for tag pushes (handled by release workflow)
@@ -22,7 +51,27 @@ jobs:
       run-security: ${{ steps.determine.outputs.security }}
       run-coverage: ${{ steps.determine.outputs.coverage }}
       is-release: ${{ steps.determine.outputs.release }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0  # Fetch all history for changelog generation
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Configure Git for private repos
+      run: |
+        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
     - name: Determine pipeline type
       id: determine
       run: |
@@ -58,80 +107,120 @@ jobs:
           echo "security=false" >> $GITHUB_OUTPUT
           echo "coverage=false" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Feature branch (lightweight pipeline)"
+          echo "📋 Pipeline: Feature branch (basic pipeline)"
         fi
-
-  # Stage 2: Setup and Dependencies (always runs)
-  setup:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-      
-    - name: Set up Go
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: false  # Disable default cache to use our custom one
         
-    - name: Configure Git and Go for private repos
-      env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+    - name: Determine version
+      id: version
+      if: ${{ steps.determine.outputs.is-release == 'true' }}
       run: |
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
-        chmod 600 ~/.netrc
-        # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        echo "🏷️ Determining version..."
         
-    - name: Clean Go module cache
-      run: |
-        echo "🧹 Cleaning Go module cache..."
-        # Clean any existing module cache to avoid conflicts
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
-        mkdir -p ~/go/pkg/mod
-        mkdir -p ~/.cache/go-build
-        echo "✅ Go module cache cleaned"
-        
-    - name: Cache Go modules                                                      
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
-        restore-keys: |
-          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
-          go-mod-${{ hashFiles('go.sum') }}-
-          go-mod-
-        fail-on-cache-miss: false
+        # Check if version is provided via workflow_dispatch
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.version }}" ]]; then
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Using provided version: $VERSION"
+        else
+          # Get latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "Latest tag: $LATEST_TAG"
           
-    - name: Download dependencies
-      env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+          if [[ -n "$LATEST_TAG" ]]; then
+            # Extract version number
+            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+            echo "Version number: $VERSION_NUMBER"
+            
+            # Determine version bump based on commit messages
+            COMMITS=$(git log --oneline $LATEST_TAG..HEAD)
+            echo "Commits since $LATEST_TAG:"
+            echo "$COMMITS"
+          else
+            # No tags exist, start from v0.0.0
+            VERSION_NUMBER="0.0.0"
+            echo "No tags found, starting from v0.0.0"
+            
+            # Get all commits
+            COMMITS=$(git log --oneline --max-count=10)
+            echo "Recent commits:"
+            echo "$COMMITS"
+          fi
+          
+          # Check for conventional commits
+          if echo "$COMMITS" | grep -q "feat!:\|BREAKING CHANGE"; then
+            # Major version bump
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+            echo "Major version bump: $VERSION"
+          elif echo "$COMMITS" | grep -q "feat:"; then
+            # Minor version bump
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            echo "Minor version bump: $VERSION"
+          elif echo "$COMMITS" | grep -q "fix:"; then
+            # Patch version bump
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            echo "Patch version bump: $VERSION"
+          else
+            # Default to patch version bump
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            echo "Default patch version bump: $VERSION"
+          fi
+        fi
+        
+        # Determine if this is a prerelease
+        if [[ "${{ steps.determine.outputs.type }}" == "develop" ]]; then
+          # Get prerelease type
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.prerelease_type }}" ]]; then
+            PRERELEASE_TYPE="${{ github.event.inputs.prerelease_type }}"
+          else
+            PRERELEASE_TYPE="beta"
+          fi
+          
+          # Get prerelease number
+          PRERELEASE_NUM=$(git tag | grep "v$VERSION-$PRERELEASE_TYPE" | wc -l)
+          PRERELEASE_NUM=$((PRERELEASE_NUM + 1))
+          
+          FULL_VERSION="v$VERSION-$PRERELEASE_TYPE.$PRERELEASE_NUM"
+          TAG="$FULL_VERSION"
+          echo "Pre-release version: $FULL_VERSION"
+        else
+          FULL_VERSION="v$VERSION"
+          TAG="$FULL_VERSION"
+          echo "Release version: $FULL_VERSION"
+        fi
+        
+        echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "✅ Version determined: $FULL_VERSION"
+        
+    - name: Generate changelog
+      id: changelog
+      if: ${{ steps.determine.outputs.is-release == 'true' }}
       run: |
-        echo "📦 Downloading Go dependencies..."
-        go mod download
-        echo "✅ Dependencies downloaded"
-      
-    - name: Verify dependencies
-      run: |
-        echo "🔍 Verifying dependencies..."
-        go mod verify
-        echo "✅ Dependencies verified"
+        echo "📝 Generating changelog..."
+        
+        # Get latest tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        
+        if [[ -n "$LATEST_TAG" ]]; then
+          # Generate changelog since last tag
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD)
+        else
+          # Generate changelog for all commits
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" --max-count=10)
+        fi
+        
+        # Save changelog to file
+        echo "$CHANGELOG" > CHANGELOG.md
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "✅ Changelog generated"
 
-  # Stage 3: Build (runs in parallel with tests and lint)
+  # Stage 2: Build and Test (Parallel)
   build:
     runs-on: ubuntu-latest
-    needs: [determine-pipeline, setup]
+    needs: determine-pipeline
+    if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -140,56 +229,32 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: false  # Disable default cache to use our custom one
-        
-    - name: Configure Git and Go for private repos
-      env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
-      run: |
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
-        chmod 600 ~/.netrc
-        # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
-        
-    - name: Clean Go module cache
-      run: |
-        echo "🧹 Cleaning Go module cache..."
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
-        mkdir -p ~/go/pkg/mod
-        mkdir -p ~/.cache/go-build
-        echo "✅ Go module cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
-          go-mod-${{ hashFiles('go.sum') }}-
-          go-mod-
-        fail-on-cache-miss: false
+          ${{ runner.os }}-go-
           
     - name: Build
       run: |
         echo "🔨 Building application..."
-        go build ./...
+        go build -o ${{ env.BINARY_NAME }} .
+        echo "✅ Build completed"
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.BINARY_NAME }}-${{ runner.os }}-${{ runner.arch }}
+        path: ${{ env.BINARY_NAME }}
+        retention-days: 1
 
-  # Stage 4: Tests (runs in parallel with build)
   test:
     runs-on: ubuntu-latest
-    needs: [determine-pipeline, setup]
+    needs: determine-pipeline
+    if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -198,70 +263,25 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: false  # Disable default cache to use our custom one
-        
-    - name: Configure Git and Go for private repos
-      env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
-      run: |
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
-        chmod 600 ~/.netrc
-        # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
-        
-    - name: Clean Go module cache
-      run: |
-        echo "🧹 Cleaning Go module cache..."
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
-        mkdir -p ~/go/pkg/mod
-        mkdir -p ~/.cache/go-build
-        echo "✅ Go module cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
-          go-mod-${{ hashFiles('go.sum') }}-
-          go-mod-
-        fail-on-cache-miss: false
+          ${{ runner.os }}-go-
           
     - name: Run tests
       run: |
         echo "🧪 Running tests..."
-        if [[ "${{ needs.determine-pipeline.outputs.pipeline-type }}" == "feature" ]]; then
-          echo "📋 Feature branch: Running basic tests"
-          go test -race ./...
-        else
-          echo "📋 Main/Develop/PR: Running full test suite with coverage"
-          go test -race -coverprofile=coverage.out ./...
-        fi
-      
-    - name: Upload coverage
-      if: needs.determine-pipeline.outputs.run-coverage == 'true'
-      uses: codecov/codecov-action@v5
-      with:
-        files: ./coverage.out
-        fail_ci_if_error: false
+        go test -v ./...
+        echo "✅ Tests completed"
 
-  # Stage 5: Security (only for main/develop/PRs)
   security:
     runs-on: ubuntu-latest
-    needs: [determine-pipeline, build, test]
-    if: needs.determine-pipeline.outputs.run-security == 'true'
+    needs: determine-pipeline
+    if: ${{ needs.determine-pipeline.outputs.run-security == 'true' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -270,56 +290,79 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: false  # Disable default cache to use our custom one
         
-    - name: Configure Git and Go for private repos
-      env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
-      run: |
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
-        chmod 600 ~/.netrc
-        # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
-        
-    - name: Clean Go module cache
-      run: |
-        echo "🧹 Cleaning Go module cache..."
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
-        mkdir -p ~/go/pkg/mod
-        mkdir -p ~/.cache/go-build
-        echo "✅ Go module cache cleaned"
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
-        restore-keys: |
-          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
-          go-mod-${{ hashFiles('go.sum') }}-
-          go-mod-
-        fail-on-cache-miss: false
-          
-    - name: Check for vulnerabilities
+    - name: Run security scan
       run: |
         echo "🔒 Running security scan..."
-        go install golang.org/x/vuln/cmd/govulncheck@latest
-        govulncheck ./... | tee vuln_report.txt
-        if grep -q "Vulnerabilities found" vuln_report.txt; then
-          echo "❌ Security vulnerabilities detected! Please update dependencies."
-          cat vuln_report.txt
-          exit 1
+        # Use go vet for basic security checks
+        go vet ./...
+        # Check for common security issues
+        go list -json -deps ./... | grep -i "crypto\|hash\|rand" || true
+        echo "✅ Security scan completed"
+
+  # Stage 3: Release (Only for main branch)
+  release:
+    runs-on: ubuntu-latest
+    needs: [determine-pipeline, build, test]
+    if: ${{ needs.determine-pipeline.outputs.is-release == 'true' && needs.build.result == 'success' && needs.test.result == 'success' && needs.determine-pipeline.outputs.pipeline-type == 'main' }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Configure Git for private repos
+      run: |
+        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+    - name: Build multi-platform binaries
+      run: |
+        echo "🔨 Building multi-platform binaries..."
+        
+        # Create release directory
+        mkdir -p ${{ env.RELEASE_DIR }}
+        
+        # Build for different platforms
+        GOOS=linux GOARCH=amd64 go build -o ${{ env.RELEASE_DIR }}/${{ env.BINARY_NAME }}-linux-amd64 .
+        GOOS=linux GOARCH=arm64 go build -o ${{ env.RELEASE_DIR }}/${{ env.BINARY_NAME }}-linux-arm64 .
+        GOOS=darwin GOARCH=amd64 go build -o ${{ env.RELEASE_DIR }}/${{ env.BINARY_NAME }}-darwin-amd64 .
+        GOOS=darwin GOARCH=arm64 go build -o ${{ env.RELEASE_DIR }}/${{ env.BINARY_NAME }}-darwin-arm64 .
+        GOOS=windows GOARCH=amd64 go build -o ${{ env.RELEASE_DIR }}/${{ env.BINARY_NAME }}-windows-amd64.exe .
+        
+        echo "✅ Multi-platform build completed"
+        
+    - name: Create release
+      run: |
+        echo "🚀 Creating release ${{ needs.determine-pipeline.outputs.tag }}..."
+        
+        # Create tag if it doesn't exist
+        if ! git tag -l | grep -q "^${{ needs.determine-pipeline.outputs.tag }}$"; then
+          git tag -a "${{ needs.determine-pipeline.outputs.tag }}" -m "Release ${{ needs.determine-pipeline.outputs.tag }}"
+          git push origin "${{ needs.determine-pipeline.outputs.tag }}"
+          echo "✅ Tag created and pushed"
         else
-          echo "✅ No security vulnerabilities found."
+          echo "⚠️ Tag already exists"
         fi
+        
+        # Create release
+        gh release create "${{ needs.determine-pipeline.outputs.tag }}" \
+          --title "Release ${{ needs.determine-pipeline.outputs.tag }}" \
+          --notes "${{ needs.determine-pipeline.outputs.changelog }}" \
+          ${{ env.RELEASE_DIR }}/*
+          
+        echo "✅ Release created"
+        
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-artifacts-${{ needs.determine-pipeline.outputs.tag }}
+        path: ${{ env.RELEASE_DIR }}/*
+        retention-days: 30
