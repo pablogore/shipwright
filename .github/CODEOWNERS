@@ -1,0 +1,14 @@
+# Code owners for syntegrity-dagger
+# Global owners
+* @pablonqn
+
+# Workflow files
+.github/workflows/ @pablonqn
+
+# Documentation
+docs/ @pablonqn
+README.md @pablonqn
+CHANGELOG.md @pablonqn
+
+# Scripts
+scripts/ @pablonqn
