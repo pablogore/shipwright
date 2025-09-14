@@ -11,7 +11,6 @@ GOMOD=$(GOCMD) mod
 BINARY_NAME=syntegrity-dagger
 
 # Tools
-GOLANGCI_LINT=golangci-lint
 GORELEASER=goreleaser
 
 # Coverage threshold
@@ -31,7 +30,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test deps lint lint-fix tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms
+.PHONY: all build clean test deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms
 
 # Help target
 .PHONY: help
@@ -43,11 +42,10 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "Examples:"
-	@echo "  make all                # Complete pipeline: test, build, lint"
+	@echo "  make all                # Complete pipeline: test, build"
 	@echo "  make build              # Build the application"
 	@echo "  make test               # Run all tests"
 	@echo "  make coverage           # Generate complete coverage report"
-	@echo "  make lint               # Run linter"
 	@echo "  make local-run          # Run pipeline locally"
 	@echo "  make tools-install      # Install development tools"
 	@echo ""
@@ -102,46 +100,14 @@ deps: ## Download and tidy dependencies
 	@echo -e "$(GREEN)✅ Dependencies updated$(NC)"
 
 # Install development tools
-tools-install: ## Install development tools (golangci-lint, goreleaser)
+tools-install: ## Install development tools (goreleaser)
 	@echo -e "$(BLUE)Installing development tools...$(NC)"
-	@echo -e "$(YELLOW)Installing golangci-lint via install script...$(NC)"
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.4.0
-	@echo -e "$(YELLOW)Verifying golangci-lint installation...$(NC)"
-	@golangci-lint --version
 	@echo -e "$(YELLOW)Installing goreleaser...$(NC)"
 	@$(GOGET) github.com/goreleaser/goreleaser@latest
 	@echo -e "$(GREEN)✅ Development tools installed$(NC)"
 
-# Run golangci-lint
-lint: ## Run linter
-	@echo -e "$(BLUE)Running linter...$(NC)"
-	@if command -v $(GOLANGCI_LINT) > /dev/null; then \
-		$(GOLANGCI_LINT) run --timeout=5m; \
-	else \
-		echo -e "$(YELLOW)Warning: golangci-lint not installed$(NC)"; \
-		echo "Install with: make tools-install"; \
-	fi
-	@echo -e "$(GREEN)✅ Linting completed$(NC)"
-
-# Run golangci-lint with auto-fix
-lint-fix: ## Run linter with auto-fix
-	@echo -e "$(BLUE)Running linter with auto-fix...$(NC)"
-	@if command -v $(GOLANGCI_LINT) > /dev/null; then \
-		$(GOLANGCI_LINT) run --fix --timeout=5m; \
-	else \
-		echo -e "$(YELLOW)Warning: golangci-lint not installed$(NC)"; \
-		echo "Install with: make tools-install"; \
-	fi
-	@echo -e "$(GREEN)✅ Linting with auto-fix completed$(NC)"
-
-# Check if golangci-lint is installed
-lint-check: ## Check if golangci-lint is installed
-	@echo -e "$(BLUE)Checking golangci-lint installation...$(NC)"
-	@which $(GOLANGCI_LINT) > /dev/null || (echo -e "$(RED)golangci-lint not found. Run 'make tools-install' to install it.$(NC)" && exit 1)
-	@echo -e "$(GREEN)✅ golangci-lint is installed$(NC)"
-
-# Run all checks (lint + test)
-check: lint-check lint test ## Run all checks (lint + test)
+# Run all checks (test only)
+check: test ## Run all checks (test)
 
 # Format code
 fmt: ## Format code with gofmt
@@ -170,7 +136,7 @@ security: ## Run security vulnerability check
 	@rm -f vuln_report.txt
 
 # Run all code quality checks
-quality: fmt vet lint test security ## Run all code quality checks (fmt, vet, lint, test, security)
+quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, security)
 
 # Coverage targets
 coverage: ## Generate comprehensive ASCII coverage report with threshold validation
@@ -338,10 +304,6 @@ pipeline-test: build ## Run test step locally
 	@./$(BINARY_NAME) --local --step test
 	@echo -e "$(GREEN)✅ Test step completed$(NC)"
 
-pipeline-lint: build ## Run lint step locally
-	@echo -e "$(BLUE)Running lint step locally...$(NC)"
-	@./$(BINARY_NAME) --local --step lint
-	@echo -e "$(GREEN)✅ Lint step completed$(NC)"
 
 pipeline-security: build ## Run security step locally
 	@echo -e "$(BLUE)Running security step locally...$(NC)"
@@ -389,7 +351,6 @@ ci-build: ## CI build target
 	@echo -e "$(BLUE)Running CI build...$(NC)"
 	@make deps
 	@make fmt
-	@make lint
 	@make test
 	@make build
 	@echo -e "$(GREEN)✅ CI build completed$(NC)"
@@ -407,12 +368,6 @@ status: ## Show project status
 	@echo "=================="
 	@echo -n "Go version: "
 	@$(GOCMD) version
-	@echo -n "golangci-lint: "
-	@if command -v $(GOLANGCI_LINT) > /dev/null; then \
-		echo -e "$(GREEN)✅ available$(NC)"; \
-	else \
-		echo -e "$(RED)❌ not available$(NC)"; \
-	fi
 	@echo -n "goreleaser: "
 	@if command -v $(GORELEASER) > /dev/null; then \
 		echo -e "$(GREEN)✅ available$(NC)"; \

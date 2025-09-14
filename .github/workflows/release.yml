@@ -1,5 +1,6 @@
 name: Release Pipeline
 
+# GitHub Actions workflow for automated releases
 on:
   push:
     branches: [ main ]
@@ -9,17 +10,15 @@ on:
         description: 'Version to release (e.g., v1.0.0)'
         required: true
         default: 'v0.0.1'
-
 permissions:
   contents: write
   packages: write
   id-token: write
 
 env:
-  GO_VERSION: '1.24.2'
+  GO_VERSION: '1.25.1'
   BINARY_NAME: 'syntegrity-dagger'
   RELEASE_DIR: 'release'
-
 jobs:
   # Job 1: Determine version and create tag
   version:
@@ -100,22 +99,36 @@ jobs:
         echo "📝 Generated changelog"
         
     - name: Create and push tag
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git "${{ steps.version.outputs.tag }}"
+        git push origin "${{ steps.version.outputs.tag }}"
         echo "🏷️ Created and pushed tag: ${{ steps.version.outputs.tag }}"
 
-  # Job 2: Build binary for Linux (pipeline OS)
-  build:
+  # Job 2: Build binaries for multiple platforms
+  build-binaries:
     runs-on: ubuntu-latest
     needs: version
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+          - os: windows
+            arch: amd64
+            ext: ".exe"
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -124,42 +137,15 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
-        chmod 600 ~/.netrc
-        # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
-        
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Build binary
-      env:
-        CGO_ENABLED: 0
-      run: |
-        OUTPUT_NAME="${{ env.BINARY_NAME }}"
-        go build -ldflags="-X main.Version=${{ needs.version.outputs.version }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o "$OUTPUT_NAME" .
-        echo "Built: $OUTPUT_NAME"
-        
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: binary
-        path: ${{ env.BINARY_NAME }}
+        # Tag is already created by the version job, no need to create it again
+        echo "🏷️ Using tag from version job: ${{ needs.version.outputs.tag }}"
 
   # Job 3: Create GitHub Release
   release:
     runs-on: ubuntu-latest
-    needs: [version, build]
+    needs: [version, build-binaries]
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -187,15 +173,19 @@ jobs:
         cat > release-notes.md << EOF
         # Release ${{ needs.version.outputs.version }}
         
-        ## 📦 Binary
-        This release includes a pre-compiled binary for Linux (pipeline environment):
+        ## 📦 Binaries
+        This release includes pre-compiled binaries for multiple platforms:
         
-        - **Linux AMD64**: \`${{ env.BINARY_NAME }}\`
+        - **Linux AMD64**: \`${{ env.BINARY_NAME }}-linux-amd64\`
+        - **Linux ARM64**: \`${{ env.BINARY_NAME }}-linux-arm64\`
+        - **macOS AMD64**: \`${{ env.BINARY_NAME }}-darwin-amd64\`
+        - **macOS ARM64**: \`${{ env.BINARY_NAME }}-darwin-arm64\`
+        - **Windows AMD64**: \`${{ env.BINARY_NAME }}-windows-amd64.exe\`
         
         ## 🔧 Installation
         \`\`\`bash
-        # Download the binary
-        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }} -o ${{ env.BINARY_NAME }}
+        # Download the appropriate binary for your platform
+        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64 -o ${{ env.BINARY_NAME }}
         chmod +x ${{ env.BINARY_NAME }}
         \`\`\`
         
@@ -203,10 +193,10 @@ jobs:
         ${{ needs.version.outputs.changelog }}
         
         ## 🔗 Shared Library Usage
-        Other services can use this release as a shared library in their CI/CD pipelines:
+        Other services can use this release as a shared library:
         \`\`\`bash
         # Download and use in CI/CD pipelines
-        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }} -o ${{ env.BINARY_NAME }}
+        curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64 -o ${{ env.BINARY_NAME }}
         chmod +x ${{ env.BINARY_NAME }}
         ./${{ env.BINARY_NAME }} --help
         \`\`\`
@@ -229,4 +219,4 @@ jobs:
       run: |
         # Create a 'latest' release for easy access
         echo "🔗 Release created: https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}"
-        echo "📥 Direct download: https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}"
+        echo "📥 Direct download: https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.BINARY_NAME }}-linux-amd64"

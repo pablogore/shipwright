@@ -1078,17 +1078,19 @@ func TestNewGoKitPipeline(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	client := &dagger.Client{}
 
 	// Setup mock expectations for convertConfig
 	setupMockConfigForConvertConfig(mockConfig)
 
-	// Test the factory function
-	pipeline := NewGoKitPipeline(client, mockConfig)
+	// Test with nil client - pipelines handle this gracefully
+	pipeline := NewGoKitPipeline(nil, mockConfig)
 
 	// Should return a PipelineAdapter, not nil
 	assert.NotNil(t, pipeline)
 	assert.IsType(t, &PipelineAdapter{}, pipeline)
+
+	// Test that the pipeline has a name
+	assert.NotEmpty(t, pipeline.Name())
 }
 
 func TestNewDockerGoPipeline(t *testing.T) {
@@ -1096,17 +1098,19 @@ func TestNewDockerGoPipeline(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	client := &dagger.Client{}
 
 	// Setup mock expectations for convertConfig
 	setupMockConfigForConvertConfig(mockConfig)
 
-	// Test the factory function
-	pipeline := NewDockerGoPipeline(client, mockConfig)
+	// Test with nil client - pipelines handle this gracefully
+	pipeline := NewDockerGoPipeline(nil, mockConfig)
 
 	// Should return a PipelineAdapter, not nil
 	assert.NotNil(t, pipeline)
 	assert.IsType(t, &PipelineAdapter{}, pipeline)
+
+	// Test that the pipeline has a name
+	assert.NotEmpty(t, pipeline.Name())
 }
 
 func TestNewInfraPipeline(t *testing.T) {
@@ -1114,17 +1118,19 @@ func TestNewInfraPipeline(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	client := &dagger.Client{}
 
 	// Setup mock expectations for convertConfig
 	setupMockConfigForConvertConfig(mockConfig)
 
-	// Test the factory function
-	pipeline := NewInfraPipeline(client, mockConfig)
+	// Test with nil client - pipelines handle this gracefully
+	pipeline := NewInfraPipeline(nil, mockConfig)
 
 	// Should return a PipelineAdapter, not nil
 	assert.NotNil(t, pipeline)
 	assert.IsType(t, &PipelineAdapter{}, pipeline)
+
+	// Test that the pipeline has a name
+	assert.NotEmpty(t, pipeline.Name())
 }
 
 // Test PipelineAdapter functionality

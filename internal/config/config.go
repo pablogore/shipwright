@@ -393,8 +393,47 @@ func (cw *ConfigurationWrapper) Get(key string) any {
 }
 
 // Set sets a value.
-func (cw *ConfigurationWrapper) Set(_ string, _ any) {
-	// Not implemented for this wrapper - configuration is read-only
+func (cw *ConfigurationWrapper) Set(key string, value any) {
+	// Update the internal configuration based on the key
+	switch key {
+	case "git.protocol":
+		if strValue, ok := value.(string); ok {
+			cw.Config.Git.Protocol = strValue
+		}
+	case "git.ref":
+		if strValue, ok := value.(string); ok {
+			cw.Config.Git.Ref = strValue
+		}
+	case "pipeline.coverage":
+		if floatValue, ok := value.(float64); ok {
+			cw.Config.Pipeline.Coverage = floatValue
+		}
+	case "environment":
+		if strValue, ok := value.(string); ok {
+			cw.Config.Environment = strValue
+		}
+	case "pipeline.skip_push":
+		if boolValue, ok := value.(bool); ok {
+			cw.Config.Pipeline.SkipPush = boolValue
+		}
+	case "pipeline.only_build":
+		if boolValue, ok := value.(bool); ok {
+			cw.Config.Pipeline.OnlyBuild = boolValue
+		}
+	case "pipeline.only_test":
+		if boolValue, ok := value.(bool); ok {
+			cw.Config.Pipeline.OnlyTest = boolValue
+		}
+	case "pipeline.verbose":
+		if boolValue, ok := value.(bool); ok {
+			cw.Config.Pipeline.Verbose = boolValue
+		}
+	case "logging.level":
+		if strValue, ok := value.(string); ok {
+			cw.Config.Logging.Level = strValue
+		}
+		// Add more cases as needed
+	}
 }
 
 // Has checks if a key exists.

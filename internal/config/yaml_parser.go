@@ -41,6 +41,10 @@ type YAMLConfig struct {
 	Logging struct {
 		Level string `yaml:"level"`
 	} `yaml:"logging"`
+
+	Git struct {
+		Protocol string `yaml:"protocol"`
+	} `yaml:"git"`
 }
 
 // YAMLParser handles parsing of YAML configuration files
@@ -112,6 +116,11 @@ func (p *YAMLParser) ApplyToConfiguration(yamlConfig *YAMLConfig, config interfa
 	// Apply logging settings
 	if yamlConfig.Logging.Level != "" {
 		config.Set("logging.level", yamlConfig.Logging.Level)
+	}
+
+	// Apply git settings
+	if yamlConfig.Git.Protocol != "" {
+		config.Set("git.protocol", yamlConfig.Git.Protocol)
 	}
 
 	return nil

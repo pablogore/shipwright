@@ -51,16 +51,16 @@ resolve_go_mod() {
         # Asegurar que tenemos las versiones correctas
         log_info "Verificando versiones en go.mod"
         
-        # Verificar que tenemos Go 1.24.2
-        if grep -q "go 1.24.2" go.mod; then
-            log_success "✅ Go version correcta (1.24.2)"
+        # Verificar que tenemos Go 1.25.1
+        if grep -q "go 1.25.1" go.mod; then
+            log_success "✅ Go version correcta (1.25.1)"
         else
             log_warning "⚠️  Go version podría necesitar actualización"
         fi
         
-        # Verificar que tenemos Dagger v0.9.11
-        if grep -q "dagger.io/dagger v0.9.11" go.mod; then
-            log_success "✅ Dagger version correcta (v0.9.11)"
+        # Verificar que tenemos Dagger v0.18.17
+        if grep -q "dagger.io/dagger v0.18.17" go.mod; then
+            log_success "✅ Dagger version correcta (v0.18.17)"
         else
             log_warning "⚠️  Dagger version podría necesitar actualización"
         fi
