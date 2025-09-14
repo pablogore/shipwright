@@ -1,9 +1,9 @@
 name: Pre-release Pipeline
 
 # GitHub Actions workflow for pre-releases from develop branch
+# NOTE: This workflow is ONLY for manual pre-releases via workflow_dispatch
+# Develop branch pushes are handled by consolidated-pipeline.yml (build + test only)
 on:
-  push:
-    branches: [ develop ]
   workflow_dispatch:
     inputs:
       version:
