@@ -4,12 +4,26 @@ name: Release Pipeline
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
   workflow_dispatch:
     inputs:
       version:
         description: 'Version to release (e.g., v1.0.0)'
-        required: true
-        default: 'v0.0.1'
+        required: false
+        default: ''
+      version_type:
+        description: 'Version bump type'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - major
+          - minor
+          - patch
 permissions:
   contents: write
   packages: write
@@ -23,6 +37,8 @@ jobs:
   # Job 1: Determine version and create tag
   version:
     runs-on: ubuntu-latest
+    # Only run on main branch pushes, tag pushes, or manual dispatch
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.base_ref == 'main')
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -48,9 +64,35 @@ jobs:
       id: version
       run: |
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          VERSION="${{ github.event.inputs.version }}"
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Use version_type input for manual bump
+            VERSION_TYPE="${{ github.event.inputs.version_type }}"
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//')
+            MAJOR=$(echo $VERSION_NUM | cut -d. -f1)
+            MINOR=$(echo $VERSION_NUM | cut -d. -f2)
+            PATCH=$(echo $VERSION_NUM | cut -d. -f3)
+            
+            case $VERSION_TYPE in
+              "major")
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              "minor")
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              "patch"|"auto")
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
         else
-          # Auto-increment version based on previous tags
+          # Auto-increment version based on conventional commits
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
           
@@ -60,8 +102,30 @@ jobs:
           MINOR=$(echo $VERSION_NUM | cut -d. -f2)
           PATCH=$(echo $VERSION_NUM | cut -d. -f3)
           
-          # Increment patch version
-          PATCH=$((PATCH + 1))
+          # Determine version bump based on conventional commits since last tag
+          if [[ -n "$LATEST_TAG" ]]; then
+            COMMITS=$(git log --pretty=format:"%s" $LATEST_TAG..HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"%s" --max-count=50)
+          fi
+          
+          # Check for breaking changes (major version bump)
+          if echo "$COMMITS" | grep -qE "^(feat|fix|perf|refactor)(\(.+\))?!:"; then
+            echo "🚨 Breaking changes detected - major version bump"
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          # Check for new features (minor version bump)
+          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+            echo "✨ New features detected - minor version bump"
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          # Default to patch version bump
+          else
+            echo "🔧 Bug fixes and improvements - patch version bump"
+            PATCH=$((PATCH + 1))
+          fi
+          
           VERSION="v${MAJOR}.${MINOR}.${PATCH}"
         fi
         
@@ -141,6 +205,19 @@ jobs:
       run: |
         # Tag is already created by the version job, no need to create it again
         echo "🏷️ Using tag from version job: ${{ needs.version.outputs.tag }}"
+        
+    - name: Build binary
+      run: |
+        echo "🔨 Building binary for ${{ matrix.os }}/${{ matrix.arch }}..."
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w -X main.version=${{ needs.version.outputs.version }}" -o ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./main.go
+        echo "✅ Binary built: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
+        
+    - name: Upload binary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+        path: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+        retention-days: 30
 
   # Job 3: Create GitHub Release
   release:

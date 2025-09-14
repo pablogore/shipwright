@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Automated release system** with conventional commits support
+- **Pre-release workflow** for develop branch testing
+- **Conventional commits helper script** for consistent commit messages
+- **Automatic version bumping** based on commit types (feat, fix, breaking changes)
+- **Multi-platform binary builds** for all releases
+- **Release process documentation** with examples and best practices
 - Comprehensive documentation with C4 architecture diagrams
 - API reference documentation
 - Pipeline development guide
@@ -15,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributing guidelines
 
 ### Changed
+- **Release workflow** now triggers automatically on main branch merges
+- **Version determination** now uses conventional commits instead of simple patch increments
+- **CI workflow** now skips tag pushes to avoid conflicts with release workflow
 - Updated Go version to 1.25.1
 - Updated Dagger SDK to v0.18.17
 - Migrated from go-kit logger to standard log/slog
@@ -22,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling with structured errors
 
 ### Fixed
+- **Release automation** now works correctly when merging from develop to main
+- **Version jumping** from v0.0.x to v0.x.0 now supported through conventional commits
 - Resolved Go 1.25.1 compatibility issues
 - Fixed golangci-lint version compatibility
 - Resolved merge conflicts in CI/CD workflows
