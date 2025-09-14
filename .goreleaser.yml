@@ -51,13 +51,6 @@ changelog:
       - '^ci:'
       - '^build:'
   use: git
-  git:
-    format: |
-      ## {{ .Tag }}
-      
-      {{ range .Commits -}}
-      - {{ .Subject }} ({{ .Hash.Short }})
-      {{ end }}
 
 release:
   github:
