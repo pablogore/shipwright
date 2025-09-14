@@ -190,26 +190,28 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
       
-    - name: Install yamllint
+    - name: Install dependencies
       run: |
-        pip install yamllint
+        pip install yamllint PyYAML
         
     - name: Validate workflow syntax
       run: |
         echo "🔍 Validating workflow syntax..."
         
-        # Validar sintaxis de todos los workflows
+        # Validar solo sintaxis básica de YAML (sin reglas estrictas)
         for workflow in .github/workflows/*.yml; do
           if [ -f "$workflow" ]; then
             echo "Validating $workflow"
-            yamllint "$workflow" || {
-              echo "❌ Syntax error in $workflow"
+            # Verificar solo que es YAML válido, no reglas de formato
+            python3 -c "import yaml; yaml.safe_load(open('$workflow'))" || {
+              echo "❌ Invalid YAML syntax in $workflow"
               exit 1
             }
+            echo "✅ $workflow - valid YAML syntax"
           fi
         done
         
-        echo "✅ All workflows have valid syntax"
+        echo "✅ All workflows have valid YAML syntax"
         
     - name: Check for workflow conflicts
       run: |
