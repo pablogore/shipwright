@@ -48,6 +48,10 @@ curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/mai
 
 # Install specific version
 curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash -s -- -v v1.0.0
+
+# Download binary directly
+curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
+chmod +x syntegrity-dagger
 ```
 
 ### Manual Installation
@@ -288,6 +292,7 @@ syntegrity-dagger/
 - [Pipeline Development](docs/PIPELINE_DEVELOPMENT.md) - Creating custom pipelines
 - [Configuration Reference](docs/CONFIGURATION.md) - Configuration options
 - [API Reference](docs/API.md) - Programmatic API documentation
+- [Release Process](docs/RELEASE_PROCESS.md) - Automated release system
 - [Examples](examples/) - Usage examples and templates
 
 ## 🤝 Contributing
