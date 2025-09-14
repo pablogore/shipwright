@@ -110,6 +110,7 @@ jobs:
         
     - name: Determine version
       id: version
+      if: ${{ steps.determine.outputs.is-release == 'true' }}
       run: |
         echo "🏷️ Determining version..."
         
@@ -190,6 +191,7 @@ jobs:
         
     - name: Generate changelog
       id: changelog
+      if: ${{ steps.determine.outputs.is-release == 'true' }}
       run: |
         echo "📝 Generating changelog..."
         
