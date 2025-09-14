@@ -65,14 +65,14 @@ jobs:
         # Determine context based on branch and event
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           if [[ "${{ github.base_ref }}" == "main" ]]; then
-            # PR to main: Full pipeline (NO release - releases only on direct push to main)
+            # PR to main: Full pipeline + Release (releases on PR merge to main)
             echo "type=pr-main" >> $GITHUB_OUTPUT
             echo "skip_build=false" >> $GITHUB_OUTPUT
             echo "skip_test=false" >> $GITHUB_OUTPUT
             echo "skip_security=false" >> $GITHUB_OUTPUT
-            echo "skip_release=true" >> $GITHUB_OUTPUT
+            echo "skip_release=false" >> $GITHUB_OUTPUT
             echo "cache_key=pr-main-${{ github.sha }}" >> $GITHUB_OUTPUT
-            echo "📋 Pipeline: PR to main (full pipeline, no release)"
+            echo "📋 Pipeline: PR to main (full pipeline + release)"
           else
             # PR to develop: Build + Test only
             echo "type=pr-develop" >> $GITHUB_OUTPUT
@@ -249,7 +249,6 @@ jobs:
     needs: [determine-context, build, test, security]
     if: |
       needs.determine-context.outputs.skip-release == 'false' && 
-      needs.determine-context.outputs.context == 'main' &&
       needs.build.result == 'success' && 
       needs.test.result == 'success' && 
       needs.security.result == 'success'
