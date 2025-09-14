@@ -50,8 +50,22 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Configure Git
+    - name: Configure Git and Go for private repos
+      env:
+        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
       run: |
+        # Configure Go to treat getsyntegrity repos as private
+        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        # Create .netrc file for authentication
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        chmod 600 ~/.netrc
+        # Configure Git authentication
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
@@ -172,7 +186,20 @@ jobs:
     - name: Configure Git and Go for private repos
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
       run: |
+        # Configure Go to treat getsyntegrity repos as private
+        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        # Create .netrc file for authentication
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        chmod 600 ~/.netrc
+        # Configure Git authentication
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
         echo "🏷️ Using pre-release tag from version job: ${{ needs.version.outputs.tag }}"
         
     - name: Build binary
