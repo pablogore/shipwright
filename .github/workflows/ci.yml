@@ -401,10 +401,38 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Stage 6: Summary
-  summary:
+  # Stage 6: Debug (temporary)
+  debug:
     runs-on: ubuntu-latest
     needs: [determine-context, build, test, security, release]
+    if: always()
+    steps:
+    - name: Debug Pipeline Execution
+      run: |
+        echo "🔍 Debug Pipeline Execution"
+        echo "============================"
+        echo "Context: ${{ needs.determine-context.outputs.context }}"
+        echo "Skip Build: ${{ needs.determine-context.outputs.skip-build }}"
+        echo "Skip Test: ${{ needs.determine-context.outputs.skip-test }}"
+        echo "Skip Security: ${{ needs.determine-context.outputs.skip-security }}"
+        echo "Skip Release: ${{ needs.determine-context.outputs.skip-release }}"
+        echo ""
+        echo "Job Results:"
+        echo "Build: ${{ needs.build.result || 'skipped' }}"
+        echo "Test: ${{ needs.test.result || 'skipped' }}"
+        echo "Security: ${{ needs.security.result || 'skipped' }}"
+        echo "Release: ${{ needs.release.result || 'skipped' }}"
+        echo ""
+        echo "Release Condition Check:"
+        echo "skip-release == 'false': ${{ needs.determine-context.outputs.skip-release == 'false' }}"
+        echo "build.result == 'success': ${{ needs.build.result == 'success' }}"
+        echo "test.result == 'success': ${{ needs.test.result == 'success' }}"
+        echo "security.result == 'success': ${{ needs.security.result == 'success' }}"
+
+  # Stage 7: Summary
+  summary:
+    runs-on: ubuntu-latest
+    needs: [determine-context, build, test, security, release, debug]
     if: always()
     steps:
     - name: Pipeline Summary
