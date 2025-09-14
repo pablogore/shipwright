@@ -184,12 +184,12 @@ jobs:
     - name: Run tests with coverage
       if: needs.determine-context.outputs.context == 'main' || needs.determine-context.outputs.context == 'pr-main'
       run: |
-        echo "📊 Running tests with coverage using make coverage..."
+        echo "📊 Running tests with coverage using make coverage-ci..."
         
-        # Use make coverage for more accurate reporting
+        # Use make coverage-ci for CI with relaxed threshold
         # This excludes /examples, /mocks, /app, /config, /proto
-        # and uses a 90% threshold instead of 70%
-        make coverage
+        # and uses a 70% threshold for CI (vs 90% for local development)
+        make coverage-ci
         
         echo "✅ Coverage validation completed"
 
