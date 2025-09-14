@@ -1,0 +1,49 @@
+# Configuración de yamllint para workflows de GitHub Actions
+# Permite sintaxis específica de GitHub Actions
+
+extends: default
+
+rules:
+  # Reglas específicas para GitHub Actions
+  line-length:
+    max: 120
+    level: warning
+  
+  # Permitir comentarios en cualquier lugar
+  comments:
+    min-spaces-from-content: 1
+  
+  # Permitir múltiples documentos
+  document-start:
+    present: false
+  
+  # Permitir saltos de línea en strings largos
+  line-length:
+    max: 120
+    level: warning
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+  
+  # Permitir indentación mixta (tabs y espacios)
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+  
+  # Permitir comillas simples y dobles
+  quoted-strings:
+    quote-type: any
+  
+  # Permitir valores booleanos en diferentes formatos
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+  
+  # Permitir keys duplicadas (necesario para algunos workflows)
+  key-duplicates: disable
+  
+  # Permitir trailing spaces en algunos contextos
+  trailing-spaces:
+    level: warning
+  
+  # Permitir comentarios al final de líneas
+  comments-indentation: disable
