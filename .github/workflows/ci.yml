@@ -1,4 +1,4 @@
-name: Consolidated CI/CD Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -98,8 +98,8 @@ jobs:
           echo "type=develop" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
           echo "coverage=true" >> $GITHUB_OUTPUT
-          echo "release=true" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Develop branch (full pipeline + prerelease)"
+          echo "release=false" >> $GITHUB_OUTPUT
+          echo "📋 Pipeline: Develop branch (full pipeline, no release)"
         else
           echo "type=feature" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT
@@ -283,11 +283,11 @@ jobs:
         gosec ./...
         echo "✅ Security scan completed"
 
-  # Stage 3: Release (Sequential - after build and test)
+  # Stage 3: Release (Only for main branch)
   release:
     runs-on: ubuntu-latest
     needs: [determine-pipeline, build, test]
-    if: ${{ needs.determine-pipeline.outputs.is-release == 'true' && needs.build.result == 'success' && needs.test.result == 'success' }}
+    if: ${{ needs.determine-pipeline.outputs.is-release == 'true' && needs.build.result == 'success' && needs.test.result == 'success' && needs.determine-pipeline.outputs.pipeline-type == 'main' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -339,8 +339,7 @@ jobs:
         gh release create "${{ needs.determine-pipeline.outputs.tag }}" \
           --title "Release ${{ needs.determine-pipeline.outputs.tag }}" \
           --notes "${{ needs.determine-pipeline.outputs.changelog }}" \
-          ${{ env.RELEASE_DIR }}/* \
-          --prerelease=${{ needs.determine-pipeline.outputs.pipeline-type == 'develop' }}
+          ${{ env.RELEASE_DIR }}/*
           
         echo "✅ Release created"
         
