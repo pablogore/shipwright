@@ -8,6 +8,8 @@ rules:
   line-length:
     max: 120
     level: warning
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
   
   # Permitir comentarios en cualquier lugar
   comments:
@@ -16,13 +18,6 @@ rules:
   # Permitir múltiples documentos
   document-start:
     present: false
-  
-  # Permitir saltos de línea en strings largos
-  line-length:
-    max: 120
-    level: warning
-    allow-non-breakable-words: true
-    allow-non-breakable-inline-mappings: true
   
   # Permitir indentación mixta (tabs y espacios)
   indentation:
@@ -47,3 +42,8 @@ rules:
   
   # Permitir comentarios al final de líneas
   comments-indentation: disable
+  
+  # Permitir brackets con espacios (necesario para GitHub Actions)
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
