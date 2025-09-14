@@ -18,6 +18,13 @@ jobs:
   detect-conflicts:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'push'
+    outputs:
+      conflicts: ${{ steps.detect-conflicts.outputs.conflicts }}
+      conflict-files: ${{ steps.detect-conflicts.outputs.conflict-files }}
+      behind: ${{ steps.detect-conflicts.outputs.behind }}
+      behind-count: ${{ steps.detect-conflicts.outputs.behind-count }}
+      conflict-risk: ${{ steps.potential-conflicts.outputs.conflict-risk }}
+      risky-files: ${{ steps.potential-conflicts.outputs.risky-files }}
     
     steps:
     - name: Checkout code
@@ -216,33 +223,12 @@ jobs:
 
   notify-team:
     runs-on: ubuntu-latest
-    if: always() && (steps.detect-conflicts.outputs.conflicts == 'true' || steps.potential-conflicts.outputs.conflict-risk == 'high')
+    if: always() && (needs.detect-conflicts.outputs.conflicts == 'true' || needs.detect-conflicts.outputs.conflict-risk == 'high')
     needs: [detect-conflicts, validate-workflow-syntax]
     
     steps:
-    - name: Notify team via Slack
-      if: env.SLACK_WEBHOOK != ''
-      run: |
-        echo "📢 Notifying team about conflict detection..."
-        
-        MESSAGE="🚨 *Conflict Detection Alert* in ${{ github.repository }}
-        
-        *PR:* #${{ github.event.number }} - ${{ github.event.pull_request.title }}
-        *Author:* ${{ github.event.pull_request.user.login }}
-        *Branch:* ${{ github.head_ref }} → ${{ github.base_ref }}
-        
-        *Issues Detected:*
-        ${{ steps.detect-conflicts.outputs.conflicts == 'true' && '❌ Active merge conflicts' || '' }}
-        ${{ steps.potential-conflicts.outputs.conflict-risk == 'high' && '🔴 High conflict risk' || '' }}
-        
-        *Link:* ${{ github.event.pull_request.html_url }}"
-        
-        curl -X POST -H 'Content-type: application/json' \
-          --data "{\"text\":\"$MESSAGE\"}" \
-          ${{ secrets.SLACK_WEBHOOK }}
-          
     - name: Create issue for tracking
-      if: steps.detect-conflicts.outputs.conflicts == 'true'
+      if: needs.detect-conflicts.outputs.conflicts == 'true'
       uses: actions/github-script@v7
       with:
         script: |
@@ -254,7 +240,7 @@ jobs:
           **Branch:** ${{ github.head_ref }} → ${{ github.base_ref }}
           
           **Files with conflicts:**
-          ${{ steps.detect-conflicts.outputs.conflict-files }}
+          ${{ needs.detect-conflicts.outputs.conflict-files }}
           
           ## Action Required
           - [ ] Resolve merge conflicts
