@@ -247,7 +247,12 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: [determine-context, build, test, security]
-    if: needs.determine-context.outputs.skip-release == 'false' && needs.build.result == 'success' && needs.test.result == 'success' && needs.security.result == 'success'
+    if: |
+      needs.determine-context.outputs.skip-release == 'false' && 
+      needs.determine-context.outputs.context == 'main' &&
+      needs.build.result == 'success' && 
+      needs.test.result == 'success' && 
+      needs.security.result == 'success'
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
