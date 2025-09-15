@@ -31,7 +31,7 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GORELEASER_CURRENT_TAG }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -40,7 +40,7 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.GORELEASER_CURRENT_TAG }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
@@ -169,7 +169,7 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GORELEASER_CURRENT_TAG }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -178,7 +178,7 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.GORELEASER_CURRENT_TAG }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
@@ -203,7 +203,7 @@ jobs:
         version: latest
         args: release --clean
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GORELEASER_CURRENT_TAG }}
         
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
