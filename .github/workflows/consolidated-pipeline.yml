@@ -43,7 +43,7 @@ env:
 jobs:
   # Stage 1: Determine pipeline type and version
   determine-pipeline:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     # Skip CI for tag pushes (handled by release workflow)
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     outputs:
@@ -109,7 +109,7 @@ jobs:
 
   # Stage 2: Build and Test (Parallel)
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     needs: determine-pipeline
     if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
@@ -143,7 +143,7 @@ jobs:
         retention-days: 1
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     needs: determine-pipeline
     if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
@@ -170,7 +170,7 @@ jobs:
         echo "✅ Tests completed"
 
   security:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     needs: determine-pipeline
     if: ${{ needs.determine-pipeline.outputs.run-security == 'true' }}
     steps:

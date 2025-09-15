@@ -14,7 +14,7 @@ env:
 jobs:
   # Stage 1: Determine pipeline type and configuration
   determine-pipeline:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     # Skip CI for tag pushes (handled by release workflow)
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     outputs:
@@ -63,7 +63,7 @@ jobs:
 
   # Stage 2: Setup and Dependencies (always runs)
   setup:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -130,7 +130,7 @@ jobs:
 
   # Stage 3: Build (runs in parallel with tests and lint)
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     needs: [determine-pipeline, setup]
     steps:
     - name: Checkout code
@@ -188,7 +188,7 @@ jobs:
 
   # Stage 4: Tests (runs in parallel with build)
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     needs: [determine-pipeline, setup]
     steps:
     - name: Checkout code
@@ -259,7 +259,7 @@ jobs:
 
   # Stage 5: Security (only for main/develop/PRs)
   security:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,linux,go]
     needs: [determine-pipeline, build, test]
     if: needs.determine-pipeline.outputs.run-security == 'true'
     steps:
