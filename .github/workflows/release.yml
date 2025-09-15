@@ -1,9 +1,11 @@
 name: Release Pipeline
 
-# This workflow ONLY runs when a tag is pushed
-# For automatic releases, create a tag manually
+# This workflow runs when:
+# 1. A tag is pushed (manual release)
+# 2. Push to main branch (automatic release)
 on:
   push:
+    branches: [ main ]
     tags:
       - 'v*'  # Version tags (v1.0.0, v2.1.3, etc.)
 
@@ -42,18 +44,33 @@ jobs:
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-    - name: Extract tag information
+    - name: Determine release type and version
       id: tag
       run: |
-        echo "🏷️ Processing tag: ${{ github.ref_name }}"
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          # Manual release via tag
+          echo "🏷️ Manual release via tag: ${{ github.ref_name }}"
+          TAG="${{ github.ref_name }}"
+          VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          echo "type=manual" >> $GITHUB_OUTPUT
+        else
+          # Automatic release via push to main
+          echo "🚀 Automatic release via push to main"
+          
+          # Get latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          
+          # Extract version number and bump patch
+          VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+          VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+          TAG="v$VERSION"
+          echo "type=automatic" >> $GITHUB_OUTPUT
+        fi
         
-        # Extract version from tag (remove 'v' prefix)
-        VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
-        echo "Version: $VERSION"
-        
-        echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "✅ Tag information extracted"
+        echo "✅ Release information determined: $TAG"
         
     - name: Generate changelog
       id: changelog
@@ -139,6 +156,20 @@ jobs:
         git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
+        
+    - name: Create tag (automatic release only)
+      if: needs.validate-release.outputs.type == 'automatic'
+      run: |
+        echo "🏷️ Creating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
+        
+        # Create tag if it doesn't exist
+        if ! git tag -l | grep -q "^${{ needs.validate-release.outputs.tag }}$"; then
+          git tag -a "${{ needs.validate-release.outputs.tag }}" -m "Release ${{ needs.validate-release.outputs.tag }}"
+          git push origin "${{ needs.validate-release.outputs.tag }}"
+          echo "✅ Tag created and pushed: ${{ needs.validate-release.outputs.tag }}"
+        else
+          echo "⚠️ Tag already exists: ${{ needs.validate-release.outputs.tag }}"
+        fi
         
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v5
