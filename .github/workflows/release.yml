@@ -2,7 +2,7 @@ name: Release Pipeline
 
 # This workflow runs when:
 # 1. A tag is pushed (manual release)
-# 2. Push to main branch (automatic release)
+# 2. Merge to main branch (automatic release with auto-tagging)
 on:
   push:
     branches: [ main ]
@@ -55,18 +55,44 @@ jobs:
           VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           echo "type=manual" >> $GITHUB_OUTPUT
         else
-          # Automatic release via push to main
-          echo "🚀 Automatic release via push to main"
+          # Automatic release via merge to main
+          echo "🚀 Automatic release via merge to main"
           
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
           
-          # Extract version number and bump patch
-          VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-          VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+          # Check commit message to determine version bump type
+          # Look for conventional commit types in the merge commit or recent commits
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+          
+          # Determine version bump based on commit message
+          if echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
+            # Feature: bump minor version
+            echo "📦 Feature detected: bumping minor version"
+            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+          elif echo "$COMMIT_MSG" | grep -qiE "^(fix|bugfix|hotfix)(\(.+\))?:"; then
+            # Fix: bump patch version
+            echo "🔧 Fix detected: bumping patch version"
+            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+          elif echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
+            # Breaking change: bump major version
+            echo "⚠️ Breaking change detected: bumping major version"
+            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+          else
+            # Default: bump patch version
+            echo "📝 Default: bumping patch version"
+            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+          fi
+          
           TAG="v$VERSION"
           echo "type=automatic" >> $GITHUB_OUTPUT
+          echo "auto_tag=true" >> $GITHUB_OUTPUT
         fi
         
         echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -78,16 +104,68 @@ jobs:
       run: |
         echo "📝 Generating changelog for release..."
         
-        # Get previous tag
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        echo "Previous tag: $PREVIOUS_TAG"
+        # Get the latest tag (before this release)
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        echo "Latest tag: $LATEST_TAG"
         
-        if [[ -n "$PREVIOUS_TAG" ]]; then
+        # Get the version that will be released
+        RELEASE_VERSION="${{ steps.tag.outputs.version }}"
+        RELEASE_TAG="${{ steps.tag.outputs.tag }}"
+        
+        if [[ -n "$LATEST_TAG" ]]; then
           # Generate changelog since previous tag
-          CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+          echo "Generating changelog from $LATEST_TAG to HEAD..."
+          
+          # Get commits since last tag, grouped by type
+          FEATURES=$(git log --pretty=format:"- %s (%h)" --grep="^feat" --grep="^feature" -i $LATEST_TAG..HEAD 2>/dev/null || echo "")
+          FIXES=$(git log --pretty=format:"- %s (%h)" --grep="^fix" --grep="^bugfix" --grep="^hotfix" -i $LATEST_TAG..HEAD 2>/dev/null || echo "")
+          BREAKING=$(git log --pretty=format:"- %s (%h)" --grep="BREAKING" -i $LATEST_TAG..HEAD 2>/dev/null || echo "")
+          OTHERS=$(git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD --grep="^feat" --grep="^feature" --grep="^fix" --grep="^bugfix" --grep="^hotfix" --grep="BREAKING" -i --invert-grep 2>/dev/null || echo "")
+          
+          # Build structured changelog
+          CHANGELOG="## Release $RELEASE_TAG"
+          CHANGELOG="$CHANGELOG"$'\n'$'\n'"**Release Date:** $(date +%Y-%m-%d)"
+          CHANGELOG="$CHANGELOG"$'\n'$'\n'"### Changes since $LATEST_TAG"
+          CHANGELOG="$CHANGELOG"$'\n'$'\n'
+          
+          if [[ -n "$BREAKING" ]]; then
+            CHANGELOG="$CHANGELOG"$'\n'"#### ⚠️ Breaking Changes"
+            CHANGELOG="$CHANGELOG"$'\n'"$BREAKING"
+            CHANGELOG="$CHANGELOG"$'\n'$'\n'
+          fi
+          
+          if [[ -n "$FEATURES" ]]; then
+            CHANGELOG="$CHANGELOG"$'\n'"#### ✨ Features"
+            CHANGELOG="$CHANGELOG"$'\n'"$FEATURES"
+            CHANGELOG="$CHANGELOG"$'\n'$'\n'
+          fi
+          
+          if [[ -n "$FIXES" ]]; then
+            CHANGELOG="$CHANGELOG"$'\n'"#### 🐛 Bug Fixes"
+            CHANGELOG="$CHANGELOG"$'\n'"$FIXES"
+            CHANGELOG="$CHANGELOG"$'\n'$'\n'
+          fi
+          
+          if [[ -n "$OTHERS" ]]; then
+            CHANGELOG="$CHANGELOG"$'\n'"#### 📝 Other Changes"
+            CHANGELOG="$CHANGELOG"$'\n'"$OTHERS"
+            CHANGELOG="$CHANGELOG"$'\n'$'\n'
+          fi
+          
+          # If no categorized commits, get all commits
+          if [[ -z "$FEATURES" && -z "$FIXES" && -z "$BREAKING" && -z "$OTHERS" ]]; then
+            ALL_COMMITS=$(git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD)
+            CHANGELOG="$CHANGELOG"$'\n'"#### 📋 All Changes"
+            CHANGELOG="$CHANGELOG"$'\n'"$ALL_COMMITS"
+          fi
         else
-          # Generate changelog for all commits
-          CHANGELOG=$(git log --pretty=format:"- %s (%h)" --max-count=20)
+          # First release - generate changelog for all commits
+          echo "First release - generating changelog for all commits..."
+          ALL_COMMITS=$(git log --pretty=format:"- %s (%h)" --max-count=50)
+          CHANGELOG="## Release $RELEASE_TAG"
+          CHANGELOG="$CHANGELOG"$'\n'$'\n'"**Release Date:** $(date +%Y-%m-%d)"
+          CHANGELOG="$CHANGELOG"$'\n'$'\n'"### Initial Release"
+          CHANGELOG="$CHANGELOG"$'\n'$'\n'"$ALL_COMMITS"
         fi
         
         # Save changelog to file for GoReleaser
@@ -97,6 +175,9 @@ jobs:
         echo "EOF" >> $GITHUB_OUTPUT
         
         echo "✅ Changelog generated for release"
+        echo ""
+        echo "Preview:"
+        echo "$CHANGELOG" | head -20
 
   # Job 2: Build and test before release
   build-and-test:
@@ -264,6 +345,62 @@ jobs:
         echo ""
         echo "📦 Available binaries for download:"
         ls -lh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Update CHANGELOG.md in repository
+      if: needs.validate-release.outputs.type == 'automatic'
+      run: |
+        echo "📝 Updating CHANGELOG.md in repository..."
+        
+        # Checkout the repository to update CHANGELOG.md
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        # Read the generated changelog
+        NEW_CHANGELOG_ENTRY=$(cat CHANGELOG.md)
+        
+        # Read existing CHANGELOG.md
+        if [ -f CHANGELOG.md ]; then
+          # Create backup
+          cp CHANGELOG.md CHANGELOG.md.backup
+          
+          # Prepend new release to CHANGELOG.md
+          {
+            echo "$NEW_CHANGELOG_ENTRY"
+            echo ""
+            echo "---"
+            echo ""
+            cat CHANGELOG.md.backup | sed '/^## \[Unreleased\]/,$d'
+          } > CHANGELOG.md.new
+          
+          # Add Unreleased section back if it existed
+          if grep -q "^## \[Unreleased\]" CHANGELOG.md.backup; then
+            {
+              cat CHANGELOG.md.new
+              echo ""
+              echo "## [Unreleased]"
+              echo ""
+              echo "### Added"
+              echo "- Changes in progress..."
+            } > CHANGELOG.md
+          else
+            mv CHANGELOG.md.new CHANGELOG.md
+          fi
+          
+          # Commit and push the updated CHANGELOG.md
+          git add CHANGELOG.md
+          git commit -m "docs: update CHANGELOG.md for ${{ needs.validate-release.outputs.tag }}" || echo "No changes to commit"
+          git push origin main || echo "Push failed or no changes"
+          
+          echo "✅ CHANGELOG.md updated in repository"
+        else
+          echo "⚠️ CHANGELOG.md not found, creating new one"
+          echo "$NEW_CHANGELOG_ENTRY" > CHANGELOG.md
+          git add CHANGELOG.md
+          git commit -m "docs: add CHANGELOG.md for ${{ needs.validate-release.outputs.tag }}"
+          git push origin main
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
