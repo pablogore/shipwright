@@ -1,0 +1,278 @@
+name: 'Syntegrity Dagger'
+description: 'Execute Syntegrity Dagger pipeline stages in GitHub Actions'
+branding:
+  icon: 'play-circle'
+  color: 'blue'
+
+inputs:
+  version:
+    description: 'Version of syntegrity-dagger to use (e.g., "latest", "v1.0.0")'
+    required: false
+    default: 'latest'
+  pipeline:
+    description: 'Pipeline type to execute (e.g., "go-kit", "docker-go", "infra")'
+    required: true
+  stage:
+    description: 'Specific stage to execute (setup, build, test, etc.). Leave empty for full pipeline'
+    required: false
+    default: ''
+  config:
+    description: 'Path to configuration file'
+    required: false
+    default: '.syntegrity-dagger.yml'
+  env:
+    description: 'Environment (dev, staging, prod)'
+    required: false
+    default: 'dev'
+  coverage:
+    description: 'Minimum coverage percentage required'
+    required: false
+    default: '90'
+  skip-cache:
+    description: 'Skip binary caching (useful for testing)'
+    required: false
+    default: 'false'
+  verbose:
+    description: 'Enable verbose logging'
+    required: false
+    default: 'false'
+  only-build:
+    description: 'Execute build step only'
+    required: false
+    default: 'false'
+  only-test:
+    description: 'Execute test step only'
+    required: false
+    default: 'false'
+  skip-push:
+    description: 'Skip image push to registry'
+    required: false
+    default: 'false'
+  git-ref:
+    description: 'Git reference to use (branch, tag, commit)'
+    required: false
+    default: ''
+  git-auth:
+    description: 'Git authentication method (ssh or https)'
+    required: false
+    default: 'https'
+
+outputs:
+  binary-path:
+    description: 'Path to the syntegrity-dagger binary'
+    value: ${{ steps.setup.outputs.binary-path }}
+  version:
+    description: 'Version of syntegrity-dagger used'
+    value: ${{ steps.setup.outputs.version }}
+  exit-code:
+    description: 'Exit code from syntegrity-dagger execution'
+    value: ${{ steps.execute.outputs.exit-code || steps.execute-full.outputs.exit-code }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine binary URL
+      id: binary-url
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        ARCH="$(uname -m)"
+        
+        # Normalize architecture
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        
+        # Normalize OS
+        case "$OS" in
+          darwin) OS="darwin" ;;
+          linux) OS="linux" ;;
+          *) OS="linux" ;;
+        esac
+        
+        if [ "$VERSION" = "latest" ]; then
+          URL="https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-${OS}-${ARCH}"
+        else
+          URL="https://github.com/getsyntegrity/syntegrity-dagger/releases/download/${VERSION}/syntegrity-dagger-${OS}-${ARCH}"
+        fi
+        
+        echo "url=$URL" >> $GITHUB_OUTPUT
+        echo "os=$OS" >> $GITHUB_OUTPUT
+        echo "arch=$ARCH" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Cache Syntegrity Dagger binary
+      id: cache-binary
+      if: inputs.skip-cache != 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.tool_cache }}/syntegrity-dagger
+        key: syntegrity-dagger-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-${{ steps.binary-url.outputs.arch }}
+        restore-keys: |
+          syntegrity-dagger-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-
+          syntegrity-dagger-${{ steps.binary-url.outputs.version }}-
+          syntegrity-dagger-
+
+    - name: Setup Syntegrity Dagger
+      id: setup
+      shell: bash
+      run: |
+        BINARY_NAME="syntegrity-dagger"
+        CACHE_DIR="${{ runner.tool_cache }}/syntegrity-dagger"
+        BINARY_PATH="./${BINARY_NAME}"
+        
+        # Try to use cached binary first
+        if [ "${{ inputs.skip-cache }}" != "true" ] && [ "${{ steps.cache-binary.outputs.cache-hit }}" = "true" ]; then
+          if [ -f "${CACHE_DIR}/${BINARY_NAME}" ]; then
+            echo "✅ Using cached binary"
+            cp "${CACHE_DIR}/${BINARY_NAME}" "${BINARY_PATH}"
+            chmod +x "${BINARY_PATH}"
+          fi
+        fi
+        
+        # Download if not cached or cache disabled
+        if [ ! -f "${BINARY_PATH}" ] || [ ! -x "${BINARY_PATH}" ]; then
+          echo "📥 Downloading Syntegrity Dagger from ${{ steps.binary-url.outputs.url }}"
+          curl -L "${{ steps.binary-url.outputs.url }}" -o "${BINARY_PATH}" || {
+            echo "❌ Failed to download binary"
+            exit 1
+          }
+          chmod +x "${BINARY_PATH}"
+          
+          # Save to cache if caching is enabled
+          if [ "${{ inputs.skip-cache }}" != "true" ]; then
+            mkdir -p "${CACHE_DIR}"
+            cp "${BINARY_PATH}" "${CACHE_DIR}/${BINARY_NAME}"
+          fi
+        fi
+        
+        # Verify binary works
+        INSTALLED_VERSION=$("${BINARY_PATH}" --version 2>&1 | head -n1 | awk '{print $3}' || echo "unknown")
+        echo "✅ Syntegrity Dagger $INSTALLED_VERSION ready"
+        echo "binary-path=${BINARY_PATH}" >> $GITHUB_OUTPUT
+        echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Execute Pipeline Stage
+      id: execute
+      if: inputs.stage != ''
+      shell: bash
+      run: |
+        set +e  # Don't fail immediately, we want to capture exit code
+        
+        echo "::group::Executing stage: ${{ inputs.stage }}"
+        echo "🌍 Environment: GitHub Actions"
+        echo "📦 Pipeline: ${{ inputs.pipeline }}"
+        echo "🎯 Stage: ${{ inputs.stage }}"
+        
+        CMD="${{ steps.setup.outputs.binary-path }}"
+        CMD="$CMD --pipeline=${{ inputs.pipeline }}"
+        CMD="$CMD --step=${{ inputs.stage }}"
+        CMD="$CMD --config=${{ inputs.config }}"
+        CMD="$CMD --env=${{ inputs.env }}"
+        CMD="$CMD --coverage=${{ inputs.coverage }}"
+        
+        # Auto-detect CI environment - don't use --local in CI
+        # The binary will automatically detect CI via environment variables
+        
+        if [ "${{ inputs.verbose }}" = "true" ]; then
+          CMD="$CMD --verbose"
+        fi
+        
+        if [ "${{ inputs.skip-push }}" = "true" ]; then
+          CMD="$CMD --skip-push"
+        fi
+        
+        if [ -n "${{ inputs.git-ref }}" ]; then
+          CMD="$CMD --git-ref=${{ inputs.git-ref }}"
+        else
+          # Use GitHub ref if available
+          if [ -n "${{ github.ref }}" ]; then
+            CMD="$CMD --git-ref=${{ github.ref_name }}"
+          fi
+        fi
+        
+        if [ -n "${{ inputs.git-auth }}" ]; then
+          CMD="$CMD --git-auth=${{ inputs.git-auth }}"
+        else
+          # Default to HTTPS in GitHub Actions
+          CMD="$CMD --git-auth=https"
+        fi
+        
+        echo "Running: $CMD"
+        eval "$CMD"
+        EXIT_CODE=$?
+        
+        echo "::endgroup::"
+        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+        
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "::error::Stage ${{ inputs.stage }} failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+
+    - name: Execute Full Pipeline
+      id: execute-full
+      if: inputs.stage == ''
+      shell: bash
+      run: |
+        set +e  # Don't fail immediately, we want to capture exit code
+        
+        echo "::group::Executing full pipeline: ${{ inputs.pipeline }}"
+        echo "🌍 Environment: GitHub Actions"
+        echo "📦 Pipeline: ${{ inputs.pipeline }}"
+        
+        CMD="${{ steps.setup.outputs.binary-path }}"
+        CMD="$CMD --pipeline=${{ inputs.pipeline }}"
+        CMD="$CMD --config=${{ inputs.config }}"
+        CMD="$CMD --env=${{ inputs.env }}"
+        CMD="$CMD --coverage=${{ inputs.coverage }}"
+        
+        # Auto-detect CI environment - don't use --local in CI
+        # The binary will automatically detect CI via environment variables
+        
+        if [ "${{ inputs.verbose }}" = "true" ]; then
+          CMD="$CMD --verbose"
+        fi
+        
+        if [ "${{ inputs.only-build }}" = "true" ]; then
+          CMD="$CMD --only-build"
+        fi
+        
+        if [ "${{ inputs.only-test }}" = "true" ]; then
+          CMD="$CMD --only-test"
+        fi
+        
+        if [ "${{ inputs.skip-push }}" = "true" ]; then
+          CMD="$CMD --skip-push"
+        fi
+        
+        if [ -n "${{ inputs.git-ref }}" ]; then
+          CMD="$CMD --git-ref=${{ inputs.git-ref }}"
+        else
+          # Use GitHub ref if available
+          if [ -n "${{ github.ref }}" ]; then
+            CMD="$CMD --git-ref=${{ github.ref_name }}"
+          fi
+        fi
+        
+        if [ -n "${{ inputs.git-auth }}" ]; then
+          CMD="$CMD --git-auth=${{ inputs.git-auth }}"
+        else
+          # Default to HTTPS in GitHub Actions
+          CMD="$CMD --git-auth=https"
+        fi
+        
+        echo "Running: $CMD"
+        eval "$CMD"
+        EXIT_CODE=$?
+        
+        echo "::endgroup::"
+        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+        
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "::error::Pipeline ${{ inputs.pipeline }} failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+
