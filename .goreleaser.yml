@@ -115,20 +115,21 @@ release:
         chmod +x syntegrity-dagger
     ```
 
-dockers:
-  - image_templates:
-      - "ghcr.io/getsyntegrity/syntegrity-dagger:{{ .Version }}"
-      - "ghcr.io/getsyntegrity/syntegrity-dagger:latest"
-    dockerfile: Dockerfile
-    goos: linux
-    goarch: amd64
-    build_flag_templates:
-      - --label=org.opencontainers.image.title={{ .ProjectName }}
-      - --label=org.opencontainers.image.description={{ .ProjectName }}
-      - --label=org.opencontainers.image.url=https://github.com/getsyntegrity/syntegrity-dagger
-      - --label=org.opencontainers.image.source=https://github.com/getsyntegrity/syntegrity-dagger
-      - --label=org.opencontainers.image.version={{ .Version }}
-      - --label=org.opencontainers.image.created={{ .Date }}
-      - --label=org.opencontainers.image.revision={{ .FullCommit }}
-      - --label=org.opencontainers.image.licenses=MIT
+# Docker builds disabled for testing - uncomment when Dockerfile is available
+# dockers:
+#   - image_templates:
+#       - "ghcr.io/getsyntegrity/syntegrity-dagger:{{ .Version }}"
+#       - "ghcr.io/getsyntegrity/syntegrity-dagger:latest"
+#     dockerfile: Dockerfile
+#     goos: linux
+#     goarch: amd64
+#     build_flag_templates:
+#       - --label=org.opencontainers.image.title={{ .ProjectName }}
+#       - --label=org.opencontainers.image.description={{ .ProjectName }}
+#       - --label=org.opencontainers.image.url=https://github.com/getsyntegrity/syntegrity-dagger
+#       - --label=org.opencontainers.image.source=https://github.com/getsyntegrity/syntegrity-dagger
+#       - --label=org.opencontainers.image.version={{ .Version }}
+#       - --label=org.opencontainers.image.created={{ .Date }}
+#       - --label=org.opencontainers.image.revision={{ .FullCommit }}
+#       - --label=org.opencontainers.image.licenses=MIT
 
