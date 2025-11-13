@@ -9,7 +9,7 @@ pipeline:
   only_build: false
   only_test: false
   verbose: false
-  go_version: "1.25.1"
+  go_version: "1.25.3"
 
 service:
   name: "test-service"
