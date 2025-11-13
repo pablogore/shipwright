@@ -25,6 +25,7 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
+      type: ${{ steps.tag.outputs.type }}
       changelog: ${{ steps.changelog.outputs.changelog }}
     steps:
     - name: Checkout code
@@ -179,12 +180,100 @@ jobs:
         args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Prepare raw binaries for direct download
+      run: |
+        echo "📦 Preparing raw binaries for direct download..."
+        mkdir -p raw-binaries
+        
+        # Extract binaries from archives and rename them
+        cd dist
+        
+        # Process Linux binaries
+        for file in syntegrity-dagger_*_linux_amd64.tar.gz; do
+          if [ -f "$file" ]; then
+            tar -xzf "$file" syntegrity-dagger
+            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-linux-amd64
+            chmod +x ../raw-binaries/syntegrity-dagger-linux-amd64
+          fi
+        done
+        
+        for file in syntegrity-dagger_*_linux_arm64.tar.gz; do
+          if [ -f "$file" ]; then
+            tar -xzf "$file" syntegrity-dagger
+            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-linux-arm64
+            chmod +x ../raw-binaries/syntegrity-dagger-linux-arm64
+          fi
+        done
+        
+        # Process Darwin (macOS) binaries
+        for file in syntegrity-dagger_*_darwin_amd64.tar.gz; do
+          if [ -f "$file" ]; then
+            tar -xzf "$file" syntegrity-dagger
+            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-darwin-amd64
+            chmod +x ../raw-binaries/syntegrity-dagger-darwin-amd64
+          fi
+        done
+        
+        for file in syntegrity-dagger_*_darwin_arm64.tar.gz; do
+          if [ -f "$file" ]; then
+            tar -xzf "$file" syntegrity-dagger
+            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-darwin-arm64
+            chmod +x ../raw-binaries/syntegrity-dagger-darwin-arm64
+          fi
+        done
+        
+        # Process Windows binaries
+        for file in syntegrity-dagger_*_windows_amd64.zip; do
+          if [ -f "$file" ]; then
+            unzip -q "$file" syntegrity-dagger.exe
+            mv syntegrity-dagger.exe ../raw-binaries/syntegrity-dagger-windows-amd64.exe
+          fi
+        done
+        
+        cd ..
+        echo "✅ Raw binaries prepared:"
+        ls -lh raw-binaries/
+    
+    - name: Setup GitHub CLI
+      run: |
+        if ! command -v gh &> /dev/null; then
+          echo "Installing GitHub CLI..."
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+        fi
+        gh --version
+    
+    - name: Upload raw binaries to GitHub Release
+      run: |
+        echo "Uploading raw binaries to GitHub Release..."
+        cd raw-binaries
+        
+        # Upload each binary to the release
+        for binary in *; do
+          if [ -f "$binary" ]; then
+            echo "Uploading $binary..."
+            gh release upload "${{ needs.validate-release.outputs.tag }}" "$binary" --clobber
+          fi
+        done
+        
+        echo "✅ Raw binaries uploaded successfully"
+        echo ""
+        echo "📦 Available binaries for download:"
+        ls -lh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
       with:
         name: release-artifacts-${{ needs.validate-release.outputs.tag }}
-        path: dist/*
+        path: |
+          dist/*
+          raw-binaries/*
         retention-days: 30
         
     - name: Release summary
@@ -192,3 +281,9 @@ jobs:
         echo "🎉 Release ${{ needs.validate-release.outputs.tag }} created successfully!"
         echo "📦 Artifacts uploaded to GitHub Releases"
         echo "📝 Changelog generated and included"
+        echo "🔗 Raw binaries available for direct download:"
+        echo "   - syntegrity-dagger-linux-amd64"
+        echo "   - syntegrity-dagger-linux-arm64"
+        echo "   - syntegrity-dagger-darwin-amd64"
+        echo "   - syntegrity-dagger-darwin-arm64"
+        echo "   - syntegrity-dagger-windows-amd64.exe"

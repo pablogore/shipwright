@@ -20,10 +20,12 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X main.Version={{.Version}}
+      - -X main.BuildTime={{.Date}}
+      - -X main.GitCommit={{.Commit}}
     binary: syntegrity-dagger
+    # Rename binaries to include platform info for direct download
+    id: default
 
 archives:
   - format: tar.gz
@@ -38,6 +40,9 @@ archives:
 
 checksum:
   name_template: 'checksums.txt'
+
+# After build, we'll use a hook to publish raw binaries with correct names
+# This is handled in the release workflow
 
 snapshot:
   name_template: "{{ .Tag }}-next"
@@ -68,7 +73,27 @@ release:
     
     Download the appropriate binary for your platform and architecture.
     
-    ### Quick Install
+    ### Direct Binary Download (Recommended for CI/CD)
+    
+    Download the binary directly without extracting:
+    
+    ```bash
+    # Linux/macOS
+    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/{{ .Tag }}/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger
+    chmod +x syntegrity-dagger
+    sudo mv syntegrity-dagger /usr/local/bin/
+    ```
+    
+    Available binaries:
+    - `syntegrity-dagger-linux-amd64` - Linux AMD64
+    - `syntegrity-dagger-linux-arm64` - Linux ARM64
+    - `syntegrity-dagger-darwin-amd64` - macOS AMD64
+    - `syntegrity-dagger-darwin-arm64` - macOS ARM64
+    - `syntegrity-dagger-windows-amd64.exe` - Windows AMD64
+    
+    ### Archive Download
+    
+    Or download the full archive:
     
     ```bash
     # Linux/macOS
@@ -77,6 +102,17 @@ release:
     
     # Windows
     # Download the .zip file and extract syntegrity-dagger.exe
+    ```
+    
+    ### For CI/CD Usage
+    
+    Services can download and use the binary directly in their pipelines:
+    
+    ```yaml
+    - name: Download Syntegrity Dagger
+      run: |
+        curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/{{ .Tag }}/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
+        chmod +x syntegrity-dagger
     ```
 
 dockers:
@@ -95,3 +131,4 @@ dockers:
       - --label=org.opencontainers.image.created={{ .Date }}
       - --label=org.opencontainers.image.revision={{ .FullCommit }}
       - --label=org.opencontainers.image.licenses=MIT
+
