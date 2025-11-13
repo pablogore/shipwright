@@ -21,7 +21,7 @@ env:
 jobs:
   # Job 1: Validate tag and prepare release
   validate-release:
-    runs-on: [self-hosted,linux,go]
+    runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
@@ -100,7 +100,7 @@ jobs:
 
   # Job 2: Build and test before release
   build-and-test:
-    runs-on: [self-hosted,linux,go]
+    runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -138,7 +138,7 @@ jobs:
 
   # Job 3: Create release with GoReleaser
   create-release:
-    runs-on: [self-hosted,linux,go]
+    runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     needs: [validate-release, build-and-test]
     steps:
     - name: Checkout code
