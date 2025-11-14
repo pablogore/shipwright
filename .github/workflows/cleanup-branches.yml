@@ -1,0 +1,98 @@
+name: Cleanup Merged Branches
+
+# This workflow automatically deletes branches after they are merged
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (show what would be deleted)'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup-branches:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+    - name: Get merged PR info
+      id: pr-info
+      if: github.event.pull_request.merged == true
+      run: |
+        echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+        echo "head_branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+        echo "base_branch=${{ github.event.pull_request.base.ref }}" >> $GITHUB_OUTPUT
+        echo "merged=${{ github.event.pull_request.merged }}" >> $GITHUB_OUTPUT
+        
+    - name: Delete merged branch
+      if: github.event.pull_request.merged == true && steps.pr-info.outputs.merged == 'true'
+      run: |
+        echo "🗑️ Deleting merged branch: ${{ steps.pr-info.outputs.head_branch }}"
+        
+        # Delete the branch
+        git push origin --delete ${{ steps.pr-info.outputs.head_branch }}
+        
+        echo "✅ Branch ${{ steps.pr-info.outputs.head_branch }} deleted successfully"
+        
+    - name: Cleanup stale branches (Manual trigger)
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        echo "🧹 Cleaning up stale branches..."
+        
+        # Get all remote branches
+        git fetch --prune
+        
+        # Get merged branches (excluding main, develop, and release branches)
+        MERGED_BRANCHES=$(git branch -r --merged | grep -v -E "(main|develop|HEAD|release/)" | sed 's/origin\///' | tr -d ' ')
+        
+        if [ -z "$MERGED_BRANCHES" ]; then
+          echo "✅ No stale branches found"
+          exit 0
+        fi
+        
+        echo "📋 Found merged branches:"
+        echo "$MERGED_BRANCHES"
+        
+        if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+          echo "🔍 DRY RUN: Would delete the following branches:"
+          echo "$MERGED_BRANCHES"
+        else
+          echo "🗑️ Deleting merged branches..."
+          for branch in $MERGED_BRANCHES; do
+            echo "Deleting branch: $branch"
+            git push origin --delete "$branch" || echo "Failed to delete $branch"
+          done
+          echo "✅ Cleanup completed"
+        fi
+        
+    - name: Summary
+      run: |
+        echo "## 🧹 Branch Cleanup Summary"
+        echo ""
+        if [ "${{ github.event.pull_request.merged }}" == "true" ]; then
+          echo "✅ **Merged PR**: #${{ github.event.pull_request.number }}"
+          echo "🗑️ **Deleted branch**: ${{ github.event.pull_request.head.ref }}"
+          echo "🎯 **Target branch**: ${{ github.event.pull_request.base.ref }}"
+        else
+          echo "🔍 **Manual cleanup** completed"
+        fi
+        echo ""
+        echo "**Repository**: ${{ github.repository }}"
+        echo "**Triggered by**: ${{ github.actor }}"

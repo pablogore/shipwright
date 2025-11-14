@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: '1.25.1'
+  GO_VERSION: '1.25.3'
   CACHE_VERSION: v1
 
 jobs:
@@ -314,12 +314,33 @@ jobs:
     - name: Check for vulnerabilities
       run: |
         echo "🔒 Running security scan..."
+        echo "📋 Go version: $(go version)"
         go install golang.org/x/vuln/cmd/govulncheck@latest
-        govulncheck ./... | tee vuln_report.txt
-        if grep -q "Vulnerabilities found" vuln_report.txt; then
-          echo "❌ Security vulnerabilities detected! Please update dependencies."
-          cat vuln_report.txt
-          exit 1
-        else
+        
+        # Run vulnerability check and capture output
+        govulncheck ./... > vuln_report.txt 2>&1 || true
+        
+        # Check if there are vulnerabilities in dependencies (not stdlib)
+        if grep -q "Your code is affected" vuln_report.txt; then
+          # Check if vulnerabilities are only in stdlib
+          if grep -q "Standard library" vuln_report.txt && ! grep -q "packages you import" vuln_report.txt; then
+            echo "⚠️ Vulnerabilities found in Go standard library"
+            echo "📋 These should be fixed by updating Go version"
+            echo "📋 Current Go version: $(go version)"
+            cat vuln_report.txt
+            echo ""
+            echo "❌ Security scan failed: Go standard library vulnerabilities detected."
+            echo "💡 Solution: Update Go to the latest patch version (1.25.3 or newer)"
+            exit 1
+          else
+            echo "❌ Security vulnerabilities detected in dependencies!"
+            cat vuln_report.txt
+            exit 1
+          fi
+        elif grep -q "No vulnerabilities found" vuln_report.txt; then
           echo "✅ No security vulnerabilities found."
+        else
+          # Show report for debugging
+          cat vuln_report.txt
+          echo "✅ Security scan completed."
         fi
