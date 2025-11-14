@@ -1,6 +1,6 @@
 module github.com/getsyntegrity/syntegrity-dagger
 
-go 1.25.1
+go 1.25.3
 
 require (
 	dagger.io/dagger v0.18.17
