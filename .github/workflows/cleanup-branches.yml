@@ -44,12 +44,21 @@ jobs:
     - name: Delete merged branch
       if: github.event.pull_request.merged == true && steps.pr-info.outputs.merged == 'true'
       run: |
-        echo "🗑️ Deleting merged branch: ${{ steps.pr-info.outputs.head_branch }}"
+        BRANCH_NAME="${{ steps.pr-info.outputs.head_branch }}"
+        echo "🗑️ Attempting to delete merged branch: $BRANCH_NAME"
         
-        # Delete the branch
-        git push origin --delete ${{ steps.pr-info.outputs.head_branch }}
-        
-        echo "✅ Branch ${{ steps.pr-info.outputs.head_branch }} deleted successfully"
+        # Check if branch exists on remote before attempting to delete
+        if git ls-remote --exit-code --heads origin "$BRANCH_NAME" > /dev/null 2>&1; then
+          echo "✅ Branch $BRANCH_NAME exists on remote, deleting..."
+          git push origin --delete "$BRANCH_NAME" || {
+            echo "⚠️ Failed to delete $BRANCH_NAME, but continuing..."
+            exit 0
+          }
+          echo "✅ Branch $BRANCH_NAME deleted successfully"
+        else
+          echo "ℹ️ Branch $BRANCH_NAME does not exist on remote (may have been already deleted)"
+          echo "✅ Skipping deletion - branch already removed"
+        fi
         
     - name: Cleanup stale branches (Manual trigger)
       if: github.event_name == 'workflow_dispatch'
