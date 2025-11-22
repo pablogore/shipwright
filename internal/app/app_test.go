@@ -325,7 +325,7 @@ func TestApp_ListPipelines_Success(t *testing.T) {
 	pipelines, err := app.ListPipelines()
 	require.NoError(t, err)
 	assert.NotEmpty(t, pipelines)
-	assert.Contains(t, pipelines, "go-kit")
+	assert.Contains(t, pipelines, "go-service")
 	assert.Contains(t, pipelines, "docker-go")
 	assert.Contains(t, pipelines, "infra")
 }

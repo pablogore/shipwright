@@ -17,10 +17,11 @@ import (
 //   - client: The Dagger client used for container operations.
 //   - src: The source directory of the cloned repository.
 //   - coverage: The coverage threshold for the tests.
+//   - goVersion: The Go version to use for testing (e.g., "1.25.1").
 //
 // Returns:
 //   - An error if the tests fail, otherwise nil.
-func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagger.Directory, coverage float64) error {
+func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagger.Directory, coverage float64, goVersion string) error {
 	// Create a temporary directory for the coverage file
 	tmpDir, err := os.MkdirTemp("", "coverage")
 	if err != nil {
@@ -28,9 +29,14 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Use default Go version if not provided
+	if goVersion == "" {
+		goVersion = "1.25.1"
+	}
+
 	// Run the tests in a Dagger container with coverage
 	container := client.Container().
-		From("golang:1.21").
+		From("golang:" + goVersion).
 		WithMountedDirectory("/src", src).
 		WithWorkdir("/src").
 		WithEnvVariable("GO111MODULE", "on").

@@ -10,14 +10,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// StepConfig represents configuration for a single step
+type StepConfig struct {
+	Name    string `yaml:"name"`
+	Timeout string `yaml:"timeout,omitempty"` // e.g., "5m", "1h"
+	Retries int    `yaml:"retries,omitempty"`
+}
+
 // YAMLConfig represents the structure of the .syntegrity-dagger.yml file
 type YAMLConfig struct {
 	Pipeline struct {
-		Name        string   `yaml:"name"`
-		Environment string   `yaml:"environment"`
-		Coverage    float64  `yaml:"coverage"`
-		GoVersion   string   `yaml:"goVersion"`
-		Steps       []string `yaml:"steps"`
+		Name        string       `yaml:"name"`
+		Environment string       `yaml:"environment"`
+		Coverage    float64      `yaml:"coverage"`
+		GoVersion   string       `yaml:"goVersion"`
+		Steps       interface{}  `yaml:"steps"` // Can be []string or []StepConfig
+		StepConfigs []StepConfig `yaml:"stepConfigs,omitempty"` // Detailed step configurations
 	} `yaml:"pipeline"`
 
 	Registry struct {

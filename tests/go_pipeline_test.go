@@ -7,7 +7,7 @@ import (
 
 	"dagger.io/dagger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-	goKit "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-kit"
+	goService "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-service"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
 	"github.com/getsyntegrity/syntegrity-dagger/tests/mocks"
 	"github.com/onsi/ginkgo/v2"
@@ -74,7 +74,7 @@ func TestAdd(t *testing.T) {
 	})
 
 	ginkgo.It("should setup the pipeline", func() {
-		pipeline := goKit.New(client, cfg).(*goKit.Pipeline)
+		pipeline := goService.New(client, cfg).(*goService.Pipeline)
 		pipeline.Cloner = mockCloner
 
 		err := pipeline.Setup(testCtx)

@@ -134,12 +134,22 @@ func (sr *StepRegistry) ExecuteStep(ctx context.Context, stepName string) error 
 		defer cancel()
 	}
 
-	// Execute the step with retries
+	// Execute the step with retries and exponential backoff with jitter
 	var lastErr error
 	for attempt := 0; attempt <= config.Retries; attempt++ {
 		if attempt > 0 {
-			// Wait before retry (exponential backoff)
-			waitTime := time.Duration(attempt) * time.Second
+			// Exponential backoff with jitter: base * 2^(attempt-1) + random jitter
+			baseDelay := time.Second
+			exponentialDelay := baseDelay * time.Duration(1<<uint(attempt-1))
+			// Add jitter: random value between 0 and 25% of the delay
+			jitter := time.Duration(float64(exponentialDelay) * 0.25 * (float64(time.Now().UnixNano()%100) / 100.0))
+			waitTime := exponentialDelay + jitter
+
+			// Cap maximum wait time at 30 seconds
+			if waitTime > 30*time.Second {
+				waitTime = 30 * time.Second
+			}
+
 			select {
 			case <-ctx.Done():
 				return ctx.Err()

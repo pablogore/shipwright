@@ -62,12 +62,12 @@ func TestPipelineError_Error(t *testing.T) {
 		{
 			name: "pipeline error with all fields",
 			error: PipelineError{
-				Pipeline: "go-kit",
+				Pipeline: "go-service",
 				Step:     "build",
 				Message:  "build failed",
 				Cause:    errors.New("compilation error"),
 			},
-			expected: "pipeline error in go-kit at step build: build failed: compilation error",
+			expected: "pipeline error in go-service at step build: build failed: compilation error",
 		},
 		{
 			name: "pipeline error with empty fields",

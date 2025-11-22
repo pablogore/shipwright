@@ -95,10 +95,10 @@ func TestSyntegrityInfraPipeline_Tag(t *testing.T) {
 
 	ctx := t.Context()
 
-	// Tag method panics with "implement me"
-	assert.Panics(t, func() {
-		_ = pipeline.Tag(ctx)
-	}, "Tag method should panic with 'implement me'")
+	// Tag method should return error instead of panicking
+	err := pipeline.Tag(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 }
 
 func TestSyntegrityInfraPipeline_Push(t *testing.T) {
@@ -112,10 +112,10 @@ func TestSyntegrityInfraPipeline_Push(t *testing.T) {
 
 	ctx := t.Context()
 
-	// Push method panics with "implement me"
-	assert.Panics(t, func() {
-		_ = pipeline.Push(ctx)
-	}, "Push method should panic with 'implement me'")
+	// Push method should return error instead of panicking
+	err := pipeline.Push(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 }
 
 func TestSyntegrityInfraPipeline_Setup(t *testing.T) {
@@ -146,10 +146,9 @@ func TestSyntegrityInfraPipeline_BeforeStep(t *testing.T) {
 
 	ctx := t.Context()
 
-	// BeforeStep method panics with "implement me"
-	assert.Panics(t, func() {
-		pipeline.BeforeStep(ctx, "test-step")
-	}, "BeforeStep method should panic with 'implement me'")
+	// BeforeStep method should return nil HookFunc (not implemented)
+	hookFunc := pipeline.BeforeStep(ctx, "test-step")
+	assert.Nil(t, hookFunc)
 }
 
 func TestSyntegrityInfraPipeline_AfterStep(t *testing.T) {
@@ -163,10 +162,9 @@ func TestSyntegrityInfraPipeline_AfterStep(t *testing.T) {
 
 	ctx := t.Context()
 
-	// AfterStep method panics with "implement me"
-	assert.Panics(t, func() {
-		pipeline.AfterStep(ctx, "test-step")
-	}, "AfterStep method should panic with 'implement me'")
+	// AfterStep method should return nil HookFunc (not implemented)
+	hookFunc := pipeline.AfterStep(ctx, "test-step")
+	assert.Nil(t, hookFunc)
 }
 
 func TestSyntegrityInfraPipeline_Integration(t *testing.T) {
@@ -196,14 +194,14 @@ func TestSyntegrityInfraPipeline_Integration(t *testing.T) {
 	err = pipeline.Package(ctx)
 	require.NoError(t, err) // Package returns nil (no-op implementation)
 
-	// Tag and Push methods should panic with "implement me"
-	assert.Panics(t, func() {
-		_ = pipeline.Tag(ctx)
-	}, "Tag method should panic with 'implement me'")
+	// Tag and Push methods should return errors instead of panicking
+	err = pipeline.Tag(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 
-	assert.Panics(t, func() {
-		_ = pipeline.Push(ctx)
-	}, "Push method should panic with 'implement me'")
+	err = pipeline.Push(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 }
 
 func TestSyntegrityInfraPipeline_StructFields(t *testing.T) {
@@ -249,14 +247,14 @@ func TestSyntegrityInfraPipeline_NoOpOperations(t *testing.T) {
 	err = pipeline.Package(ctx)
 	require.NoError(t, err)
 
-	// Tag and Push operations should panic with "implement me"
-	assert.Panics(t, func() {
-		_ = pipeline.Tag(ctx)
-	}, "Tag method should panic with 'implement me'")
+	// Tag and Push operations should return errors instead of panicking
+	err = pipeline.Tag(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 
-	assert.Panics(t, func() {
-		_ = pipeline.Push(ctx)
-	}, "Push method should panic with 'implement me'")
+	err = pipeline.Push(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 
 	// Setup method requires real client, so it will return error for nil client
 	err = pipeline.Setup(ctx)
@@ -307,14 +305,12 @@ func TestSyntegrityInfraPipeline_StepNames(t *testing.T) {
 	stepNames := []string{"setup", "test", "build", "package", "tag", "push", "deploy", "unknown"}
 
 	for _, stepName := range stepNames {
-		// BeforeStep and AfterStep methods panic with "implement me"
-		assert.Panics(t, func() {
-			pipeline.BeforeStep(ctx, stepName)
-		}, "BeforeStep should panic with 'implement me' for step: %s", stepName)
+		// BeforeStep and AfterStep methods should return nil HookFunc (not implemented)
+		hookFunc := pipeline.BeforeStep(ctx, stepName)
+		assert.Nil(t, hookFunc, "BeforeStep should return nil for step: %s", stepName)
 
-		assert.Panics(t, func() {
-			pipeline.AfterStep(ctx, stepName)
-		}, "AfterStep should panic with 'implement me' for step: %s", stepName)
+		hookFunc = pipeline.AfterStep(ctx, stepName)
+		assert.Nil(t, hookFunc, "AfterStep should return nil for step: %s", stepName)
 	}
 }
 

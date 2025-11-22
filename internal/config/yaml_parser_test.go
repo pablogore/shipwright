@@ -384,7 +384,7 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 				return func() {
 					// Restore the config file for other tests
 					configContent := `pipeline:
-  name: go-kit
+  name: go-service
   steps:
     - setup
     - build

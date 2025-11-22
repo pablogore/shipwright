@@ -47,7 +47,7 @@ jobs:
         # Verify download
         ./syntegrity-dagger --version
         
-    # Run Syntegrity Dagger Pipeline for go-kit
+    # Run Syntegrity Dagger Pipeline for go-service
     - name: Run Syntegrity Dagger Pipeline
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

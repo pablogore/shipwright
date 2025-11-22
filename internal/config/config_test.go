@@ -69,7 +69,7 @@ func TestConfig_Validate(t *testing.T) {
 					Coverage:  90.0,
 				},
 				Registry: RegistryConfig{
-					BaseURL: "registry.test.com",
+					BaseURL: "https://registry.test.com",
 				},
 			},
 			wantErr: false,
@@ -82,7 +82,7 @@ func TestConfig_Validate(t *testing.T) {
 					Coverage:  90.0,
 				},
 				Registry: RegistryConfig{
-					BaseURL: "registry.test.com",
+					BaseURL: "https://registry.test.com",
 				},
 			},
 			wantErr: true,
@@ -109,7 +109,7 @@ func TestConfig_Validate(t *testing.T) {
 					Coverage: 90.0,
 				},
 				Registry: RegistryConfig{
-					BaseURL: "registry.test.com",
+					BaseURL: "https://registry.test.com",
 				},
 			},
 			wantErr: true,
@@ -124,7 +124,7 @@ func TestConfig_Validate(t *testing.T) {
 					Coverage:  -1.0,
 				},
 				Registry: RegistryConfig{
-					BaseURL: "registry.test.com",
+					BaseURL: "https://registry.test.com",
 				},
 			},
 			wantErr: true,
@@ -139,11 +139,106 @@ func TestConfig_Validate(t *testing.T) {
 					Coverage:  101.0,
 				},
 				Registry: RegistryConfig{
-					BaseURL: "registry.test.com",
+					BaseURL: "https://registry.test.com",
 				},
 			},
 			wantErr: true,
 			errMsg:  "coverage must be between 0 and 100",
+		},
+		{
+			name: "invalid registry URL - missing scheme",
+			config: &Config{
+				Pipeline: PipelineConfig{
+					Name:      "test-pipeline",
+					GoVersion: "1.21",
+					Coverage:  90.0,
+				},
+				Registry: RegistryConfig{
+					BaseURL: "registry.test.com",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid registry URL",
+		},
+		{
+			name: "invalid Go version format",
+			config: &Config{
+				Pipeline: PipelineConfig{
+					Name:      "test-pipeline",
+					GoVersion: "v1.21",
+					Coverage:  90.0,
+				},
+				Registry: RegistryConfig{
+					BaseURL: "https://registry.test.com",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid Go version",
+		},
+		{
+			name: "invalid Git repository URL",
+			config: &Config{
+				Pipeline: PipelineConfig{
+					Name:      "test-pipeline",
+					GoVersion: "1.21",
+					Coverage:  90.0,
+				},
+				Registry: RegistryConfig{
+					BaseURL: "https://registry.test.com",
+				},
+				Git: GitConfig{
+					Repo: "not-a-valid-url",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid Git repository URL",
+		},
+		{
+			name: "invalid environment",
+			config: &Config{
+				Pipeline: PipelineConfig{
+					Name:      "test-pipeline",
+					GoVersion: "1.21",
+					Coverage:  90.0,
+				},
+				Registry: RegistryConfig{
+					BaseURL: "https://registry.test.com",
+				},
+				Environment: "invalid-env",
+			},
+			wantErr: true,
+			errMsg:  "invalid environment",
+		},
+		{
+			name: "production environment with low coverage",
+			config: &Config{
+				Pipeline: PipelineConfig{
+					Name:      "test-pipeline",
+					GoVersion: "1.21",
+					Coverage:  70.0,
+				},
+				Registry: RegistryConfig{
+					BaseURL: "https://registry.test.com",
+				},
+				Environment: "production",
+			},
+			wantErr: true,
+			errMsg:  "coverage must be at least 80%",
+		},
+		{
+			name: "valid production environment with sufficient coverage",
+			config: &Config{
+				Pipeline: PipelineConfig{
+					Name:      "test-pipeline",
+					GoVersion: "1.21",
+					Coverage:  85.0,
+				},
+				Registry: RegistryConfig{
+					BaseURL: "https://registry.test.com",
+				},
+				Environment: "production",
+			},
+			wantErr: false,
 		},
 	}
 
@@ -208,9 +303,6 @@ func TestConfigurationWrapper_GetString(t *testing.T) {
 		key    string
 		expect string
 	}{
-		{KeyServiceName, "syntegrity-dagger"},
-		{KeyServiceVersion, "1.0.0"},
-		{KeyEnvironment, DefaultEnvironment},
 		{KeyPipelineName, DefaultPipelineName},
 		{KeyPipelineGoVersion, DefaultGoVersion},
 		{KeyRegistryBaseURL, DefaultRegistryBaseURL},
@@ -353,9 +445,6 @@ func TestConfigurationWrapper_Has(t *testing.T) {
 		key    string
 		expect bool
 	}{
-		{KeyServiceName, true},
-		{KeyServiceVersion, true},
-		{KeyEnvironment, true},
 		{KeyPipelineName, true},
 		{KeyPipelineGoVersion, true},
 		{KeyPipelineJavaVersion, true},
@@ -383,9 +472,6 @@ func TestConfigurationWrapper_All(t *testing.T) {
 
 	all := cfg.All()
 	assert.NotNil(t, all)
-	assert.Contains(t, all, KeyServiceName)
-	assert.Contains(t, all, KeyServiceVersion)
-	assert.Contains(t, all, KeyEnvironment)
 	assert.Contains(t, all, KeyPipelineName)
 	assert.Contains(t, all, KeyPipelineGoVersion)
 	assert.Contains(t, all, KeyRegistryBaseURL)

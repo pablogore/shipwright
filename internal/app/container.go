@@ -11,11 +11,21 @@ import (
 
 	"dagger.io/dagger"
 
+	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	docker_go "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/docker-go"
-	gokit "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-kit"
+	goservice "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-service"
 	infra "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/infra"
+)
+
+const (
+	// MaxStepTimeout is the maximum allowed timeout for a step (2 hours)
+	MaxStepTimeout = 2 * time.Hour
+	// DefaultStepTimeout is the default timeout for steps (5 minutes)
+	DefaultStepTimeout = 5 * time.Minute
+	// DefaultStepRetries is the default number of retries for steps
+	DefaultStepRetries = 0
 )
 
 // Static errors for err113 compliance.
@@ -183,7 +193,7 @@ func (c *Container) registerPipelineComponents() {
 		registry := NewPipelineRegistry()
 
 		// Register default pipelines
-		registry.Register("go-kit", NewGoKitPipeline)
+		registry.Register("go-service", NewGoServicePipeline)
 		registry.Register("docker-go", NewDockerGoPipeline)
 		registry.Register("infra", NewInfraPipeline)
 
@@ -502,11 +512,20 @@ func (c *Container) registerHookComponents() {
 // PipelineAdapter adapts pipelines.Pipeline to interfaces.Pipeline
 type PipelineAdapter struct {
 	pipeline pipelines.Pipeline
+	config   interfaces.Configuration
 }
 
 // NewPipelineAdapter creates a new pipeline adapter
 func NewPipelineAdapter(pipeline pipelines.Pipeline) *PipelineAdapter {
 	return &PipelineAdapter{pipeline: pipeline}
+}
+
+// NewPipelineAdapterWithConfig creates a new pipeline adapter with configuration
+func NewPipelineAdapterWithConfig(pipeline pipelines.Pipeline, cfg interfaces.Configuration) *PipelineAdapter {
+	return &PipelineAdapter{
+		pipeline: pipeline,
+		config:   cfg,
+	}
 }
 
 // Name returns the name of the pipeline
@@ -559,14 +578,40 @@ func (p *PipelineAdapter) AfterStep(ctx context.Context, stepName string) interf
 	return interfaces.HookFunc(hook)
 }
 
-// GetStepConfig returns configuration for a step
+// GetStepConfig returns configuration for a step.
+// It reads timeout and retries from configuration if available, otherwise uses defaults.
 func (p *PipelineAdapter) GetStepConfig(stepName string) interfaces.StepConfig {
+	timeout := DefaultStepTimeout
+	retries := DefaultStepRetries
+
+	// Try to read from configuration if available
+	if p.config != nil {
+		// Read timeout from config (format: "step.<stepName>.timeout")
+		timeoutKey := fmt.Sprintf("step.%s.timeout", stepName)
+		if timeoutStr := p.config.GetString(timeoutKey); timeoutStr != "" {
+			if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
+				// Validate timeout doesn't exceed maximum
+				if parsedTimeout <= MaxStepTimeout {
+					timeout = parsedTimeout
+				} else {
+					timeout = MaxStepTimeout
+				}
+			}
+		}
+
+		// Read retries from config (format: "step.<stepName>.retries")
+		retriesKey := fmt.Sprintf("step.%s.retries", stepName)
+		if retriesInt := p.config.GetInt(retriesKey); retriesInt > 0 {
+			retries = retriesInt
+		}
+	}
+
 	return interfaces.StepConfig{
 		Name:        stepName,
 		Description: fmt.Sprintf("Execute %s step", stepName),
 		Required:    true,
-		Timeout:     5 * time.Minute,
-		Retries:     0,
+		Timeout:     timeout,
+		Retries:     retries,
 	}
 }
 
@@ -579,6 +624,44 @@ func (p *PipelineAdapter) ValidateStep(stepName string) error {
 		}
 	}
 	return fmt.Errorf("invalid step: %s", stepName)
+}
+
+// validateConvertedConfig validates URLs and versions in the configuration.
+// This is called after convertConfig to ensure all values are valid.
+func validateConvertedConfig(cfg interfaces.Configuration) error {
+	// Validate registry URL if provided
+	registryURL := cfg.GetString("registry.base_url")
+	if registryURL != "" {
+		if err := config.ValidateRegistryURL(registryURL); err != nil {
+			return fmt.Errorf("invalid registry URL: %w", err)
+		}
+	}
+
+	// Validate Go version if provided
+	goVersion := cfg.GetString("pipeline.go_version")
+	if goVersion != "" {
+		if err := config.ValidateGoVersion(goVersion); err != nil {
+			return fmt.Errorf("invalid Go version: %w", err)
+		}
+	}
+
+	// Validate Git repository URL if provided
+	gitRepo := cfg.GetString("git.repo")
+	if gitRepo != "" {
+		if err := config.ValidateGitRepoURL(gitRepo); err != nil {
+			return fmt.Errorf("invalid Git repository URL: %w", err)
+		}
+	}
+
+	// Validate environment if provided
+	env := cfg.Environment()
+	if env != "" {
+		if err := config.ValidateEnvironment(env); err != nil {
+			return fmt.Errorf("invalid environment: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // convertConfig converts interfaces.Configuration to pipelines.Config
@@ -597,7 +680,6 @@ func convertConfig(cfg interfaces.Configuration) pipelines.Config {
 		RegistryURL:   cfg.GetString("registry.base_url"),
 		RegistryUser:  cfg.GetString("registry.user"),
 		RegistryPass:  cfg.GetString("registry.pass"),
-		Version:       cfg.GetString("service.version"),
 		BuildTag:      cfg.GetString("registry.tag"),
 		CommitSHA:     cfg.GetString("git.ref"),
 		BranchName:    cfg.GetString("git.ref"),
@@ -610,20 +692,32 @@ func convertConfig(cfg interfaces.Configuration) pipelines.Config {
 }
 
 // Pipeline factory functions
-func NewGoKitPipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
+func NewGoServicePipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
+	// Validate configuration before conversion
+	if err := validateConvertedConfig(cfg); err != nil {
+		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
+	}
 	pipelineConfig := convertConfig(cfg)
-	pipeline := gokit.New(client, pipelineConfig)
-	return NewPipelineAdapter(pipeline)
+	pipeline := goservice.New(client, pipelineConfig)
+	return NewPipelineAdapterWithConfig(pipeline, cfg)
 }
 
 func NewDockerGoPipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
+	// Validate configuration before conversion
+	if err := validateConvertedConfig(cfg); err != nil {
+		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
+	}
 	pipelineConfig := convertConfig(cfg)
 	pipeline := docker_go.New(client, pipelineConfig)
-	return NewPipelineAdapter(pipeline)
+	return NewPipelineAdapterWithConfig(pipeline, cfg)
 }
 
 func NewInfraPipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
+	// Validate configuration before conversion
+	if err := validateConvertedConfig(cfg); err != nil {
+		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
+	}
 	pipelineConfig := convertConfig(cfg)
 	pipeline := infra.New(client, pipelineConfig)
-	return NewPipelineAdapter(pipeline)
+	return NewPipelineAdapterWithConfig(pipeline, cfg)
 }

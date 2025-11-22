@@ -27,13 +27,13 @@ var (
 const (
 	// Default values.
 	DefaultEnvironment     = "development"
-	DefaultPipelineName    = "go-kit"
+	DefaultPipelineName    = "go-service"
 	DefaultCoverage        = 90.0
 	DefaultGoVersion       = "1.25.1"
 	DefaultJavaVersion     = "17"
-	DefaultRegistryBaseURL = "registry.gitlab.com/syntegrity"
-	DefaultRegistryUser    = "gitlab-ci-token"
-	DefaultGitProtocol     = "ssh"
+	DefaultRegistryBaseURL = ""
+	DefaultRegistryUser    = ""
+	DefaultGitProtocol     = "https"
 	DefaultGitRef          = "main"
 	DefaultLogLevel        = "info"
 	DefaultLogFormat       = "json"
@@ -225,15 +225,49 @@ func (c *Config) Validate() error {
 	if c.Pipeline.Name == "" {
 		return ErrPipelineNameRequired
 	}
-	if c.Registry.BaseURL == "" {
+
+	// Validate registry URL format if provided
+	if c.Registry.BaseURL != "" {
+		if err := ValidateRegistryURL(c.Registry.BaseURL); err != nil {
+			return fmt.Errorf("invalid registry URL: %w", err)
+		}
+	} else {
 		return ErrRegistryBaseURLRequired
 	}
-	if c.Pipeline.GoVersion == "" {
+
+	// Validate Go version format if provided
+	if c.Pipeline.GoVersion != "" {
+		if err := ValidateGoVersion(c.Pipeline.GoVersion); err != nil {
+			return fmt.Errorf("invalid Go version: %w", err)
+		}
+	} else {
 		return ErrGoVersionRequired
 	}
+
+	// Validate Git repository URL format if provided
+	if c.Git.Repo != "" {
+		if err := ValidateGitRepoURL(c.Git.Repo); err != nil {
+			return fmt.Errorf("invalid Git repository URL: %w", err)
+		}
+	}
+
+	// Validate environment if provided
+	if c.Environment != "" {
+		if err := ValidateEnvironment(c.Environment); err != nil {
+			return fmt.Errorf("invalid environment: %w", err)
+		}
+	}
+
+	// Validate coverage range
 	if c.Pipeline.Coverage < 0 || c.Pipeline.Coverage > 100 {
 		return ErrInvalidCoverage
 	}
+
+	// Validate minimum coverage for production environments
+	if (c.Environment == "production" || c.Environment == "prod") && c.Pipeline.Coverage < 80 {
+		return fmt.Errorf("coverage must be at least 80%% for production environment, got: %.1f%%", c.Pipeline.Coverage)
+	}
+
 	return nil
 }
 
@@ -270,9 +304,6 @@ func (cw *ConfigurationWrapper) GetConfigSummary() string {
 // stringConfigMap holds the string configuration values.
 func (cw *ConfigurationWrapper) getStringConfigMap() map[string]string {
 	return map[string]string{
-		KeyServiceName:         "syntegrity-dagger",
-		KeyServiceVersion:      "1.0.0",
-		KeyEnvironment:         cw.Config.Environment,
 		KeyPipelineName:        cw.Config.Pipeline.Name,
 		KeyPipelineGoVersion:   cw.Config.Pipeline.GoVersion,
 		KeyPipelineJavaVersion: cw.Config.Pipeline.JavaVersion,
@@ -440,8 +471,7 @@ func (cw *ConfigurationWrapper) Set(key string, value any) {
 func (cw *ConfigurationWrapper) Has(key string) bool {
 	// Check if the key has a non-empty value
 	switch key {
-	case KeyServiceName, KeyServiceVersion, KeyEnvironment,
-		KeyPipelineName, KeyPipelineGoVersion, KeyPipelineJavaVersion,
+	case KeyPipelineName, KeyPipelineGoVersion, KeyPipelineJavaVersion,
 		KeyRegistryBaseURL, KeyRegistryUser, KeyGitRef, KeyGitProtocol,
 		KeySecurityLintTimeout, KeyLogLevel, KeyLogFormat:
 		return true
@@ -453,9 +483,6 @@ func (cw *ConfigurationWrapper) Has(key string) bool {
 // All returns all configuration as map.
 func (cw *ConfigurationWrapper) All() map[string]any {
 	return map[string]any{
-		KeyServiceName:       "syntegrity-dagger",
-		KeyServiceVersion:    "1.0.0",
-		KeyEnvironment:       cw.Config.Environment,
 		KeyPipelineName:      cw.Config.Pipeline.Name,
 		KeyPipelineGoVersion: cw.Config.Pipeline.GoVersion,
 		KeyRegistryBaseURL:   cw.Config.Registry.BaseURL,

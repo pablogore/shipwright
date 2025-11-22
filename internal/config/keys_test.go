@@ -12,11 +12,6 @@ func TestConfigurationKeys(t *testing.T) {
 		key      string
 		category string
 	}{
-		// Service configuration
-		{name: "service name", key: KeyServiceName, category: "service"},
-		{name: "service version", key: KeyServiceVersion, category: "service"},
-		{name: "environment", key: KeyEnvironment, category: "service"},
-
 		// Pipeline configuration
 		{name: "pipeline name", key: KeyPipelineName, category: "pipeline"},
 		{name: "pipeline coverage", key: KeyPipelineCoverage, category: "pipeline"},
@@ -79,7 +74,6 @@ func TestConfigurationKeys(t *testing.T) {
 func TestKeyFormat(t *testing.T) {
 	// Test that all keys follow the expected format: category.field
 	allKeys := []string{
-		KeyServiceName, KeyServiceVersion, KeyEnvironment,
 		KeyPipelineName, KeyPipelineCoverage, KeyPipelineSkipPush, KeyPipelineOnlyBuild,
 		KeyPipelineOnlyTest, KeyPipelineVerbose, KeyPipelineGoVersion, KeyPipelineJavaVersion,
 		KeyRegistryBaseURL, KeyRegistryUser, KeyRegistryPass, KeyRegistryImage, KeyRegistryTag,
@@ -109,7 +103,6 @@ func TestKeyFormat(t *testing.T) {
 func TestKeyUniqueness(t *testing.T) {
 	// Test that all keys are unique
 	allKeys := []string{
-		KeyServiceName, KeyServiceVersion, KeyEnvironment,
 		KeyPipelineName, KeyPipelineCoverage, KeyPipelineSkipPush, KeyPipelineOnlyBuild,
 		KeyPipelineOnlyTest, KeyPipelineVerbose, KeyPipelineGoVersion, KeyPipelineJavaVersion,
 		KeyRegistryBaseURL, KeyRegistryUser, KeyRegistryPass, KeyRegistryImage, KeyRegistryTag,
@@ -131,7 +124,6 @@ func TestKeyUniqueness(t *testing.T) {
 func TestKeyCategories(t *testing.T) {
 	// Test that keys are properly categorized
 	categories := map[string][]string{
-		"service": {KeyServiceName, KeyServiceVersion, KeyEnvironment},
 		"pipeline": {
 			KeyPipelineName, KeyPipelineCoverage, KeyPipelineSkipPush, KeyPipelineOnlyBuild,
 			KeyPipelineOnlyTest, KeyPipelineVerbose, KeyPipelineGoVersion, KeyPipelineJavaVersion,

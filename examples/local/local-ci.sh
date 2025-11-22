@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PIPELINE_TYPE="${1:-go-kit}"
+PIPELINE_TYPE="${1:-go-service}"
 ENVIRONMENT="${2:-dev}"
 COVERAGE_THRESHOLD="${3:-90}"
 CONFIG_FILE="${4:-.syntegrity-dagger.yml}"

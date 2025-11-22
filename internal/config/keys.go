@@ -2,11 +2,6 @@ package config
 
 // Configuration key constants for consistent access.
 const (
-	// Service configuration.
-	KeyServiceName    = "service.name"
-	KeyServiceVersion = "service.version"
-	KeyEnvironment    = "service.environment"
-
 	// Pipeline configuration.
 	KeyPipelineName        = "pipeline.name"
 	KeyPipelineCoverage    = "pipeline.coverage"

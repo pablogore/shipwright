@@ -1073,7 +1073,7 @@ func setupMockConfigForConvertConfig(mockConfig *mocks.MockConfiguration) {
 }
 
 // Test pipeline factory functions
-func TestNewGoKitPipeline(t *testing.T) {
+func TestNewGoServicePipeline(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -1083,7 +1083,7 @@ func TestNewGoKitPipeline(t *testing.T) {
 	setupMockConfigForConvertConfig(mockConfig)
 
 	// Test with nil client - pipelines handle this gracefully
-	pipeline := NewGoKitPipeline(nil, mockConfig)
+	pipeline := NewGoServicePipeline(nil, mockConfig)
 
 	// Should return a PipelineAdapter, not nil
 	assert.NotNil(t, pipeline)
