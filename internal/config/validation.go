@@ -9,25 +9,30 @@ import (
 )
 
 // ValidateRegistryURL validates that the registry URL has a valid format.
-// It checks for scheme (http:// or https://) and host.
+// It accepts URLs with or without schemes. If no scheme is provided, https:// is assumed.
+// This maintains backward compatibility with existing configurations.
 func ValidateRegistryURL(registryURL string) error {
 	if registryURL == "" {
 		return errors.New("registry URL cannot be empty")
 	}
 
-	parsed, err := url.Parse(registryURL)
+	// Normalize URL by adding https:// scheme if missing (for backward compatibility)
+	normalizedURL := registryURL
+	if !strings.Contains(registryURL, "://") {
+		normalizedURL = "https://" + registryURL
+	}
+
+	parsed, err := url.Parse(normalizedURL)
 	if err != nil {
 		return fmt.Errorf("invalid registry URL format: %w", err)
 	}
 
-	if parsed.Scheme == "" {
-		return errors.New("registry URL must include scheme (http:// or https://)")
-	}
-
+	// Validate scheme (after normalization, should always have one)
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("registry URL must use http:// or https:// scheme, got: %s", parsed.Scheme)
 	}
 
+	// Validate host
 	if parsed.Host == "" {
 		return errors.New("registry URL must include host")
 	}

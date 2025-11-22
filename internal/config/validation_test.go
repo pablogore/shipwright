@@ -38,9 +38,14 @@ func TestValidateRegistryURL(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "URL without scheme",
+			name:    "URL without scheme (normalized to https://)",
 			url:     "registry.example.com",
-			wantErr: true,
+			wantErr: false,
+		},
+		{
+			name:    "URL without scheme - backward compatibility (test-registry)",
+			url:     "test-registry",
+			wantErr: false,
 		},
 		{
 			name:    "invalid URL format",
@@ -56,7 +61,7 @@ func TestValidateRegistryURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateRegistryURL(tt.url)
+			err := ValidateRegistryURL(tt.url)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -121,7 +126,7 @@ func TestValidateGitRepoURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateGitRepoURL(tt.url)
+			err := ValidateGitRepoURL(tt.url)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -191,7 +196,7 @@ func TestValidateGoVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateGoVersion(tt.version)
+			err := ValidateGoVersion(tt.version)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -256,7 +261,7 @@ func TestValidateEnvironment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateEnvironment(tt.env)
+			err := ValidateEnvironment(tt.env)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

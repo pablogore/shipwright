@@ -226,13 +226,11 @@ func (c *Config) Validate() error {
 		return ErrPipelineNameRequired
 	}
 
-	// Validate registry URL format if provided
+	// Validate registry URL format if provided (optional - only needed for pipelines that push images)
 	if c.Registry.BaseURL != "" {
 		if err := ValidateRegistryURL(c.Registry.BaseURL); err != nil {
 			return fmt.Errorf("invalid registry URL: %w", err)
 		}
-	} else {
-		return ErrRegistryBaseURLRequired
 	}
 
 	// Validate Go version format if provided
