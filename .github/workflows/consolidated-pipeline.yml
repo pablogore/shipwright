@@ -52,7 +52,7 @@ jobs:
       run-coverage: ${{ steps.determine.outputs.coverage }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -114,7 +114,7 @@ jobs:
     if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -148,7 +148,7 @@ jobs:
     if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -175,7 +175,7 @@ jobs:
     if: ${{ needs.determine-pipeline.outputs.run-security == 'true' }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       
     - name: Set up Go
       uses: actions/setup-go@v6
