@@ -2,12 +2,16 @@ name: Release Pipeline
 
 # This workflow runs when:
 # 1. A tag is pushed (manual release)
-# 2. Merge to main branch (automatic release with auto-tagging)
+# 2. Merge to main branch from hotfix/* or develop (automatic release with auto-tagging)
+# 3. Pull request merged to main from hotfix/* or develop
 on:
   push:
     branches: [ main ]
     tags:
       - 'v*'  # Version tags (v1.0.0, v2.1.3, etc.)
+  pull_request:
+    types: [closed]
+    branches: [ main ]
 
 permissions:
   contents: write
@@ -22,17 +26,21 @@ jobs:
   # Job 1: Validate tag and prepare release
   validate-release:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
+    # Only run on merged PRs or direct pushes to main
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
       type: ${{ steps.tag.outputs.type }}
       changelog: ${{ steps.changelog.outputs.changelog }}
+      source_branch: ${{ steps.tag.outputs.source_branch }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
         token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.merge_commit_sha || 'main') || github.sha }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -54,40 +62,92 @@ jobs:
           TAG="${{ github.ref_name }}"
           VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           echo "type=manual" >> $GITHUB_OUTPUT
+          echo "source_branch=tag" >> $GITHUB_OUTPUT
         else
           # Automatic release via merge to main
           echo "🚀 Automatic release via merge to main"
           
+          # Detect source branch
+          SOURCE_BRANCH=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Get source branch from PR
+            SOURCE_BRANCH="${{ github.event.pull_request.head.ref }}"
+            echo "📋 PR merged from branch: $SOURCE_BRANCH"
+          else
+            # Try to detect from merge commit message or recent commits
+            MERGE_COMMIT=$(git log -1 --pretty=%B)
+            if echo "$MERGE_COMMIT" | grep -qE "Merge pull request|Merge branch"; then
+              # Extract branch name from merge commit
+              SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
+            fi
+            # Also check recent commits for branch info
+            if [[ -z "$SOURCE_BRANCH" ]]; then
+              SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
+            fi
+          fi
+
+          echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
+
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
           
-          # Check commit message to determine version bump type
-          # Look for conventional commit types in the merge commit or recent commits
+          # Determine version bump based on source branch and commit messages
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "Commit message: $COMMIT_MSG"
           
-          # Determine version bump based on commit message
-          if echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
-            # Feature: bump minor version
-            echo "📦 Feature detected: bumping minor version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
-          elif echo "$COMMIT_MSG" | grep -qiE "^(fix|bugfix|hotfix)(\(.+\))?:"; then
-            # Fix: bump patch version
-            echo "🔧 Fix detected: bumping patch version"
+          # Check if merge comes from hotfix branch
+          if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+            # Hotfix: always bump patch version
+            echo "🔥 Hotfix detected from branch: $SOURCE_BRANCH - bumping patch version"
             VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
             VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
-          elif echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
-            # Breaking change: bump major version
-            echo "⚠️ Breaking change detected: bumping major version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+          elif [[ "$SOURCE_BRANCH" == "develop" ]] || echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
+            # Merge from develop: determine based on commit messages
+            echo "🌿 Merge from develop branch detected - analyzing commits"
+
+            # Check commit messages in the merge
+            if echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
+              # Breaking change: bump major version
+              echo "⚠️ Breaking change detected: bumping major version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+            elif echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
+              # Feature: bump minor version
+              echo "📦 Feature detected: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            else
+              # Default for develop: bump minor version (develop usually has features)
+              echo "📝 Default for develop: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            fi
           else
-            # Default: bump patch version
-            echo "📝 Default: bumping patch version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            # Other merges: determine based on commit message
+            echo "📋 Analyzing commit messages to determine version bump"
+
+            if echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
+              # Feature: bump minor version
+              echo "📦 Feature detected: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            elif echo "$COMMIT_MSG" | grep -qiE "^(fix|bugfix|hotfix)(\(.+\))?:"; then
+              # Fix: bump patch version
+              echo "🔧 Fix detected: bumping patch version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            elif echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
+              # Breaking change: bump major version
+              echo "⚠️ Breaking change detected: bumping major version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+            else
+              # Default: bump patch version
+              echo "📝 Default: bumping patch version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            fi
           fi
           
           TAG="v$VERSION"
@@ -182,9 +242,14 @@ jobs:
   # Job 2: Build and test before release
   build-and-test:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
+    # Only run on merged PRs or direct pushes to main
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.merge_commit_sha || 'main') || github.sha }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -227,6 +292,7 @@ jobs:
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.merge_commit_sha || 'main') || github.sha }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
