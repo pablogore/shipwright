@@ -32,7 +32,7 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -41,7 +41,7 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
@@ -226,7 +226,8 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-tags: true  # Fetch all tags to ensure tag validation works
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -235,24 +236,64 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-    - name: Create tag (automatic release only)
+    - name: Create or update tag (automatic release only)
       if: needs.validate-release.outputs.type == 'automatic'
       run: |
-        echo "🏷️ Creating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
+        echo "🏷️ Creating/updating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
         
-        # Create tag if it doesn't exist
-        if ! git tag -l | grep -q "^${{ needs.validate-release.outputs.tag }}$"; then
-          git tag -a "${{ needs.validate-release.outputs.tag }}" -m "Release ${{ needs.validate-release.outputs.tag }}"
-          git push origin "${{ needs.validate-release.outputs.tag }}"
-          echo "✅ Tag created and pushed: ${{ needs.validate-release.outputs.tag }}"
+        TAG="${{ needs.validate-release.outputs.tag }}"
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        
+        # Check if tag exists
+        if git tag -l | grep -q "^${TAG}$"; then
+          TAG_COMMIT=$(git rev-parse ${TAG}^{commit} 2>/dev/null || echo "")
+          
+          if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+            echo "⚠️ Tag ${TAG} exists but points to different commit"
+            echo "   Tag commit: ${TAG_COMMIT}"
+            echo "   Current commit: ${CURRENT_COMMIT}"
+            echo "🔄 Updating tag to point to current commit..."
+            
+            # Delete tag locally and remotely
+            git tag -d "${TAG}" || true
+            git push origin ":refs/tags/${TAG}" || true
+            
+            # Create new tag pointing to current commit
+            git tag -a "${TAG}" -m "Release ${TAG}"
+            git push origin "${TAG}"
+            echo "✅ Tag updated and pushed: ${TAG}"
+          else
+            echo "✅ Tag ${TAG} already exists and points to current commit"
+          fi
         else
-          echo "⚠️ Tag already exists: ${{ needs.validate-release.outputs.tag }}"
+          # Create new tag
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+          echo "✅ Tag created and pushed: ${TAG}"
         fi
         
+    - name: Verify tag points to current commit
+      run: |
+        TAG="${{ needs.validate-release.outputs.tag }}"
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        
+        if git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
+          TAG_COMMIT=$(git rev-parse "${TAG}^{commit}")
+          if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+            echo "❌ Error: Tag ${TAG} points to commit ${TAG_COMMIT} but current commit is ${CURRENT_COMMIT}"
+            echo "   This will cause GoReleaser to fail. Please ensure the tag is updated."
+            exit 1
+          else
+            echo "✅ Tag ${TAG} correctly points to current commit ${CURRENT_COMMIT}"
+          fi
+        else
+          echo "⚠️ Warning: Tag ${TAG} not found locally, but will be validated by GoReleaser"
+        fi
+    
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v5
       with:
@@ -260,7 +301,7 @@ jobs:
         version: latest
         args: release --clean
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
     
     - name: Prepare raw binaries for direct download
       run: |
@@ -346,7 +387,7 @@ jobs:
         echo "📦 Available binaries for download:"
         ls -lh
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
     
     - name: Update CHANGELOG.md in repository
       if: needs.validate-release.outputs.type == 'automatic'
@@ -402,7 +443,7 @@ jobs:
           git push origin main
         fi
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Upload release artifacts
       uses: actions/upload-artifact@v5

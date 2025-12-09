@@ -51,11 +51,19 @@ jobs:
       run-security: ${{ steps.determine.outputs.security }}
       run-coverage: ${{ steps.determine.outputs.coverage }}
     steps:
+    - name: Determine checkout token
+      id: token
+      run: |
+        if [ -n "${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" ]; then
+          echo "value=${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> $GITHUB_OUTPUT
+        else
+          echo "value=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+        fi
     - name: Checkout code
       uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ steps.token.outputs.value }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -64,7 +72,7 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
@@ -113,8 +121,18 @@ jobs:
     needs: determine-pipeline
     if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
+    - name: Determine checkout token
+      id: token
+      run: |
+        if [ -n "${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" ]; then
+          echo "value=${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> $GITHUB_OUTPUT
+        else
+          echo "value=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+        fi
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        token: ${{ steps.token.outputs.value }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -147,8 +165,18 @@ jobs:
     needs: determine-pipeline
     if: ${{ always() && (needs.determine-pipeline.result == 'success' || needs.determine-pipeline.outputs.pipeline-type == 'pr') }}
     steps:
+    - name: Determine checkout token
+      id: token
+      run: |
+        if [ -n "${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" ]; then
+          echo "value=${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> $GITHUB_OUTPUT
+        else
+          echo "value=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+        fi
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        token: ${{ steps.token.outputs.value }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -174,8 +202,18 @@ jobs:
     needs: determine-pipeline
     if: ${{ needs.determine-pipeline.outputs.run-security == 'true' }}
     steps:
+    - name: Determine checkout token
+      id: token
+      run: |
+        if [ -n "${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" ]; then
+          echo "value=${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> $GITHUB_OUTPUT
+        else
+          echo "value=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+        fi
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        token: ${{ steps.token.outputs.value }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
