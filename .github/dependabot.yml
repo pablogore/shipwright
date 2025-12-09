@@ -26,7 +26,6 @@ updates:
       security-updates:
         patterns:
           - "*"
-        applies-to: security-updates
         update-types:
           - "patch"
           - "minor"
