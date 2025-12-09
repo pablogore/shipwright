@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"os"
 	"testing"
 
@@ -85,14 +84,6 @@ func TestMain_ErrorOutput(t *testing.T) {
 
 	// Test with invalid args that should cause an error
 	os.Args = []string{"syntegrity-dagger", "-invalid-flag"}
-
-	// Capture stderr
-	var stderr bytes.Buffer
-	oldStderr := os.Stderr
-	os.Stderr = &stderr
-	defer func() {
-		os.Stderr = oldStderr
-	}()
 
 	// We can't actually call main() in a test easily, but we can verify
 	// that the error handling code path exists and doesn't use log.Fatalf

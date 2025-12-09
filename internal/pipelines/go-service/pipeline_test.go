@@ -520,27 +520,27 @@ func TestPipeline_Push_NoRegistry(t *testing.T) {
 
 	// Use our mock Dagger client instead of real client
 	mockDaggerClient := mocks.NewMockDaggerClient(ctrl)
-	mockContainer := mocks.NewMockDaggerContainer(ctrl)
 
 	cfg := pipelines.Config{
 		// No registry configured
 	}
 
-	// Create pipeline with mock client and mock image
+	// Create pipeline with mock client (Image is nil since we're testing with mocks)
 	pipeline := &Pipeline{
 		Client: mockDaggerClient,
 		Config: cfg,
 		Src:    nil,
 		Cloner: nil,
-		Image:  mockContainer,
+		Image:  nil, // Image must be *dagger.Container, not mock
 	}
 
 	ctx := t.Context()
 	err := pipeline.Push(ctx)
 
-	// Push method requires real Dagger client, so it will return error for mock
+	// Push method checks for Image first, then requires real Dagger client
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Push method requires real Dagger client, not mock")
+	// Image is nil, so it returns error about no image
+	assert.Contains(t, err.Error(), "no image to push")
 }
 
 func TestPipeline_BeforeStep(t *testing.T) {

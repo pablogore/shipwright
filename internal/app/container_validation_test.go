@@ -3,8 +3,8 @@ package app
 import (
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -35,7 +35,7 @@ func TestValidateConvertedConfig(t *testing.T) {
 				defer ctrl.Finish()
 				mockConfig := mocks.NewMockConfiguration(ctrl)
 				mockConfig.EXPECT().Environment().Return("dev").AnyTimes()
-				mockConfig.EXPECT().GetString("registry.base_url").Return("invalid-url").AnyTimes()
+				mockConfig.EXPECT().GetString("registry.base_url").Return("https://").AnyTimes() // Invalid: no host
 				mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.25.5").AnyTimes()
 				mockConfig.EXPECT().GetString("git.repo").Return("").AnyTimes()
 				return mockConfig
