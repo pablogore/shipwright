@@ -12,21 +12,13 @@ import (
 
 // Helper function to create a test YAMLConfig
 func createTestYAMLConfig(steps []string) *YAMLConfig {
-	return &YAMLConfig{
-		Pipeline: struct {
-			Name        string   `yaml:"name"`
-			Environment string   `yaml:"environment"`
-			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"goVersion"`
-			Steps       []string `yaml:"steps"`
-		}{
-			Name:        "test-pipeline",
-			Environment: "dev",
-			Coverage:    95.0,
-			GoVersion:   "1.21",
-			Steps:       steps,
-		},
-	}
+	config := &YAMLConfig{}
+	config.Pipeline.Name = "test-pipeline"
+	config.Pipeline.Environment = "dev"
+	config.Pipeline.Coverage = 95.0
+	config.Pipeline.GoVersion = "1.21"
+	config.Pipeline.Steps = steps
+	return config
 }
 
 func TestNewYAMLParser(t *testing.T) {
@@ -114,53 +106,22 @@ func TestYAMLParser_ApplyToConfiguration(t *testing.T) {
 	mockConfig := mocks.NewMockConfiguration(ctrl)
 
 	parser := NewYAMLParser()
-	yamlConfig := &YAMLConfig{
-		Pipeline: struct {
-			Name        string   `yaml:"name"`
-			Environment string   `yaml:"environment"`
-			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"goVersion"`
-			Steps       []string `yaml:"steps"`
-		}{
-			Name:        "test-pipeline",
-			Environment: "dev",
-			Coverage:    95.0,
-			GoVersion:   "1.21",
-			Steps:       []string{"setup", "build", "test"},
-		},
-		Registry: struct {
-			BaseURL string `yaml:"baseUrl"`
-			Image   string `yaml:"image"`
-			User    string `yaml:"user"`
-		}{
-			BaseURL: "registry.test.com",
-			Image:   "test-image",
-			User:    "test-user",
-		},
-		Security: struct {
-			EnableVulnCheck bool `yaml:"enableVulnCheck"`
-			EnableLinting   bool `yaml:"enableLinting"`
-		}{
-			EnableVulnCheck: true,
-			EnableLinting:   true,
-		},
-		Release: struct {
-			Enabled             bool     `yaml:"enabled"`
-			UseGoreleaser       bool     `yaml:"useGoreleaser"`
-			CreateGithubRelease bool     `yaml:"createGithubRelease"`
-			Platforms           []string `yaml:"platforms"`
-		}{
-			Enabled:             false,
-			UseGoreleaser:       true,
-			CreateGithubRelease: false,
-			Platforms:           []string{"linux/amd64"},
-		},
-		Logging: struct {
-			Level string `yaml:"level"`
-		}{
-			Level: "info",
-		},
-	}
+	yamlConfig := &YAMLConfig{}
+	yamlConfig.Pipeline.Name = "test-pipeline"
+	yamlConfig.Pipeline.Environment = "dev"
+	yamlConfig.Pipeline.Coverage = 95.0
+	yamlConfig.Pipeline.GoVersion = "1.21"
+	yamlConfig.Pipeline.Steps = []string{"setup", "build", "test"}
+	yamlConfig.Registry.BaseURL = "registry.test.com"
+	yamlConfig.Registry.Image = "test-image"
+	yamlConfig.Registry.User = "test-user"
+	yamlConfig.Security.EnableVulnCheck = true
+	yamlConfig.Security.EnableLinting = true
+	yamlConfig.Release.Enabled = false
+	yamlConfig.Release.UseGoreleaser = true
+	yamlConfig.Release.CreateGithubRelease = false
+	yamlConfig.Release.Platforms = []string{"linux/amd64"}
+	yamlConfig.Logging.Level = "info"
 
 	// Set up expectations
 	mockConfig.EXPECT().Set("pipeline.name", "test-pipeline").Times(1)
@@ -188,35 +149,16 @@ func TestYAMLParser_ApplyToConfiguration_EmptyValues(t *testing.T) {
 	mockConfig := mocks.NewMockConfiguration(ctrl)
 
 	parser := NewYAMLParser()
-	yamlConfig := &YAMLConfig{
-		Pipeline: struct {
-			Name        string   `yaml:"name"`
-			Environment string   `yaml:"environment"`
-			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"goVersion"`
-			Steps       []string `yaml:"steps"`
-		}{
-			Name:        "",
-			Environment: "",
-			Coverage:    0,
-			GoVersion:   "",
-			Steps:       []string{},
-		},
-		Registry: struct {
-			BaseURL string `yaml:"baseUrl"`
-			Image   string `yaml:"image"`
-			User    string `yaml:"user"`
-		}{
-			BaseURL: "",
-			Image:   "",
-			User:    "",
-		},
-		Logging: struct {
-			Level string `yaml:"level"`
-		}{
-			Level: "",
-		},
-	}
+	yamlConfig := &YAMLConfig{}
+	yamlConfig.Pipeline.Name = ""
+	yamlConfig.Pipeline.Environment = ""
+	yamlConfig.Pipeline.Coverage = 0
+	yamlConfig.Pipeline.GoVersion = ""
+	yamlConfig.Pipeline.Steps = []string{}
+	yamlConfig.Registry.BaseURL = ""
+	yamlConfig.Registry.Image = ""
+	yamlConfig.Registry.User = ""
+	yamlConfig.Logging.Level = ""
 
 	// Only security and release settings should be set (they have default values)
 	mockConfig.EXPECT().Set("security.enable_vuln_check", false).Times(1)
@@ -259,18 +201,12 @@ func TestYAMLParser_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "missing pipeline name",
-			config: &YAMLConfig{
-				Pipeline: struct {
-					Name        string   `yaml:"name"`
-					Environment string   `yaml:"environment"`
-					Coverage    float64  `yaml:"coverage"`
-					GoVersion   string   `yaml:"goVersion"`
-					Steps       []string `yaml:"steps"`
-				}{
-					Name:  "",
-					Steps: []string{"setup", "build", "test"},
-				},
-			},
+			config: func() *YAMLConfig {
+				cfg := &YAMLConfig{}
+				cfg.Pipeline.Name = ""
+				cfg.Pipeline.Steps = []string{"setup", "build", "test"}
+				return cfg
+			}(),
 			wantErr:     true,
 			errContains: "pipeline name is required",
 		},
@@ -507,53 +443,22 @@ func TestYAMLParser_FindConfigFile_ParentDirectories(t *testing.T) {
 
 func TestYAMLConfig_Structure(t *testing.T) {
 	// Test that YAMLConfig has the expected structure
-	config := &YAMLConfig{
-		Pipeline: struct {
-			Name        string   `yaml:"name"`
-			Environment string   `yaml:"environment"`
-			Coverage    float64  `yaml:"coverage"`
-			GoVersion   string   `yaml:"goVersion"`
-			Steps       []string `yaml:"steps"`
-		}{
-			Name:        "test",
-			Environment: "dev",
-			Coverage:    90.0,
-			GoVersion:   "1.21",
-			Steps:       []string{"setup", "build"},
-		},
-		Registry: struct {
-			BaseURL string `yaml:"baseUrl"`
-			Image   string `yaml:"image"`
-			User    string `yaml:"user"`
-		}{
-			BaseURL: "registry.test.com",
-			Image:   "test-image",
-			User:    "test-user",
-		},
-		Security: struct {
-			EnableVulnCheck bool `yaml:"enableVulnCheck"`
-			EnableLinting   bool `yaml:"enableLinting"`
-		}{
-			EnableVulnCheck: true,
-			EnableLinting:   true,
-		},
-		Release: struct {
-			Enabled             bool     `yaml:"enabled"`
-			UseGoreleaser       bool     `yaml:"useGoreleaser"`
-			CreateGithubRelease bool     `yaml:"createGithubRelease"`
-			Platforms           []string `yaml:"platforms"`
-		}{
-			Enabled:             false,
-			UseGoreleaser:       true,
-			CreateGithubRelease: false,
-			Platforms:           []string{"linux/amd64"},
-		},
-		Logging: struct {
-			Level string `yaml:"level"`
-		}{
-			Level: "info",
-		},
-	}
+	config := &YAMLConfig{}
+	config.Pipeline.Name = "test"
+	config.Pipeline.Environment = "dev"
+	config.Pipeline.Coverage = 90.0
+	config.Pipeline.GoVersion = "1.21"
+	config.Pipeline.Steps = []string{"setup", "build"}
+	config.Registry.BaseURL = "registry.test.com"
+	config.Registry.Image = "test-image"
+	config.Registry.User = "test-user"
+	config.Security.EnableVulnCheck = true
+	config.Security.EnableLinting = true
+	config.Release.Enabled = false
+	config.Release.UseGoreleaser = true
+	config.Release.CreateGithubRelease = false
+	config.Release.Platforms = []string{"linux/amd64"}
+	config.Logging.Level = "info"
 
 	assert.Equal(t, "test", config.Pipeline.Name)
 	assert.Equal(t, "dev", config.Pipeline.Environment)

@@ -17,7 +17,7 @@ import (
 //   - client: The Dagger client used for container operations.
 //   - src: The source directory of the cloned repository.
 //   - coverage: The coverage threshold for the tests.
-//   - goVersion: The Go version to use for testing (e.g., "1.25.1").
+//   - goVersion: The Go version to use for testing (e.g., "1.25.5").
 //
 // Returns:
 //   - An error if the tests fail, otherwise nil.
@@ -31,7 +31,7 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 
 	// Use default Go version if not provided
 	if goVersion == "" {
-		goVersion = "1.25.1"
+		goVersion = "1.25.5"
 	}
 
 	// Run the tests in a Dagger container with coverage

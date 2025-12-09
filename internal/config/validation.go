@@ -81,7 +81,7 @@ func ValidateGitRepoURL(repoURL string) error {
 }
 
 // ValidateGoVersion validates that the Go version follows semantic versioning format.
-// It accepts X.Y or X.Y.Z formats (e.g., "1.25" or "1.25.1").
+// It accepts X.Y or X.Y.Z formats (e.g., "1.25" or "1.25.5").
 func ValidateGoVersion(version string) error {
 	if version == "" {
 		return errors.New("Go version cannot be empty")
@@ -94,7 +94,7 @@ func ValidateGoVersion(version string) error {
 	}
 
 	if !matched {
-		return fmt.Errorf("invalid Go version format: %s (expected X.Y or X.Y.Z, e.g., 1.25 or 1.25.1)", version)
+		return fmt.Errorf("invalid Go version format: %s (expected X.Y or X.Y.Z, e.g., 1.25 or 1.25.5)", version)
 	}
 
 	return nil

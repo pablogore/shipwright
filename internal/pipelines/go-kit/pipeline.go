@@ -187,7 +187,7 @@ func (p *Pipeline) Build(ctx context.Context) error {
 			realSrc := srcAdapter.GetRealDirectory()
 			goVersion := p.Config.GoVersion
 			if goVersion == "" {
-				goVersion = "1.25.1"
+				goVersion = "1.25.5"
 			}
 			builder := shared.NewGoBuilder(realClient, realSrc, goVersion)
 			outPath := "bin/app"

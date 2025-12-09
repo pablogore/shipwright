@@ -2,7 +2,7 @@ pipeline:
   name: "go-service"
   environment: "production"
   coverage: 90.0
-  go_version: "1.25.1"
+  go_version: "1.25.5"
 
 # Steps para librería (sin container)
 steps:

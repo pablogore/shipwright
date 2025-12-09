@@ -34,10 +34,10 @@ func (p *Pipeline) Test(ctx context.Context) error {
 
 	fmt.Println("🧪 running tests for docker-go...")
 
-	// Use Go version from config, default to 1.25.1 if not set
+	// Use Go version from config, default to 1.25.5 if not set
 	goVersion := p.Config.GoVersion
 	if goVersion == "" {
-		goVersion = "1.25.1"
+		goVersion = "1.25.5"
 	}
 
 	// Create a Go container

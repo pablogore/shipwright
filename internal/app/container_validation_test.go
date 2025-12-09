@@ -36,7 +36,7 @@ func TestValidateConvertedConfig(t *testing.T) {
 				mockConfig := mocks.NewMockConfiguration(ctrl)
 				mockConfig.EXPECT().Environment().Return("dev").AnyTimes()
 				mockConfig.EXPECT().GetString("registry.base_url").Return("invalid-url").AnyTimes()
-				mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.25.1").AnyTimes()
+				mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.25.5").AnyTimes()
 				mockConfig.EXPECT().GetString("git.repo").Return("").AnyTimes()
 				return mockConfig
 			}(),
@@ -66,7 +66,7 @@ func TestValidateConvertedConfig(t *testing.T) {
 				mockConfig := mocks.NewMockConfiguration(ctrl)
 				mockConfig.EXPECT().Environment().Return("dev").AnyTimes()
 				mockConfig.EXPECT().GetString("registry.base_url").Return("https://registry.example.com").AnyTimes()
-				mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.25.1").AnyTimes()
+				mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.25.5").AnyTimes()
 				mockConfig.EXPECT().GetString("git.repo").Return("not-a-valid-url").AnyTimes()
 				return mockConfig
 			}(),

@@ -144,7 +144,7 @@ func (h *BuildStepHandler) Execute(_ context.Context, _ string, config interface
 	// Example build logic
 	goVersion := h.config.GetString("pipeline.go_version")
 	if goVersion == "" {
-		goVersion = "1.25.1"
+		goVersion = "1.25.5"
 	}
 
 	fmt.Printf("Building with Go version: %s\n", goVersion)

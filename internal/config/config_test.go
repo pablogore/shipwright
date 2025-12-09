@@ -89,7 +89,7 @@ func TestConfig_Validate(t *testing.T) {
 			errMsg:  "pipeline name is required",
 		},
 		{
-			name: "missing registry base URL",
+			name: "missing registry base URL (optional)",
 			config: &Config{
 				Pipeline: PipelineConfig{
 					Name:      "test-pipeline",
@@ -98,8 +98,7 @@ func TestConfig_Validate(t *testing.T) {
 				},
 				Registry: RegistryConfig{},
 			},
-			wantErr: true,
-			errMsg:  "registry base URL is required",
+			wantErr: false, // BaseURL is optional - only validated if provided
 		},
 		{
 			name: "missing Go version",
@@ -146,7 +145,7 @@ func TestConfig_Validate(t *testing.T) {
 			errMsg:  "coverage must be between 0 and 100",
 		},
 		{
-			name: "invalid registry URL - missing scheme",
+			name: "registry URL without scheme (normalized to https://)",
 			config: &Config{
 				Pipeline: PipelineConfig{
 					Name:      "test-pipeline",
@@ -157,8 +156,7 @@ func TestConfig_Validate(t *testing.T) {
 					BaseURL: "registry.test.com",
 				},
 			},
-			wantErr: true,
-			errMsg:  "invalid registry URL",
+			wantErr: false, // URLs without scheme are normalized to https://
 		},
 		{
 			name: "invalid Go version format",

@@ -2,7 +2,7 @@ pipeline:
   name: "tenant-svc"
   environment: "production"
   coverage: 85.0
-  go_version: "1.25.1"
+  go_version: "1.25.5"
 
 # Steps para aplicación con container
 steps:
