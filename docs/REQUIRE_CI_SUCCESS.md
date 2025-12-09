@@ -4,6 +4,14 @@ Este documento explica cómo configurar las reglas de protección de ramas para 
 
 ## 📋 Configuración Actual
 
+### Flujos de Merge Protegidos
+
+Las siguientes ramas están protegidas y requieren aprobación + CI success:
+
+1. **Feature → Develop**: Requiere 1 aprobación + CI success
+2. **Develop → Main**: Requiere 1 aprobación + CI success  
+3. **Hotfix → Main**: Requiere 1 aprobación + CI success
+
 ### Workflows que Deben Pasar
 
 Los siguientes jobs del workflow `ci.yml` deben pasar exitosamente antes de permitir merge:
@@ -24,18 +32,30 @@ El archivo `org_rules_with_required_checks.json` contiene la configuración que:
 
 ## 🚀 Aplicar el Ruleset
 
-### Opción 1: Usando GitHub CLI
+### Opción 1: Usando el Script Automatizado (Recomendado)
 
 ```bash
-# Aplicar a nivel de organización (todos los repos)
-gh api orgs/getsyntegrity/rulesets \
-  --method POST \
-  --input org_rules_with_required_checks.json
+# Ejecutar el script que aplica las reglas automáticamente
+./scripts/apply-branch-protection.sh
+```
 
-# O aplicar a un repositorio específico
+Este script:
+- ✅ Verifica que GitHub CLI esté instalado y autenticado
+- ✅ Aplica las reglas de protección a las ramas `main` y `develop`
+- ✅ Configura: 1 aprobación requerida + CI success (build, test, security)
+
+### Opción 2: Usando GitHub CLI Manualmente
+
+```bash
+# Aplicar a un repositorio específico
 gh api repos/getsyntegrity/syntegrity-dagger/rulesets \
   --method POST \
-  --input org_rules_with_required_checks.json
+  --input .github/rulesets/branch-protection-rules.json
+
+# O aplicar a nivel de organización (todos los repos)
+gh api orgs/getsyntegrity/rulesets \
+  --method POST \
+  --input .github/rulesets/branch-protection-rules.json
 ```
 
 ### Opción 2: Usando la API de GitHub
