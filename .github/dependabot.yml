@@ -9,7 +9,7 @@ registries:
     type: git
     url: https://github.com
     username: x-access-token
-    password: ${{secrets.GITHUB_TOKEN}}
+    password: ${{secrets.SYNTEGRITY_DAGGER_TOKEN}}
 
 updates:
   # Go module updates - consolidated configuration
@@ -27,6 +27,9 @@ updates:
         patterns:
           - "*"
         applies-to: security-updates
+        update-types:
+          - "patch"
+          - "minor"
       # Minor and patch updates - grouped for weekly processing
       minor-patch-updates:
         patterns:
