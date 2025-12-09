@@ -32,7 +32,7 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -41,7 +41,7 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
@@ -185,6 +185,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -226,7 +228,8 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-tags: true  # Fetch all tags to ensure tag validation works
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -235,7 +238,7 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
@@ -260,7 +263,7 @@ jobs:
         version: latest
         args: release --clean
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
     
     - name: Prepare raw binaries for direct download
       run: |
@@ -346,7 +349,7 @@ jobs:
         echo "📦 Available binaries for download:"
         ls -lh
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
     
     - name: Update CHANGELOG.md in repository
       if: needs.validate-release.outputs.type == 'automatic'
@@ -402,7 +405,7 @@ jobs:
           git push origin main
         fi
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Upload release artifacts
       uses: actions/upload-artifact@v5
