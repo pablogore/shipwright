@@ -371,7 +371,7 @@ jobs:
         version: latest
         args: release --clean
       env:
-        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Prepare raw binaries for direct download
       run: |
@@ -457,7 +457,7 @@ jobs:
         echo "📦 Available binaries for download:"
         ls -lh
       env:
-        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Update CHANGELOG.md in repository
       if: needs.validate-release.outputs.type == 'automatic'
@@ -513,7 +513,7 @@ jobs:
           git push origin main
         fi
       env:
-        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Upload release artifacts
       uses: actions/upload-artifact@v5
