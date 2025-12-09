@@ -1,9 +1,11 @@
 name: CI/CD Pipeline
 
+# This workflow runs when:
+# 1. Push to main or develop branches (includes PR merges)
+# 2. Manual trigger via workflow_dispatch
+# Note: PR merges trigger push events, so we only need push trigger
 on:
   push:
-    branches: [ main, develop ]
-  pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
 
@@ -33,13 +35,8 @@ jobs:
         echo "Commit message: ${{ github.event.head_commit.message }}"
         
         # Determine pipeline type based on context
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "type=pr" >> $GITHUB_OUTPUT
-          echo "security=true" >> $GITHUB_OUTPUT
-          echo "coverage=true" >> $GITHUB_OUTPUT
-          echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Pull Request (full pipeline)"
-        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+        # Note: PR merges now trigger push events, so we detect them via merge commits
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           # Main branch: full pipeline + release
           echo "type=main" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
