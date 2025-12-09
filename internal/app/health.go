@@ -35,8 +35,14 @@ func CheckRegistry(ctx context.Context, registryURL, user, pass string) error {
 		return fmt.Errorf("registry URL is empty")
 	}
 
+	// Normalize URL by adding https:// scheme if missing (for backward compatibility)
+	normalizedURL := registryURL
+	if !strings.Contains(registryURL, "://") {
+		normalizedURL = "https://" + registryURL
+	}
+
 	// Validate URL format
-	parsedURL, err := url.Parse(registryURL)
+	parsedURL, err := url.Parse(normalizedURL)
 	if err != nil {
 		return fmt.Errorf("invalid registry URL format: %w", err)
 	}
@@ -44,6 +50,9 @@ func CheckRegistry(ctx context.Context, registryURL, user, pass string) error {
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
 		return fmt.Errorf("registry URL must use http:// or https:// scheme, got: %s", parsedURL.Scheme)
 	}
+
+	// Use normalized URL for the health check
+	registryURL = normalizedURL
 
 	// Create HTTP client with timeout
 	httpClient := &http.Client{
