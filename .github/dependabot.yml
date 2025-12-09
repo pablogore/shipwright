@@ -24,6 +24,7 @@ updates:
     groups:
       # Security updates - grouped for daily processing
       security-updates:
+        applies-to: security-updates
         patterns:
           - "*"
         update-types:
