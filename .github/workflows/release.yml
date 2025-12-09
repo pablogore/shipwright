@@ -261,7 +261,9 @@ jobs:
     - name: Run tests
       run: |
         echo "🧪 Running tests..."
-        go test -v ./...
+        # Exclude examples and mocks directories from tests
+        TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
+        go test -v $TEST_PACKAGES
         echo "✅ Tests completed"
         
     - name: Run security scan
