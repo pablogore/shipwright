@@ -27,7 +27,6 @@ updates:
           - "*"
         update-types:
           - "patch"
-        dependency-type: "security"
     
   # Minor and patch updates - twice weekly
   - package-ecosystem: "gomod"
