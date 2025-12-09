@@ -2,7 +2,8 @@ name: Release Pipeline
 
 # This workflow runs when:
 # 1. A tag is pushed (manual release)
-# 2. Merge to main branch (automatic release with auto-tagging)
+# 2. Push to main branch (automatic release with auto-tagging)
+#    Note: PR merges trigger push events, so we only need push trigger
 on:
   push:
     branches: [ main ]
@@ -27,12 +28,13 @@ jobs:
       version: ${{ steps.tag.outputs.version }}
       type: ${{ steps.tag.outputs.type }}
       changelog: ${{ steps.changelog.outputs.changelog }}
+      source_branch: ${{ steps.tag.outputs.source_branch }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -41,7 +43,7 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
@@ -54,40 +56,89 @@ jobs:
           TAG="${{ github.ref_name }}"
           VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           echo "type=manual" >> $GITHUB_OUTPUT
+          echo "source_branch=tag" >> $GITHUB_OUTPUT
         else
           # Automatic release via merge to main
           echo "🚀 Automatic release via merge to main"
           
+          # Detect source branch from merge commit message or recent commits
+          SOURCE_BRANCH=""
+          MERGE_COMMIT=$(git log -1 --pretty=%B)
+          if echo "$MERGE_COMMIT" | grep -qE "Merge pull request|Merge branch"; then
+            # Extract branch name from merge commit
+            SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
+            echo "📋 Detected source branch from merge commit: $SOURCE_BRANCH"
+          fi
+          # Also check recent commits for branch info
+          if [[ -z "$SOURCE_BRANCH" ]]; then
+            SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
+            if [[ -n "$SOURCE_BRANCH" ]]; then
+              echo "📋 Detected source branch from commit history: $SOURCE_BRANCH"
+            fi
+          fi
+
+          echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
+
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
           
-          # Check commit message to determine version bump type
-          # Look for conventional commit types in the merge commit or recent commits
+          # Determine version bump based on source branch and commit messages
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "Commit message: $COMMIT_MSG"
           
-          # Determine version bump based on commit message
-          if echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
-            # Feature: bump minor version
-            echo "📦 Feature detected: bumping minor version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
-          elif echo "$COMMIT_MSG" | grep -qiE "^(fix|bugfix|hotfix)(\(.+\))?:"; then
-            # Fix: bump patch version
-            echo "🔧 Fix detected: bumping patch version"
+          # Check if merge comes from hotfix branch
+          if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+            # Hotfix: always bump patch version
+            echo "🔥 Hotfix detected from branch: $SOURCE_BRANCH - bumping patch version"
             VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
             VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
-          elif echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
-            # Breaking change: bump major version
-            echo "⚠️ Breaking change detected: bumping major version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+          elif [[ "$SOURCE_BRANCH" == "develop" ]] || echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
+            # Merge from develop: determine based on commit messages
+            echo "🌿 Merge from develop branch detected - analyzing commits"
+
+            # Check commit messages in the merge
+            if echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
+              # Breaking change: bump major version
+              echo "⚠️ Breaking change detected: bumping major version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+            elif echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
+              # Feature: bump minor version
+              echo "📦 Feature detected: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            else
+              # Default for develop: bump minor version (develop usually has features)
+              echo "📝 Default for develop: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            fi
           else
-            # Default: bump patch version
-            echo "📝 Default: bumping patch version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            # Other merges: determine based on commit message
+            echo "📋 Analyzing commit messages to determine version bump"
+
+            if echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
+              # Feature: bump minor version
+              echo "📦 Feature detected: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            elif echo "$COMMIT_MSG" | grep -qiE "^(fix|bugfix|hotfix)(\(.+\))?:"; then
+              # Fix: bump patch version
+              echo "🔧 Fix detected: bumping patch version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            elif echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
+              # Breaking change: bump major version
+              echo "⚠️ Breaking change detected: bumping major version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+            else
+              # Default: bump patch version
+              echo "📝 Default: bumping patch version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+            fi
           fi
           
           TAG="v$VERSION"
@@ -185,6 +236,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -208,7 +261,9 @@ jobs:
     - name: Run tests
       run: |
         echo "🧪 Running tests..."
-        go test -v ./...
+        # Exclude examples and mocks directories from tests
+        TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
+        go test -v $TEST_PACKAGES
         echo "✅ Tests completed"
         
     - name: Run security scan
@@ -226,7 +281,8 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-tags: true  # Fetch all tags to ensure tag validation works
+        token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -235,24 +291,64 @@ jobs:
         
     - name: Configure Git for private repos
       run: |
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-    - name: Create tag (automatic release only)
+    - name: Create or update tag (automatic release only)
       if: needs.validate-release.outputs.type == 'automatic'
       run: |
-        echo "🏷️ Creating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
+        echo "🏷️ Creating/updating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
         
-        # Create tag if it doesn't exist
-        if ! git tag -l | grep -q "^${{ needs.validate-release.outputs.tag }}$"; then
-          git tag -a "${{ needs.validate-release.outputs.tag }}" -m "Release ${{ needs.validate-release.outputs.tag }}"
-          git push origin "${{ needs.validate-release.outputs.tag }}"
-          echo "✅ Tag created and pushed: ${{ needs.validate-release.outputs.tag }}"
+        TAG="${{ needs.validate-release.outputs.tag }}"
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        
+        # Check if tag exists
+        if git tag -l | grep -q "^${TAG}$"; then
+          TAG_COMMIT=$(git rev-parse ${TAG}^{commit} 2>/dev/null || echo "")
+          
+          if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+            echo "⚠️ Tag ${TAG} exists but points to different commit"
+            echo "   Tag commit: ${TAG_COMMIT}"
+            echo "   Current commit: ${CURRENT_COMMIT}"
+            echo "🔄 Updating tag to point to current commit..."
+            
+            # Delete tag locally and remotely
+            git tag -d "${TAG}" || true
+            git push origin ":refs/tags/${TAG}" || true
+            
+            # Create new tag pointing to current commit
+            git tag -a "${TAG}" -m "Release ${TAG}"
+            git push origin "${TAG}"
+            echo "✅ Tag updated and pushed: ${TAG}"
+          else
+            echo "✅ Tag ${TAG} already exists and points to current commit"
+          fi
         else
-          echo "⚠️ Tag already exists: ${{ needs.validate-release.outputs.tag }}"
+          # Create new tag
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+          echo "✅ Tag created and pushed: ${TAG}"
         fi
         
+    - name: Verify tag points to current commit
+      run: |
+        TAG="${{ needs.validate-release.outputs.tag }}"
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        
+        if git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
+          TAG_COMMIT=$(git rev-parse "${TAG}^{commit}")
+          if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+            echo "❌ Error: Tag ${TAG} points to commit ${TAG_COMMIT} but current commit is ${CURRENT_COMMIT}"
+            echo "   This will cause GoReleaser to fail. Please ensure the tag is updated."
+            exit 1
+          else
+            echo "✅ Tag ${TAG} correctly points to current commit ${CURRENT_COMMIT}"
+          fi
+        else
+          echo "⚠️ Warning: Tag ${TAG} not found locally, but will be validated by GoReleaser"
+        fi
+    
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v5
       with:
@@ -260,7 +356,7 @@ jobs:
         version: latest
         args: release --clean
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
     
     - name: Prepare raw binaries for direct download
       run: |
@@ -346,7 +442,7 @@ jobs:
         echo "📦 Available binaries for download:"
         ls -lh
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
     
     - name: Update CHANGELOG.md in repository
       if: needs.validate-release.outputs.type == 'automatic'
@@ -402,7 +498,7 @@ jobs:
           git push origin main
         fi
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Upload release artifacts
       uses: actions/upload-artifact@v5

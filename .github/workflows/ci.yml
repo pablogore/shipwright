@@ -1,9 +1,11 @@
 name: CI/CD Pipeline
 
+# This workflow runs when:
+# 1. Push to main or develop branches (includes PR merges)
+# 2. Manual trigger via workflow_dispatch
+# Note: PR merges trigger push events, so we only need push trigger
 on:
   push:
-    branches: [ main, develop ]
-  pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
 
@@ -33,13 +35,8 @@ jobs:
         echo "Commit message: ${{ github.event.head_commit.message }}"
         
         # Determine pipeline type based on context
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "type=pr" >> $GITHUB_OUTPUT
-          echo "security=true" >> $GITHUB_OUTPUT
-          echo "coverage=true" >> $GITHUB_OUTPUT
-          echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Pull Request (full pipeline)"
-        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+        # Note: PR merges now trigger push events, so we detect them via merge commits
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           # Main branch: full pipeline + release
           echo "type=main" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
@@ -76,7 +73,7 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
       run: |
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
@@ -85,11 +82,11 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        echo "password ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> ~/.netrc
         chmod 600 ~/.netrc
         # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
         
     - name: Clean Go module cache
       run: |
@@ -116,7 +113,7 @@ jobs:
           
     - name: Download dependencies
       env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
       run: |
         echo "📦 Downloading Go dependencies..."
         go mod download
@@ -144,7 +141,7 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
       run: |
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
@@ -153,11 +150,11 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        echo "password ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> ~/.netrc
         chmod 600 ~/.netrc
         # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
         
     - name: Clean Go module cache
       run: |
@@ -202,7 +199,7 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
       run: |
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
@@ -211,11 +208,11 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        echo "password ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> ~/.netrc
         chmod 600 ~/.netrc
         # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
         
     - name: Clean Go module cache
       run: |
@@ -242,12 +239,14 @@ jobs:
     - name: Run tests
       run: |
         echo "🧪 Running tests..."
+        # Exclude examples and mocks directories from test coverage
+        TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
         if [[ "${{ needs.determine-pipeline.outputs.pipeline-type }}" == "feature" ]]; then
           echo "📋 Feature branch: Running basic tests"
-          go test -race ./...
+          go test -race $TEST_PACKAGES
         else
           echo "📋 Main/Develop/PR: Running full test suite with coverage"
-          go test -race -coverprofile=coverage.out ./...
+          go test -race -coverprofile=coverage.out $TEST_PACKAGES
         fi
       
     - name: Upload coverage
@@ -274,7 +273,7 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        ORG_CHECKOUT_TOKEN: ${{ secrets.ORG_CHECKOUT_TOKEN }}
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
       run: |
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
@@ -283,11 +282,11 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.ORG_CHECKOUT_TOKEN }}" >> ~/.netrc
+        echo "password ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> ~/.netrc
         chmod 600 ~/.netrc
         # Configure Git authentication
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.ORG_CHECKOUT_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
         
     - name: Clean Go module cache
       run: |
