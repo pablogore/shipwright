@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"dagger.io/dagger"
 
@@ -71,19 +72,37 @@ func (p *Pipeline) Name() string {
 	return "go-kit"
 }
 
-// Setup clones the go-kit repository and sets up the source directory.
+// Setup prepares the Go microservice pipeline.
+// In CI environments, it uses the current directory directly.
+// In local environments, it clones the repository if needed.
 //
 // Parameters:
 //   - ctx: The context for managing execution.
 //
 // Returns:
-//   - An error if the cloning process fails, otherwise nil.
+//   - An error if the setup process fails, otherwise nil.
 func (p *Pipeline) Setup(ctx context.Context) error {
 	// Check if client is nil or not an adapter
 	if p.Client == nil {
 		return errors.New("Setup method requires real Dagger client, not nil")
 	}
 
+	// Check if we're in a CI environment
+	isCI := isCIEnvironment()
+
+	if isCI {
+		// In CI, we're already in the repository, use current directory
+		if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
+			realClient := adapter.GetRealClient()
+			p.Src = pipelines.NewDaggerAdapter(realClient).Host().Directory(".", pipelines.DaggerHostDirectoryOpts{
+				Exclude: []string{"**/node_modules", "**/.git", "**/.dagger-cache"},
+			})
+			return nil
+		}
+		return errors.New("Setup method requires real Dagger client, not mock")
+	}
+
+	// In local environment, clone if cloner is available
 	if p.Cloner != nil {
 		// Check if client is an adapter (real client) or mock
 		if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
@@ -103,6 +122,29 @@ func (p *Pipeline) Setup(ctx context.Context) error {
 	return nil
 }
 
+// isCIEnvironment checks if we're running in a CI environment.
+func isCIEnvironment() bool {
+	// Check common CI environment variables
+	ciVars := []string{
+		"CI",
+		"GITHUB_ACTIONS",
+		"GITLAB_CI",
+		"JENKINS_URL",
+		"CIRCLECI",
+		"TRAVIS",
+		"BUILDKITE",
+		"TEAMCITY_VERSION",
+	}
+
+	for _, envVar := range ciVars {
+		if os.Getenv(envVar) != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Test runs the tests for the go-kit project with coverage.
 //
 // Parameters:
@@ -120,7 +162,7 @@ func (p *Pipeline) Test(ctx context.Context) error {
 		realClient := adapter.GetRealClient()
 		if srcAdapter, ok := p.Src.(*pipelines.DaggerDirectoryAdapter); ok {
 			realSrc := srcAdapter.GetRealDirectory()
-			return shared.RunTestsWithCoverage(ctx, realClient, realSrc, p.Config.Coverage)
+			return shared.RunTestsWithCoverage(ctx, realClient, realSrc, p.Config.Coverage, p.Config.GoVersion)
 		}
 	}
 	// For mocks, return an error indicating this requires real client
@@ -143,11 +185,15 @@ func (p *Pipeline) Build(ctx context.Context) error {
 		realClient := adapter.GetRealClient()
 		if srcAdapter, ok := p.Src.(*pipelines.DaggerDirectoryAdapter); ok {
 			realSrc := srcAdapter.GetRealDirectory()
-			builder := shared.NewGoBuilder(realClient, realSrc, "1.21")
+			goVersion := p.Config.GoVersion
+			if goVersion == "" {
+				goVersion = "1.25.5"
+			}
+			builder := shared.NewGoBuilder(realClient, realSrc, goVersion)
 			outPath := "bin/app"
 			_, err := builder.Build(ctx, outPath, outPath, map[string]string{"CGO_ENABLED": "0"})
 			if err != nil {
-				return fmt.Errorf("failed to build go-kit binary: %w", err)
+				return fmt.Errorf("failed to build Go binary: %w", err)
 			}
 			fmt.Printf("✅ Binary built successfully at %s\n", outPath)
 			return nil

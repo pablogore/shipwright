@@ -69,8 +69,7 @@ func (s *SyntegrityInfraPipeline) Package(_ context.Context) error {
 }
 
 func (s *SyntegrityInfraPipeline) Tag(_ context.Context) error {
-	// TODO implement me
-	panic("implement me")
+	return errors.New("not implemented: Tag method is not yet implemented for infra pipeline")
 }
 
 func (s *SyntegrityInfraPipeline) Name() string {
@@ -100,7 +99,7 @@ func (s *SyntegrityInfraPipeline) Setup(ctx context.Context) error {
 		realClient := adapter.GetRealClient()
 		if srcAdapter, ok := s.Src.(*pipelines.DaggerDirectoryAdapter); ok {
 			realSrc := srcAdapter.GetRealDirectory()
-			return shared.RunTestsWithCoverage(ctx, realClient, realSrc, s.Config.Coverage)
+			return shared.RunTestsWithCoverage(ctx, realClient, realSrc, s.Config.Coverage, s.Config.GoVersion)
 		}
 	}
 	// For mocks, return an error indicating this requires real client
@@ -108,16 +107,15 @@ func (s *SyntegrityInfraPipeline) Setup(ctx context.Context) error {
 }
 
 func (s *SyntegrityInfraPipeline) Push(_ context.Context) error {
-	// TODO implement me
-	panic("implement me")
+	return errors.New("not implemented: Push method is not yet implemented for infra pipeline")
 }
 
 func (s *SyntegrityInfraPipeline) BeforeStep(_ context.Context, _ string) pipelines.HookFunc {
-	// TODO implement me
-	panic("implement me")
+	// Not implemented yet - return nil to indicate no hook
+	return nil
 }
 
 func (s *SyntegrityInfraPipeline) AfterStep(_ context.Context, _ string) pipelines.HookFunc {
-	// TODO implement me
-	panic("implement me")
+	// Not implemented yet - return nil to indicate no hook
+	return nil
 }

@@ -31,8 +31,14 @@ func (g *GoTester) RunTests(ctx context.Context) error {
 	goMod := g.Client.CacheVolume("go-mod-cache")
 	goBuild := g.Client.CacheVolume("go-build-cache")
 
+	// Use Go version from config, default to 1.25.5 if not set
+	goVersion := g.Config.GoVersion
+	if goVersion == "" {
+		goVersion = "1.25.5"
+	}
+
 	base := g.Client.Container().
-		From("golang:1.21-alpine").
+		From("golang:" + goVersion + "-alpine").
 		WithMountedDirectory("/app", g.Src).
 		WithMountedCache("/go/pkg/mod", goMod).
 		WithMountedCache("/root/.cache/go-build", goBuild).

@@ -29,7 +29,7 @@ jobs:
       changelog: ${{ steps.changelog.outputs.changelog }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
         token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -223,7 +223,7 @@ jobs:
     needs: [validate-release, build-and-test]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
         fetch-tags: true  # Fetch all tags to ensure tag validation works
@@ -446,7 +446,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         
     - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: release-artifacts-${{ needs.validate-release.outputs.tag }}
         path: |

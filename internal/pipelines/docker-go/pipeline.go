@@ -34,9 +34,15 @@ func (p *Pipeline) Test(ctx context.Context) error {
 
 	fmt.Println("🧪 running tests for docker-go...")
 
+	// Use Go version from config, default to 1.25.5 if not set
+	goVersion := p.Config.GoVersion
+	if goVersion == "" {
+		goVersion = "1.25.5"
+	}
+
 	// Create a Go container
 	goContainer := p.Client.Container().
-		From("golang:1.21").
+		From("golang:" + goVersion).
 		WithWorkdir("/app")
 
 	// Mount the source code
@@ -65,7 +71,7 @@ func (p *Pipeline) Build(ctx context.Context) error {
 		fmt.Printf("  - %s\n", e)
 	}
 
-	img := p.Client.Container().Build(p.Src)
+	img := p.Src.DockerBuild()
 	p.Image = img
 
 	fmt.Println("✅ image built in memory correctly")
@@ -136,14 +142,21 @@ func (p *Pipeline) Push(ctx context.Context) error {
 		secret   *dagger.Secret
 	)
 
-	if os.Getenv("GITLAB_CI") != "" {
-		username = "gitlab-ci-token"
-		token := os.Getenv("CI_JOB_TOKEN")
-		if token == "" {
-			return errors.New("❌ CI_JOB_TOKEN not available in GitLab CI")
+	// Try to get credentials from environment (CI or local)
+	if os.Getenv("CI") == "true" || os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("GITLAB_CI") == "true" {
+		// Try GitHub token first
+		if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+			username = "x-access-token"
+			secret = p.Client.SetSecret("github-token", token)
+			fmt.Println("🔐 using GitHub CI authentication")
+		} else if token := os.Getenv("CI_JOB_TOKEN"); token != "" {
+			// GitLab CI token
+			username = "gitlab-ci-token"
+			secret = p.Client.SetSecret("ci-job-token", token)
+			fmt.Println("🔐 using GitLab CI authentication")
+		} else {
+			return errors.New("❌ No CI token available (GITHUB_TOKEN or CI_JOB_TOKEN)")
 		}
-		secret = p.Client.SetSecret("ci-job-token", token)
-		fmt.Println("🔐 using GitLab CI authentication")
 	} else {
 		username = p.Config.RegistryUser
 		if username == "" {
@@ -181,7 +194,7 @@ func validateConfig(cfg pipelines.Config) error {
 		return errors.New("❌ BranchName not defined")
 	}
 	if cfg.Registry == "" {
-		return errors.New("❌ Registry (registry.gitlab.com/...) not defined")
+		return errors.New("❌ Registry URL not defined")
 	}
 	if cfg.ImageTag == "" {
 		return errors.New("❌ ImageTag not defined")

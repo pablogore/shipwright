@@ -174,3 +174,85 @@ func TestGitCredentials_String(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateRequiredSecrets(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation string
+		setupEnv  func(t *testing.T)
+		wantErr   bool
+	}{
+		{
+			name:      "push operation requires credentials",
+			operation: "push",
+			setupEnv: func(t *testing.T) {
+				// No credentials set - use empty strings
+				t.Setenv("GITHUB_TOKEN", "")
+				t.Setenv("CI_JOB_TOKEN", "")
+				t.Setenv("GITLAB_PAT", "")
+				t.Setenv("SSH_PRIVATE_KEY", "")
+				t.Setenv("CI", "")
+				t.Setenv("GITHUB_ACTIONS", "")
+				t.Setenv("GITLAB_CI", "")
+			},
+			wantErr: true,
+		},
+		{
+			name:      "push operation with GitHub token",
+			operation: "push",
+			setupEnv: func(t *testing.T) {
+				t.Setenv("GITHUB_TOKEN", "test-token")
+			},
+			wantErr: false,
+		},
+		{
+			name:      "push operation with GitLab CI token",
+			operation: "push",
+			setupEnv: func(t *testing.T) {
+				t.Setenv("CI", "true")
+				t.Setenv("CI_JOB_TOKEN", "test-token")
+			},
+			wantErr: false,
+		},
+		{
+			name:      "clone operation does not require credentials",
+			operation: "clone",
+			setupEnv: func(t *testing.T) {
+				// No credentials set - use empty strings
+				t.Setenv("GITHUB_TOKEN", "")
+				t.Setenv("CI_JOB_TOKEN", "")
+				t.Setenv("GITLAB_PAT", "")
+				t.Setenv("SSH_PRIVATE_KEY", "")
+				t.Setenv("CI", "")
+			},
+			wantErr: false,
+		},
+		{
+			name:      "unknown operation does not require credentials",
+			operation: "unknown",
+			setupEnv: func(t *testing.T) {
+				// No credentials set - use empty strings
+				t.Setenv("GITHUB_TOKEN", "")
+				t.Setenv("CI_JOB_TOKEN", "")
+				t.Setenv("GITLAB_PAT", "")
+				t.Setenv("SSH_PRIVATE_KEY", "")
+				t.Setenv("CI", "")
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupEnv(t)
+
+			err := ValidateRequiredSecrets(tt.operation)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "credentials required")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

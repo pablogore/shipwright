@@ -22,7 +22,7 @@ jobs:
         uses: ./.github/actions/syntegrity-dagger
         with:
           version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
-          pipeline: go-kit
+          pipeline: go-service
           stage: setup
           config: .syntegrity-dagger.yml
           env: dev
@@ -41,7 +41,7 @@ jobs:
         uses: ./.github/actions/syntegrity-dagger
         with:
           version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
-          pipeline: go-kit
+          pipeline: go-service
           stage: build
           config: .syntegrity-dagger.yml
           env: dev
@@ -70,7 +70,7 @@ jobs:
         uses: ./.github/actions/syntegrity-dagger
         with:
           version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
-          pipeline: go-kit
+          pipeline: go-service
           stage: test
           config: .syntegrity-dagger.yml
           env: dev
@@ -100,7 +100,7 @@ jobs:
         uses: ./.github/actions/syntegrity-dagger
         with:
           version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
-          pipeline: go-kit
+          pipeline: go-service
           stage: security
           config: .syntegrity-dagger.yml
           env: dev
@@ -120,7 +120,7 @@ jobs:
         uses: ./.github/actions/syntegrity-dagger
         with:
           version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
-          pipeline: go-kit
+          pipeline: go-service
           stage: package
           config: .syntegrity-dagger.yml
           env: production
@@ -140,7 +140,7 @@ jobs:
         uses: ./.github/actions/syntegrity-dagger
         with:
           version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
-          pipeline: go-kit
+          pipeline: go-service
           stage: push
           config: .syntegrity-dagger.yml
           env: production
@@ -162,7 +162,7 @@ jobs:
         uses: ./.github/actions/syntegrity-dagger
         with:
           version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
-          pipeline: go-kit
+          pipeline: go-service
           # stage is empty, so full pipeline will run
           config: .syntegrity-dagger.yml
           env: dev

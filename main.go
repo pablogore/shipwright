@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 
@@ -30,12 +29,20 @@ func (c *CLI) Run(args []string) error {
 	ctx := context.Background()
 
 	// Parse command line flags
-	flags := c.parseFlags(args)
+	flags, err := c.parseFlags(args)
+	if err != nil {
+		return fmt.Errorf("failed to parse command line arguments: %w", err)
+	}
 
 	// Handle version flag
 	if flags.version {
 		c.showVersion()
 		return nil
+	}
+
+	// Handle health check flag
+	if flags.health {
+		return c.runHealthChecks(ctx, flags)
 	}
 
 	// Load configuration
@@ -94,23 +101,25 @@ type Flags struct {
 	coverage      float64
 	branch        string
 	env           string
-	skipPush      bool
+	gitAuth       string
+	gitRef        string
+	health        bool
+	listPipelines bool
+	listSteps     bool
+	local         bool
 	onlyBuild     bool
 	onlyTest      bool
-	verbose       bool
-	gitRef        string
+	skipPush      bool
 	step          string
-	gitAuth       string
-	listSteps     bool
-	listPipelines bool
-	configFile    string
+	verbose       bool
 	version       bool
-	local         bool
+	configFile    string
 }
 
 // parseFlags parses command line arguments.
-func (c *CLI) parseFlags(args []string) *Flags {
-	flagSet := flag.NewFlagSet("syntegrity-dagger", flag.ExitOnError)
+// Returns parsed flags and an error if flag parsing fails.
+func (c *CLI) parseFlags(args []string) (*Flags, error) {
+	flagSet := flag.NewFlagSet("syntegrity-dagger", flag.ContinueOnError)
 
 	defaultGitAuth := "ssh"
 	if os.Getenv("CI_JOB_TOKEN") != "" {
@@ -119,7 +128,7 @@ func (c *CLI) parseFlags(args []string) *Flags {
 
 	flags := &Flags{}
 
-	flagSet.StringVar(&flags.pipelineName, "pipeline", "go-kit", "Name of the pipeline to be executed")
+	flagSet.StringVar(&flags.pipelineName, "pipeline", "go-service", "Name of the pipeline to be executed")
 	flagSet.Float64Var(&flags.coverage, "coverage", 90, "Minimum coverage percentage required (in: 90 for 90%)")
 	flagSet.StringVar(&flags.branch, "branch", "develop", "Branch name")
 	flagSet.StringVar(&flags.env, "env", "dev", "Environment: dev, staging, prod")
@@ -135,12 +144,12 @@ func (c *CLI) parseFlags(args []string) *Flags {
 	flagSet.StringVar(&flags.configFile, "config", ".syntegrity-dagger.yml", "Configuration file path")
 	flagSet.BoolVar(&flags.version, "version", false, "Show version information")
 	flagSet.BoolVar(&flags.local, "local", false, "Run pipeline locally without Docker")
+	flagSet.BoolVar(&flags.health, "health", false, "Run health checks for Dagger, registry, and Git")
 
 	if err := flagSet.Parse(args); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to parse flags: %w", err)
 	}
-	return flags
+	return flags, nil
 }
 
 // overrideConfig overrides configuration with CLI flags.
@@ -355,10 +364,33 @@ func (c *CLI) showVersion() {
 	fmt.Printf("Git commit: %s\n", GitCommit)
 }
 
+// runHealthChecks executes health checks for all configured services
+func (c *CLI) runHealthChecks(ctx context.Context, flags *Flags) error {
+	// Load configuration
+	cfg, err := config.NewConfigurationWrapper()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Load YAML configuration if specified
+	if flags.configFile != "" {
+		err = c.loadYAMLConfig(cfg, flags.configFile)
+		if err != nil {
+			return fmt.Errorf("failed to load YAML configuration: %w", err)
+		}
+	}
+
+	fmt.Println("🏥 Running health checks...")
+	fmt.Println()
+
+	return app.RunHealthChecks(ctx, cfg)
+}
+
 func main() {
 	cli := NewCLI()
 
 	if err := cli.Run(os.Args[1:]); err != nil {
-		log.Fatalf("❌ %v", err)
+		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		os.Exit(1)
 	}
 }

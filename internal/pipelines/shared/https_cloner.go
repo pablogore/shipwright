@@ -6,10 +6,46 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"dagger.io/dagger"
 )
+
+// extractHostFromRepoURL extracts the host from a repository URL.
+func extractHostFromRepoURL(repoURL string) (string, error) {
+	if repoURL == "" {
+		return "", errors.New("repository URL is empty")
+	}
+
+	// Handle SSH format: git@host:user/repo.git
+	if strings.HasPrefix(repoURL, "git@") {
+		parts := strings.Split(repoURL, ":")
+		if len(parts) > 0 {
+			host := strings.TrimPrefix(parts[0], "git@")
+			return host, nil
+		}
+	}
+
+	// Handle HTTPS format: https://host/user/repo.git
+	parsedURL, err := url.Parse(repoURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse repository URL: %w", err)
+	}
+
+	host := parsedURL.Host
+	// Remove port if present
+	if idx := strings.Index(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
+
+	if host == "" {
+		return "", fmt.Errorf("could not extract host from repository URL: %s", repoURL)
+	}
+
+	return host, nil
+}
 
 // CloneOptions configures the behavior of cloning
 type CloneOptions struct {
@@ -94,7 +130,12 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 
 	// Configure credentials if not anonymous
 	if creds.Source != string(SourceAnonymous) {
-		netrc := fmt.Sprintf("machine gitlab.com login %s password %s", creds.User, creds.Token)
+		// Extract host from repository URL
+		host, err := extractHostFromRepoURL(opts.Repo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract host from repository URL: %w", err)
+		}
+		netrc := fmt.Sprintf("machine %s login %s password %s", host, creds.User, creds.Token)
 		container = container.
 			WithEnvVariable("HOME", "/root").
 			WithNewFile("/root/.netrc", netrc, dagger.ContainerWithNewFileOpts{

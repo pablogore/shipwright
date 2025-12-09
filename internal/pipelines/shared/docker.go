@@ -33,12 +33,14 @@ func NewDockerDeployer(client *dagger.Client, imageName string, src *dagger.Dire
 func (d *DockerDeployer) BuildAndPush(ctx context.Context) error {
 	fmt.Printf("🐳 Construyendo y publicando %s:%s...\n", d.ImageName, d.Tag)
 
-	image := d.Client.Container().
-		Build(d.Source).
-		WithRegistryAuth(d.ImageName, d.RegistryUser, d.RegistryPass)
+	// Build the Docker image from the source directory (which contains Dockerfile)
+	image := d.Source.DockerBuild()
 
+	// Configure registry authentication and publish
 	ref := fmt.Sprintf("%s:%s", d.ImageName, d.Tag)
-	_, err := image.Publish(ctx, ref)
+	_, err := image.
+		WithRegistryAuth(d.ImageName, d.RegistryUser, d.RegistryPass).
+		Publish(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("❌ error al publicar la imagen: %w", err)
 	}

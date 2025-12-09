@@ -156,7 +156,7 @@ func TestGoTester_RunTests_WithMocks(t *testing.T) {
 	mockClient.EXPECT().Container().Return(mockContainer).Times(1)
 
 	// Mock the container chain
-	mockContainer.EXPECT().From("golang:1.21-alpine").Return(mockContainer).Times(1)
+	mockContainer.EXPECT().From("golang:1.25.5-alpine").Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedDirectory("/app", mockDirectory).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/go/pkg/mod", mockCacheVolume).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/root/.cache/go-build", mockCacheVolume).Return(mockContainer).Times(1)
@@ -204,7 +204,7 @@ func TestGoTester_RunTests_FileContentsError(t *testing.T) {
 	mockClient.EXPECT().Container().Return(mockContainer).Times(1)
 
 	// Mock the container chain
-	mockContainer.EXPECT().From("golang:1.21-alpine").Return(mockContainer).Times(1)
+	mockContainer.EXPECT().From("golang:1.25.5-alpine").Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedDirectory("/app", mockDirectory).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/go/pkg/mod", mockCacheVolume).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/root/.cache/go-build", mockCacheVolume).Return(mockContainer).Times(1)
@@ -253,7 +253,7 @@ func TestGoTester_RunTests_InsufficientCoverage(t *testing.T) {
 	mockClient.EXPECT().Container().Return(mockContainer).Times(1)
 
 	// Mock the container chain
-	mockContainer.EXPECT().From("golang:1.21-alpine").Return(mockContainer).Times(1)
+	mockContainer.EXPECT().From("golang:1.25.5-alpine").Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedDirectory("/app", mockDirectory).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/go/pkg/mod", mockCacheVolume).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/root/.cache/go-build", mockCacheVolume).Return(mockContainer).Times(1)
@@ -304,7 +304,7 @@ func TestGoTester_RunTests_NoTotalLine(t *testing.T) {
 	mockClient.EXPECT().Container().Return(mockContainer).Times(1)
 
 	// Mock the container chain
-	mockContainer.EXPECT().From("golang:1.21-alpine").Return(mockContainer).Times(1)
+	mockContainer.EXPECT().From("golang:1.25.5-alpine").Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedDirectory("/app", mockDirectory).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/go/pkg/mod", mockCacheVolume).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/root/.cache/go-build", mockCacheVolume).Return(mockContainer).Times(1)
@@ -353,7 +353,7 @@ func TestGoTester_RunTests_CoverageParsingError(t *testing.T) {
 	mockClient.EXPECT().Container().Return(mockContainer).Times(1)
 
 	// Mock the container chain
-	mockContainer.EXPECT().From("golang:1.21-alpine").Return(mockContainer).Times(1)
+	mockContainer.EXPECT().From("golang:1.25.5-alpine").Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedDirectory("/app", mockDirectory).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/go/pkg/mod", mockCacheVolume).Return(mockContainer).Times(1)
 	mockContainer.EXPECT().WithMountedCache("/root/.cache/go-build", mockCacheVolume).Return(mockContainer).Times(1)
