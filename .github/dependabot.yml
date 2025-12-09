@@ -9,37 +9,25 @@ registries:
     type: git
     url: https://github.com
     username: x-access-token
-    password: ${{secrets.ORG_CHECKOUT_TOKEN}}
+    password: ${{secrets.GITHUB_TOKEN}}
 
 updates:
-  # Security updates - daily
+  # Go module updates - consolidated configuration
   - package-ecosystem: "gomod"
     directory: "/"
     target-branch: "main"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     registries:
       - github-ep
     groups:
+      # Security updates - grouped for daily processing
       security-updates:
         patterns:
           - "*"
-        update-types:
-          - "patch"
-        dependency-type: "security"
-    
-  # Minor and patch updates - twice weekly
-  - package-ecosystem: "gomod"
-    directory: "/"
-    target-branch: "main"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 8
-    registries:
-      - github-ep
-    groups:
+        applies-to: security-updates
+      # Minor and patch updates - grouped for weekly processing
       minor-patch-updates:
         patterns:
           - "*"
@@ -48,18 +36,7 @@ updates:
           - "patch"
         exclude-patterns:
           - "github.com/getsyntegrity/*"  # Exclude private repos from auto-updates
-    
-  # Major updates - weekly with manual review
-  - package-ecosystem: "gomod"
-    directory: "/"
-    target-branch: "main"
-    schedule:
-      interval: "weekly"
-      day: "friday"
-    open-pull-requests-limit: 3
-    registries:
-      - github-ep
-    groups:
+      # Major updates - grouped for weekly processing with manual review
       major-updates:
         patterns:
           - "*"
