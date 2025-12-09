@@ -101,18 +101,19 @@ type Flags struct {
 	coverage      float64
 	branch        string
 	env           string
-	skipPush      bool
+	gitAuth       string
+	gitRef        string
+	health        bool
+	listPipelines bool
+	listSteps     bool
+	local         bool
 	onlyBuild     bool
 	onlyTest      bool
-	verbose       bool
-	gitRef        string
+	skipPush      bool
 	step          string
-	gitAuth       string
-	listSteps     bool
-	listPipelines bool
-	configFile    string
+	verbose       bool
 	version       bool
-	local         bool
+	configFile    string
 }
 
 // parseFlags parses command line arguments.
