@@ -2,11 +2,15 @@ name: CI/CD Pipeline
 
 # This workflow runs when:
 # 1. Push to main or develop branches (includes PR merges)
-# 2. Manual trigger via workflow_dispatch
-# Note: PR merges trigger push events, so we only need push trigger
+# 2. Pull requests targeting main or develop (for pre-merge validation)
+# 3. Manual trigger via workflow_dispatch
+# Note: PR merges trigger push events, so we handle both to avoid duplicates
 on:
   push:
     branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 env:
@@ -35,8 +39,29 @@ jobs:
         echo "Commit message: ${{ github.event.head_commit.message }}"
         
         # Determine pipeline type based on context
-        # Note: PR merges now trigger push events, so we detect them via merge commits
-        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # Pull request: full pipeline with security and coverage checks
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          if [[ "$BASE_BRANCH" == "main" ]]; then
+            echo "type=pr-main" >> $GITHUB_OUTPUT
+            echo "security=true" >> $GITHUB_OUTPUT
+            echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "release=false" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: PR to main (full pipeline with security and coverage)"
+          elif [[ "$BASE_BRANCH" == "develop" ]]; then
+            echo "type=pr-develop" >> $GITHUB_OUTPUT
+            echo "security=true" >> $GITHUB_OUTPUT
+            echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "release=false" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: PR to develop (full pipeline with security and coverage)"
+          else
+            echo "type=pr" >> $GITHUB_OUTPUT
+            echo "security=true" >> $GITHUB_OUTPUT
+            echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "release=false" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: PR to other branch (full pipeline)"
+          fi
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           # Main branch: full pipeline + release
           echo "type=main" >> $GITHUB_OUTPUT
           echo "security=true" >> $GITHUB_OUTPUT
@@ -64,6 +89,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        # For PRs, checkout the PR head commit
+        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -132,6 +160,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        # For PRs, checkout the PR head commit
+        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -190,6 +221,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        # For PRs, checkout the PR head commit
+        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -264,6 +298,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        # For PRs, checkout the PR head commit
+        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
