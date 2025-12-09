@@ -136,7 +136,36 @@ func (p *YAMLParser) ApplyToConfiguration(yamlConfig *YAMLConfig, config interfa
 
 // GetSteps returns the list of steps from YAML config
 func (p *YAMLParser) GetSteps(yamlConfig *YAMLConfig) []string {
-	return yamlConfig.Pipeline.Steps
+	if yamlConfig.Pipeline.Steps == nil {
+		return []string{}
+	}
+
+	// Handle []string case
+	if steps, ok := yamlConfig.Pipeline.Steps.([]string); ok {
+		return steps
+	}
+
+	// Handle []interface{} case (from YAML parsing)
+	if stepsInterface, ok := yamlConfig.Pipeline.Steps.([]interface{}); ok {
+		steps := make([]string, 0, len(stepsInterface))
+		for _, step := range stepsInterface {
+			if stepStr, ok := step.(string); ok {
+				steps = append(steps, stepStr)
+			}
+		}
+		return steps
+	}
+
+	// Handle []StepConfig case - extract names
+	if stepConfigs, ok := yamlConfig.Pipeline.Steps.([]StepConfig); ok {
+		steps := make([]string, 0, len(stepConfigs))
+		for _, stepConfig := range stepConfigs {
+			steps = append(steps, stepConfig.Name)
+		}
+		return steps
+	}
+
+	return []string{}
 }
 
 // ValidateConfig validates the YAML configuration
@@ -145,7 +174,9 @@ func (p *YAMLParser) ValidateConfig(yamlConfig *YAMLConfig) error {
 		return errors.New("pipeline name is required")
 	}
 
-	if len(yamlConfig.Pipeline.Steps) == 0 {
+	// Get steps using GetSteps to handle type conversion
+	steps := p.GetSteps(yamlConfig)
+	if len(steps) == 0 {
 		return errors.New("at least one step must be defined")
 	}
 
@@ -162,7 +193,7 @@ func (p *YAMLParser) ValidateConfig(yamlConfig *YAMLConfig) error {
 		"release":  true,
 	}
 
-	for _, step := range yamlConfig.Pipeline.Steps {
+	for _, step := range steps {
 		if !validSteps[step] {
 			return fmt.Errorf("invalid step: %s", step)
 		}

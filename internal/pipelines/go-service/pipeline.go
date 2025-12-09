@@ -346,9 +346,7 @@ func (p *Pipeline) Package(ctx context.Context) error {
 	// Extract real types for shared functions (only if using adapter, not mocks)
 	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
 		realClient := adapter.GetRealClient()
-		if srcAdapter, ok := p.Src.(*pipelines.DaggerDirectoryAdapter); ok {
-			realSrc := srcAdapter.GetRealDirectory()
-
+		if _, ok := p.Src.(*pipelines.DaggerDirectoryAdapter); ok {
 			// Read the built binary from bin/app on the host
 			// The binary was exported to the host during the Build step
 			binaryDir := realClient.Host().Directory("bin")
