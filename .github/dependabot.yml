@@ -27,9 +27,6 @@ updates:
         patterns:
           - "*"
         applies-to: security-updates
-        update-types:
-          - "patch"
-          - "minor"
       # Minor and patch updates - grouped for weekly processing
       minor-patch-updates:
         patterns:
