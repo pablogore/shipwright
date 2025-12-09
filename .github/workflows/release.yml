@@ -2,16 +2,13 @@ name: Release Pipeline
 
 # This workflow runs when:
 # 1. A tag is pushed (manual release)
-# 2. Merge to main branch from hotfix/* or develop (automatic release with auto-tagging)
-# 3. Pull request merged to main from hotfix/* or develop
+# 2. Push to main branch (automatic release with auto-tagging)
+#    Note: PR merges trigger push events, so we only need push trigger
 on:
   push:
     branches: [ main ]
     tags:
       - 'v*'  # Version tags (v1.0.0, v2.1.3, etc.)
-  pull_request:
-    types: [closed]
-    branches: [ main ]
 
 permissions:
   contents: write
@@ -26,8 +23,6 @@ jobs:
   # Job 1: Validate tag and prepare release
   validate-release:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
-    # Only run on merged PRs or direct pushes to main
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
@@ -40,7 +35,6 @@ jobs:
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
         token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
-        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.merge_commit_sha || 'main') || github.sha }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -67,22 +61,19 @@ jobs:
           # Automatic release via merge to main
           echo "🚀 Automatic release via merge to main"
           
-          # Detect source branch
+          # Detect source branch from merge commit message or recent commits
           SOURCE_BRANCH=""
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # Get source branch from PR
-            SOURCE_BRANCH="${{ github.event.pull_request.head.ref }}"
-            echo "📋 PR merged from branch: $SOURCE_BRANCH"
-          else
-            # Try to detect from merge commit message or recent commits
-            MERGE_COMMIT=$(git log -1 --pretty=%B)
-            if echo "$MERGE_COMMIT" | grep -qE "Merge pull request|Merge branch"; then
-              # Extract branch name from merge commit
-              SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
-            fi
-            # Also check recent commits for branch info
-            if [[ -z "$SOURCE_BRANCH" ]]; then
-              SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
+          MERGE_COMMIT=$(git log -1 --pretty=%B)
+          if echo "$MERGE_COMMIT" | grep -qE "Merge pull request|Merge branch"; then
+            # Extract branch name from merge commit
+            SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
+            echo "📋 Detected source branch from merge commit: $SOURCE_BRANCH"
+          fi
+          # Also check recent commits for branch info
+          if [[ -z "$SOURCE_BRANCH" ]]; then
+            SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
+            if [[ -n "$SOURCE_BRANCH" ]]; then
+              echo "📋 Detected source branch from commit history: $SOURCE_BRANCH"
             fi
           fi
 
@@ -242,14 +233,11 @@ jobs:
   # Job 2: Build and test before release
   build-and-test:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
-    # Only run on merged PRs or direct pushes to main
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
         token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
-        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.merge_commit_sha || 'main') || github.sha }}
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -293,7 +281,6 @@ jobs:
         fetch-depth: 0
         fetch-tags: true  # Fetch all tags to ensure tag validation works
         token: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
-        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.merge_commit_sha || 'main') || github.sha }}
         
     - name: Set up Go
       uses: actions/setup-go@v6
