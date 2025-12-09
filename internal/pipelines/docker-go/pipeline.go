@@ -71,7 +71,7 @@ func (p *Pipeline) Build(ctx context.Context) error {
 		fmt.Printf("  - %s\n", e)
 	}
 
-	img := p.Client.Container().Build(p.Src)
+	img := p.Src.DockerBuild()
 	p.Image = img
 
 	fmt.Println("✅ image built in memory correctly")
