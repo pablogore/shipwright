@@ -1,0 +1,110 @@
+# Production Configuration Template for Syntegrity Dagger
+# This template provides secure defaults and best practices for production deployments
+
+pipeline:
+  # Pipeline name (go-service, docker-go, or infra)
+  name: go-service
+  
+  # Environment: dev, development, staging, production, or prod
+  environment: production
+  
+  # Go version (format: X.Y or X.Y.Z, e.g., 1.25 or 1.25.1)
+  goVersion: "1.25.5"
+  
+  # Minimum code coverage required (must be >= 80% for production)
+  coverage: 90.0
+  
+  # Pipeline steps to execute
+  steps:
+    - setup
+    - build
+    - test
+    - lint
+    - security
+    - package
+    - tag
+    - push
+  
+  # Step-specific configurations (timeouts in Go duration format: 5m, 1h, etc.)
+  stepConfigs:
+    - name: setup
+      timeout: "5m"
+      retries: 2
+    - name: build
+      timeout: "15m"
+      retries: 1
+    - name: test
+      timeout: "20m"
+      retries: 2
+    - name: lint
+      timeout: "10m"
+      retries: 1
+    - name: security
+      timeout: "15m"
+      retries: 1
+    - name: package
+      timeout: "10m"
+      retries: 1
+    - name: tag
+      timeout: "2m"
+      retries: 2
+    - name: push
+      timeout: "10m"
+      retries: 3  # Push operations may need more retries due to network issues
+
+# Registry configuration
+registry:
+  # Registry base URL (must include scheme: http:// or https://)
+  baseUrl: "https://ghcr.io"
+  
+  # Registry image name
+  image: "your-org/your-service"
+  
+  # Registry user (set via environment variable or secret)
+  # user: ${REGISTRY_USER}
+  
+  # Registry password/token (set via environment variable or secret)
+  # pass: ${REGISTRY_TOKEN}
+
+# Security configuration
+security:
+  # Enable vulnerability scanning
+  enableVulnCheck: true
+  
+  # Enable linting
+  enableLinting: true
+
+# Release configuration
+release:
+  enabled: true
+  useGoreleaser: false
+  createGithubRelease: true
+  platforms:
+    - linux/amd64
+    - linux/arm64
+
+# Logging configuration
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+
+# Git configuration
+git:
+  # Git protocol: ssh or https
+  protocol: https
+  
+  # Git repository URL (optional, can be set via environment)
+  # repo: "https://github.com/your-org/your-repo.git"
+  
+  # Git reference (branch or tag)
+  # ref: "main"
+
+# Notes:
+# - All sensitive values (passwords, tokens) should be set via environment variables
+# - Timeouts are capped at 2 hours maximum
+# - Retry counts should be reasonable (0-5 recommended)
+# - For production, always use HTTPS for registry and Git URLs
+# - Ensure Dagger engine is running before executing pipelines
+# - Run health checks with: syntegrity-dagger --health
+
+

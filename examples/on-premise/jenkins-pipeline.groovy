@@ -33,7 +33,7 @@ pipeline {
         )
         choice(
             name: 'PIPELINE_TYPE',
-            choices: ['go-kit', 'docker-go', 'infra'],
+            choices: ['go-service', 'docker-go', 'infra'],
             description: 'Pipeline type to execute'
         )
         booleanParam(

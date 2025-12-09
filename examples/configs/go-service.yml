@@ -1,0 +1,32 @@
+pipeline:
+  name: "go-service"
+  environment: "production"
+  coverage: 90.0
+  go_version: "1.25.5"
+
+# Steps para librería (sin container)
+steps:
+  - setup
+  - build
+  - test
+  - lint
+  - security
+  - release  # Con Goreleaser para múltiples plataformas
+
+security:
+  enable_vuln_check: true
+  enable_linting: true
+
+release:
+  enabled: true
+  use_goreleaser: true
+  create_github_release: true
+  platforms:
+    - linux/amd64
+    - linux/arm64
+    - darwin/amd64
+    - darwin/arm64
+    - windows/amd64
+
+logging:
+  level: "info"

@@ -1,5 +1,5 @@
 pipeline:
-  name: go-kit
+  name: go-service
   steps:
     - setup
     - build
@@ -10,11 +10,6 @@ pipeline:
   only_test: false
   verbose: false
   go_version: "1.25.3"
-
-service:
-  name: "test-service"
-  version: "1.0.0"
-  environment: "dev"
 
 registry:
   base_url: "test-registry"

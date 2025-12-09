@@ -20,7 +20,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.25.1'
+        go-version: '1.25.5'
         
     # Cache Syntegrity Dagger binary
     - name: Cache Syntegrity Dagger
@@ -47,7 +47,7 @@ jobs:
         # Verify download
         ./syntegrity-dagger --version
         
-    # Run Syntegrity Dagger Pipeline for go-kit
+    # Run Syntegrity Dagger Pipeline for go-service
     - name: Run Syntegrity Dagger Pipeline
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
