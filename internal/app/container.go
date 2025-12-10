@@ -260,7 +260,7 @@ func (c *Container) verifyDockerAvailable(ctx context.Context) error {
 	// but indicates Docker CLI is available
 	cmd := exec.CommandContext(verifyCtx, "docker", "version", "--format", "{{.Server.Version}}")
 	cmd.Env = os.Environ()
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Docker might not be available or daemon not running
