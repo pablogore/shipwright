@@ -1,6 +1,10 @@
 package shared
 
 import (
+	"fmt"
+	"strings"
+	"time"
+
 	"dagger.io/dagger"
 	"golang.org/x/net/context"
 )
@@ -52,6 +56,11 @@ func NewGoBuilder(client *dagger.Client, src *dagger.Directory, version string) 
 //   - A string representing the path to the exported binary.
 //   - An error if the build process fails.
 func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, env map[string]string) (string, error) {
+	// Verify Dagger connection before proceeding
+	if err := verifyConnection(ctx, b.Client); err != nil {
+		return "", fmt.Errorf("Dagger connection verification failed: %w", err)
+	}
+
 	goImage := "golang:" + b.GoVersion
 
 	// Initialize the container with the specified Go version and mount directories
@@ -75,9 +84,94 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 
 	// Export the built binary to the specified output path
 	file := container.File("/app/" + target)
-	_, err := file.Export(ctx, outPath)
+	err := exportWithRetry(ctx, file, outPath)
 	if err != nil {
 		return "", err
 	}
 	return outPath, nil
+}
+
+// isConnectionError checks if an error is connection-related.
+//
+// Parameters:
+//   - err: The error to check.
+//
+// Returns:
+//   - true if the error is connection-related, false otherwise.
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "dial tcp") ||
+		strings.Contains(errStr, "context deadline exceeded")
+}
+
+// verifyConnection performs a lightweight operation to verify Dagger client connectivity.
+//
+// Parameters:
+//   - ctx: The context for managing execution.
+//   - client: The Dagger client to verify.
+//
+// Returns:
+//   - An error if the connection is not available.
+func verifyConnection(ctx context.Context, client *dagger.Client) error {
+	// Perform a lightweight operation to verify connectivity
+	_, err := client.Container().From("alpine:latest").ID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to verify Dagger connection: %w", err)
+	}
+	return nil
+}
+
+// exportWithRetry wraps file.Export with exponential backoff retry logic.
+//
+// Parameters:
+//   - ctx: The context for managing execution.
+//   - file: The Dagger file to export.
+//   - outPath: The output path where the file will be exported.
+//
+// Returns:
+//   - An error if all retry attempts fail.
+func exportWithRetry(ctx context.Context, file *dagger.File, outPath string) error {
+	maxRetries := 3
+	retryDelay := 2 * time.Second
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Wait before retrying (exponential backoff)
+			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
+			if waitTime > 10*time.Second {
+				waitTime = 10 * time.Second // Cap at 10 seconds
+			}
+
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("context deadline exceeded after %d attempts: %w", attempt, lastErr)
+			case <-time.After(waitTime):
+				// Continue with retry
+			}
+		}
+
+		_, lastErr = file.Export(ctx, outPath)
+		if lastErr == nil {
+			return nil // Success
+		}
+
+		// Only retry on connection-related errors
+		if !isConnectionError(lastErr) {
+			return lastErr // Fail immediately for non-connection errors
+		}
+
+		// Log retry attempt if there are more retries remaining
+		if attempt < maxRetries {
+			fmt.Printf("⚠️  Export attempt %d/%d failed with connection error: %v. Retrying...\n",
+				attempt+1, maxRetries+1, lastErr)
+		}
+	}
+
+	// All retries failed
+	return fmt.Errorf("failed to export file after %d attempts: %w", maxRetries+1, lastErr)
 }
