@@ -93,8 +93,59 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 
 	// Export the built binary to the specified output path
 	file := container.File("/app/" + target)
-	if err := exportWithRetry(ctx, file, outPath); err != nil {
-		return "", err
+	exportErr := exportWithRetry(ctx, file, outPath)
+	if exportErr != nil {
+		// If export failed with connection error, try to reconnect and rebuild the file
+		if isConnectionError(exportErr) {
+			fmt.Printf("⚠️  Connection lost during export, attempting to reconnect and retry...\n")
+			
+			// Reconnect the client
+			reconnectedClient, reconnectErr := verifyConnection(ctx, b.Client)
+			if reconnectErr != nil {
+				return "", fmt.Errorf("failed to reconnect during export: %w (original error: %v)", reconnectErr, exportErr)
+			}
+			
+			// Update client and recreate container with new client
+			if reconnectedClient != b.Client {
+				b.Client = reconnectedClient
+				// Recreate cache volumes with new client
+				b.GoModCache = reconnectedClient.CacheVolume("go-mod-cache")
+				b.GoBuildCache = reconnectedClient.CacheVolume("go-build-cache")
+				
+				// Rebuild the container and file with the new client
+				// Note: We need to rebuild the entire container chain
+				goImage := "golang:" + b.GoVersion
+				newContainer := b.Client.Container().
+					From(goImage).
+					WithMountedDirectory("/app", b.Source).
+					WithMountedCache("/go/pkg/mod", b.GoModCache).
+					WithMountedCache("/root/.cache/go-build", b.GoBuildCache).
+					WithWorkdir("/app").
+					WithEnvVariable("GOPATH", "/go").
+					WithEnvVariable("GOCACHE", "/root/.cache/go-build")
+				
+				// Re-add custom environment variables
+				for k, v := range env {
+					newContainer = newContainer.WithEnvVariable(k, v)
+				}
+				
+				// Re-run Go commands
+				newContainer = newContainer.WithExec([]string{"go", "mod", "tidy"})
+				newContainer = newContainer.WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", target, "main.go"})
+				
+				// Get the file from the new container
+				newFile := newContainer.File("/app/" + target)
+				
+				// Retry export with the new file
+				if retryErr := exportWithRetry(ctx, newFile, outPath); retryErr != nil {
+					return "", fmt.Errorf("failed to export after reconnection: %w (original error: %v)", retryErr, exportErr)
+				}
+				fmt.Printf("✅ Export succeeded after reconnection\n")
+				return outPath, nil
+			}
+		}
+		// If it's not a connection error or reconnection didn't help, return the original error
+		return "", exportErr
 	}
 	return outPath, nil
 }
