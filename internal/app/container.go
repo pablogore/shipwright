@@ -368,7 +368,7 @@ func (c *Container) verifyAndReconnectDaggerClient(ctx context.Context, client *
 	// Try to verify the connection
 	// This will panic if the client is a mock or invalid
 	_, verifyErr := client.Container().From("alpine:latest").ID(verifyCtx)
-	
+
 	// If we reach here, no panic occurred
 	// If verification succeeded, return the client
 	if verifyErr == nil {

@@ -208,7 +208,7 @@ func verifyConnection(ctx context.Context, client *dagger.Client) (*dagger.Clien
 		// Check if client is closed - this is a connection error that requires reconnection
 		errStr := strings.ToLower(verifyErr.Error())
 		isClientClosed := strings.Contains(errStr, "client has closed") || strings.Contains(errStr, "client closed")
-		
+
 		// If it's a client closed error, treat it as connection error and proceed to reconnect
 		if isClientClosed {
 			// Client is closed, we need to reconnect - break out of verification loop
