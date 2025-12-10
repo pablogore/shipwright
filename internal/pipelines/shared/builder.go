@@ -99,50 +99,51 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 		if isConnectionError(exportErr) {
 			fmt.Printf("⚠️  Connection lost during export, attempting to reconnect and retry...\n")
 
-			// Reconnect the client
+			// Always reconnect when export fails with connection error
+			// Even if verifyConnection returns the same client, we need to rebuild
+			// because the file object is invalid after connection loss
 			reconnectedClient, reconnectErr := verifyConnection(ctx, b.Client)
 			if reconnectErr != nil {
 				return "", fmt.Errorf("failed to reconnect during export: %w (original error: %v)", reconnectErr, exportErr)
 			}
 
-			// Update client and recreate container with new client
-			if reconnectedClient != b.Client {
-				b.Client = reconnectedClient
-				// Recreate cache volumes with new client
-				b.GoModCache = reconnectedClient.CacheVolume("go-mod-cache")
-				b.GoBuildCache = reconnectedClient.CacheVolume("go-build-cache")
+			// Always rebuild the container chain when export fails with connection error
+			// The file object is invalid after connection loss, so we must rebuild everything
+			b.Client = reconnectedClient
+			// Recreate cache volumes with new client
+			b.GoModCache = reconnectedClient.CacheVolume("go-mod-cache")
+			b.GoBuildCache = reconnectedClient.CacheVolume("go-build-cache")
 
-				// Rebuild the container and file with the new client
-				// Note: We need to rebuild the entire container chain
-				goImage := "golang:" + b.GoVersion
-				newContainer := b.Client.Container().
-					From(goImage).
-					WithMountedDirectory("/app", b.Source).
-					WithMountedCache("/go/pkg/mod", b.GoModCache).
-					WithMountedCache("/root/.cache/go-build", b.GoBuildCache).
-					WithWorkdir("/app").
-					WithEnvVariable("GOPATH", "/go").
-					WithEnvVariable("GOCACHE", "/root/.cache/go-build")
+			// Rebuild the container and file with the new client
+			// Note: We need to rebuild the entire container chain because the connection was lost
+			goImage := "golang:" + b.GoVersion
+			newContainer := b.Client.Container().
+				From(goImage).
+				WithMountedDirectory("/app", b.Source).
+				WithMountedCache("/go/pkg/mod", b.GoModCache).
+				WithMountedCache("/root/.cache/go-build", b.GoBuildCache).
+				WithWorkdir("/app").
+				WithEnvVariable("GOPATH", "/go").
+				WithEnvVariable("GOCACHE", "/root/.cache/go-build")
 
-				// Re-add custom environment variables
-				for k, v := range env {
-					newContainer = newContainer.WithEnvVariable(k, v)
-				}
-
-				// Re-run Go commands
-				newContainer = newContainer.WithExec([]string{"go", "mod", "tidy"})
-				newContainer = newContainer.WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", target, "main.go"})
-
-				// Get the file from the new container
-				newFile := newContainer.File("/app/" + target)
-
-				// Retry export with the new file
-				if retryErr := exportWithRetry(ctx, newFile, outPath); retryErr != nil {
-					return "", fmt.Errorf("failed to export after reconnection: %w (original error: %v)", retryErr, exportErr)
-				}
-				fmt.Printf("✅ Export succeeded after reconnection\n")
-				return outPath, nil
+			// Re-add custom environment variables
+			for k, v := range env {
+				newContainer = newContainer.WithEnvVariable(k, v)
 			}
+
+			// Re-run Go commands
+			newContainer = newContainer.WithExec([]string{"go", "mod", "tidy"})
+			newContainer = newContainer.WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", target, "main.go"})
+
+			// Get the file from the new container
+			newFile := newContainer.File("/app/" + target)
+
+			// Retry export with the new file
+			if retryErr := exportWithRetry(ctx, newFile, outPath); retryErr != nil {
+				return "", fmt.Errorf("failed to export after reconnection: %w (original error: %v)", retryErr, exportErr)
+			}
+			fmt.Printf("✅ Export succeeded after reconnection\n")
+			return outPath, nil
 		}
 		// If it's not a connection error or reconnection didn't help, return the original error
 		return "", exportErr
@@ -230,10 +231,9 @@ func verifyConnection(ctx context.Context, client *dagger.Client) (*dagger.Clien
 	// All verification attempts failed with connection errors - attempt to reconnect
 	fmt.Printf("⚠️  Dagger connection lost, attempting to reconnect...\n")
 
-	// Close the old client if possible
-	if client != nil {
-		_ = client.Close()
-	}
+	// Don't close the old client immediately - let Dagger handle engine lifecycle
+	// Closing the client can cause the engine to restart, which we want to avoid
+	// The new connection will reuse the same engine if it's still running
 
 	// Attempt to reconnect with retries
 	maxRetries := 3
@@ -260,13 +260,15 @@ func verifyConnection(ctx context.Context, client *dagger.Client) (*dagger.Clien
 		newClient, lastErr = dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if lastErr == nil {
 			// Verify the new connection works
-			_, verifyErr := newClient.Container().From("alpine:latest").ID(ctx)
+			verifyCtx, verifyCancel := context.WithTimeout(ctx, 5*time.Second)
+			_, verifyErr := newClient.Container().From("alpine:latest").ID(verifyCtx)
+			verifyCancel()
 			if verifyErr == nil {
 				fmt.Printf("✅ Dagger connection reestablished successfully\n")
 				return newClient, nil
 			}
-			// New client also failed, close it and retry
-			_ = newClient.Close()
+			// New client verification failed - don't close immediately
+			// The engine might still be starting, wait and retry
 			lastErr = verifyErr
 		}
 

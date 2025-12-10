@@ -227,9 +227,19 @@ func (c *Container) registerDaggerComponents() {
 				if verifyErr == nil {
 					return client, nil
 				}
-				// Connection established but verification failed - close and retry
-				_ = client.Close()
+				// Connection established but verification failed
+				// Don't close immediately - the engine might still be starting
+				// Wait a bit and retry with the same client
 				lastErr = verifyErr
+				if attempt < maxRetries {
+					// Wait a bit longer for engine to be ready
+					select {
+					case <-ctx.Done():
+						return nil, fmt.Errorf("%w: context deadline exceeded", ErrFailedToCreateDaggerClient)
+					case <-time.After(2 * time.Second):
+						// Continue with retry
+					}
+				}
 			}
 
 			// Log retry attempt (if logger is available)
@@ -457,10 +467,9 @@ func (c *Container) verifyAndReconnectDaggerClient(ctx context.Context, client *
 		return nil, fmt.Errorf("Docker not available during reconnection: %w", err)
 	}
 
-	// Close the old client if possible
-	if client != nil {
-		_ = client.Close()
-	}
+	// Don't close the old client immediately - let Dagger handle it
+	// Closing the client can cause the engine to restart, which we want to avoid
+	// The new connection will use the same engine if it's still running
 
 	// Attempt to reconnect with retries
 	timeout := c.config.GetDuration("dagger.timeout")
@@ -503,9 +512,18 @@ func (c *Container) verifyAndReconnectDaggerClient(ctx context.Context, client *
 				fmt.Printf("✅ Dagger connection reestablished successfully\n")
 				return newClient, nil
 			}
-			// New client also failed, close it and retry
-			_ = newClient.Close()
+			// New client verification failed - don't close immediately
+			// The engine might still be starting, wait a bit before retrying
 			lastErr = verifyErr
+			if attempt < maxRetries {
+				// Wait a bit longer for engine to be ready
+				select {
+				case <-reconnectCtx.Done():
+					return nil, fmt.Errorf("context deadline exceeded while reconnecting")
+				case <-time.After(2 * time.Second):
+					// Continue with retry
+				}
+			}
 		}
 
 		// Log retry attempt if there are more retries remaining
