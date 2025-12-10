@@ -123,16 +123,24 @@ func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
 
 	logger.Info("Running pipeline", "name", pipelineName)
 
-	pipeline, err := a.container.GetPipeline(pipelineName)
+	// Get pipeline once to determine available steps
+	initialPipeline, err := a.container.GetPipeline(pipelineName)
 	if err != nil {
 		return fmt.Errorf("failed to get pipeline %s: %w", pipelineName, err)
 	}
 
 	// Execute pipeline steps
-	steps := pipeline.GetAvailableSteps()
+	steps := initialPipeline.GetAvailableSteps()
 
 	for _, step := range steps {
 		logger.Info("Executing pipeline step", "step", step)
+
+		// Get a fresh pipeline instance before each step to ensure
+		// we have a valid Dagger client (connection may be lost between steps)
+		pipeline, err := a.container.GetPipeline(pipelineName)
+		if err != nil {
+			return fmt.Errorf("failed to get pipeline %s for step %s: %w", pipelineName, step, err)
+		}
 
 		stepErr := pipeline.ExecuteStep(ctx, step)
 		if stepErr != nil {
