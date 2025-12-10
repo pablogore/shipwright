@@ -171,18 +171,58 @@ func (c *Container) registerDaggerComponents() {
 	c.Register("daggerClient", func() (any, error) {
 		timeout := c.config.GetDuration("dagger.timeout")
 		if timeout == 0 {
-			timeout = 30 * time.Second
+			// Increased default timeout to 60 seconds for CI environments
+			// where Dagger engine may take longer to start
+			timeout = 60 * time.Second
 		}
 
+		// Use a longer context for connection attempts
+		// This allows the Dagger engine time to start up
 		ctx, cancel := context.WithTimeout(c.ctx, timeout)
 		defer cancel()
 
-		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
-		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrFailedToCreateDaggerClient, err)
+		// Retry connection with exponential backoff
+		// This helps handle cases where the engine is still starting
+		maxRetries := 3
+		retryDelay := 2 * time.Second
+
+		var client *dagger.Client
+		var lastErr error
+
+		for attempt := 0; attempt <= maxRetries; attempt++ {
+			if attempt > 0 {
+				// Wait before retrying (exponential backoff)
+				waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
+				if waitTime > 10*time.Second {
+					waitTime = 10 * time.Second // Cap at 10 seconds
+				}
+
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("%w: context deadline exceeded after %d attempts: %v",
+						ErrFailedToCreateDaggerClient, attempt, lastErr)
+				case <-time.After(waitTime):
+					// Continue with retry
+				}
+			}
+
+			client, lastErr = dagger.Connect(ctx, dagger.WithLogOutput(nil))
+			if lastErr == nil {
+				return client, nil
+			}
+
+			// Log retry attempt (if logger is available)
+			if attempt < maxRetries {
+				fmt.Printf("⚠️  Dagger connection attempt %d/%d failed: %v. Retrying...\n",
+					attempt+1, maxRetries+1, lastErr)
+			}
 		}
 
-		return client, nil
+		// All retries failed
+		return nil, fmt.Errorf("%w: failed after %d attempts: %v. "+
+			"Ensure Dagger engine is running (try 'dagger run echo test' to verify). "+
+			"In GitHub Actions, ensure Docker service is available.",
+			ErrFailedToCreateDaggerClient, maxRetries+1, lastErr)
 	})
 }
 
