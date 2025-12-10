@@ -56,9 +56,18 @@ func NewGoBuilder(client *dagger.Client, src *dagger.Directory, version string) 
 //   - A string representing the path to the exported binary.
 //   - An error if the build process fails.
 func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, env map[string]string) (string, error) {
-	// Verify Dagger connection before proceeding
-	if err := verifyConnection(ctx, b.Client); err != nil {
+	// Verify Dagger connection before proceeding, reconnect if necessary
+	client, err := verifyConnection(ctx, b.Client)
+	if err != nil {
 		return "", fmt.Errorf("Dagger connection verification failed: %w", err)
+	}
+
+	// Update client if reconnection occurred
+	if client != b.Client {
+		b.Client = client
+		// Recreate cache volumes with new client
+		b.GoModCache = client.CacheVolume("go-mod-cache")
+		b.GoBuildCache = client.CacheVolume("go-build-cache")
 	}
 
 	goImage := "golang:" + b.GoVersion
@@ -84,8 +93,7 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 
 	// Export the built binary to the specified output path
 	file := container.File("/app/" + target)
-	err := exportWithRetry(ctx, file, outPath)
-	if err != nil {
+	if err := exportWithRetry(ctx, file, outPath); err != nil {
 		return "", err
 	}
 	return outPath, nil
@@ -109,20 +117,82 @@ func isConnectionError(err error) bool {
 }
 
 // verifyConnection performs a lightweight operation to verify Dagger client connectivity.
+// If the connection is lost, it attempts to reconnect automatically.
 //
 // Parameters:
 //   - ctx: The context for managing execution.
-//   - client: The Dagger client to verify.
+//   - client: The Dagger client to verify (may be updated if reconnection is needed).
 //
 // Returns:
-//   - An error if the connection is not available.
-func verifyConnection(ctx context.Context, client *dagger.Client) error {
+//   - A new client if reconnection was successful, or the original client if connection is valid.
+//   - An error if the connection is not available and reconnection failed.
+func verifyConnection(ctx context.Context, client *dagger.Client) (*dagger.Client, error) {
 	// Perform a lightweight operation to verify connectivity
 	_, err := client.Container().From("alpine:latest").ID(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to verify Dagger connection: %w", err)
+	if err == nil {
+		return client, nil // Connection is valid
 	}
-	return nil
+
+	// Connection failed - check if it's a connection error
+	if !isConnectionError(err) {
+		return nil, fmt.Errorf("failed to verify Dagger connection: %w", err)
+	}
+
+	// Connection lost - attempt to reconnect
+	fmt.Printf("⚠️  Dagger connection lost, attempting to reconnect...\n")
+
+	// Close the old client if possible
+	if client != nil {
+		_ = client.Close()
+	}
+
+	// Attempt to reconnect with retries
+	maxRetries := 3
+	retryDelay := 2 * time.Second
+	var newClient *dagger.Client
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Wait before retrying (exponential backoff)
+			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
+			if waitTime > 10*time.Second {
+				waitTime = 10 * time.Second // Cap at 10 seconds
+			}
+
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("context deadline exceeded while reconnecting after %d attempts: %w", attempt, lastErr)
+			case <-time.After(waitTime):
+				// Continue with retry
+			}
+		}
+
+		newClient, lastErr = dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if lastErr == nil {
+			// Verify the new connection works
+			_, verifyErr := newClient.Container().From("alpine:latest").ID(ctx)
+			if verifyErr == nil {
+				fmt.Printf("✅ Dagger connection reestablished successfully\n")
+				return newClient, nil
+			}
+			// New client also failed, close it and retry
+			_ = newClient.Close()
+			lastErr = verifyErr
+		}
+
+		// Log retry attempt if there are more retries remaining
+		if attempt < maxRetries {
+			fmt.Printf("⚠️  Reconnection attempt %d/%d failed: %v. Retrying...\n",
+				attempt+1, maxRetries+1, lastErr)
+		}
+	}
+
+	// All reconnection attempts failed
+	return nil, fmt.Errorf("failed to reconnect to Dagger engine after %d attempts: %w. "+
+		"Ensure Dagger engine is running (try 'dagger run echo test' to verify). "+
+		"In GitHub Actions, ensure Docker service is available.",
+		maxRetries+1, lastErr)
 }
 
 // exportWithRetry wraps file.Export with exponential backoff retry logic.
