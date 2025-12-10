@@ -285,13 +285,14 @@ func TestContainer_GetPipeline(t *testing.T) {
 	container.Register("pipelineRegistry", func() (any, error) {
 		return mockRegistry, nil
 	})
-	var mockClient *dagger.Client
+	// Create a non-nil mock client to avoid nil pointer issues in verification
+	mockClient := &dagger.Client{}
 	container.Register("daggerClient", func() (any, error) {
 		return mockClient, nil
 	})
 
 	// Set up expectations
-	mockRegistry.EXPECT().Get("test-pipeline", mockClient, mockConfig).Return(mockPipeline, nil)
+	mockRegistry.EXPECT().Get("test-pipeline", gomock.Any(), mockConfig).Return(mockPipeline, nil)
 
 	// Test GetPipeline
 	pipeline, err := container.GetPipeline("test-pipeline")
@@ -325,7 +326,8 @@ func TestContainer_GetDaggerClient(t *testing.T) {
 	container := NewContainer(ctx, mockConfig)
 
 	// Register dagger client
-	var expectedClient *dagger.Client
+	// Create a non-nil mock client to avoid nil pointer issues in verification
+	expectedClient := &dagger.Client{}
 	container.Register("daggerClient", func() (any, error) {
 		return expectedClient, nil
 	})

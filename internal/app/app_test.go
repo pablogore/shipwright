@@ -452,7 +452,9 @@ func TestApp_RunPipeline_SuccessfulExecution(t *testing.T) {
 
 	// Create mock pipeline registry
 	mockRegistry := mocks.NewMockPipelineRegistry(ctrl)
-	mockRegistry.EXPECT().Get("test-pipeline", gomock.Any(), gomock.Any()).Return(mockPipeline, nil).Times(1)
+	// GetPipeline is called once initially to get steps, then once per step
+	// So for 2 steps (build, test), we expect 3 calls total: 1 initial + 2 steps
+	mockRegistry.EXPECT().Get("test-pipeline", gomock.Any(), gomock.Any()).Return(mockPipeline, nil).Times(3)
 
 	// Create mock dagger client
 	mockDaggerClient := &dagger.Client{}
@@ -497,7 +499,9 @@ func TestApp_RunPipeline_StepExecutionError(t *testing.T) {
 
 	// Create mock pipeline registry
 	mockRegistry := mocks.NewMockPipelineRegistry(ctrl)
-	mockRegistry.EXPECT().Get("test-pipeline", gomock.Any(), gomock.Any()).Return(mockPipeline, nil).Times(1)
+	// GetPipeline is called once initially to get steps, then once per step
+	// So for 1 step (build), we expect 2 calls total: 1 initial + 1 step
+	mockRegistry.EXPECT().Get("test-pipeline", gomock.Any(), gomock.Any()).Return(mockPipeline, nil).Times(2)
 
 	// Create mock dagger client
 	mockDaggerClient := &dagger.Client{}
