@@ -98,20 +98,20 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 		// If export failed with connection error, try to reconnect and rebuild the file
 		if isConnectionError(exportErr) {
 			fmt.Printf("⚠️  Connection lost during export, attempting to reconnect and retry...\n")
-			
+
 			// Reconnect the client
 			reconnectedClient, reconnectErr := verifyConnection(ctx, b.Client)
 			if reconnectErr != nil {
 				return "", fmt.Errorf("failed to reconnect during export: %w (original error: %v)", reconnectErr, exportErr)
 			}
-			
+
 			// Update client and recreate container with new client
 			if reconnectedClient != b.Client {
 				b.Client = reconnectedClient
 				// Recreate cache volumes with new client
 				b.GoModCache = reconnectedClient.CacheVolume("go-mod-cache")
 				b.GoBuildCache = reconnectedClient.CacheVolume("go-build-cache")
-				
+
 				// Rebuild the container and file with the new client
 				// Note: We need to rebuild the entire container chain
 				goImage := "golang:" + b.GoVersion
@@ -123,19 +123,19 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 					WithWorkdir("/app").
 					WithEnvVariable("GOPATH", "/go").
 					WithEnvVariable("GOCACHE", "/root/.cache/go-build")
-				
+
 				// Re-add custom environment variables
 				for k, v := range env {
 					newContainer = newContainer.WithEnvVariable(k, v)
 				}
-				
+
 				// Re-run Go commands
 				newContainer = newContainer.WithExec([]string{"go", "mod", "tidy"})
 				newContainer = newContainer.WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", target, "main.go"})
-				
+
 				// Get the file from the new container
 				newFile := newContainer.File("/app/" + target)
-				
+
 				// Retry export with the new file
 				if retryErr := exportWithRetry(ctx, newFile, outPath); retryErr != nil {
 					return "", fmt.Errorf("failed to export after reconnection: %w (original error: %v)", retryErr, exportErr)
@@ -169,7 +169,10 @@ func isConnectionError(err error) bool {
 		strings.Contains(errStr, "write tcp") ||
 		strings.Contains(errStr, "context deadline exceeded") ||
 		strings.Contains(errStr, "broken pipe") ||
-		strings.Contains(errStr, "no connection could be made")
+		strings.Contains(errStr, "no connection could be made") ||
+		strings.Contains(errStr, "client has closed") ||
+		strings.Contains(errStr, "client closed") ||
+		strings.Contains(errStr, "502") // HTTP 502 Bad Gateway often indicates connection issues
 }
 
 // verifyConnection performs a lightweight operation to verify Dagger client connectivity.
@@ -200,6 +203,16 @@ func verifyConnection(ctx context.Context, client *dagger.Client) (*dagger.Clien
 		_, verifyErr = client.Container().From("alpine:latest").ID(ctx)
 		if verifyErr == nil {
 			return client, nil // Connection is valid
+		}
+
+		// Check if client is closed - this is a connection error that requires reconnection
+		errStr := strings.ToLower(verifyErr.Error())
+		isClientClosed := strings.Contains(errStr, "client has closed") || strings.Contains(errStr, "client closed")
+		
+		// If it's a client closed error, treat it as connection error and proceed to reconnect
+		if isClientClosed {
+			// Client is closed, we need to reconnect - break out of verification loop
+			break
 		}
 
 		// If it's not a connection error, fail immediately
