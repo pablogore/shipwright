@@ -112,8 +112,13 @@ func isConnectionError(err error) bool {
 	}
 	errStr := strings.ToLower(err.Error())
 	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "connection reset") ||
 		strings.Contains(errStr, "dial tcp") ||
-		strings.Contains(errStr, "context deadline exceeded")
+		strings.Contains(errStr, "read tcp") ||
+		strings.Contains(errStr, "write tcp") ||
+		strings.Contains(errStr, "context deadline exceeded") ||
+		strings.Contains(errStr, "broken pipe") ||
+		strings.Contains(errStr, "no connection could be made")
 }
 
 // verifyConnection performs a lightweight operation to verify Dagger client connectivity.
@@ -127,18 +132,38 @@ func isConnectionError(err error) bool {
 //   - A new client if reconnection was successful, or the original client if connection is valid.
 //   - An error if the connection is not available and reconnection failed.
 func verifyConnection(ctx context.Context, client *dagger.Client) (*dagger.Client, error) {
-	// Perform a lightweight operation to verify connectivity
-	_, err := client.Container().From("alpine:latest").ID(ctx)
-	if err == nil {
-		return client, nil // Connection is valid
+	// Perform a lightweight operation to verify connectivity with retries
+	// This handles transient connection issues during verification
+	maxVerifyRetries := 2
+	var verifyErr error
+	for attempt := 0; attempt <= maxVerifyRetries; attempt++ {
+		if attempt > 0 {
+			// Brief wait before retry
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("context deadline exceeded during connection verification: %w", verifyErr)
+			case <-time.After(1 * time.Second):
+			}
+		}
+
+		_, verifyErr = client.Container().From("alpine:latest").ID(ctx)
+		if verifyErr == nil {
+			return client, nil // Connection is valid
+		}
+
+		// If it's not a connection error, fail immediately
+		if !isConnectionError(verifyErr) {
+			return nil, fmt.Errorf("failed to verify Dagger connection: %w", verifyErr)
+		}
+
+		// Connection error - retry verification once more before attempting reconnection
+		if attempt < maxVerifyRetries {
+			fmt.Printf("⚠️  Connection verification attempt %d/%d failed: %v. Retrying...\n",
+				attempt+1, maxVerifyRetries+1, verifyErr)
+		}
 	}
 
-	// Connection failed - check if it's a connection error
-	if !isConnectionError(err) {
-		return nil, fmt.Errorf("failed to verify Dagger connection: %w", err)
-	}
-
-	// Connection lost - attempt to reconnect
+	// All verification attempts failed with connection errors - attempt to reconnect
 	fmt.Printf("⚠️  Dagger connection lost, attempting to reconnect...\n")
 
 	// Close the old client if possible
