@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -182,6 +183,14 @@ func (c *Container) registerDaggerComponents() {
 		ctx, cancel := context.WithTimeout(c.ctx, timeout)
 		defer cancel()
 
+		// Verify Docker is available before attempting to connect
+		// Dagger requires Docker to be running
+		if err := c.verifyDockerAvailable(ctx); err != nil {
+			return nil, fmt.Errorf("%w: Docker not available: %v. "+
+				"Dagger requires Docker to be running. In GitHub Actions, ensure Docker service is configured.",
+				ErrFailedToCreateDaggerClient, err)
+		}
+
 		// Retry connection with exponential backoff
 		// This helps handle cases where the engine is still starting
 		maxRetries := 3
@@ -207,9 +216,20 @@ func (c *Container) registerDaggerComponents() {
 				}
 			}
 
+			// Connect to Dagger engine (which uses Docker)
+			// dagger.Connect() automatically manages the Dagger engine via Docker
 			client, lastErr = dagger.Connect(ctx, dagger.WithLogOutput(nil))
 			if lastErr == nil {
-				return client, nil
+				// Verify the connection works with a lightweight operation
+				verifyCtx, verifyCancel := context.WithTimeout(ctx, 5*time.Second)
+				_, verifyErr := client.Container().From("alpine:latest").ID(verifyCtx)
+				verifyCancel()
+				if verifyErr == nil {
+					return client, nil
+				}
+				// Connection established but verification failed - close and retry
+				_ = client.Close()
+				lastErr = verifyErr
 			}
 
 			// Log retry attempt (if logger is available)
@@ -225,6 +245,36 @@ func (c *Container) registerDaggerComponents() {
 			"In GitHub Actions, ensure Docker service is available.",
 			ErrFailedToCreateDaggerClient, maxRetries+1, lastErr)
 	})
+}
+
+// verifyDockerAvailable checks if Docker is available and running.
+// This is required for Dagger to function properly.
+func (c *Container) verifyDockerAvailable(ctx context.Context) error {
+	// Try to execute a simple Docker command to verify it's available
+	// Use a short timeout to avoid hanging
+	verifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// Check if docker command is available by trying to get version
+	// This is a lightweight check that doesn't require Docker daemon to be fully ready
+	// but indicates Docker CLI is available
+	cmd := exec.CommandContext(verifyCtx, "docker", "version", "--format", "{{.Server.Version}}")
+	cmd.Env = os.Environ()
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Docker might not be available or daemon not running
+		// Return a helpful error message
+		return fmt.Errorf("Docker not available or daemon not running: %v (output: %s). "+
+			"In GitHub Actions, add 'services: docker:' to your workflow",
+			err, string(output))
+	}
+
+	// Docker is available
+	if len(output) > 0 {
+		fmt.Printf("✅ Docker is available (version: %s)\n", strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // registerPipelineComponents registers pipeline-related components.
@@ -375,11 +425,6 @@ func (c *Container) verifyAndReconnectDaggerClient(ctx context.Context, client *
 		return client, nil // Connection is valid
 	}
 
-	// If verification succeeded, return the client
-	if verifyErr == nil {
-		return client, nil // Connection is valid
-	}
-
 	// If we got an error (not a panic), check if it's a connection error
 	err = verifyErr
 	errStr := strings.ToLower(err.Error())
@@ -406,6 +451,11 @@ func (c *Container) verifyAndReconnectDaggerClient(ctx context.Context, client *
 
 	// Connection lost - attempt to reconnect
 	fmt.Printf("⚠️  Dagger connection lost, attempting to reconnect...\n")
+
+	// Verify Docker is still available before reconnecting
+	if err := c.verifyDockerAvailable(ctx); err != nil {
+		return nil, fmt.Errorf("Docker not available during reconnection: %w", err)
+	}
 
 	// Close the old client if possible
 	if client != nil {
@@ -442,10 +492,13 @@ func (c *Container) verifyAndReconnectDaggerClient(ctx context.Context, client *
 			}
 		}
 
+		// Connect to Dagger engine (which uses Docker)
 		newClient, lastErr = dagger.Connect(reconnectCtx, dagger.WithLogOutput(nil))
 		if lastErr == nil {
-			// Verify the new connection works
-			_, verifyErr := newClient.Container().From("alpine:latest").ID(reconnectCtx)
+			// Verify the new connection works with a lightweight operation
+			verifyCtx, verifyCancel := context.WithTimeout(reconnectCtx, 5*time.Second)
+			_, verifyErr := newClient.Container().From("alpine:latest").ID(verifyCtx)
+			verifyCancel()
 			if verifyErr == nil {
 				fmt.Printf("✅ Dagger connection reestablished successfully\n")
 				return newClient, nil
