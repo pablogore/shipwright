@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 )
 
 // RunTestsWithCoverage runs the tests for the project with coverage.
@@ -98,8 +99,10 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 		}
 
 		// Log retry attempt
-		fmt.Printf("⚠️  Test connection attempt %d/%d failed: %v. Retrying...\n",
-			attempt+1, maxRetries+1, err)
+		logger.L().WarnContext(ctx, "Test connection attempt failed, retrying",
+			"attempt", attempt+1,
+			"max_retries", maxRetries+1,
+			"error", err)
 	}
 
 	if err != nil {
@@ -149,8 +152,10 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 		}
 
 		// Log retry attempt
-		fmt.Printf("⚠️  Coverage connection attempt %d/%d failed: %v. Retrying...\n",
-			attempt+1, maxRetries+1, err)
+		logger.L().WarnContext(ctx, "Coverage connection attempt failed, retrying",
+			"attempt", attempt+1,
+			"max_retries", maxRetries+1,
+			"error", err)
 	}
 
 	if err != nil {
@@ -174,6 +179,6 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 		return fmt.Errorf("coverage %.2f%% is below the required threshold of %.2f%%", coverageValue, coverage)
 	}
 
-	fmt.Printf("✅ Test coverage: %.2f%%\n", coverageValue)
+	logger.L().InfoContext(ctx, "Test coverage", "coverage", coverageValue)
 	return nil
 }

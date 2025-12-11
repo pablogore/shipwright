@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 )
@@ -15,7 +16,6 @@ import (
 type BaseStepHandler struct {
 	config interfaces.Configuration
 	client *dagger.Client
-	logger interfaces.Logger
 }
 
 // CanHandle implements the StepHandler interface.
@@ -49,11 +49,10 @@ func (h *BaseStepHandler) Validate(stepName string, _ interfaces.StepConfig) err
 }
 
 // NewBaseStepHandler creates a new base step handler.
-func NewBaseStepHandler(config interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) *BaseStepHandler {
+func NewBaseStepHandler(config interfaces.Configuration, client *dagger.Client) *BaseStepHandler {
 	return &BaseStepHandler{
 		config: config,
 		client: client,
-		logger: logger,
 	}
 }
 
@@ -63,9 +62,9 @@ type SetupStepHandler struct {
 }
 
 // NewSetupStepHandler creates a new setup step handler.
-func NewSetupStepHandler(config interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
+func NewSetupStepHandler(config interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
 	return &SetupStepHandler{
-		BaseStepHandler: NewBaseStepHandler(config, client, logger),
+		BaseStepHandler: NewBaseStepHandler(config, client),
 	}
 }
 
@@ -73,8 +72,8 @@ func (h *SetupStepHandler) CanHandle(stepName string) bool {
 	return stepName == "setup"
 }
 
-func (h *SetupStepHandler) Execute(_ context.Context, stepName string, config interfaces.StepConfig) error {
-	h.logger.Info("Starting setup step",
+func (h *SetupStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+	logger.L().InfoContext(ctx, "Starting setup step",
 		"step", stepName,
 		"timeout", config.Timeout,
 		"required", config.Required,
@@ -82,17 +81,17 @@ func (h *SetupStepHandler) Execute(_ context.Context, stepName string, config in
 
 	// Example setup logic
 	if h.client == nil {
-		h.logger.Error("Dagger client not available")
+		logger.L().ErrorContext(ctx, "Dagger client not available")
 		return errors.New("dagger client not available")
 	}
 
 	// Create source directory
-	h.logger.Debug("Creating source directory")
+	logger.L().DebugContext(ctx, "Creating source directory")
 	_ = h.client.Host().Directory(".", dagger.HostDirectoryOpts{
 		Exclude: []string{"**/node_modules", "**/.git", "**/.dagger-cache"},
 	})
 
-	h.logger.Info("Setup step completed successfully")
+	logger.L().InfoContext(ctx, "Setup step completed successfully")
 	return nil
 }
 
@@ -128,9 +127,9 @@ type BuildStepHandler struct {
 }
 
 // NewBuildStepHandler creates a new build step handler.
-func NewBuildStepHandler(config interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
+func NewBuildStepHandler(config interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
 	return &BuildStepHandler{
-		BaseStepHandler: NewBaseStepHandler(config, client, logger),
+		BaseStepHandler: NewBaseStepHandler(config, client),
 	}
 }
 
@@ -138,8 +137,8 @@ func (h *BuildStepHandler) CanHandle(stepName string) bool {
 	return stepName == "build"
 }
 
-func (h *BuildStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
-	fmt.Printf("🔨 Executing build step with config: %+v\n", config)
+func (h *BuildStepHandler) Execute(ctx context.Context, _ string, config interfaces.StepConfig) error {
+	logger.L().InfoContext(ctx, "Executing build step", "config", config)
 
 	// Example build logic
 	goVersion := h.config.GetString("pipeline.go_version")
@@ -147,8 +146,8 @@ func (h *BuildStepHandler) Execute(_ context.Context, _ string, config interface
 		goVersion = "1.25.5"
 	}
 
-	fmt.Printf("Building with Go version: %s\n", goVersion)
-	fmt.Println("✅ Build step completed")
+	logger.L().InfoContext(ctx, "Building with Go version", "go_version", goVersion)
+	logger.L().InfoContext(ctx, "Build step completed")
 	return nil
 }
 
@@ -184,9 +183,9 @@ type TestStepHandler struct {
 }
 
 // NewTestStepHandler creates a new test step handler.
-func NewTestStepHandler(config interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
+func NewTestStepHandler(config interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
 	return &TestStepHandler{
-		BaseStepHandler: NewBaseStepHandler(config, client, logger),
+		BaseStepHandler: NewBaseStepHandler(config, client),
 	}
 }
 
@@ -194,14 +193,14 @@ func (h *TestStepHandler) CanHandle(stepName string) bool {
 	return stepName == "test"
 }
 
-func (h *TestStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
+func (h *TestStepHandler) Execute(ctx context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🧪 Executing test step with config: %+v\n", config)
 
 	// Example test logic
 	coverage := h.config.GetFloat("pipeline.coverage")
-	fmt.Printf("Running tests with coverage threshold: %.1f%%\n", coverage)
+	logger.L().InfoContext(ctx, "Running tests with coverage threshold", "coverage", coverage)
 
-	fmt.Println("✅ Test step completed")
+	logger.L().InfoContext(ctx, "Test step completed")
 	return nil
 }
 
@@ -237,9 +236,9 @@ type LintStepHandler struct {
 }
 
 // NewLintStepHandler creates a new lint step handler.
-func NewLintStepHandler(config interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
+func NewLintStepHandler(config interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
 	return &LintStepHandler{
-		BaseStepHandler: NewBaseStepHandler(config, client, logger),
+		BaseStepHandler: NewBaseStepHandler(config, client),
 	}
 }
 
@@ -247,14 +246,14 @@ func (h *LintStepHandler) CanHandle(stepName string) bool {
 	return stepName == "lint"
 }
 
-func (h *LintStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
+func (h *LintStepHandler) Execute(ctx context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🔍 Executing lint step with config: %+v\n", config)
 
 	// Example lint logic
 	timeout := h.config.GetString("security.lint_timeout")
-	fmt.Printf("Running linter with timeout: %s\n", timeout)
+	logger.L().InfoContext(ctx, "Running linter with timeout", "timeout", timeout)
 
-	fmt.Println("✅ Lint step completed")
+	logger.L().InfoContext(ctx, "Lint step completed")
 	return nil
 }
 
@@ -290,9 +289,9 @@ type SecurityStepHandler struct {
 }
 
 // NewSecurityStepHandler creates a new security step handler.
-func NewSecurityStepHandler(config interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
+func NewSecurityStepHandler(config interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
 	return &SecurityStepHandler{
-		BaseStepHandler: NewBaseStepHandler(config, client, logger),
+		BaseStepHandler: NewBaseStepHandler(config, client),
 	}
 }
 
@@ -300,14 +299,14 @@ func (h *SecurityStepHandler) CanHandle(stepName string) bool {
 	return stepName == "security"
 }
 
-func (h *SecurityStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
-	fmt.Printf("🔒 Executing security step with config: %+v\n", config)
+func (h *SecurityStepHandler) Execute(ctx context.Context, _ string, config interfaces.StepConfig) error {
+	logger.L().InfoContext(ctx, "Executing security step", "config", config)
 
 	// Example security logic
 	enableVulnCheck := h.config.GetBool("security.enable_vuln_check")
-	fmt.Printf("Vulnerability checking enabled: %t\n", enableVulnCheck)
+	logger.L().InfoContext(ctx, "Vulnerability checking enabled", "enabled", enableVulnCheck)
 
-	fmt.Println("✅ Security step completed")
+	logger.L().InfoContext(ctx, "Security step completed")
 	return nil
 }
 
@@ -338,18 +337,18 @@ func (h *SecurityStepHandler) Validate(stepName string, config interfaces.StepCo
 }
 
 // Placeholder implementations for other step handlers
-func NewTagStepHandler(cfg interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
-	return &BaseStepHandler{config: cfg, client: client, logger: logger}
+func NewTagStepHandler(cfg interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
+	return &BaseStepHandler{config: cfg, client: client}
 }
 
-func NewPackageStepHandler(cfg interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
-	return &BaseStepHandler{config: cfg, client: client, logger: logger}
+func NewPackageStepHandler(cfg interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
+	return &BaseStepHandler{config: cfg, client: client}
 }
 
-func NewPushStepHandler(cfg interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
-	return &BaseStepHandler{config: cfg, client: client, logger: logger}
+func NewPushStepHandler(cfg interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
+	return &BaseStepHandler{config: cfg, client: client}
 }
 
-func NewReleaseStepHandler(cfg interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
-	return &BaseStepHandler{config: cfg, client: client, logger: logger}
+func NewReleaseStepHandler(cfg interfaces.Configuration, client *dagger.Client) interfaces.StepHandler {
+	return &BaseStepHandler{config: cfg, client: client}
 }

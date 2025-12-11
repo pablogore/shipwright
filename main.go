@@ -7,9 +7,8 @@ import (
 	"os"
 	"runtime"
 
-	"log/slog"
-
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/app"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
@@ -61,7 +60,7 @@ func (c *CLI) Run(args []string) error {
 		// Check if file exists before trying to load it
 		if _, err := os.Stat(flags.configFile); err == nil {
 			var yamlCfg *config.YAMLConfig
-			yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
+			yamlCfg, err = c.loadYAMLConfig(ctx, cfg, flags.configFile)
 			if err != nil {
 				return fmt.Errorf("failed to load YAML configuration: %w", err)
 			}
@@ -70,7 +69,8 @@ func (c *CLI) Run(args []string) error {
 			// File doesn't exist - this is OK, we'll use defaults
 			// Only warn if the user explicitly specified --config
 			if flags.configFile != ".syntegrity-dagger.yml" {
-				fmt.Printf("⚠️  Configuration file not found: %s (using defaults)\n", flags.configFile)
+				logger.L().WarnContext(ctx, "Configuration file not found, using defaults",
+					"config_file", flags.configFile)
 			}
 		}
 	}
@@ -85,8 +85,8 @@ func (c *CLI) Run(args []string) error {
 	}
 	defer app.Reset()
 
-	// Log successful initialization using the global logger
-	slog.Info("Syntegrity Dagger initialized successfully",
+	// Log successful initialization using go-kit-logger
+	logger.L().InfoContext(ctx, "Syntegrity Dagger initialized successfully",
 		"pipeline", flags.pipelineName,
 		"environment", flags.env,
 		"verbose", flags.verbose)
@@ -204,18 +204,29 @@ func (c *CLI) executePipeline(ctx context.Context, flags *Flags) error {
 	// Auto-detect local execution if not in CI and no executor specified
 	shouldUseLocal := flags.local || (flags.executor == "" && !c.isCIEnvironment() && flags.executor == "")
 
+	// Warn in CI if executing full pipeline (better to use individual steps)
+	if c.isCIEnvironment() && flags.step == "" {
+		logger.L().WarnContext(ctx, "Executing full pipeline in CI environment",
+			"recommendation", "For better visibility in CI/CD UI, execute steps individually using --step flag",
+			"example", "syntegrity-dagger --pipeline go-service --step build")
+	}
+
 	if shouldUseLocal {
-		fmt.Printf("🏠 Running pipeline locally: %s (%s)\n", flags.pipelineName, flags.env)
-		fmt.Printf("📊 Coverage threshold: %.1f%%\n", flags.coverage)
-		fmt.Printf("🌿 Git ref: %s\n", flags.gitRef)
-		fmt.Printf("⚡ Using native execution (no Docker required)\n")
+		logger.L().InfoContext(ctx, "Running pipeline locally",
+			"pipeline", flags.pipelineName,
+			"environment", flags.env,
+			"coverage", flags.coverage,
+			"git_ref", flags.gitRef)
+		logger.L().InfoContext(ctx, "Using native execution (no Docker required)")
 
 		return c.executePipelineLocally(ctx, flags)
 	}
 
-	fmt.Printf("🚀 Running pipeline: %s (%s)\n", flags.pipelineName, flags.env)
-	fmt.Printf("📊 Coverage threshold: %.1f%%\n", flags.coverage)
-	fmt.Printf("🌿 Git ref: %s\n", flags.gitRef)
+	logger.L().InfoContext(ctx, "Running pipeline",
+		"pipeline", flags.pipelineName,
+		"environment", flags.env,
+		"coverage", flags.coverage,
+		"git_ref", flags.gitRef)
 
 	// Use executor selector if executor is specified
 	if flags.executor != "" {
@@ -276,7 +287,7 @@ func (c *CLI) executePipelineWithExecutor(ctx context.Context, flags *Flags) err
 		return fmt.Errorf("failed to select executor: %w", err)
 	}
 
-	fmt.Printf("🔧 Using executor: %s\n", executor.Name())
+	logger.L().InfoContext(ctx, "Using executor", "executor", executor.Name())
 
 	// Get pipeline steps from configuration
 	steps := []string{"setup", "build", "test"}
@@ -288,11 +299,11 @@ func (c *CLI) executePipelineWithExecutor(ctx context.Context, flags *Flags) err
 
 	// Execute steps using selected executor
 	for _, step := range steps {
-		fmt.Printf("▶️  Executing step: %s\n", step)
+		logger.L().InfoContext(ctx, "Executing step", "step", step)
 		if err := executor.ExecuteStep(ctx, step); err != nil {
 			return fmt.Errorf("step %s failed: %w", step, err)
 		}
-		fmt.Printf("✅ Step completed: %s\n", step)
+		logger.L().InfoContext(ctx, "Step completed", "step", step)
 	}
 
 	return nil
@@ -304,7 +315,9 @@ func (c *CLI) executeSingleStep(ctx context.Context, flags *Flags) error {
 	shouldUseLocal := flags.local || (flags.executor == "" && !c.isCIEnvironment())
 
 	if shouldUseLocal {
-		fmt.Printf("🏠 Executing step locally '%s' in pipeline: %s\n", flags.step, flags.pipelineName)
+		logger.L().InfoContext(ctx, "Executing step locally",
+			"step", flags.step,
+			"pipeline", flags.pipelineName)
 		return c.executeStepLocally(ctx, flags)
 	}
 
@@ -334,21 +347,23 @@ func (c *CLI) executeSingleStep(ctx context.Context, flags *Flags) error {
 		// Try to select executor automatically (native first, then docker)
 		executor, err := executorSelector.SelectExecutor(ctx, daggerClient, pipelineConfig, "")
 		if err == nil {
-			fmt.Printf("🔧 Auto-selected executor: %s\n", executor.Name())
-			fmt.Printf("▶️  Executing step: %s\n", flags.step)
+			logger.L().InfoContext(ctx, "Auto-selected executor", "executor", executor.Name())
+			logger.L().InfoContext(ctx, "Executing step", "step", flags.step)
 
 			if err := executor.ExecuteStep(ctx, flags.step); err != nil {
 				return fmt.Errorf("step %s failed: %w", flags.step, err)
 			}
 
-			fmt.Printf("✅ Step completed: %s\n", flags.step)
+			logger.L().InfoContext(ctx, "Step completed", "step", flags.step)
 			return nil
 		}
 		// If executor selection fails, fall through to RunPipelineStep
 	}
 
 	// Fallback to RunPipelineStep (requires Dagger)
-	fmt.Printf("🎯 Executing step '%s' in pipeline: %s\n", flags.step, flags.pipelineName)
+	logger.L().InfoContext(ctx, "Executing step in pipeline",
+		"step", flags.step,
+		"pipeline", flags.pipelineName)
 
 	return c.app.RunPipelineStep(ctx, flags.pipelineName, flags.step)
 }
@@ -382,19 +397,19 @@ func (c *CLI) executeStepWithExecutor(ctx context.Context, flags *Flags) error {
 		return fmt.Errorf("failed to select executor: %w", err)
 	}
 
-	fmt.Printf("🔧 Using executor: %s\n", executor.Name())
-	fmt.Printf("▶️  Executing step: %s\n", flags.step)
+	logger.L().InfoContext(ctx, "Using executor", "executor", executor.Name())
+	logger.L().InfoContext(ctx, "Executing step", "step", flags.step)
 
 	if err := executor.ExecuteStep(ctx, flags.step); err != nil {
 		return fmt.Errorf("step %s failed: %w", flags.step, err)
 	}
 
-	fmt.Printf("✅ Step completed: %s\n", flags.step)
+	logger.L().InfoContext(ctx, "Step completed", "step", flags.step)
 	return nil
 }
 
 // listAvailableSteps lists available steps for a pipeline.
-func (c *CLI) listAvailableSteps(_ context.Context, flags *Flags) error {
+func (c *CLI) listAvailableSteps(ctx context.Context, flags *Flags) error {
 	container := c.app.GetContainer()
 	stepRegistry, err := container.Get("stepRegistry")
 	if err != nil {
@@ -404,29 +419,32 @@ func (c *CLI) listAvailableSteps(_ context.Context, flags *Flags) error {
 	registry := stepRegistry.(interfaces.StepRegistry)
 	steps := registry.ListSteps()
 
-	fmt.Printf("Available steps for pipeline '%s':\n", flags.pipelineName)
+	logger.L().InfoContext(ctx, "Available steps for pipeline",
+		"pipeline", flags.pipelineName,
+		"steps_count", len(steps))
 
 	for i, step := range steps {
 		cfg, err := registry.GetStepConfig(step)
 		if err != nil {
-			fmt.Printf("  %d. %s (error getting config)\n", i+1, step)
-
+			logger.L().WarnContext(ctx, "Error getting step config",
+				"step", step,
+				"error", err)
 			continue
 		}
 
-		fmt.Printf("  %d. %s - %s\n", i+1, step, cfg.Description)
-		if cfg.Required {
-			fmt.Printf("     (Required: Yes, Timeout: %v)\n", cfg.Timeout)
-		} else {
-			fmt.Printf("     (Required: No, Timeout: %v)\n", cfg.Timeout)
-		}
+		logger.L().InfoContext(ctx, "Step information",
+			"index", i+1,
+			"step", step,
+			"description", cfg.Description,
+			"required", cfg.Required,
+			"timeout", cfg.Timeout)
 	}
 
 	return nil
 }
 
 // listAvailablePipelines lists available pipelines.
-func (c *CLI) listAvailablePipelines(_ context.Context) error {
+func (c *CLI) listAvailablePipelines(ctx context.Context) error {
 	container := c.app.GetContainer()
 	registry, err := container.Get("pipelineRegistry")
 	if err != nil {
@@ -436,9 +454,12 @@ func (c *CLI) listAvailablePipelines(_ context.Context) error {
 	pipelineRegistry := registry.(interfaces.PipelineRegistry)
 	pipelines := pipelineRegistry.List()
 
-	fmt.Println("Available pipelines:")
+	logger.L().InfoContext(ctx, "Available pipelines",
+		"count", len(pipelines))
 	for index, pipelineName := range pipelines {
-		fmt.Printf("  %d. %s\n", index+1, pipelineName)
+		logger.L().InfoContext(ctx, "Pipeline",
+			"index", index+1,
+			"name", pipelineName)
 	}
 
 	return nil
@@ -446,7 +467,7 @@ func (c *CLI) listAvailablePipelines(_ context.Context) error {
 
 // loadYAMLConfig loads and applies YAML configuration
 // Returns the parsed YAMLConfig for later use
-func (c *CLI) loadYAMLConfig(cfg interfaces.Configuration, configFile string) (*config.YAMLConfig, error) {
+func (c *CLI) loadYAMLConfig(ctx context.Context, cfg interfaces.Configuration, configFile string) (*config.YAMLConfig, error) {
 	parser := config.NewYAMLParser()
 
 	// Parse YAML file
@@ -465,26 +486,22 @@ func (c *CLI) loadYAMLConfig(cfg interfaces.Configuration, configFile string) (*
 		return nil, fmt.Errorf("failed to apply YAML configuration: %w", err)
 	}
 
-	fmt.Printf("📋 Loaded configuration from: %s\n", configFile)
-	fmt.Printf("🎯 Pipeline: %s\n", yamlConfig.Pipeline.Name)
-	fmt.Printf("📝 Steps: %v\n", yamlConfig.Pipeline.Steps)
+	logger.L().InfoContext(ctx, "Loaded configuration from file",
+		"config_file", configFile,
+		"pipeline", yamlConfig.Pipeline.Name,
+		"steps", yamlConfig.Pipeline.Steps)
 
 	return yamlConfig, nil
 }
 
 // executePipelineLocally executes a pipeline locally without Docker
 func (c *CLI) executePipelineLocally(ctx context.Context, flags *Flags) error {
-	// Get logger and config from the app
+	// Get config from the app
 	container := c.app.GetContainer()
-	logger, err := container.GetLogger()
-	if err != nil {
-		return fmt.Errorf("failed to get logger: %w", err)
-	}
-
 	cfg := container.GetConfiguration()
 
 	// Create local executor
-	localExecutor := app.NewLocalExecutor(logger, cfg)
+	localExecutor := app.NewLocalExecutor(cfg)
 
 	// Get pipeline steps from configuration
 	var steps []string
@@ -493,7 +510,7 @@ func (c *CLI) executePipelineLocally(ctx context.Context, flags *Flags) error {
 	if c.yamlConfig != nil {
 		parser := config.NewYAMLParser()
 		steps = parser.GetSteps(c.yamlConfig)
-		logger.Info("Using steps from YAML configuration", "steps", steps)
+		logger.L().InfoContext(ctx, "Using steps from YAML configuration", "steps", steps)
 	}
 
 	// If no steps from YAML, try to get from configuration
@@ -501,7 +518,7 @@ func (c *CLI) executePipelineLocally(ctx context.Context, flags *Flags) error {
 		if stepsConfig := cfg.Get("pipeline.steps"); stepsConfig != nil {
 			if stepsList, ok := stepsConfig.([]string); ok {
 				steps = stepsList
-				logger.Info("Using steps from configuration", "steps", steps)
+				logger.L().InfoContext(ctx, "Using steps from configuration", "steps", steps)
 			}
 		}
 	}
@@ -509,14 +526,14 @@ func (c *CLI) executePipelineLocally(ctx context.Context, flags *Flags) error {
 	// Handle CLI flags that override step selection
 	if flags.onlyBuild {
 		steps = []string{"setup", "build"}
-		logger.Info("Using only-build steps", "steps", steps)
+		logger.L().InfoContext(ctx, "Using only-build steps", "steps", steps)
 	} else if flags.onlyTest {
 		steps = []string{"setup", "test"}
-		logger.Info("Using only-test steps", "steps", steps)
+		logger.L().InfoContext(ctx, "Using only-test steps", "steps", steps)
 	} else if len(steps) == 0 {
 		// Default steps if nothing is configured
 		steps = []string{"setup", "build", "test"}
-		logger.Info("Using default steps", "steps", steps)
+		logger.L().InfoContext(ctx, "Using default steps", "steps", steps)
 	}
 
 	// Filter out steps that are not supported in local mode
@@ -534,7 +551,7 @@ func (c *CLI) executePipelineLocally(ctx context.Context, flags *Flags) error {
 		if supportedLocalSteps[step] {
 			filteredSteps = append(filteredSteps, step)
 		} else {
-			logger.Warn("Skipping step not supported in local mode", "step", step)
+			logger.L().WarnContext(ctx, "Skipping step not supported in local mode", "step", step)
 		}
 	}
 
@@ -544,39 +561,35 @@ func (c *CLI) executePipelineLocally(ctx context.Context, flags *Flags) error {
 
 	// Execute steps in order
 	for _, step := range filteredSteps {
-		logger.Info("Running pipeline step", "pipeline", flags.pipelineName, "step", step)
+		logger.L().InfoContext(ctx, "Running pipeline step", "pipeline", flags.pipelineName, "step", step)
 
 		if err := localExecutor.ExecuteStep(ctx, step); err != nil {
 			return fmt.Errorf("pipeline step %s failed: %w", step, err)
 		}
 
-		logger.Info("Pipeline step completed", "step", step)
+		logger.L().InfoContext(ctx, "Pipeline step completed", "step", step)
 	}
 
-	logger.Info("Pipeline completed successfully", "name", flags.pipelineName)
+	logger.L().InfoContext(ctx, "Pipeline completed successfully", "name", flags.pipelineName)
 	return nil
 }
 
 // executeStepLocally executes a single step locally without Docker
 func (c *CLI) executeStepLocally(ctx context.Context, flags *Flags) error {
-	// Get logger and config from the app
+	// Get config from the app
 	container := c.app.GetContainer()
-	logger, err := container.GetLogger()
-	if err != nil {
-		return fmt.Errorf("failed to get logger: %w", err)
-	}
 
 	// Create local executor
-	localExecutor := app.NewLocalExecutor(logger, container.GetConfiguration())
+	localExecutor := app.NewLocalExecutor(container.GetConfiguration())
 
 	// Execute the step
-	logger.Info("Running pipeline step", "pipeline", flags.pipelineName, "step", flags.step)
+	logger.L().InfoContext(ctx, "Running pipeline step", "pipeline", flags.pipelineName, "step", flags.step)
 
-	if err = localExecutor.ExecuteStep(ctx, flags.step); err != nil {
+	if err := localExecutor.ExecuteStep(ctx, flags.step); err != nil {
 		return fmt.Errorf("pipeline step %s failed: %w", flags.step, err)
 	}
 
-	logger.Info("Pipeline step completed", "step", flags.step)
+	logger.L().InfoContext(ctx, "Pipeline step completed", "step", flags.step)
 	return nil
 }
 
@@ -589,11 +602,13 @@ var (
 
 // showVersion displays version information
 func (c *CLI) showVersion() {
-	fmt.Printf("Syntegrity Dagger %s\n", Version)
-	fmt.Printf("Go version: %s\n", runtime.Version())
-	fmt.Printf("OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
-	fmt.Printf("Build time: %s\n", BuildTime)
-	fmt.Printf("Git commit: %s\n", GitCommit)
+	logger.L().InfoContext(context.Background(), "Syntegrity Dagger version",
+		"version", Version,
+		"go_version", runtime.Version(),
+		"os", runtime.GOOS,
+		"arch", runtime.GOARCH,
+		"build_time", BuildTime,
+		"git_commit", GitCommit)
 }
 
 // runHealthChecks executes health checks for all configured services
@@ -610,7 +625,7 @@ func (c *CLI) runHealthChecks(ctx context.Context, flags *Flags) error {
 		// Check if file exists before trying to load it
 		if _, err := os.Stat(flags.configFile); err == nil {
 			var yamlCfg *config.YAMLConfig
-			yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
+			yamlCfg, err = c.loadYAMLConfig(ctx, cfg, flags.configFile)
 			if err != nil {
 				return fmt.Errorf("failed to load YAML configuration: %w", err)
 			}
@@ -619,8 +634,7 @@ func (c *CLI) runHealthChecks(ctx context.Context, flags *Flags) error {
 		// If file doesn't exist, silently use defaults (no error)
 	}
 
-	fmt.Println("🏥 Running health checks...")
-	fmt.Println()
+	logger.L().InfoContext(ctx, "Running health checks")
 
 	return app.RunHealthChecks(ctx, cfg)
 }
@@ -629,7 +643,7 @@ func main() {
 	cli := NewCLI()
 
 	if err := cli.Run(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		logger.L().ErrorContext(context.Background(), "CLI execution failed", "error", err)
 		os.Exit(1)
 	}
 }

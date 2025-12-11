@@ -17,13 +17,13 @@ func TestNewBaseStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBaseStepHandler(mockConfig, nil, mockLogger)
+	handler := NewBaseStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Equal(t, mockConfig, handler.config)
 	assert.Nil(t, handler.client)
-	assert.Equal(t, mockLogger, handler.logger)
+	// Logger is used directly via logger.L() - no field to check
 }
 
 func TestBaseStepHandler_CanHandle(t *testing.T) {
@@ -31,9 +31,9 @@ func TestBaseStepHandler_CanHandle(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBaseStepHandler(mockConfig, nil, mockLogger)
+	handler := NewBaseStepHandler(mockConfig, nil)
 
 	// Base handler should not handle any specific steps
 	assert.False(t, handler.CanHandle("setup"))
@@ -46,9 +46,9 @@ func TestBaseStepHandler_Execute(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBaseStepHandler(mockConfig, nil, mockLogger)
+	handler := NewBaseStepHandler(mockConfig, nil)
 
 	// Base handler should return error for any step
 	config := interfaces.StepConfig{Name: "test-step"}
@@ -62,9 +62,9 @@ func TestBaseStepHandler_GetStepInfo(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBaseStepHandler(mockConfig, nil, mockLogger)
+	handler := NewBaseStepHandler(mockConfig, nil)
 
 	// Test GetStepInfo
 	config := handler.GetStepInfo("test-step")
@@ -84,9 +84,9 @@ func TestBaseStepHandler_Validate(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBaseStepHandler(mockConfig, nil, mockLogger)
+	handler := NewBaseStepHandler(mockConfig, nil)
 
 	// Base handler should return error for any validation
 	config := interfaces.StepConfig{Name: "test-step"}
@@ -100,9 +100,9 @@ func TestNewSetupStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSetupStepHandler(mockConfig, nil, mockLogger)
+	handler := NewSetupStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -112,9 +112,9 @@ func TestSetupStepHandler_CanHandle(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSetupStepHandler(mockConfig, nil, mockLogger).(*SetupStepHandler)
+	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
 
 	// Should handle setup step
 	assert.True(t, handler.CanHandle("setup"))
@@ -127,9 +127,9 @@ func TestSetupStepHandler_Execute(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSetupStepHandler(mockConfig, nil, mockLogger).(*SetupStepHandler)
+	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
 
 	// Test Execute with nil client
 	config := interfaces.StepConfig{
@@ -138,8 +138,7 @@ func TestSetupStepHandler_Execute(t *testing.T) {
 		Required: true,
 	}
 
-	mockLogger.EXPECT().Info("Starting setup step", "step", "setup", "timeout", config.Timeout, "required", config.Required).Return()
-	mockLogger.EXPECT().Error("Dagger client not available").Return()
+	// Logger is used directly via logger.L() - no need to mock
 
 	err := handler.Execute(t.Context(), "setup", config)
 	require.Error(t, err)
@@ -151,11 +150,11 @@ func TestSetupStepHandler_Execute_WithClient(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
 	// Use nil for dagger client since it's an external dependency
 	var mockClient *dagger.Client
-	handler := NewSetupStepHandler(mockConfig, mockClient, mockLogger).(*SetupStepHandler)
+	handler := NewSetupStepHandler(mockConfig, mockClient).(*SetupStepHandler)
 
 	// Test Execute with client
 	config := interfaces.StepConfig{
@@ -164,8 +163,7 @@ func TestSetupStepHandler_Execute_WithClient(t *testing.T) {
 		Required: true,
 	}
 
-	mockLogger.EXPECT().Info("Starting setup step", "step", "setup", "timeout", config.Timeout, "required", config.Required).Return()
-	mockLogger.EXPECT().Error("Dagger client not available").Return()
+	// Logger is used directly via logger.L() - no need to mock
 
 	err := handler.Execute(t.Context(), "setup", config)
 	require.Error(t, err)
@@ -177,9 +175,9 @@ func TestSetupStepHandler_GetStepInfo(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSetupStepHandler(mockConfig, nil, mockLogger).(*SetupStepHandler)
+	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
 
 	// Test GetStepInfo
 	config := handler.GetStepInfo("setup")
@@ -203,9 +201,9 @@ func TestSetupStepHandler_Validate(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSetupStepHandler(mockConfig, nil, mockLogger).(*SetupStepHandler)
+	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
 
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "setup"}
@@ -224,9 +222,9 @@ func TestNewBuildStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBuildStepHandler(mockConfig, nil, mockLogger)
+	handler := NewBuildStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -236,9 +234,9 @@ func TestBuildStepHandler_CanHandle(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBuildStepHandler(mockConfig, nil, mockLogger).(*BuildStepHandler)
+	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
 
 	// Should handle build step
 	assert.True(t, handler.CanHandle("build"))
@@ -251,9 +249,9 @@ func TestBuildStepHandler_Execute(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBuildStepHandler(mockConfig, nil, mockLogger).(*BuildStepHandler)
+	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
 
 	// Test Execute
 	config := interfaces.StepConfig{Name: "build"}
@@ -270,9 +268,9 @@ func TestBuildStepHandler_Execute_DefaultGoVersion(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBuildStepHandler(mockConfig, nil, mockLogger).(*BuildStepHandler)
+	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
 
 	// Test Execute with empty Go version
 	config := interfaces.StepConfig{Name: "build"}
@@ -289,9 +287,9 @@ func TestBuildStepHandler_GetStepInfo(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBuildStepHandler(mockConfig, nil, mockLogger).(*BuildStepHandler)
+	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
 
 	// Test GetStepInfo
 	config := handler.GetStepInfo("build")
@@ -315,9 +313,9 @@ func TestBuildStepHandler_Validate(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewBuildStepHandler(mockConfig, nil, mockLogger).(*BuildStepHandler)
+	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
 
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "build"}
@@ -336,9 +334,9 @@ func TestNewTestStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewTestStepHandler(mockConfig, nil, mockLogger)
+	handler := NewTestStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -348,9 +346,9 @@ func TestTestStepHandler_CanHandle(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewTestStepHandler(mockConfig, nil, mockLogger).(*TestStepHandler)
+	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
 
 	// Should handle test step
 	assert.True(t, handler.CanHandle("test"))
@@ -363,9 +361,9 @@ func TestTestStepHandler_Execute(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewTestStepHandler(mockConfig, nil, mockLogger).(*TestStepHandler)
+	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
 
 	// Test Execute
 	config := interfaces.StepConfig{Name: "test"}
@@ -382,9 +380,9 @@ func TestTestStepHandler_GetStepInfo(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewTestStepHandler(mockConfig, nil, mockLogger).(*TestStepHandler)
+	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
 
 	// Test GetStepInfo
 	config := handler.GetStepInfo("test")
@@ -408,9 +406,9 @@ func TestTestStepHandler_Validate(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewTestStepHandler(mockConfig, nil, mockLogger).(*TestStepHandler)
+	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
 
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "test"}
@@ -429,9 +427,9 @@ func TestNewLintStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewLintStepHandler(mockConfig, nil, mockLogger)
+	handler := NewLintStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -441,9 +439,9 @@ func TestLintStepHandler_CanHandle(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewLintStepHandler(mockConfig, nil, mockLogger).(*LintStepHandler)
+	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
 
 	// Should handle lint step
 	assert.True(t, handler.CanHandle("lint"))
@@ -456,9 +454,9 @@ func TestLintStepHandler_Execute(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewLintStepHandler(mockConfig, nil, mockLogger).(*LintStepHandler)
+	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
 
 	// Test Execute
 	config := interfaces.StepConfig{Name: "lint"}
@@ -475,9 +473,9 @@ func TestLintStepHandler_GetStepInfo(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewLintStepHandler(mockConfig, nil, mockLogger).(*LintStepHandler)
+	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
 
 	// Test GetStepInfo
 	config := handler.GetStepInfo("lint")
@@ -501,9 +499,9 @@ func TestLintStepHandler_Validate(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewLintStepHandler(mockConfig, nil, mockLogger).(*LintStepHandler)
+	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
 
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "lint"}
@@ -522,9 +520,9 @@ func TestNewSecurityStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSecurityStepHandler(mockConfig, nil, mockLogger)
+	handler := NewSecurityStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -534,9 +532,9 @@ func TestSecurityStepHandler_CanHandle(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSecurityStepHandler(mockConfig, nil, mockLogger).(*SecurityStepHandler)
+	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
 
 	// Should handle security step
 	assert.True(t, handler.CanHandle("security"))
@@ -549,9 +547,9 @@ func TestSecurityStepHandler_Execute(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSecurityStepHandler(mockConfig, nil, mockLogger).(*SecurityStepHandler)
+	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
 
 	// Test Execute
 	config := interfaces.StepConfig{Name: "security"}
@@ -568,9 +566,9 @@ func TestSecurityStepHandler_GetStepInfo(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSecurityStepHandler(mockConfig, nil, mockLogger).(*SecurityStepHandler)
+	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
 
 	// Test GetStepInfo
 	config := handler.GetStepInfo("security")
@@ -594,9 +592,9 @@ func TestSecurityStepHandler_Validate(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewSecurityStepHandler(mockConfig, nil, mockLogger).(*SecurityStepHandler)
+	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
 
 	// Test Validate with correct step name
 	config := interfaces.StepConfig{Name: "security"}
@@ -615,9 +613,9 @@ func TestNewTagStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewTagStepHandler(mockConfig, nil, mockLogger)
+	handler := NewTagStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -627,9 +625,9 @@ func TestNewPackageStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewPackageStepHandler(mockConfig, nil, mockLogger)
+	handler := NewPackageStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -639,9 +637,9 @@ func TestNewPushStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewPushStepHandler(mockConfig, nil, mockLogger)
+	handler := NewPushStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }
@@ -651,9 +649,9 @@ func TestNewReleaseStepHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	// Logger is used directly via logger.L() - no need to mock
 
-	handler := NewReleaseStepHandler(mockConfig, nil, mockLogger)
+	handler := NewReleaseStepHandler(mockConfig, nil)
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*interfaces.StepHandler)(nil), handler)
 }

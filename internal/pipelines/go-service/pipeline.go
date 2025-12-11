@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
@@ -166,7 +167,7 @@ func (p *Pipeline) Test(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
-	fmt.Println("🧪 running tests for Go microservice...")
+	logger.L().InfoContext(ctx, "Running tests for Go microservice")
 	// Extract real types for shared functions (only if using adapter, not mocks)
 	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
 		realClient := adapter.GetRealClient()
@@ -191,7 +192,7 @@ func (p *Pipeline) Lint(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
-	fmt.Println("🔍 Running golangci-lint on Go microservice...")
+	logger.L().InfoContext(ctx, "Running golangci-lint on Go microservice")
 	// Extract real types for shared functions (only if using adapter, not mocks)
 	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
 		realClient := adapter.GetRealClient()
@@ -222,7 +223,7 @@ func (p *Pipeline) Lint(ctx context.Context) error {
 				return fmt.Errorf("golangci-lint found issues: %w", err)
 			}
 
-			fmt.Println("✅ Linting completed successfully")
+			logger.L().InfoContext(ctx, "Linting completed successfully")
 			return nil
 		}
 	}
@@ -242,7 +243,7 @@ func (p *Pipeline) Vuln(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
-	fmt.Println("🔒 Running vulnerability scan on Go microservice...")
+	logger.L().InfoContext(ctx, "Running vulnerability scan on Go microservice")
 	// Extract real types for shared functions (only if using adapter, not mocks)
 	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
 		realClient := adapter.GetRealClient()
@@ -292,7 +293,7 @@ func (p *Pipeline) Vuln(ctx context.Context) error {
 				return fmt.Errorf("security vulnerabilities detected:\n%s", output)
 			}
 
-			fmt.Println("✅ No security vulnerabilities found")
+			logger.L().InfoContext(ctx, "No security vulnerabilities found")
 			return nil
 		}
 	}
@@ -335,12 +336,12 @@ func (p *Pipeline) Build(ctx context.Context) error {
 	case BuildModeBinary:
 		return p.buildBinary(ctx, realClient, realSrc, goVersion)
 	case BuildModeDocker:
-		return p.buildDocker(ctx, realClient, realSrc)
+		return p.buildDocker(ctx, realSrc)
 	case BuildModeBoth:
 		if err := p.buildBinary(ctx, realClient, realSrc, goVersion); err != nil {
 			return fmt.Errorf("failed to build binary: %w", err)
 		}
-		return p.buildDocker(ctx, realClient, realSrc)
+		return p.buildDocker(ctx, realSrc)
 	default:
 		// Default to binary build
 		return p.buildBinary(ctx, realClient, realSrc, goVersion)
@@ -364,7 +365,7 @@ func (p *Pipeline) buildBinary(ctx context.Context, client *dagger.Client, src *
 	if err != nil {
 		return fmt.Errorf("failed to build Go binary: %w", err)
 	}
-	fmt.Printf("✅ Binary built successfully at %s\n", outPath)
+	logger.L().InfoContext(ctx, "Binary built successfully", "out_path", outPath)
 	return nil
 }
 
@@ -373,20 +374,19 @@ func (p *Pipeline) buildBinary(ctx context.Context, client *dagger.Client, src *
 //
 // Parameters:
 //   - ctx: The context for managing execution.
-//   - client: The Dagger client for container operations.
 //   - src: The source directory containing the Dockerfile.
 //
 // Returns:
 //   - An error if the build process fails, otherwise nil.
-func (p *Pipeline) buildDocker(ctx context.Context, client *dagger.Client, src *dagger.Directory) error {
-	fmt.Println("🔧 Building Docker image...")
+func (p *Pipeline) buildDocker(ctx context.Context, src *dagger.Directory) error {
+	logger.L().InfoContext(ctx, "Building Docker image")
 
 	// Build Docker image from source directory (contains Dockerfile)
 	// This is the functionality from docker-go pipeline
 	image := src.DockerBuild()
 	p.Image = image
 
-	fmt.Println("✅ Docker image built successfully")
+	logger.L().InfoContext(ctx, "Docker image built successfully")
 	return nil
 }
 
@@ -409,12 +409,12 @@ func (p *Pipeline) Package(ctx context.Context) error {
 		if p.Image == nil {
 			return errors.New("Docker image not built - run Build step first")
 		}
-		fmt.Println("✅ Docker image already built in Build step")
+		logger.L().InfoContext(ctx, "Docker image already built in Build step")
 		return nil
 	}
 
 	// For Binary or Both modes, create Docker image from binary
-	fmt.Println("📦 Packaging Go binary into Docker image...")
+	logger.L().InfoContext(ctx, "Packaging Go binary into Docker image")
 
 	adapter, ok := p.Client.(*pipelines.DaggerAdapter)
 	if !ok {
@@ -437,7 +437,7 @@ func (p *Pipeline) Package(ctx context.Context) error {
 		WithEntrypoint([]string{"/app"})
 
 	p.Image = image
-	fmt.Println("✅ Docker image created successfully")
+	logger.L().InfoContext(ctx, "Docker image created successfully")
 	return nil
 }
 
@@ -449,7 +449,7 @@ func (p *Pipeline) Package(ctx context.Context) error {
 // Returns:
 //   - An error if the tagging process fails, otherwise nil.
 func (p *Pipeline) Tag(ctx context.Context) error {
-	fmt.Println("🧪 Generating tag...")
+	logger.L().InfoContext(ctx, "Generating tag")
 	// Extract real types for shared functions (only if using adapter, not mocks)
 	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
 		realClient := adapter.GetRealClient()
@@ -459,7 +459,7 @@ func (p *Pipeline) Tag(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("❌ Error generating tag: %w", err)
 			}
-			fmt.Printf("✅ Tag generated: %s\n", tag)
+			logger.L().InfoContext(ctx, "Tag generated", "tag", tag)
 			return nil
 		}
 	}
@@ -480,7 +480,7 @@ func (p *Pipeline) Push(ctx context.Context) error {
 		return errors.New("no image to push - run Package step first")
 	}
 
-	fmt.Println("📤 Pushing Docker image to registry...")
+	logger.L().InfoContext(ctx, "Pushing Docker image to registry")
 
 	// Extract real types for shared functions (only if using adapter, not mocks)
 	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
@@ -525,12 +525,12 @@ func (p *Pipeline) Push(ctx context.Context) error {
 			if token := os.Getenv("GITHUB_TOKEN"); token != "" {
 				username = "x-access-token"
 				secret = realClient.SetSecret("github-token", token)
-				fmt.Println("🔐 using GitHub CI authentication")
+				logger.L().InfoContext(ctx, "Using GitHub CI authentication")
 			} else if token := os.Getenv("CI_JOB_TOKEN"); token != "" {
 				// GitLab CI token
 				username = "gitlab-ci-token"
 				secret = realClient.SetSecret("ci-job-token", token)
-				fmt.Println("🔐 using GitLab CI authentication")
+				logger.L().InfoContext(ctx, "Using GitLab CI authentication")
 			} else {
 				return errors.New("no CI token available (GITHUB_TOKEN or CI_JOB_TOKEN)")
 			}
@@ -545,7 +545,7 @@ func (p *Pipeline) Push(ctx context.Context) error {
 				return errors.New("registry password not configured for local environment")
 			}
 			secret = realClient.SetSecret("local-registry-password", password)
-			fmt.Println("🔐 using local authentication")
+			logger.L().InfoContext(ctx, "Using local authentication")
 		}
 
 		// Add registry authentication and publish
@@ -555,7 +555,7 @@ func (p *Pipeline) Push(ctx context.Context) error {
 			return fmt.Errorf("failed to publish image: %w", err)
 		}
 
-		fmt.Printf("✅ Image published successfully: %s\n", url)
+		logger.L().InfoContext(ctx, "Image published successfully", "url", url)
 		return nil
 	}
 	// For mocks, return an error indicating this requires real client

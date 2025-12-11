@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 	"dagger.io/dagger"
 
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/executors"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
@@ -37,51 +37,6 @@ var (
 	ErrPipelineNotFound           = errors.New("pipeline not found")
 	ErrInvalidConfiguration       = errors.New("invalid configuration")
 )
-
-// LoggerAdapter adapts slog to interfaces.Logger
-type LoggerAdapter struct {
-	logger *slog.Logger
-}
-
-// Debug logs a debug message
-func (l *LoggerAdapter) Debug(msg string, fields ...any) {
-	l.logger.Debug(msg, fields...)
-}
-
-// Info logs an info message
-func (l *LoggerAdapter) Info(msg string, fields ...any) {
-	l.logger.Info(msg, fields...)
-}
-
-// Warn logs a warning message
-func (l *LoggerAdapter) Warn(msg string, fields ...any) {
-	l.logger.Warn(msg, fields...)
-}
-
-// Error logs an error message
-func (l *LoggerAdapter) Error(msg string, fields ...any) {
-	l.logger.Error(msg, fields...)
-}
-
-// Fatal logs a fatal message
-func (l *LoggerAdapter) Fatal(msg string, fields ...any) {
-	l.logger.Error(msg, fields...)
-	// In a real implementation, this would call os.Exit(1)
-}
-
-// WithField adds a single field to the logger context
-func (l *LoggerAdapter) WithField(_ string, _ any) interfaces.Logger {
-	// For now, return the same logger since the API might be different
-	// This would need to be implemented based on the actual API
-	return l
-}
-
-// WithFields adds multiple fields to the logger context
-func (l *LoggerAdapter) WithFields(_ map[string]any) interfaces.Logger {
-	// For now, return the same logger since the API might be different
-	// This would need to be implemented based on the actual API
-	return l
-}
 
 // Container manages dependency injection for the application.
 type Container struct {
@@ -145,7 +100,9 @@ func (c *Container) Stop(_ context.Context) error {
 		if closer, ok := component.(interface{ Close() error }); ok {
 			if err := closer.Close(); err != nil {
 				// Log error but continue cleanup
-				fmt.Printf("Failed to close component %s: %v\n", name, err)
+				logger.L().ErrorContext(context.Background(), "Failed to close component",
+					"component", name,
+					"error", err)
 			}
 		}
 	}
@@ -253,8 +210,10 @@ func (c *Container) registerDaggerComponents() {
 
 			// Log retry attempt (if logger is available)
 			if attempt < maxRetries {
-				fmt.Printf("⚠️  Dagger connection attempt %d/%d failed: %v. Retrying...\n",
-					attempt+1, maxRetries+1, lastErr)
+				logger.L().WarnContext(ctx, "Dagger connection attempt failed, retrying",
+					"attempt", attempt+1,
+					"max_retries", maxRetries+1,
+					"error", lastErr)
 			}
 		}
 
@@ -292,7 +251,7 @@ func (c *Container) verifyDockerAvailable(ctx context.Context) error {
 
 	// Docker is available
 	if len(output) > 0 {
-		fmt.Printf("✅ Docker is available (version: %s)\n", strings.TrimSpace(string(output)))
+		logger.L().InfoContext(ctx, "Docker is available", "version", strings.TrimSpace(string(output)))
 	}
 	return nil
 }
@@ -325,32 +284,33 @@ func (c *Container) registerSecurityComponents() {
 	})
 }
 
-// CreateLogger creates a new logger instance using the configuration.
-func (c *Container) CreateLogger() *slog.Logger {
+// CreateLogger initializes go-kit-logger with configuration.
+func (c *Container) CreateLogger() error {
 	loggingConfig := c.config.Logging()
 
-	// Create a simple slog logger
-	opts := &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+	// Initialize go-kit-logger with configuration
+	opts := []func(*logger.Config){
+		logger.WithLevel(loggingConfig.Level),
 	}
 
-	if loggingConfig.Level == "debug" {
-		opts.Level = slog.LevelDebug
+	if loggingConfig.Format != "" {
+		opts = append(opts, logger.WithEncoding(loggingConfig.Format))
 	}
 
-	return slog.New(slog.NewTextHandler(os.Stdout, opts))
+	// Create logger with options
+	_ = logger.NewLogger(opts...)
+
+	return nil
 }
 
 // registerLoggingComponents registers logging-related components.
 func (c *Container) registerLoggingComponents() {
-	// Logger using Syntegrity go-kit-logger directly
-	c.Register("logger", func() (any, error) {
-		// Create logger using the CreateLogger method
-		logger := c.CreateLogger()
-
-		// Return logger adapter that implements interfaces.Logger
-		return &LoggerAdapter{logger: logger}, nil
-	})
+	// Initialize go-kit-logger
+	if err := c.CreateLogger(); err != nil {
+		// If logger initialization fails, use default logger
+		_ = logger.NewLogger()
+	}
+	// No need to register logger - use logger.L() directly throughout the codebase
 }
 
 // registerExecutorComponents registers executor-related components.
@@ -451,12 +411,10 @@ func (c *Container) GetLinter() (interfaces.Linter, error) {
 }
 
 // GetLogger implements LoggingProvider interface.
+// GetLogger is deprecated - use logger.L() directly from go-kit-logger
+// This method is kept for backward compatibility but returns nil
 func (c *Container) GetLogger() (interfaces.Logger, error) {
-	logger, err := c.Get("logger")
-	if err != nil {
-		return nil, err
-	}
-	return logger.(interfaces.Logger), nil
+	return nil, fmt.Errorf("GetLogger is deprecated - use logger.L() directly from go-kit-logger")
 }
 
 // GetConfiguration returns the configuration instance.
@@ -555,27 +513,27 @@ func NewLogger(config interfaces.Configuration) *Logger {
 
 // Debug logs a debug message.
 func (l *Logger) Debug(msg string, fields ...any) {
-	fmt.Printf("[DEBUG] %s %v\n", msg, fields)
+	logger.L().DebugContext(context.Background(), msg, fields...)
 }
 
 // Info logs an info message.
 func (l *Logger) Info(msg string, fields ...any) {
-	fmt.Printf("[INFO] %s %v\n", msg, fields)
+	logger.L().InfoContext(context.Background(), msg, fields...)
 }
 
 // Warn logs a warning message.
 func (l *Logger) Warn(msg string, fields ...any) {
-	fmt.Printf("[WARN] %s %v\n", msg, fields)
+	logger.L().WarnContext(context.Background(), msg, fields...)
 }
 
 // Error logs an error message.
 func (l *Logger) Error(msg string, fields ...any) {
-	fmt.Printf("[ERROR] %s %v\n", msg, fields)
+	logger.L().ErrorContext(context.Background(), msg, fields...)
 }
 
 // Fatal logs a fatal message and exits.
 func (l *Logger) Fatal(msg string, fields ...any) {
-	fmt.Printf("[FATAL] %s %v\n", msg, fields)
+	logger.L().ErrorContext(context.Background(), msg, fields...)
 	// In a real implementation, this would call os.Exit(1)
 }
 
@@ -598,12 +556,6 @@ func (c *Container) registerStepComponents() {
 		registry := NewStepRegistry()
 
 		// Get logger and dagger client
-		logger, err := c.Get("logger")
-		if err != nil {
-			return nil, fmt.Errorf("failed to get logger: %w", err)
-		}
-		log := logger.(*LoggerAdapter)
-
 		client, err := c.Get("daggerClient")
 		if err != nil {
 			// Dagger client might not be available, pass nil
@@ -614,16 +566,16 @@ func (c *Container) registerStepComponents() {
 			daggerClient = client.(*dagger.Client)
 		}
 
-		// Register default steps with logger and client
-		_ = registry.RegisterStep("setup", NewSetupStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("build", NewBuildStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("test", NewTestStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("lint", NewLintStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("security", NewSecurityStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("tag", NewTagStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("package", NewPackageStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("push", NewPushStepHandler(c.config, daggerClient, log))
-		_ = registry.RegisterStep("release", NewReleaseStepHandler(c.config, daggerClient, log))
+		// Register default steps with client (logger is used directly via logger.L())
+		_ = registry.RegisterStep("setup", NewSetupStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("build", NewBuildStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("test", NewTestStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("lint", NewLintStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("security", NewSecurityStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("tag", NewTagStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("package", NewPackageStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("push", NewPushStepHandler(c.config, daggerClient))
+		_ = registry.RegisterStep("release", NewReleaseStepHandler(c.config, daggerClient))
 
 		return registry, nil
 	})
@@ -845,7 +797,7 @@ func ConvertConfigToPipelinesConfig(cfg interfaces.Configuration) pipelines.Conf
 func NewGoServicePipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
 	// Validate configuration before conversion
 	if err := validateConvertedConfig(cfg); err != nil {
-		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
+		logger.L().WarnContext(context.Background(), "Configuration validation warning", "error", err)
 	}
 	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
 	pipeline := goservice.New(client, pipelineConfig)
@@ -855,7 +807,7 @@ func NewGoServicePipeline(client *dagger.Client, cfg interfaces.Configuration) i
 func NewInfraPipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
 	// Validate configuration before conversion
 	if err := validateConvertedConfig(cfg); err != nil {
-		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
+		logger.L().WarnContext(context.Background(), "Configuration validation warning", "error", err)
 	}
 	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
 	pipeline := infra.New(client, pipelineConfig)

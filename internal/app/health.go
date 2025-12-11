@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 )
 
@@ -165,7 +166,7 @@ func RunHealthChecks(ctx context.Context, cfg interfaces.Configuration) error {
 		if err := CheckDaggerEngine(ctx, client); err != nil {
 			errors = append(errors, fmt.Errorf("Dagger engine check failed: %w", err))
 		} else {
-			fmt.Println("✅ Dagger engine is accessible")
+			logger.L().InfoContext(ctx, "Dagger engine is accessible")
 		}
 	}
 
@@ -177,10 +178,10 @@ func RunHealthChecks(ctx context.Context, cfg interfaces.Configuration) error {
 		if err := CheckRegistry(ctx, registryURL, user, pass); err != nil {
 			errors = append(errors, fmt.Errorf("registry check failed: %w", err))
 		} else {
-			fmt.Printf("✅ Registry is accessible: %s\n", registryURL)
+			logger.L().InfoContext(ctx, "Registry is accessible", "registry_url", registryURL)
 		}
 	} else {
-		fmt.Println("⏭️  Registry check skipped (not configured)")
+		logger.L().InfoContext(ctx, "Registry check skipped (not configured)")
 	}
 
 	// Check Git repository if configured
@@ -189,10 +190,10 @@ func RunHealthChecks(ctx context.Context, cfg interfaces.Configuration) error {
 		if err := CheckGitRepo(ctx, gitRepo); err != nil {
 			errors = append(errors, fmt.Errorf("Git repository check failed: %w", err))
 		} else {
-			fmt.Printf("✅ Git repository is accessible: %s\n", gitRepo)
+			logger.L().InfoContext(ctx, "Git repository is accessible", "git_repo", gitRepo)
 		}
 	} else {
-		fmt.Println("⏭️  Git repository check skipped (not configured)")
+		logger.L().InfoContext(ctx, "Git repository check skipped (not configured)")
 	}
 
 	if len(errors) > 0 {
@@ -211,5 +212,3 @@ func GetDaggerClientFromConfig(ctx context.Context, cfg interfaces.Configuration
 	}
 	return client, nil
 }
-
-

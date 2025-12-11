@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 )
 
 // extractHostFromRepoURL extracts the host from a repository URL.
@@ -100,7 +101,7 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 	if opts.Repo == "" {
 		return nil, errors.New("invalid repository URL: repo is empty")
 	}
-	fmt.Printf("🔧 Cloning repo (HTTPS): %s (%s)\n", opts.Name, opts.Branch)
+	logger.L().InfoContext(ctx, "Cloning repo (HTTPS)", "name", opts.Name, "branch", opts.Branch)
 
 	// Get and validate credentials
 	creds, err := ResolveGitCredentials()
@@ -164,7 +165,7 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 	var lastErr error
 	for i := 0; i < c.opts.MaxRetries; i++ {
 		if i > 0 {
-			fmt.Printf("Retrying clone (attempt %d/%d)...\n", i+1, c.opts.MaxRetries)
+			logger.L().InfoContext(ctx, "Retrying clone", "attempt", i+1, "max_retries", c.opts.MaxRetries)
 			time.Sleep(c.opts.RetryDelay)
 		}
 
@@ -185,7 +186,7 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 			continue
 		}
 
-		fmt.Println("✅ Repository cloned successfully")
+		logger.L().InfoContext(ctx, "Repository cloned successfully")
 		return dir, nil
 	}
 

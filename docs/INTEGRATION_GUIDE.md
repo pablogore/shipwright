@@ -173,16 +173,24 @@ Los stages disponibles dependen del tipo de pipeline:
 
 ### Configuración Personalizada
 
-Crea un archivo `.syntegrity-dagger.yml` en la raíz de tu proyecto:
+**⚠️ Importante para CI/CD**: Si defines `steps` en el YAML y ejecutas el pipeline completo, todos los steps se ejecutarán en un solo step de GitHub Actions, lo que dificulta la visualización y debugging.
+
+**Recomendación para CI/CD**: Ejecuta cada step individualmente en jobs separados (ver ejemplo arriba) en lugar de usar el pipeline completo con steps definidos en YAML.
+
+El archivo `.syntegrity-dagger.yml` es útil principalmente para:
+- **Ejecución local** (desarrollo en tu máquina)
+- **Configuración de valores por defecto** (coverage, go_version, etc.)
+- **NO para definir el orden de steps en CI/CD** (usa jobs separados en GitHub Actions)
+
+Ejemplo de `.syntegrity-dagger.yml`:
 
 ```yaml
 pipeline:
   name: go-kit
-  steps:
-    - setup
-    - build
-    - test
+  # ⚠️ NO uses 'steps' aquí si ejecutas en CI/CD
+  # En su lugar, ejecuta steps individuales en GitHub Actions
   coverage: 90
+  go_version: "1.25.5"
   skip_push: false
 
 service:

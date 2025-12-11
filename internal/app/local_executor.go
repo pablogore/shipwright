@@ -8,26 +8,25 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 )
 
 // LocalExecutor executes pipeline steps locally without Docker
 type LocalExecutor struct {
-	logger interfaces.Logger
 	config interfaces.Configuration
 }
 
 // NewLocalExecutor creates a new local executor
-func NewLocalExecutor(logger interfaces.Logger, config interfaces.Configuration) *LocalExecutor {
+func NewLocalExecutor(config interfaces.Configuration) *LocalExecutor {
 	return &LocalExecutor{
-		logger: logger,
 		config: config,
 	}
 }
 
 // ExecuteStep executes a pipeline step locally
 func (le *LocalExecutor) ExecuteStep(ctx context.Context, stepName string) error {
-	le.logger.Info("Executing step locally", "step", stepName)
+	logger.L().InfoContext(ctx, "Executing step locally", "step", stepName)
 
 	// List of supported steps in local mode
 	supportedSteps := map[string]bool{
@@ -49,7 +48,7 @@ func (le *LocalExecutor) ExecuteStep(ctx context.Context, stepName string) error
 		}
 
 		if cloudOnlySteps[stepName] {
-			le.logger.Warn("Step requires cloud services and is skipped in local mode", "step", stepName)
+			logger.L().WarnContext(ctx, "Step requires cloud services and is skipped in local mode", "step", stepName)
 			return nil // Skip silently in local mode
 		}
 
@@ -74,7 +73,7 @@ func (le *LocalExecutor) ExecuteStep(ctx context.Context, stepName string) error
 
 // executeSetup performs local setup
 func (le *LocalExecutor) executeSetup(ctx context.Context) error {
-	le.logger.Info("Setting up local environment")
+	logger.L().InfoContext(ctx, "Setting up local environment")
 
 	// Check if we're in a Go project
 	if !le.isGoProject() {
@@ -82,7 +81,7 @@ func (le *LocalExecutor) executeSetup(ctx context.Context) error {
 	}
 
 	// Download dependencies
-	le.logger.Info("Downloading Go dependencies")
+	logger.L().InfoContext(ctx, "Downloading Go dependencies")
 	cmd := exec.CommandContext(ctx, "go", "mod", "download")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -92,7 +91,7 @@ func (le *LocalExecutor) executeSetup(ctx context.Context) error {
 	}
 
 	// Tidy modules
-	le.logger.Info("Tidying Go modules")
+	logger.L().InfoContext(ctx, "Tidying Go modules")
 	cmd = exec.CommandContext(ctx, "go", "mod", "tidy")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -101,13 +100,13 @@ func (le *LocalExecutor) executeSetup(ctx context.Context) error {
 		return fmt.Errorf("failed to tidy modules: %w", err)
 	}
 
-	le.logger.Info("Setup completed successfully")
+	logger.L().InfoContext(ctx, "Setup completed successfully")
 	return nil
 }
 
 // executeBuild performs local build
 func (le *LocalExecutor) executeBuild(ctx context.Context) error {
-	le.logger.Info("Building application locally")
+	logger.L().InfoContext(ctx, "Building application locally")
 
 	if !le.isGoProject() {
 		return errors.New("not a Go project - build step requires Go modules")
@@ -122,13 +121,13 @@ func (le *LocalExecutor) executeBuild(ctx context.Context) error {
 		return fmt.Errorf("failed to build application: %w", err)
 	}
 
-	le.logger.Info("Build completed successfully")
+	logger.L().InfoContext(ctx, "Build completed successfully")
 	return nil
 }
 
 // executeTest performs local testing
 func (le *LocalExecutor) executeTest(ctx context.Context) error {
-	le.logger.Info("Running tests locally")
+	logger.L().InfoContext(ctx, "Running tests locally")
 
 	if !le.isGoProject() {
 		return errors.New("not a Go project - test step requires Go modules")
@@ -136,7 +135,7 @@ func (le *LocalExecutor) executeTest(ctx context.Context) error {
 
 	// Run tests with coverage
 	coverageThreshold := le.getCoverageThreshold()
-	le.logger.Info("Running tests with coverage", "threshold", coverageThreshold)
+	logger.L().InfoContext(ctx, "Running tests with coverage", "threshold", coverageThreshold)
 
 	// Create coverage directory if it doesn't exist
 	coverageDir := "coverage"
@@ -154,13 +153,13 @@ func (le *LocalExecutor) executeTest(ctx context.Context) error {
 	}
 
 	// Generate coverage report
-	le.logger.Info("Generating coverage report")
+	logger.L().InfoContext(ctx, "Generating coverage report")
 	cmd = exec.CommandContext(ctx, "go", "tool", "cover", "-html=coverage/coverage.out", "-o", "coverage/coverage.html")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		le.logger.Warn("Failed to generate HTML coverage report", "error", err)
+		logger.L().WarnContext(ctx, "Failed to generate HTML coverage report", "error", err)
 	}
 
 	// Check coverage threshold
@@ -168,20 +167,20 @@ func (le *LocalExecutor) executeTest(ctx context.Context) error {
 		return fmt.Errorf("coverage threshold not met: %w", err)
 	}
 
-	le.logger.Info("Tests completed successfully")
+	logger.L().InfoContext(ctx, "Tests completed successfully")
 	return nil
 }
 
 // executeLint performs local linting
 func (le *LocalExecutor) executeLint(ctx context.Context) error {
-	le.logger.Info("Running linters locally")
+	logger.L().InfoContext(ctx, "Running linters locally")
 
 	if !le.isGoProject() {
 		return errors.New("not a Go project - lint step requires Go modules")
 	}
 
 	// Run go vet
-	le.logger.Info("Running go vet")
+	logger.L().InfoContext(ctx, "Running go vet")
 	cmd := exec.CommandContext(ctx, "go", "vet", "./...")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -191,7 +190,7 @@ func (le *LocalExecutor) executeLint(ctx context.Context) error {
 	}
 
 	// Run go fmt check
-	le.logger.Info("Checking code formatting")
+	logger.L().InfoContext(ctx, "Checking code formatting")
 	cmd = exec.CommandContext(ctx, "bash", "-c", "test -z \"$(go fmt ./...)\"")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -202,26 +201,26 @@ func (le *LocalExecutor) executeLint(ctx context.Context) error {
 
 	// Try to run golangci-lint if available
 	if le.isCommandAvailable("golangci-lint") {
-		le.logger.Info("Running golangci-lint")
+		logger.L().InfoContext(ctx, "Running golangci-lint")
 		cmd = exec.CommandContext(ctx, "golangci-lint", "run")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err != nil {
-			le.logger.Warn("golangci-lint found issues", "error", err)
+			logger.L().WarnContext(ctx, "golangci-lint found issues", "error", err)
 			// Don't fail the build for linting issues in local mode
 		}
 	} else {
-		le.logger.Info("golangci-lint not available - skipping advanced linting")
+		logger.L().InfoContext(ctx, "golangci-lint not available - skipping advanced linting")
 	}
 
-	le.logger.Info("Linting completed successfully")
+	logger.L().InfoContext(ctx, "Linting completed successfully")
 	return nil
 }
 
 // executeSecurity performs local security checks
 func (le *LocalExecutor) executeSecurity(ctx context.Context) error {
-	le.logger.Info("Running security checks locally")
+	logger.L().InfoContext(ctx, "Running security checks locally")
 
 	if !le.isGoProject() {
 		return errors.New("not a Go project - security step requires Go modules")
@@ -229,35 +228,35 @@ func (le *LocalExecutor) executeSecurity(ctx context.Context) error {
 
 	// Try to run gosec if available
 	if le.isCommandAvailable("gosec") {
-		le.logger.Info("Running gosec security scanner")
+		logger.L().InfoContext(ctx, "Running gosec security scanner")
 		cmd := exec.CommandContext(ctx, "gosec", "./...")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err != nil {
-			le.logger.Warn("gosec found security issues", "error", err)
+			logger.L().WarnContext(ctx, "gosec found security issues", "error", err)
 			// Don't fail the build for security issues in local mode
 		}
 	} else {
-		le.logger.Info("gosec not available - skipping security scanning")
+		logger.L().InfoContext(ctx, "gosec not available - skipping security scanning")
 	}
 
 	// Try to run govulncheck if available (Go 1.18+)
 	if le.isCommandAvailable("govulncheck") {
-		le.logger.Info("Running govulncheck")
+		logger.L().InfoContext(ctx, "Running govulncheck")
 		cmd := exec.CommandContext(ctx, "govulncheck", "./...")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err != nil {
-			le.logger.Warn("govulncheck found vulnerabilities", "error", err)
+			logger.L().WarnContext(ctx, "govulncheck found vulnerabilities", "error", err)
 			// Don't fail the build for vulnerabilities in local mode
 		}
 	} else {
-		le.logger.Info("govulncheck not available - skipping vulnerability check")
+		logger.L().InfoContext(ctx, "govulncheck not available - skipping vulnerability check")
 	}
 
-	le.logger.Info("Security checks completed successfully")
+	logger.L().InfoContext(ctx, "Security checks completed successfully")
 	return nil
 }
 
@@ -289,7 +288,7 @@ func (le *LocalExecutor) getCoverageThreshold() float64 {
 func (le *LocalExecutor) checkCoverageThreshold(ctx context.Context, threshold float64) error {
 	coverageFile := "coverage/coverage.out"
 	if _, err := os.Stat(coverageFile); os.IsNotExist(err) {
-		le.logger.Warn("Coverage file not found - skipping threshold check")
+		logger.L().WarnContext(ctx, "Coverage file not found - skipping threshold check")
 		return nil
 	}
 
@@ -308,7 +307,7 @@ func (le *LocalExecutor) checkCoverageThreshold(ctx context.Context, threshold f
 			if len(parts) >= 3 {
 				var coverage float64
 				if _, err := fmt.Sscanf(parts[2], "%f%%", &coverage); err == nil {
-					le.logger.Info("Coverage check", "current", coverage, "threshold", threshold)
+					logger.L().InfoContext(ctx, "Coverage check", "current", coverage, "threshold", threshold)
 					if coverage < threshold {
 						return fmt.Errorf("coverage %.2f%% is below threshold %.2f%%", coverage, threshold)
 					}
@@ -318,6 +317,6 @@ func (le *LocalExecutor) checkCoverageThreshold(ctx context.Context, threshold f
 		}
 	}
 
-	le.logger.Warn("Could not parse coverage percentage - skipping threshold check")
+	logger.L().WarnContext(ctx, "Could not parse coverage percentage - skipping threshold check")
 	return nil
 }

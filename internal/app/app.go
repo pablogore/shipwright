@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 )
 
@@ -33,9 +33,10 @@ func Initialize(ctx context.Context, cfg interfaces.Configuration) error {
 	containerOnce.Do(func() {
 		container := NewContainer(ctx, cfg)
 
-		// Initialize and set global logger
-		logger := container.CreateLogger()
-		slog.SetDefault(logger)
+		// Initialize logger (go-kit-logger is initialized in registerLoggingComponents)
+		if err := container.CreateLogger(); err != nil {
+			// Logger initialization error is non-fatal, continue with default logger
+		}
 
 		if err := container.Start(ctx); err != nil {
 			initErr = fmt.Errorf("failed to start container: %w", err)
@@ -89,23 +90,13 @@ func NewApp(container *Container) *App {
 
 // Start starts the application.
 func (a *App) Start(ctx context.Context) error {
-	logger, err := a.container.GetLogger()
-	if err != nil {
-		return fmt.Errorf("failed to get logger: %w", err)
-	}
-
-	logger.Info("Starting Syntegrity Dagger application...")
+	logger.L().InfoContext(ctx, "Starting Syntegrity Dagger application...")
 	return a.container.Start(ctx)
 }
 
 // Stop stops the application.
 func (a *App) Stop(ctx context.Context) error {
-	logger, err := a.container.GetLogger()
-	if err != nil {
-		return fmt.Errorf("failed to get logger: %w", err)
-	}
-
-	logger.Info("Stopping Syntegrity Dagger application...")
+	logger.L().InfoContext(ctx, "Stopping Syntegrity Dagger application...")
 	return a.container.Stop(ctx)
 }
 
@@ -116,12 +107,7 @@ func (a *App) GetContainer() *Container {
 
 // RunPipeline executes a pipeline with the given name.
 func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
-	logger, err := a.container.GetLogger()
-	if err != nil {
-		return fmt.Errorf("failed to get logger: %w", err)
-	}
-
-	logger.Info("Running pipeline", "name", pipelineName)
+	logger.L().InfoContext(ctx, "Running pipeline", "name", pipelineName)
 
 	// Get pipeline once to determine available steps
 	initialPipeline, err := a.container.GetPipeline(pipelineName)
@@ -133,7 +119,7 @@ func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
 	steps := initialPipeline.GetAvailableSteps()
 
 	for _, step := range steps {
-		logger.Info("Executing pipeline step", "step", step)
+		logger.L().InfoContext(ctx, "Executing pipeline step", "step", step)
 
 		// Get a fresh pipeline instance before each step to ensure
 		// we have a valid Dagger client (connection may be lost between steps)
@@ -147,21 +133,16 @@ func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
 			return fmt.Errorf("pipeline step %s failed: %w", step, stepErr)
 		}
 
-		logger.Info("Pipeline step completed", "step", step)
+		logger.L().InfoContext(ctx, "Pipeline step completed", "step", step)
 	}
 
-	logger.Info("Pipeline completed successfully", "name", pipelineName)
+	logger.L().InfoContext(ctx, "Pipeline completed successfully", "name", pipelineName)
 	return nil
 }
 
 // RunPipelineStep executes a single pipeline step.
 func (a *App) RunPipelineStep(ctx context.Context, pipelineName, step string) error {
-	logger, err := a.container.GetLogger()
-	if err != nil {
-		return fmt.Errorf("failed to get logger: %w", err)
-	}
-
-	logger.Info("Running pipeline step", "pipeline", pipelineName, "step", step)
+	logger.L().InfoContext(ctx, "Running pipeline step", "pipeline", pipelineName, "step", step)
 
 	pipeline, err := a.container.GetPipeline(pipelineName)
 	if err != nil {
@@ -174,7 +155,7 @@ func (a *App) RunPipelineStep(ctx context.Context, pipelineName, step string) er
 		return fmt.Errorf("pipeline step %s failed: %w", step, stepErr)
 	}
 
-	logger.Info("Pipeline step completed successfully", "pipeline", pipelineName, "step", step)
+	logger.L().InfoContext(ctx, "Pipeline step completed successfully", "pipeline", pipelineName, "step", step)
 	return nil
 }
 

@@ -1,10 +1,13 @@
 package shared
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 )
 
 // GitCredentials representa las credenciales para autenticación Git
@@ -78,7 +81,7 @@ func ResolveGitCredentials() (*GitCredentials, error) {
 	}
 
 	// 4. Modo anónimo (solo para repos públicos)
-	fmt.Println("⚠️  No credentials found, using anonymous access")
+	logger.L().WarnContext(context.Background(), "No credentials found, using anonymous access")
 	return &GitCredentials{
 		User:      "",
 		Token:     "",
@@ -92,8 +95,8 @@ func ResolveGitCredentials() (*GitCredentials, error) {
 func ValidateRequiredSecrets(operation string) error {
 	// Operations that require authentication
 	operationsRequiringAuth := map[string]bool{
-		"push":   true,
-		"tag":    true,
+		"push":    true,
+		"tag":     true,
 		"release": true,
 	}
 

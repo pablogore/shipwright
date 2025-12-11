@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"log/slog"
-
 	"dagger.io/dagger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
@@ -505,20 +503,15 @@ func TestContainer_GetLogger(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
 	ctx := t.Context()
 
 	container := NewContainer(ctx, mockConfig)
 
-	// Register logger
-	container.Register("logger", func() (any, error) {
-		return mockLogger, nil
-	})
-
-	// Test GetLogger
+	// Test GetLogger - should return error as it's deprecated
 	logger, err := container.GetLogger()
-	require.NoError(t, err)
-	assert.Equal(t, mockLogger, logger)
+	require.Error(t, err)
+	assert.Nil(t, logger)
+	assert.Contains(t, err.Error(), "deprecated")
 }
 
 func TestContainer_GetLogger_Error(t *testing.T) {
@@ -530,11 +523,11 @@ func TestContainer_GetLogger_Error(t *testing.T) {
 
 	container := NewContainer(ctx, mockConfig)
 
-	// Test GetLogger without registration
+	// Test GetLogger - should return error as it's deprecated
 	logger, err := container.GetLogger()
 	require.Error(t, err)
 	assert.Nil(t, logger)
-	assert.Contains(t, err.Error(), "component not found")
+	assert.Contains(t, err.Error(), "deprecated")
 }
 
 func TestNewPipelineRegistry(t *testing.T) {
@@ -998,10 +991,7 @@ func TestContainer_registerStepComponents_Execution(t *testing.T) {
 	container := NewContainer(ctx, mockConfig)
 
 	// Register required dependencies first
-	container.Register("logger", func() (any, error) {
-		logger := slog.Default()
-		return &LoggerAdapter{logger: logger}, nil
-	})
+	// Logger is no longer registered - use logger.L() directly
 	container.Register("daggerClient", func() (any, error) {
 		return &dagger.Client{}, nil
 	})

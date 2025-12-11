@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 )
 
 // GenerateTag generates a tag and saves it on the host as .tag_name.
@@ -57,6 +58,6 @@ func saveTagLocally(tag string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("❌ could not save the tag to .tag_name: %w", err)
 	}
-	fmt.Printf("✅ Tag generated: %s\n", tag)
+	logger.L().InfoContext(context.Background(), "Tag generated", "tag", tag)
 	return tag, nil
 }

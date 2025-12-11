@@ -4,9 +4,9 @@ package infra
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
 )
@@ -77,7 +77,7 @@ func (s *SyntegrityInfraPipeline) Name() string {
 }
 
 func (s *SyntegrityInfraPipeline) Setup(ctx context.Context) error {
-	fmt.Println("🧪 Running go-kit tests syntegrity-infra.....")
+	logger.L().InfoContext(ctx, "Running tests for syntegrity-infra")
 
 	// Check if client is nil
 	if s.Client == nil {

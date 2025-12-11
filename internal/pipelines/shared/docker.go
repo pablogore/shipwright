@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 )
 
 // DockerDeployer encapsula la lógica para construir y publicar una imagen Docker.
@@ -31,7 +32,7 @@ func NewDockerDeployer(client *dagger.Client, imageName string, src *dagger.Dire
 
 // BuildAndPush construye la imagen y la publica en la registry.
 func (d *DockerDeployer) BuildAndPush(ctx context.Context) error {
-	fmt.Printf("🐳 Construyendo y publicando %s:%s...\n", d.ImageName, d.Tag)
+	logger.L().InfoContext(ctx, "Building and publishing Docker image", "image", d.ImageName, "tag", d.Tag)
 
 	// Build the Docker image from the source directory (which contains Dockerfile)
 	image := d.Source.DockerBuild()
@@ -45,6 +46,6 @@ func (d *DockerDeployer) BuildAndPush(ctx context.Context) error {
 		return fmt.Errorf("❌ error al publicar la imagen: %w", err)
 	}
 
-	fmt.Printf("✅ Imagen publicada: %s\n", ref)
+	logger.L().InfoContext(ctx, "Image published", "ref", ref)
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 )
 
 // GoBuilder encapsulates the logic for building Go binaries.
@@ -136,8 +137,10 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 		}
 
 		// Log retry attempt
-		fmt.Printf("⚠️  Build connection attempt %d/%d failed: %v. Retrying...\n",
-			attempt+1, maxRetries+1, err)
+		logger.L().WarnContext(ctx, "Build connection attempt failed, retrying",
+			"attempt", attempt+1,
+			"max_retries", maxRetries+1,
+			"error", err)
 	}
 
 	if err != nil {
@@ -182,8 +185,10 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 		}
 
 		// Log retry attempt
-		fmt.Printf("⚠️  Export connection attempt %d/%d failed: %v. Retrying...\n",
-			attempt+1, maxRetries+1, err)
+		logger.L().WarnContext(ctx, "Export connection attempt failed, retrying",
+			"attempt", attempt+1,
+			"max_retries", maxRetries+1,
+			"error", err)
 	}
 
 	if err != nil {

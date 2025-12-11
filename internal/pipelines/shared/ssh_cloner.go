@@ -8,12 +8,13 @@ import (
 	"os"
 
 	"dagger.io/dagger"
+	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 )
 
 type SSHCloner struct{}
 
 func (c *SSHCloner) Clone(ctx context.Context, client *dagger.Client, opts GitCloneOpts) (*dagger.Directory, error) {
-	fmt.Printf("🔧 Cloning repo (SSH): %s (%s)\n", opts.Name, opts.Branch)
+	logger.L().InfoContext(ctx, "Cloning repo (SSH)", "name", opts.Name, "branch", opts.Branch)
 
 	keyContent := os.Getenv("SSH_PRIVATE_KEY")
 
@@ -57,6 +58,6 @@ func (c *SSHCloner) Clone(ctx context.Context, client *dagger.Client, opts GitCl
 		return nil, errors.New("❌ repository cloned but is empty")
 	}
 
-	fmt.Println("✅ Repository cloned successfully")
+	logger.L().InfoContext(ctx, "Repository cloned successfully")
 	return dir, nil
 }
