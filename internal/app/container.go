@@ -14,9 +14,9 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
+	"github.com/getsyntegrity/syntegrity-dagger/internal/executors"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-	docker_go "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/docker-go"
 	goservice "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-service"
 	infra "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/infra"
 )
@@ -163,6 +163,7 @@ func (c *Container) registerComponents() {
 	c.registerPipelineComponents()
 	c.registerSecurityComponents()
 	c.registerLoggingComponents()
+	c.registerExecutorComponents()
 	c.registerStepComponents()
 	c.registerHookComponents()
 }
@@ -220,26 +221,8 @@ func (c *Container) registerDaggerComponents() {
 			// dagger.Connect() automatically manages the Dagger engine via Docker
 			client, lastErr = dagger.Connect(ctx, dagger.WithLogOutput(nil))
 			if lastErr == nil {
-				// Verify the connection works with a lightweight operation
-				verifyCtx, verifyCancel := context.WithTimeout(ctx, 5*time.Second)
-				_, verifyErr := client.Container().From("alpine:latest").ID(verifyCtx)
-				verifyCancel()
-				if verifyErr == nil {
-					return client, nil
-				}
-				// Connection established but verification failed
-				// Don't close immediately - the engine might still be starting
-				// Wait a bit and retry with the same client
-				lastErr = verifyErr
-				if attempt < maxRetries {
-					// Wait a bit longer for engine to be ready
-					select {
-					case <-ctx.Done():
-						return nil, fmt.Errorf("%w: context deadline exceeded", ErrFailedToCreateDaggerClient)
-					case <-time.After(2 * time.Second):
-						// Continue with retry
-					}
-				}
+				// Connection successful - Dagger handles connection management internally
+				return client, nil
 			}
 
 			// Log retry attempt (if logger is available)
@@ -295,8 +278,8 @@ func (c *Container) registerPipelineComponents() {
 
 		// Register default pipelines
 		registry.Register("go-service", NewGoServicePipeline)
-		registry.Register("docker-go", NewDockerGoPipeline)
 		registry.Register("infra", NewInfraPipeline)
+		// docker-go functionality has been merged into go-service
 
 		return registry, nil
 	})
@@ -343,6 +326,37 @@ func (c *Container) registerLoggingComponents() {
 	})
 }
 
+// registerExecutorComponents registers executor-related components.
+func (c *Container) registerExecutorComponents() {
+	// Executor Selector
+	c.Register("executorSelector", func() (any, error) {
+		selector := executors.NewSelector()
+
+		// Get Dagger client (may be nil)
+		client, err := c.Get("daggerClient")
+		var daggerClient *dagger.Client
+		if err == nil && client != nil {
+			daggerClient = client.(*dagger.Client)
+		}
+
+		// Convert config to pipelines.Config for executors
+		pipelineConfig := ConvertConfigToPipelinesConfig(c.config)
+
+		// Register native executor
+		nativeExecutor := executors.NewNativeExecutor(
+			c.config.Pipeline().GoVersion,
+			".",
+		)
+		selector.RegisterExecutor("native", nativeExecutor)
+
+		// Register Docker executor
+		dockerExecutor := executors.NewDockerExecutor(daggerClient, pipelineConfig)
+		selector.RegisterExecutor("docker", dockerExecutor)
+
+		return selector, nil
+	})
+}
+
 // GetPipelineRegistry implements PipelineProvider interface.
 func (c *Container) GetPipelineRegistry() (interfaces.PipelineRegistry, error) {
 	registry, err := c.Get("pipelineRegistry")
@@ -368,176 +382,16 @@ func (c *Container) GetPipeline(name string) (interfaces.Pipeline, error) {
 }
 
 // GetDaggerClient implements PipelineProvider interface.
-// It verifies the connection and reconnects if necessary to handle connection loss between steps.
+// Returns the cached Dagger client. Connection management is handled by Dagger internally.
 func (c *Container) GetDaggerClient() (*dagger.Client, error) {
 	client, err := c.Get("daggerClient")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get Dagger client: %w", err)
 	}
 	if client == nil {
 		return nil, errors.New("dagger client is nil")
 	}
-
-	daggerClient := client.(*dagger.Client)
-
-	// If client is nil, return error immediately (don't try to verify)
-	if daggerClient == nil {
-		return nil, errors.New("dagger client is nil")
-	}
-
-	// Verify connection and reconnect if lost
-	// This handles cases where connection is lost between pipeline steps
-	verifiedClient, err := c.verifyAndReconnectDaggerClient(c.ctx, daggerClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify/reconnect Dagger client: %w", err)
-	}
-
-	// If reconnection occurred, update the cached client
-	if verifiedClient != daggerClient {
-		c.cache["daggerClient"] = verifiedClient
-		// Reset the once to allow future reconnections if needed
-		c.once["daggerClient"] = &sync.Once{}
-	}
-
-	return verifiedClient, nil
-}
-
-// verifyAndReconnectDaggerClient verifies the Dagger client connection and reconnects if lost.
-func (c *Container) verifyAndReconnectDaggerClient(ctx context.Context, client *dagger.Client) (verifiedClient *dagger.Client, err error) {
-	// Check if client is nil
-	if client == nil {
-		return nil, errors.New("Dagger client is nil")
-	}
-
-	// Use recover to handle panics from mock clients or invalid clients
-	// This is a common pattern when dealing with mock clients in tests
-	defer func() {
-		if r := recover(); r != nil {
-			// If we get a panic, it's likely a mock client - return it as-is to allow tests to work
-			// The named return values will be used
-			verifiedClient = client
-			err = nil
-		}
-	}()
-
-	// Perform a lightweight operation to verify connectivity
-	// Use a timeout context to avoid hanging in tests or when client is invalid
-	verifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	// Try to verify the connection
-	// This will panic if the client is a mock or invalid
-	_, verifyErr := client.Container().From("alpine:latest").ID(verifyCtx)
-
-	// If we reach here, no panic occurred
-	// If verification succeeded, return the client
-	if verifyErr == nil {
-		return client, nil // Connection is valid
-	}
-
-	// If we got an error (not a panic), check if it's a connection error
-	err = verifyErr
-	errStr := strings.ToLower(err.Error())
-
-	// Check if it's a connection error
-	isConnectionErr := strings.Contains(errStr, "connection refused") ||
-		strings.Contains(errStr, "connection reset") ||
-		strings.Contains(errStr, "dial tcp") ||
-		strings.Contains(errStr, "read tcp") ||
-		strings.Contains(errStr, "write tcp") ||
-		strings.Contains(errStr, "context deadline exceeded") ||
-		strings.Contains(errStr, "broken pipe") ||
-		strings.Contains(errStr, "no connection could be made") ||
-		strings.Contains(errStr, "invalid memory address") ||
-		strings.Contains(errStr, "nil pointer")
-
-	// If it's not a connection error, return the client as-is (might be a mock or test client)
-	// This allows tests to work with mock clients
-	if !isConnectionErr {
-		// For non-connection errors (e.g., mock clients in tests), return the client as-is
-		// This prevents breaking tests that use mock clients
-		return client, nil
-	}
-
-	// Connection lost - attempt to reconnect
-	fmt.Printf("⚠️  Dagger connection lost, attempting to reconnect...\n")
-
-	// Verify Docker is still available before reconnecting
-	if err := c.verifyDockerAvailable(ctx); err != nil {
-		return nil, fmt.Errorf("Docker not available during reconnection: %w", err)
-	}
-
-	// Don't close the old client immediately - let Dagger handle it
-	// Closing the client can cause the engine to restart, which we want to avoid
-	// The new connection will use the same engine if it's still running
-
-	// Attempt to reconnect with retries
-	timeout := c.config.GetDuration("dagger.timeout")
-	if timeout == 0 {
-		timeout = 60 * time.Second
-	}
-
-	reconnectCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	maxRetries := 3
-	retryDelay := 2 * time.Second
-	var newClient *dagger.Client
-	var lastErr error
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Wait before retrying (exponential backoff)
-			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
-			if waitTime > 10*time.Second {
-				waitTime = 10 * time.Second // Cap at 10 seconds
-			}
-
-			select {
-			case <-reconnectCtx.Done():
-				return nil, fmt.Errorf("context deadline exceeded while reconnecting after %d attempts: %w", attempt, lastErr)
-			case <-time.After(waitTime):
-				// Continue with retry
-			}
-		}
-
-		// Connect to Dagger engine (which uses Docker)
-		newClient, lastErr = dagger.Connect(reconnectCtx, dagger.WithLogOutput(nil))
-		if lastErr == nil {
-			// Verify the new connection works with a lightweight operation
-			verifyCtx, verifyCancel := context.WithTimeout(reconnectCtx, 5*time.Second)
-			_, verifyErr := newClient.Container().From("alpine:latest").ID(verifyCtx)
-			verifyCancel()
-			if verifyErr == nil {
-				fmt.Printf("✅ Dagger connection reestablished successfully\n")
-				return newClient, nil
-			}
-			// New client verification failed - don't close immediately
-			// The engine might still be starting, wait a bit before retrying
-			lastErr = verifyErr
-			if attempt < maxRetries {
-				// Wait a bit longer for engine to be ready
-				select {
-				case <-reconnectCtx.Done():
-					return nil, fmt.Errorf("context deadline exceeded while reconnecting")
-				case <-time.After(2 * time.Second):
-					// Continue with retry
-				}
-			}
-		}
-
-		// Log retry attempt if there are more retries remaining
-		if attempt < maxRetries {
-			fmt.Printf("⚠️  Reconnection attempt %d/%d failed: %v. Retrying...\n",
-				attempt+1, maxRetries+1, lastErr)
-		}
-	}
-
-	// All reconnection attempts failed
-	return nil, fmt.Errorf("failed to reconnect to Dagger engine after %d attempts: %w. "+
-		"Ensure Dagger engine is running (try 'dagger run echo test' to verify). "+
-		"In GitHub Actions, ensure Docker service is available.",
-		maxRetries+1, lastErr)
+	return client.(*dagger.Client), nil
 }
 
 // GetRegistryConfig implements RegistryProvider interface.
@@ -926,8 +780,15 @@ func validateConvertedConfig(cfg interfaces.Configuration) error {
 	return nil
 }
 
-// convertConfig converts interfaces.Configuration to pipelines.Config
+// convertConfig is a private helper that converts interfaces.Configuration to pipelines.Config.
+// This is used internally and in tests.
 func convertConfig(cfg interfaces.Configuration) pipelines.Config {
+	return ConvertConfigToPipelinesConfig(cfg)
+}
+
+// ConvertConfigToPipelinesConfig converts interfaces.Configuration to pipelines.Config.
+// This function is exported to allow external packages to convert configuration.
+func ConvertConfigToPipelinesConfig(cfg interfaces.Configuration) pipelines.Config {
 	return pipelines.Config{
 		Env:           cfg.Environment(),
 		SkipPush:      cfg.GetBool("pipeline.skip_push"),
@@ -959,18 +820,8 @@ func NewGoServicePipeline(client *dagger.Client, cfg interfaces.Configuration) i
 	if err := validateConvertedConfig(cfg); err != nil {
 		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
 	}
-	pipelineConfig := convertConfig(cfg)
+	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
 	pipeline := goservice.New(client, pipelineConfig)
-	return NewPipelineAdapterWithConfig(pipeline, cfg)
-}
-
-func NewDockerGoPipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
-	// Validate configuration before conversion
-	if err := validateConvertedConfig(cfg); err != nil {
-		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
-	}
-	pipelineConfig := convertConfig(cfg)
-	pipeline := docker_go.New(client, pipelineConfig)
 	return NewPipelineAdapterWithConfig(pipeline, cfg)
 }
 
@@ -979,7 +830,7 @@ func NewInfraPipeline(client *dagger.Client, cfg interfaces.Configuration) inter
 	if err := validateConvertedConfig(cfg); err != nil {
 		fmt.Printf("⚠️  Configuration validation warning: %v\n", err)
 	}
-	pipelineConfig := convertConfig(cfg)
+	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
 	pipeline := infra.New(client, pipelineConfig)
 	return NewPipelineAdapterWithConfig(pipeline, cfg)
 }
