@@ -102,12 +102,19 @@ jobs:
     - name: Configure Git and Go for private repos
       env:
         SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
-        # Verify token is available
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
         if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
-          echo "❌ Error: SYNTEGRITY_DAGGER_TOKEN secret is not set"
-          exit 1
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+          else
+            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            exit 1
+          fi
         fi
         
         # Configure Go to treat getsyntegrity repos as private
@@ -157,14 +164,21 @@ jobs:
     - name: Download dependencies
       env:
         SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "📦 Downloading Go dependencies..."
         
-        # Verify token is available
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
         if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
-          echo "❌ Error: SYNTEGRITY_DAGGER_TOKEN secret is not set"
-          exit 1
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+          else
+            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            exit 1
+          fi
         fi
         
         # Re-ensure authentication is configured (in case cache restore cleared it)
