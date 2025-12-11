@@ -29,8 +29,10 @@ jobs:
   validate-release:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     # Only run if CI workflow completed successfully, or if triggered by tag push
+    # The branches filter in workflow_run already ensures this only runs for main branch
+    # We just need to check that CI completed successfully
     if: |
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
@@ -254,8 +256,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     # Only run if CI workflow completed successfully, or if triggered by tag push
+    # The branches filter in workflow_run already ensures this only runs for main branch
+    # We just need to check that CI completed successfully
     if: |
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     steps:
     - name: Checkout code
@@ -303,8 +307,10 @@ jobs:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     needs: [validate-release, build-and-test]
     # Only run if CI workflow completed successfully, or if triggered by tag push
+    # The branches filter in workflow_run already ensures this only runs for main branch
+    # We just need to check that CI completed successfully
     if: |
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     steps:
     - name: Checkout code
