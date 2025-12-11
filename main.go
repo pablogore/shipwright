@@ -55,14 +55,24 @@ func (c *CLI) Run(args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Load YAML configuration if specified
+	// Load YAML configuration if specified and file exists
+	// The config file is optional - if it doesn't exist, we use defaults
 	if flags.configFile != "" {
-		var yamlCfg *config.YAMLConfig
-		yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
-		if err != nil {
-			return fmt.Errorf("failed to load YAML configuration: %w", err)
+		// Check if file exists before trying to load it
+		if _, err := os.Stat(flags.configFile); err == nil {
+			var yamlCfg *config.YAMLConfig
+			yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
+			if err != nil {
+				return fmt.Errorf("failed to load YAML configuration: %w", err)
+			}
+			c.yamlConfig = yamlCfg
+		} else {
+			// File doesn't exist - this is OK, we'll use defaults
+			// Only warn if the user explicitly specified --config
+			if flags.configFile != ".syntegrity-dagger.yml" {
+				fmt.Printf("⚠️  Configuration file not found: %s (using defaults)\n", flags.configFile)
+			}
 		}
-		c.yamlConfig = yamlCfg
 	}
 
 	// Override configuration with CLI flags
@@ -594,14 +604,19 @@ func (c *CLI) runHealthChecks(ctx context.Context, flags *Flags) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Load YAML configuration if specified
+	// Load YAML configuration if specified and file exists
+	// The config file is optional - if it doesn't exist, we use defaults
 	if flags.configFile != "" {
-		var yamlCfg *config.YAMLConfig
-		yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
-		if err != nil {
-			return fmt.Errorf("failed to load YAML configuration: %w", err)
+		// Check if file exists before trying to load it
+		if _, err := os.Stat(flags.configFile); err == nil {
+			var yamlCfg *config.YAMLConfig
+			yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
+			if err != nil {
+				return fmt.Errorf("failed to load YAML configuration: %w", err)
+			}
+			c.yamlConfig = yamlCfg
 		}
-		c.yamlConfig = yamlCfg
+		// If file doesn't exist, silently use defaults (no error)
 	}
 
 	fmt.Println("🏥 Running health checks...")
