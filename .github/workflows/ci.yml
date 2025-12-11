@@ -104,6 +104,12 @@ jobs:
         SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
+        # Verify token is available
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          echo "❌ Error: SYNTEGRITY_DAGGER_TOKEN secret is not set"
+          exit 1
+        fi
+        
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
@@ -112,16 +118,18 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> ~/.netrc
+        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
-        # Configure Git authentication with token
-        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        # Configure Git authentication with token (escape special characters)
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
+        echo "Git URL config:"
+        git config --global --get-regexp url || echo "No URL config found"
         
     - name: Clean Go module cache
       run: |
@@ -152,18 +160,40 @@ jobs:
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "📦 Downloading Go dependencies..."
+        
+        # Verify token is available
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          echo "❌ Error: SYNTEGRITY_DAGGER_TOKEN secret is not set"
+          exit 1
+        fi
+        
         # Re-ensure authentication is configured (in case cache restore cleared it)
-        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        
+        # Re-create .netrc in case it was cleared
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        chmod 600 ~/.netrc
+        
+        # Test authentication before downloading
+        echo "Testing GitHub authentication..."
+        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          echo "✅ Authentication test successful"
+        else
+          echo "⚠️ Authentication test failed, but continuing..."
+        fi
         
         # Download dependencies with error handling
         if ! go mod download; then
           echo "❌ Failed to download dependencies"
           echo "Checking authentication configuration..."
           echo "GOPRIVATE: $(go env GOPRIVATE)"
-          git config --global --list | grep -i url || true
-          echo "Testing GitHub access..."
-          git ls-remote --heads https://github.com/getsyntegrity/go-kit-logger.git || true
+          echo "Git URL config:"
+          git config --global --get-regexp url || echo "No URL config found"
+          echo "Testing GitHub access with token..."
+          git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" || true
           exit 1
         fi
         echo "✅ Dependencies downloaded"
