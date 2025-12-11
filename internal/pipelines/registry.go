@@ -7,6 +7,12 @@ import (
 )
 
 // Package pipelines provides pipeline registry and registration logic.
+//
+// The registry manages available pipeline implementations. Default pipelines include:
+//   - go-service: Generic pipeline for Go microservices (supports binary, docker, and both build modes)
+//   - infra: Pipeline for infrastructure and deployment automation
+//
+// The docker-go pipeline functionality has been merged into go-service pipeline.
 
 // Registry centralizes the list of pipelines.
 // It maintains a map of pipeline names to their corresponding factory functions.

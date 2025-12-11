@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrated from go-kit logger to standard log/slog
 - Updated test assertions from assert to require
 - Improved error handling with structured errors
+- **Simplified Dagger connection management**: Removed manual reconnection logic from `GoBuilder` and `Container.GetDaggerClient()`. Dagger now handles connection management internally, reducing code complexity by ~300 lines and improving reliability
 
 ### Fixed
 - **Release automation** now works correctly when merging from develop to main
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed golangci-lint version compatibility
 - Resolved merge conflicts in CI/CD workflows
 - Fixed struct field naming conventions
+- **Removed unnecessary connection verification**: Eliminated redundant connection checks and manual reconnection logic that was causing complexity and potential race conditions. Dagger SDK now handles all connection lifecycle management automatically
 
 ## [0.0.2] - 2024-01-15
 

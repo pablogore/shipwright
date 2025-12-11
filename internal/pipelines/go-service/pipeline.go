@@ -20,15 +20,17 @@ import (
 // Fields:
 //   - Client: The Dagger client used for container operations.
 //   - Config: The configuration for the pipeline.
+//   - Options: Configurable options for the pipeline behavior.
 //   - Src: The source directory of the cloned repository.
 //   - Cloner: The cloner used for cloning the repository.
 //   - Image: The Docker image container built during the Package step.
 type Pipeline struct {
-	Client pipelines.DaggerClient
-	Config pipelines.Config
-	Src    pipelines.DaggerDirectory
-	Cloner shared.Cloner
-	Image  *dagger.Container
+	Client  pipelines.DaggerClient
+	Config  pipelines.Config
+	Options GoServiceOptions
+	Src     pipelines.DaggerDirectory
+	Cloner  shared.Cloner
+	Image   *dagger.Container
 }
 
 // New creates a new instance of Pipeline.
@@ -43,6 +45,9 @@ func New(client *dagger.Client, cfg pipelines.Config) pipelines.Pipeline {
 	var daggerClient pipelines.DaggerClient
 	var src pipelines.DaggerDirectory
 	var cloner shared.Cloner
+
+	// Parse options from configuration
+	options := parseGoServiceOptions(cfg)
 
 	// Handle nil client gracefully
 	if client != nil {
@@ -61,10 +66,11 @@ func New(client *dagger.Client, cfg pipelines.Config) pipelines.Pipeline {
 	// If client is nil, all fields will remain nil
 
 	return &Pipeline{
-		Client: daggerClient,
-		Config: cfg,
-		Src:    src,
-		Cloner: cloner,
+		Client:  daggerClient,
+		Config:  cfg,
+		Options: options,
+		Src:     src,
+		Cloner:  cloner,
 	}
 }
 
@@ -250,7 +256,7 @@ func (p *Pipeline) Vuln(ctx context.Context) error {
 			// Create a container with Go and install govulncheck
 			// Use golang image which includes Go toolchain
 			container := realClient.Container().
-				From("golang:" + goVersion).
+				From("golang:"+goVersion).
 				WithMountedDirectory("/app", realSrc).
 				WithWorkdir("/app").
 				WithEnvVariable("GO111MODULE", "on").
@@ -269,11 +275,11 @@ func (p *Pipeline) Vuln(ctx context.Context) error {
 				stderr, _ := container.
 					WithExec([]string{"govulncheck", "./..."}).
 					Stderr(ctx)
-				
+
 				// Check if vulnerabilities were found in the output
 				combinedOutput := output + stderr
-				if strings.Contains(combinedOutput, "Your code is affected") || 
-				   strings.Contains(combinedOutput, "Vulnerabilities found") {
+				if strings.Contains(combinedOutput, "Your code is affected") ||
+					strings.Contains(combinedOutput, "Vulnerabilities found") {
 					return fmt.Errorf("security vulnerabilities detected:\n%s", combinedOutput)
 				}
 				// If it's a different error, return it
@@ -281,8 +287,8 @@ func (p *Pipeline) Vuln(ctx context.Context) error {
 			}
 
 			// Check output for vulnerabilities even if exit code is 0
-			if strings.Contains(output, "Your code is affected") || 
-			   strings.Contains(output, "Vulnerabilities found") {
+			if strings.Contains(output, "Your code is affected") ||
+				strings.Contains(output, "Vulnerabilities found") {
 				return fmt.Errorf("security vulnerabilities detected:\n%s", output)
 			}
 
@@ -294,42 +300,99 @@ func (p *Pipeline) Vuln(ctx context.Context) error {
 	return errors.New("Vuln method requires real Dagger client, not mock")
 }
 
-// Build is a placeholder for the build step of the pipeline.
+// Build compiles the Go binary or builds the Docker image based on BuildMode.
 //
 // Parameters:
 //   - ctx: The context for managing execution.
 //
 // Returns:
-//   - Always returns nil as it is not implemented.
+//   - An error if the build process fails, otherwise nil.
 func (p *Pipeline) Build(ctx context.Context) error {
 	if p.Src == nil {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
+
 	// Extract real types for shared functions (only if using adapter, not mocks)
-	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
-		realClient := adapter.GetRealClient()
-		if srcAdapter, ok := p.Src.(*pipelines.DaggerDirectoryAdapter); ok {
-			realSrc := srcAdapter.GetRealDirectory()
-			goVersion := p.Config.GoVersion
-			if goVersion == "" {
-				goVersion = "1.25.5"
-			}
-			builder := shared.NewGoBuilder(realClient, realSrc, goVersion)
-			outPath := "bin/app"
-			_, err := builder.Build(ctx, outPath, outPath, map[string]string{"CGO_ENABLED": "0"})
-			if err != nil {
-				return fmt.Errorf("failed to build Go binary: %w", err)
-			}
-			fmt.Printf("✅ Binary built successfully at %s\n", outPath)
-			return nil
-		}
+	adapter, ok := p.Client.(*pipelines.DaggerAdapter)
+	if !ok {
+		return errors.New("Build method requires real Dagger client, not mock")
 	}
-	// For mocks, return an error indicating this requires real client
-	return errors.New("Build method requires real Dagger client, not mock")
+
+	realClient := adapter.GetRealClient()
+	srcAdapter, ok := p.Src.(*pipelines.DaggerDirectoryAdapter)
+	if !ok {
+		return errors.New("Build method requires real Dagger client, not mock")
+	}
+
+	realSrc := srcAdapter.GetRealDirectory()
+	goVersion := p.Config.GoVersion
+	if goVersion == "" {
+		goVersion = "1.25.5"
+	}
+
+	// Execute build based on BuildMode
+	switch p.Options.BuildMode {
+	case BuildModeBinary:
+		return p.buildBinary(ctx, realClient, realSrc, goVersion)
+	case BuildModeDocker:
+		return p.buildDocker(ctx, realClient, realSrc)
+	case BuildModeBoth:
+		if err := p.buildBinary(ctx, realClient, realSrc, goVersion); err != nil {
+			return fmt.Errorf("failed to build binary: %w", err)
+		}
+		return p.buildDocker(ctx, realClient, realSrc)
+	default:
+		// Default to binary build
+		return p.buildBinary(ctx, realClient, realSrc, goVersion)
+	}
 }
 
-// Package creates a Docker image from the built Go binary.
-// It reads the binary from bin/app and creates a minimal Docker image.
+// buildBinary builds the Go binary.
+//
+// Parameters:
+//   - ctx: The context for managing execution.
+//   - client: The Dagger client for container operations.
+//   - src: The source directory containing Go code.
+//   - goVersion: The Go version to use for building.
+//
+// Returns:
+//   - An error if the build process fails, otherwise nil.
+func (p *Pipeline) buildBinary(ctx context.Context, client *dagger.Client, src *dagger.Directory, goVersion string) error {
+	builder := shared.NewGoBuilder(client, src, goVersion)
+	outPath := "bin/" + p.Options.BinaryName
+	_, err := builder.Build(ctx, outPath, p.Options.BinaryName, map[string]string{"CGO_ENABLED": "0"})
+	if err != nil {
+		return fmt.Errorf("failed to build Go binary: %w", err)
+	}
+	fmt.Printf("✅ Binary built successfully at %s\n", outPath)
+	return nil
+}
+
+// buildDocker builds the Docker image from Dockerfile.
+// This functionality was merged from the docker-go pipeline.
+//
+// Parameters:
+//   - ctx: The context for managing execution.
+//   - client: The Dagger client for container operations.
+//   - src: The source directory containing the Dockerfile.
+//
+// Returns:
+//   - An error if the build process fails, otherwise nil.
+func (p *Pipeline) buildDocker(ctx context.Context, client *dagger.Client, src *dagger.Directory) error {
+	fmt.Println("🔧 Building Docker image...")
+
+	// Build Docker image from source directory (contains Dockerfile)
+	// This is the functionality from docker-go pipeline
+	image := src.DockerBuild()
+	p.Image = image
+
+	fmt.Println("✅ Docker image built successfully")
+	return nil
+}
+
+// Package creates a Docker image from the built Go binary or uses existing Docker image.
+// If BuildMode is Docker, the image is already built in Build step.
+// If BuildMode is Binary or Both, it creates a minimal Docker image from the binary.
 //
 // Parameters:
 //   - ctx: The context for managing execution.
@@ -341,32 +404,41 @@ func (p *Pipeline) Package(ctx context.Context) error {
 		return errors.New("pipeline not set up: source directory is nil")
 	}
 
+	// If BuildMode is Docker, image is already built in Build step
+	if p.Options.BuildMode == BuildModeDocker {
+		if p.Image == nil {
+			return errors.New("Docker image not built - run Build step first")
+		}
+		fmt.Println("✅ Docker image already built in Build step")
+		return nil
+	}
+
+	// For Binary or Both modes, create Docker image from binary
 	fmt.Println("📦 Packaging Go binary into Docker image...")
 
-	// Extract real types for shared functions (only if using adapter, not mocks)
-	if adapter, ok := p.Client.(*pipelines.DaggerAdapter); ok {
-		realClient := adapter.GetRealClient()
-		if _, ok := p.Src.(*pipelines.DaggerDirectoryAdapter); ok {
-			// Read the built binary from bin/app on the host
-			// The binary was exported to the host during the Build step
-			binaryDir := realClient.Host().Directory("bin")
-			binaryFile := binaryDir.File("app")
-
-			// Create a minimal Docker image with the binary
-			// Using alpine:latest as base for a small but functional image
-			image := realClient.Container().
-				From("alpine:latest").
-				WithFile("/app", binaryFile).
-				WithExec([]string{"chmod", "+x", "/app"}).
-				WithEntrypoint([]string{"/app"})
-
-			p.Image = image
-			fmt.Println("✅ Docker image created successfully")
-			return nil
-		}
+	adapter, ok := p.Client.(*pipelines.DaggerAdapter)
+	if !ok {
+		return errors.New("Package method requires real Dagger client, not mock")
 	}
-	// For mocks, return an error indicating this requires real client
-	return errors.New("Package method requires real Dagger client, not mock")
+
+	realClient := adapter.GetRealClient()
+
+	// Read the built binary from bin/ directory on the host
+	// The binary was exported to the host during the Build step
+	binaryDir := realClient.Host().Directory("bin")
+	binaryFile := binaryDir.File(p.Options.BinaryName)
+
+	// Create a minimal Docker image with the binary
+	// Using alpine:latest as base for a small but functional image
+	image := realClient.Container().
+		From("alpine:latest").
+		WithFile("/app", binaryFile).
+		WithExec([]string{"chmod", "+x", "/app"}).
+		WithEntrypoint([]string{"/app"})
+
+	p.Image = image
+	fmt.Println("✅ Docker image created successfully")
+	return nil
 }
 
 // Tag generates a version tag.

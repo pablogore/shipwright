@@ -5,31 +5,28 @@ A unified CI/CD pipeline library for Go projects, built on top of Dagger SDK. Sy
 ## 🚀 Features
 
 - **Unified Pipeline Architecture**: Standardized CI/CD pipelines for different Go project types
-- **Dagger Integration**: Built on Dagger SDK for container-native pipeline execution
-- **Multiple Pipeline Types**: Support for go-kit, docker-go, and infrastructure pipelines
+- **Local & Cloud Execution**: Run pipelines locally without Docker or in CI/CD with full container support
+- **Multiple Executors**: Native execution (no Docker) or Docker-based execution via Dagger
+- **Auto-Detection**: Automatically detects local vs CI/CD environment and selects appropriate executor
+- **Multiple Pipeline Types**: Support for go-service (generic), infra, and custom pipelines
 - **Flexible Configuration**: YAML-based configuration with environment variable overrides
 - **Extensible Design**: Plugin architecture for custom steps and hooks
 - **Cross-Platform**: Works on Linux, macOS, and Windows
 - **Security First**: Built-in vulnerability scanning and security checks
+- **Smart Caching**: Multi-level caching for faster execution (modules, build, Docker layers)
 
 ## 📋 Supported Pipeline Types
 
-### Go-Kit Pipeline
-Optimized for microservices built with the go-kit framework:
-- Repository cloning (SSH/HTTPS)
-- Dependency management
-- Unit testing with coverage
-- Linting and security scanning
-- Docker image building
-- Container registry publishing
-
-### Docker-Go Pipeline
-Standard pipeline for Go applications with Docker:
-- Multi-stage Docker builds
-- Cross-platform compilation
-- Container optimization
-- Registry publishing
-- Health checks
+### Go-Service Pipeline (Generic)
+Generic pipeline for Go microservices with configurable options:
+- **Build Modes**: Binary-only, Docker-only, or both
+- **Framework Support**: Standard Go, go-kit, Gin, Echo
+- **Dependency management**: Automatic Go modules handling
+- **Unit testing**: With configurable coverage thresholds
+- **Linting**: golangci-lint integration
+- **Security scanning**: govulncheck integration
+- **Docker image building**: Optional, configurable
+- **Container registry publishing**: Optional, configurable
 
 ### Infrastructure Pipeline
 For infrastructure and deployment automation:
@@ -68,17 +65,63 @@ sudo mv syntegrity-dagger /usr/local/bin/
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### Running Locally in Your Project
+
+**Easiest way - Copy and run:**
 
 ```bash
-# Run go-kit pipeline
-syntegrity-dagger --pipeline go-kit --env dev --coverage 90
+# 1. Copy the script to your project root
+cp examples/local/run-local.sh .
+chmod +x run-local.sh
 
-# Run docker-go pipeline
-syntegrity-dagger --pipeline docker-go --env prod
+# 2. Run the pipeline
+./run-local.sh go-service
+
+# 3. Or run specific steps
+./run-local.sh go-service build
+./run-local.sh go-service test
+```
+
+**Or use directly (auto-detects local execution):**
+
+```bash
+# Install syntegrity-dagger (one time)
+curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger
+chmod +x syntegrity-dagger
+sudo mv syntegrity-dagger /usr/local/bin/
+
+# Run pipeline locally (auto-detects, no Docker needed)
+syntegrity-dagger --pipeline go-service
+
+# Or explicitly force local execution
+syntegrity-dagger --local --pipeline go-service
+
+# Run specific step
+syntegrity-dagger --pipeline go-service --step test
+
+# Use native executor explicitly (fastest, no Docker)
+syntegrity-dagger --executor native --pipeline go-service
+```
+
+**Key Benefits of Local Execution:**
+- ⚡ **Faster**: No Docker overhead
+- 💚 **Lower resource usage**: Uses your local Go installation
+- 🔧 **Same tools**: Uses your local golangci-lint, govulncheck if installed
+- 🏠 **Perfect for development**: Test pipelines before committing
+
+See [Local Usage Guide](docs/LOCAL_USAGE.md) for detailed instructions.
+
+### Basic Usage (With Docker/Dagger)
+
+```bash
+# Run go-service pipeline with Docker (for CI/CD validation)
+syntegrity-dagger --executor docker --pipeline go-service --env dev --coverage 90
 
 # Run infrastructure pipeline
 syntegrity-dagger --pipeline infra --env staging
+
+# Auto-detect executor (native if local, docker if CI/CD)
+syntegrity-dagger --pipeline go-service --env prod
 ```
 
 ### Configuration File
@@ -152,7 +195,8 @@ syntegrity-dagger --config .syntegrity-dagger.yml
 | `--step` | Execute specific step only | - |
 | `--only-build` | Execute build step only | false |
 | `--only-test` | Execute test step only | false |
-| `--local` | Run locally without Docker | false |
+| `--local` | Force local execution without Docker | false |
+| `--executor` | Executor to use: native, docker (empty for auto-detection) | auto |
 | `--verbose` | Enable verbose logging | false |
 
 ## 🔄 CI/CD Integration

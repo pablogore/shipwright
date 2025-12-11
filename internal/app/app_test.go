@@ -326,8 +326,8 @@ func TestApp_ListPipelines_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, pipelines)
 	assert.Contains(t, pipelines, "go-service")
-	assert.Contains(t, pipelines, "docker-go")
 	assert.Contains(t, pipelines, "infra")
+	// docker-go functionality has been merged into go-service
 }
 
 func TestApp_ListPipelines_RegistryError(t *testing.T) {

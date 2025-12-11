@@ -29,6 +29,33 @@ func NewLocalExecutor(logger interfaces.Logger, config interfaces.Configuration)
 func (le *LocalExecutor) ExecuteStep(ctx context.Context, stepName string) error {
 	le.logger.Info("Executing step locally", "step", stepName)
 
+	// List of supported steps in local mode
+	supportedSteps := map[string]bool{
+		"setup":    true,
+		"build":    true,
+		"test":     true,
+		"lint":     true,
+		"security": true,
+	}
+
+	// Check if step is supported
+	if !supportedSteps[stepName] {
+		// For steps that require cloud services, log a warning and skip
+		cloudOnlySteps := map[string]bool{
+			"push":    true,
+			"release": true,
+			"tag":     true,
+			"package": true,
+		}
+
+		if cloudOnlySteps[stepName] {
+			le.logger.Warn("Step requires cloud services and is skipped in local mode", "step", stepName)
+			return nil // Skip silently in local mode
+		}
+
+		return fmt.Errorf("unsupported step for local execution: %s. Supported steps: setup, build, test, lint, security", stepName)
+	}
+
 	switch stepName {
 	case "setup":
 		return le.executeSetup(ctx)

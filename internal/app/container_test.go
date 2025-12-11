@@ -1095,26 +1095,6 @@ func TestNewGoServicePipeline(t *testing.T) {
 	assert.NotEmpty(t, pipeline.Name())
 }
 
-func TestNewDockerGoPipeline(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
-
-	// Setup mock expectations for convertConfig
-	setupMockConfigForConvertConfig(mockConfig)
-
-	// Test with nil client - pipelines handle this gracefully
-	pipeline := NewDockerGoPipeline(nil, mockConfig)
-
-	// Should return a PipelineAdapter, not nil
-	assert.NotNil(t, pipeline)
-	assert.IsType(t, &PipelineAdapter{}, pipeline)
-
-	// Test that the pipeline has a name
-	assert.NotEmpty(t, pipeline.Name())
-}
-
 func TestNewInfraPipeline(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

@@ -9,14 +9,18 @@ import (
 
 	"log/slog"
 
+	"dagger.io/dagger"
+
 	"github.com/getsyntegrity/syntegrity-dagger/internal/app"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
+	"github.com/getsyntegrity/syntegrity-dagger/internal/executors"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
 )
 
 // CLI represents the command line interface for the application.
 type CLI struct {
-	app *app.App
+	app        *app.App
+	yamlConfig *config.YAMLConfig
 }
 
 // NewCLI creates a new CLI instance.
@@ -53,10 +57,12 @@ func (c *CLI) Run(args []string) error {
 
 	// Load YAML configuration if specified
 	if flags.configFile != "" {
-		err = c.loadYAMLConfig(cfg, flags.configFile)
+		var yamlCfg *config.YAMLConfig
+		yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
 		if err != nil {
 			return fmt.Errorf("failed to load YAML configuration: %w", err)
 		}
+		c.yamlConfig = yamlCfg
 	}
 
 	// Override configuration with CLI flags
@@ -101,6 +107,7 @@ type Flags struct {
 	coverage      float64
 	branch        string
 	env           string
+	executor      string
 	gitAuth       string
 	gitRef        string
 	health        bool
@@ -132,6 +139,7 @@ func (c *CLI) parseFlags(args []string) (*Flags, error) {
 	flagSet.Float64Var(&flags.coverage, "coverage", 90, "Minimum coverage percentage required (in: 90 for 90%)")
 	flagSet.StringVar(&flags.branch, "branch", "develop", "Branch name")
 	flagSet.StringVar(&flags.env, "env", "dev", "Environment: dev, staging, prod")
+	flagSet.StringVar(&flags.executor, "executor", "", "Executor to use: native, docker (empty for auto-detection)")
 	flagSet.BoolVar(&flags.skipPush, "skip-push", false, "Skip image push")
 	flagSet.BoolVar(&flags.onlyBuild, "only-build", false, "Run build only")
 	flagSet.BoolVar(&flags.onlyTest, "only-test", false, "Run only tests")
@@ -183,10 +191,14 @@ func (c *CLI) overrideConfig(cfg interfaces.Configuration, flags *Flags) {
 
 // executePipeline executes a complete pipeline.
 func (c *CLI) executePipeline(ctx context.Context, flags *Flags) error {
-	if flags.local {
+	// Auto-detect local execution if not in CI and no executor specified
+	shouldUseLocal := flags.local || (flags.executor == "" && !c.isCIEnvironment() && flags.executor == "")
+
+	if shouldUseLocal {
 		fmt.Printf("🏠 Running pipeline locally: %s (%s)\n", flags.pipelineName, flags.env)
 		fmt.Printf("📊 Coverage threshold: %.1f%%\n", flags.coverage)
 		fmt.Printf("🌿 Git ref: %s\n", flags.gitRef)
+		fmt.Printf("⚡ Using native execution (no Docker required)\n")
 
 		return c.executePipelineLocally(ctx, flags)
 	}
@@ -195,19 +207,145 @@ func (c *CLI) executePipeline(ctx context.Context, flags *Flags) error {
 	fmt.Printf("📊 Coverage threshold: %.1f%%\n", flags.coverage)
 	fmt.Printf("🌿 Git ref: %s\n", flags.gitRef)
 
+	// Use executor selector if executor is specified
+	if flags.executor != "" {
+		return c.executePipelineWithExecutor(ctx, flags)
+	}
+
 	return c.app.RunPipeline(ctx, flags.pipelineName)
+}
+
+// isCIEnvironment checks if we're running in a CI environment.
+func (c *CLI) isCIEnvironment() bool {
+	ciVars := []string{
+		"CI",
+		"GITHUB_ACTIONS",
+		"GITLAB_CI",
+		"JENKINS_URL",
+		"CIRCLECI",
+		"TRAVIS",
+		"BUILDKITE",
+		"TEAMCITY_VERSION",
+	}
+
+	for _, envVar := range ciVars {
+		if os.Getenv(envVar) != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// executePipelineWithExecutor executes pipeline using the specified executor.
+func (c *CLI) executePipelineWithExecutor(ctx context.Context, flags *Flags) error {
+	container := c.app.GetContainer()
+
+	// Get executor selector
+	selector, err := container.Get("executorSelector")
+	if err != nil {
+		return fmt.Errorf("failed to get executor selector: %w", err)
+	}
+
+	executorSelector := selector.(*executors.Selector)
+
+	// Get Dagger client (may be nil for native execution)
+	var daggerClient *dagger.Client
+	client, err := container.Get("daggerClient")
+	if err == nil && client != nil {
+		daggerClient = client.(*dagger.Client)
+	}
+
+	// Get config
+	cfg := container.GetConfiguration()
+	pipelineConfig := app.ConvertConfigToPipelinesConfig(cfg)
+
+	// Select executor
+	executor, err := executorSelector.SelectExecutor(ctx, daggerClient, pipelineConfig, flags.executor)
+	if err != nil {
+		return fmt.Errorf("failed to select executor: %w", err)
+	}
+
+	fmt.Printf("🔧 Using executor: %s\n", executor.Name())
+
+	// Get pipeline steps from configuration
+	steps := []string{"setup", "build", "test"}
+	if flags.onlyBuild {
+		steps = []string{"setup", "build"}
+	} else if flags.onlyTest {
+		steps = []string{"setup", "test"}
+	}
+
+	// Execute steps using selected executor
+	for _, step := range steps {
+		fmt.Printf("▶️  Executing step: %s\n", step)
+		if err := executor.ExecuteStep(ctx, step); err != nil {
+			return fmt.Errorf("step %s failed: %w", step, err)
+		}
+		fmt.Printf("✅ Step completed: %s\n", step)
+	}
+
+	return nil
 }
 
 // executeSingleStep executes a single pipeline step.
 func (c *CLI) executeSingleStep(ctx context.Context, flags *Flags) error {
-	if flags.local {
+	// Auto-detect local execution if not in CI and no executor specified
+	shouldUseLocal := flags.local || (flags.executor == "" && !c.isCIEnvironment())
+
+	if shouldUseLocal {
 		fmt.Printf("🏠 Executing step locally '%s' in pipeline: %s\n", flags.step, flags.pipelineName)
 		return c.executeStepLocally(ctx, flags)
+	}
+
+	// Use executor selector if executor is specified
+	if flags.executor != "" {
+		return c.executeStepWithExecutor(ctx, flags)
 	}
 
 	fmt.Printf("🎯 Executing step '%s' in pipeline: %s\n", flags.step, flags.pipelineName)
 
 	return c.app.RunPipelineStep(ctx, flags.pipelineName, flags.step)
+}
+
+// executeStepWithExecutor executes a single step using the specified executor.
+func (c *CLI) executeStepWithExecutor(ctx context.Context, flags *Flags) error {
+	container := c.app.GetContainer()
+
+	// Get executor selector
+	selector, err := container.Get("executorSelector")
+	if err != nil {
+		return fmt.Errorf("failed to get executor selector: %w", err)
+	}
+
+	executorSelector := selector.(*executors.Selector)
+
+	// Get Dagger client (may be nil for native execution)
+	var daggerClient *dagger.Client
+	client, err := container.Get("daggerClient")
+	if err == nil && client != nil {
+		daggerClient = client.(*dagger.Client)
+	}
+
+	// Get config
+	cfg := container.GetConfiguration()
+	pipelineConfig := app.ConvertConfigToPipelinesConfig(cfg)
+
+	// Select executor
+	executor, err := executorSelector.SelectExecutor(ctx, daggerClient, pipelineConfig, flags.executor)
+	if err != nil {
+		return fmt.Errorf("failed to select executor: %w", err)
+	}
+
+	fmt.Printf("🔧 Using executor: %s\n", executor.Name())
+	fmt.Printf("▶️  Executing step: %s\n", flags.step)
+
+	if err := executor.ExecuteStep(ctx, flags.step); err != nil {
+		return fmt.Errorf("step %s failed: %w", flags.step, err)
+	}
+
+	fmt.Printf("✅ Step completed: %s\n", flags.step)
+	return nil
 }
 
 // listAvailableSteps lists available steps for a pipeline.
@@ -262,30 +400,31 @@ func (c *CLI) listAvailablePipelines(_ context.Context) error {
 }
 
 // loadYAMLConfig loads and applies YAML configuration
-func (c *CLI) loadYAMLConfig(cfg interfaces.Configuration, configFile string) error {
+// Returns the parsed YAMLConfig for later use
+func (c *CLI) loadYAMLConfig(cfg interfaces.Configuration, configFile string) (*config.YAMLConfig, error) {
 	parser := config.NewYAMLParser()
 
 	// Parse YAML file
 	yamlConfig, err := parser.ParseFile(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to parse YAML file: %w", err)
+		return nil, fmt.Errorf("failed to parse YAML file: %w", err)
 	}
 
 	// Validate configuration
 	if err := parser.ValidateConfig(yamlConfig); err != nil {
-		return fmt.Errorf("invalid YAML configuration: %w", err)
+		return nil, fmt.Errorf("invalid YAML configuration: %w", err)
 	}
 
 	// Apply to main configuration
 	if err := parser.ApplyToConfiguration(yamlConfig, cfg); err != nil {
-		return fmt.Errorf("failed to apply YAML configuration: %w", err)
+		return nil, fmt.Errorf("failed to apply YAML configuration: %w", err)
 	}
 
 	fmt.Printf("📋 Loaded configuration from: %s\n", configFile)
 	fmt.Printf("🎯 Pipeline: %s\n", yamlConfig.Pipeline.Name)
 	fmt.Printf("📝 Steps: %v\n", yamlConfig.Pipeline.Steps)
 
-	return nil
+	return yamlConfig, nil
 }
 
 // executePipelineLocally executes a pipeline locally without Docker
@@ -297,21 +436,69 @@ func (c *CLI) executePipelineLocally(ctx context.Context, flags *Flags) error {
 		return fmt.Errorf("failed to get logger: %w", err)
 	}
 
-	config := container.GetConfiguration()
+	cfg := container.GetConfiguration()
 
 	// Create local executor
-	localExecutor := app.NewLocalExecutor(logger, config)
+	localExecutor := app.NewLocalExecutor(logger, cfg)
 
 	// Get pipeline steps from configuration
-	steps := []string{"setup", "build", "test"}
+	var steps []string
+
+	// First, try to get steps from YAML config if available
+	if c.yamlConfig != nil {
+		parser := config.NewYAMLParser()
+		steps = parser.GetSteps(c.yamlConfig)
+		logger.Info("Using steps from YAML configuration", "steps", steps)
+	}
+
+	// If no steps from YAML, try to get from configuration
+	if len(steps) == 0 {
+		if stepsConfig := cfg.Get("pipeline.steps"); stepsConfig != nil {
+			if stepsList, ok := stepsConfig.([]string); ok {
+				steps = stepsList
+				logger.Info("Using steps from configuration", "steps", steps)
+			}
+		}
+	}
+
+	// Handle CLI flags that override step selection
 	if flags.onlyBuild {
 		steps = []string{"setup", "build"}
+		logger.Info("Using only-build steps", "steps", steps)
 	} else if flags.onlyTest {
 		steps = []string{"setup", "test"}
+		logger.Info("Using only-test steps", "steps", steps)
+	} else if len(steps) == 0 {
+		// Default steps if nothing is configured
+		steps = []string{"setup", "build", "test"}
+		logger.Info("Using default steps", "steps", steps)
+	}
+
+	// Filter out steps that are not supported in local mode
+	// Some steps like "push", "tag", "package" may not be applicable locally
+	supportedLocalSteps := map[string]bool{
+		"setup":    true,
+		"build":    true,
+		"test":     true,
+		"lint":     true,
+		"security": true,
+	}
+
+	filteredSteps := make([]string, 0, len(steps))
+	for _, step := range steps {
+		if supportedLocalSteps[step] {
+			filteredSteps = append(filteredSteps, step)
+		} else {
+			logger.Warn("Skipping step not supported in local mode", "step", step)
+		}
+	}
+
+	if len(filteredSteps) == 0 {
+		return fmt.Errorf("no valid steps to execute in local mode")
 	}
 
 	// Execute steps in order
-	for _, step := range steps {
+	for _, step := range filteredSteps {
 		logger.Info("Running pipeline step", "pipeline", flags.pipelineName, "step", step)
 
 		if err := localExecutor.ExecuteStep(ctx, step); err != nil {
@@ -374,10 +561,12 @@ func (c *CLI) runHealthChecks(ctx context.Context, flags *Flags) error {
 
 	// Load YAML configuration if specified
 	if flags.configFile != "" {
-		err = c.loadYAMLConfig(cfg, flags.configFile)
+		var yamlCfg *config.YAMLConfig
+		yamlCfg, err = c.loadYAMLConfig(cfg, flags.configFile)
 		if err != nil {
 			return fmt.Errorf("failed to load YAML configuration: %w", err)
 		}
+		c.yamlConfig = yamlCfg
 	}
 
 	fmt.Println("🏥 Running health checks...")
