@@ -85,17 +85,25 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 	// Run Go commands: tidy dependencies and build the binary
 	// Using Sync() to ensure commands complete before proceeding
 	// Add retry logic for connection errors with exponential backoff
-	maxRetries := 3
-	retryDelay := 2 * time.Second
+	maxRetries := 5
+	retryDelay := 3 * time.Second
 	var err error
 	var result *dagger.Container
+
+	// Give daemon a moment to be ready before first attempt
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("context cancelled before build execution: %w", ctx.Err())
+	case <-time.After(2 * time.Second):
+		// Continue with first attempt
+	}
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			// Wait before retrying (exponential backoff)
 			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
-			if waitTime > 10*time.Second {
-				waitTime = 10 * time.Second // Cap at 10 seconds
+			if waitTime > 15*time.Second {
+				waitTime = 15 * time.Second // Cap at 15 seconds
 			}
 
 			select {
@@ -144,8 +152,8 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 		if attempt > 0 {
 			// Wait before retrying (exponential backoff)
 			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
-			if waitTime > 10*time.Second {
-				waitTime = 10 * time.Second // Cap at 10 seconds
+			if waitTime > 15*time.Second {
+				waitTime = 15 * time.Second // Cap at 15 seconds
 			}
 
 			select {
