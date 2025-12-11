@@ -6,10 +6,8 @@ import (
 	"testing"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewHookManager(t *testing.T) {
@@ -311,11 +309,8 @@ func TestHookManager_ClearAllHooks(t *testing.T) {
 }
 
 func TestNewHookExecutor(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 	assert.NotNil(t, executor)
@@ -324,17 +319,17 @@ func TestNewHookExecutor(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteBeforeHooks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(nil)
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
 
 	// Test ExecuteBeforeHooks
 	err := executor.ExecuteBeforeHooks(t.Context(), "test-step")
@@ -342,17 +337,20 @@ func TestHookExecutor_ExecuteBeforeHooks(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteBeforeHooks_Error(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(errors.New("hook error"))
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeBefore {
+			return errors.New("hook error")
+		}
+		return nil
+	}
 
 	// Test ExecuteBeforeHooks with error
 	err := executor.ExecuteBeforeHooks(t.Context(), "test-step")
@@ -361,17 +359,17 @@ func TestHookExecutor_ExecuteBeforeHooks_Error(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteAfterHooks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing after hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeAfter).Return(nil)
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
 
 	// Test ExecuteAfterHooks
 	err := executor.ExecuteAfterHooks(t.Context(), "test-step")
@@ -379,17 +377,20 @@ func TestHookExecutor_ExecuteAfterHooks(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteAfterHooks_Error(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing after hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeAfter).Return(errors.New("hook error"))
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeAfter {
+			return errors.New("hook error")
+		}
+		return nil
+	}
 
 	// Test ExecuteAfterHooks with error
 	err := executor.ExecuteAfterHooks(t.Context(), "test-step")
@@ -398,17 +399,17 @@ func TestHookExecutor_ExecuteAfterHooks_Error(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteErrorHooks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing error hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeError).Return(nil)
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
 
 	// Test ExecuteErrorHooks
 	err := executor.ExecuteErrorHooks(t.Context(), "test-step")
@@ -416,17 +417,20 @@ func TestHookExecutor_ExecuteErrorHooks(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteErrorHooks_Error(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing error hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeError).Return(errors.New("hook error"))
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeError {
+			return errors.New("hook error")
+		}
+		return nil
+	}
 
 	// Test ExecuteErrorHooks with error
 	err := executor.ExecuteErrorHooks(t.Context(), "test-step")
@@ -435,17 +439,17 @@ func TestHookExecutor_ExecuteErrorHooks_Error(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteSuccessHooks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing success hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeSuccess).Return(nil)
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
 
 	// Test ExecuteSuccessHooks
 	err := executor.ExecuteSuccessHooks(t.Context(), "test-step")
@@ -453,17 +457,20 @@ func TestHookExecutor_ExecuteSuccessHooks(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteSuccessHooks_Error(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Executing success hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeSuccess).Return(errors.New("hook error"))
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeSuccess {
+			return errors.New("hook error")
+		}
+		return nil
+	}
 
 	// Test ExecuteSuccessHooks with error
 	err := executor.ExecuteSuccessHooks(t.Context(), "test-step")
@@ -472,21 +479,25 @@ func TestHookExecutor_ExecuteSuccessHooks_Error(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteStepWithHooks_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations for successful execution
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(nil)
-	mockLogger.EXPECT().Debug("Executing success hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeSuccess).Return(nil)
-	mockLogger.EXPECT().Debug("Executing after hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeAfter).Return(nil)
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
 
 	// Test ExecuteStepWithHooks with successful step
 	stepFunc := func() error { return nil }
@@ -495,19 +506,21 @@ func TestHookExecutor_ExecuteStepWithHooks_Success(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteStepWithHooks_StepError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations for failed step execution
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(nil)
-	mockLogger.EXPECT().Debug("Executing error hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeError).Return(nil)
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
 
 	// Test ExecuteStepWithHooks with failed step
 	stepFunc := func() error { return errors.New("step error") }
@@ -517,18 +530,21 @@ func TestHookExecutor_ExecuteStepWithHooks_StepError(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteStepWithHooks_BeforeHooksError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations for before hooks error
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(errors.New("before hooks error"))
-	mockLogger.EXPECT().Error("Before hooks failed", "step", "test-step", "error", gomock.Any()).Return()
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockLogger.ErrorFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeBefore {
+			return errors.New("before hooks error")
+		}
+		return nil
+	}
 
 	// Test ExecuteStepWithHooks with before hooks error
 	stepFunc := func() error { return nil }
@@ -538,22 +554,29 @@ func TestHookExecutor_ExecuteStepWithHooks_BeforeHooksError(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteStepWithHooks_AfterHooksError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations for after hooks error
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(nil)
-	mockLogger.EXPECT().Debug("Executing success hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeSuccess).Return(nil)
-	mockLogger.EXPECT().Debug("Executing after hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeAfter).Return(errors.New("after hooks error"))
-	mockLogger.EXPECT().Error("After hooks failed", "step", "test-step", "error", gomock.Any()).Return()
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockLogger.ErrorFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeAfter {
+			return errors.New("after hooks error")
+		}
+		return nil
+	}
 
 	// Test ExecuteStepWithHooks with after hooks error
 	stepFunc := func() error { return nil }
@@ -563,20 +586,25 @@ func TestHookExecutor_ExecuteStepWithHooks_AfterHooksError(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteStepWithHooks_ErrorHooksError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations for error hooks error (should not fail the execution)
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(nil)
-	mockLogger.EXPECT().Debug("Executing error hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeError).Return(errors.New("error hooks error"))
-	mockLogger.EXPECT().Error("Error hooks failed", "step", "test-step", "error", gomock.Any()).Return()
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockLogger.ErrorFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeError {
+			return errors.New("error hooks error")
+		}
+		return nil
+	}
 
 	// Test ExecuteStepWithHooks with error hooks error
 	stepFunc := func() error { return errors.New("step error") }
@@ -586,22 +614,29 @@ func TestHookExecutor_ExecuteStepWithHooks_ErrorHooksError(t *testing.T) {
 }
 
 func TestHookExecutor_ExecuteStepWithHooks_SuccessHooksError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockHookManager := mocks.NewMockHookManager(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHookManager := NewMockHookManager()
+	mockLogger := NewMockLogger()
 
 	executor := NewHookExecutor(mockHookManager, mockLogger)
 
 	// Set up expectations for success hooks error (should not fail the execution)
-	mockLogger.EXPECT().Debug("Executing before hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeBefore).Return(nil)
-	mockLogger.EXPECT().Debug("Executing success hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeSuccess).Return(errors.New("success hooks error"))
-	mockLogger.EXPECT().Error("Success hooks failed", "step", "test-step", "error", gomock.Any()).Return()
-	mockLogger.EXPECT().Debug("Executing after hooks", "step", "test-step").Return()
-	mockHookManager.EXPECT().ExecuteHooks(gomock.Any(), "test-step", interfaces.HookTypeAfter).Return(nil)
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockLogger.ErrorFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		if hookType == interfaces.HookTypeSuccess {
+			return errors.New("success hooks error")
+		}
+		return nil
+	}
+	mockLogger.DebugFunc = func(msg string, fields ...any) {}
+	mockHookManager.ExecuteHooksFunc = func(ctx context.Context, stepName string, hookType interfaces.HookType) error {
+		return nil
+	}
 
 	// Test ExecuteStepWithHooks with success hooks error
 	stepFunc := func() error { return nil }

@@ -6,17 +6,12 @@ import (
 
 	"dagger.io/dagger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewBaseStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBaseStepHandler(mockConfig, nil)
@@ -27,10 +22,7 @@ func TestNewBaseStepHandler(t *testing.T) {
 }
 
 func TestBaseStepHandler_CanHandle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBaseStepHandler(mockConfig, nil)
@@ -42,10 +34,7 @@ func TestBaseStepHandler_CanHandle(t *testing.T) {
 }
 
 func TestBaseStepHandler_Execute(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBaseStepHandler(mockConfig, nil)
@@ -58,10 +47,7 @@ func TestBaseStepHandler_Execute(t *testing.T) {
 }
 
 func TestBaseStepHandler_GetStepInfo(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBaseStepHandler(mockConfig, nil)
@@ -80,10 +66,7 @@ func TestBaseStepHandler_GetStepInfo(t *testing.T) {
 }
 
 func TestBaseStepHandler_Validate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBaseStepHandler(mockConfig, nil)
@@ -96,10 +79,7 @@ func TestBaseStepHandler_Validate(t *testing.T) {
 }
 
 func TestNewSetupStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSetupStepHandler(mockConfig, nil)
@@ -108,10 +88,7 @@ func TestNewSetupStepHandler(t *testing.T) {
 }
 
 func TestSetupStepHandler_CanHandle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
@@ -123,10 +100,7 @@ func TestSetupStepHandler_CanHandle(t *testing.T) {
 }
 
 func TestSetupStepHandler_Execute(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
@@ -146,10 +120,7 @@ func TestSetupStepHandler_Execute(t *testing.T) {
 }
 
 func TestSetupStepHandler_Execute_WithClient(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	// Use nil for dagger client since it's an external dependency
@@ -171,10 +142,7 @@ func TestSetupStepHandler_Execute_WithClient(t *testing.T) {
 }
 
 func TestSetupStepHandler_GetStepInfo(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
@@ -197,10 +165,7 @@ func TestSetupStepHandler_GetStepInfo(t *testing.T) {
 }
 
 func TestSetupStepHandler_Validate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSetupStepHandler(mockConfig, nil).(*SetupStepHandler)
@@ -218,10 +183,7 @@ func TestSetupStepHandler_Validate(t *testing.T) {
 }
 
 func TestNewBuildStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBuildStepHandler(mockConfig, nil)
@@ -230,10 +192,7 @@ func TestNewBuildStepHandler(t *testing.T) {
 }
 
 func TestBuildStepHandler_CanHandle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
@@ -245,10 +204,7 @@ func TestBuildStepHandler_CanHandle(t *testing.T) {
 }
 
 func TestBuildStepHandler_Execute(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
@@ -257,17 +213,19 @@ func TestBuildStepHandler_Execute(t *testing.T) {
 	config := interfaces.StepConfig{Name: "build"}
 
 	// Mock config calls
-	mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.21")
+	mockConfig.GetStringFunc = func(key string) string {
+		if key == "pipeline.go_version" {
+			return "1.21"
+		}
+		return ""
+	}
 
 	err := handler.Execute(t.Context(), "build", config)
 	require.NoError(t, err)
 }
 
 func TestBuildStepHandler_Execute_DefaultGoVersion(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
@@ -276,17 +234,19 @@ func TestBuildStepHandler_Execute_DefaultGoVersion(t *testing.T) {
 	config := interfaces.StepConfig{Name: "build"}
 
 	// Mock config calls
-	mockConfig.EXPECT().GetString("pipeline.go_version").Return("")
+	mockConfig.GetStringFunc = func(key string) string {
+		if key == "pipeline.go_version" {
+			return ""
+		}
+		return ""
+	}
 
 	err := handler.Execute(t.Context(), "build", config)
 	require.NoError(t, err)
 }
 
 func TestBuildStepHandler_GetStepInfo(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
@@ -309,10 +269,7 @@ func TestBuildStepHandler_GetStepInfo(t *testing.T) {
 }
 
 func TestBuildStepHandler_Validate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewBuildStepHandler(mockConfig, nil).(*BuildStepHandler)
@@ -330,10 +287,7 @@ func TestBuildStepHandler_Validate(t *testing.T) {
 }
 
 func TestNewTestStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewTestStepHandler(mockConfig, nil)
@@ -342,10 +296,7 @@ func TestNewTestStepHandler(t *testing.T) {
 }
 
 func TestTestStepHandler_CanHandle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
@@ -357,10 +308,7 @@ func TestTestStepHandler_CanHandle(t *testing.T) {
 }
 
 func TestTestStepHandler_Execute(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
@@ -369,17 +317,19 @@ func TestTestStepHandler_Execute(t *testing.T) {
 	config := interfaces.StepConfig{Name: "test"}
 
 	// Mock config calls
-	mockConfig.EXPECT().GetFloat("pipeline.coverage").Return(90.0)
+	mockConfig.GetFloatFunc = func(key string) float64 {
+		if key == "pipeline.coverage" {
+			return 90.0
+		}
+		return 0
+	}
 
 	err := handler.Execute(t.Context(), "test", config)
 	require.NoError(t, err)
 }
 
 func TestTestStepHandler_GetStepInfo(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
@@ -402,10 +352,7 @@ func TestTestStepHandler_GetStepInfo(t *testing.T) {
 }
 
 func TestTestStepHandler_Validate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewTestStepHandler(mockConfig, nil).(*TestStepHandler)
@@ -423,10 +370,7 @@ func TestTestStepHandler_Validate(t *testing.T) {
 }
 
 func TestNewLintStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewLintStepHandler(mockConfig, nil)
@@ -435,10 +379,7 @@ func TestNewLintStepHandler(t *testing.T) {
 }
 
 func TestLintStepHandler_CanHandle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
@@ -450,10 +391,7 @@ func TestLintStepHandler_CanHandle(t *testing.T) {
 }
 
 func TestLintStepHandler_Execute(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
@@ -462,17 +400,19 @@ func TestLintStepHandler_Execute(t *testing.T) {
 	config := interfaces.StepConfig{Name: "lint"}
 
 	// Mock config calls
-	mockConfig.EXPECT().GetString("security.lint_timeout").Return("5m")
+	mockConfig.GetStringFunc = func(key string) string {
+		if key == "security.lint_timeout" {
+			return "5m"
+		}
+		return ""
+	}
 
 	err := handler.Execute(t.Context(), "lint", config)
 	require.NoError(t, err)
 }
 
 func TestLintStepHandler_GetStepInfo(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
@@ -495,10 +435,7 @@ func TestLintStepHandler_GetStepInfo(t *testing.T) {
 }
 
 func TestLintStepHandler_Validate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewLintStepHandler(mockConfig, nil).(*LintStepHandler)
@@ -516,10 +453,7 @@ func TestLintStepHandler_Validate(t *testing.T) {
 }
 
 func TestNewSecurityStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSecurityStepHandler(mockConfig, nil)
@@ -528,10 +462,7 @@ func TestNewSecurityStepHandler(t *testing.T) {
 }
 
 func TestSecurityStepHandler_CanHandle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
@@ -543,10 +474,7 @@ func TestSecurityStepHandler_CanHandle(t *testing.T) {
 }
 
 func TestSecurityStepHandler_Execute(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
@@ -555,17 +483,19 @@ func TestSecurityStepHandler_Execute(t *testing.T) {
 	config := interfaces.StepConfig{Name: "security"}
 
 	// Mock config calls
-	mockConfig.EXPECT().GetBool("security.enable_vuln_check").Return(true)
+	mockConfig.GetBoolFunc = func(key string) bool {
+		if key == "security.enable_vuln_check" {
+			return true
+		}
+		return false
+	}
 
 	err := handler.Execute(t.Context(), "security", config)
 	require.NoError(t, err)
 }
 
 func TestSecurityStepHandler_GetStepInfo(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
@@ -588,10 +518,7 @@ func TestSecurityStepHandler_GetStepInfo(t *testing.T) {
 }
 
 func TestSecurityStepHandler_Validate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewSecurityStepHandler(mockConfig, nil).(*SecurityStepHandler)
@@ -609,10 +536,7 @@ func TestSecurityStepHandler_Validate(t *testing.T) {
 }
 
 func TestNewTagStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewTagStepHandler(mockConfig, nil)
@@ -621,10 +545,7 @@ func TestNewTagStepHandler(t *testing.T) {
 }
 
 func TestNewPackageStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewPackageStepHandler(mockConfig, nil)
@@ -633,10 +554,7 @@ func TestNewPackageStepHandler(t *testing.T) {
 }
 
 func TestNewPushStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewPushStepHandler(mockConfig, nil)
@@ -645,10 +563,7 @@ func TestNewPushStepHandler(t *testing.T) {
 }
 
 func TestNewReleaseStepHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 	// Logger is used directly via logger.L() - no need to mock
 
 	handler := NewReleaseStepHandler(mockConfig, nil)

@@ -5,17 +5,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewLocalExecutor(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	executor := NewLocalExecutor(mockConfig)
 
@@ -25,11 +20,9 @@ func TestNewLocalExecutor(t *testing.T) {
 }
 
 func TestLocalExecutor_ExecuteStep_Setup(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Mock logger calls
 
@@ -44,10 +37,7 @@ func TestLocalExecutor_ExecuteStep_Setup(t *testing.T) {
 }
 
 func TestLocalExecutor_ExecuteStep_Build(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Logger is used directly via logger.L() - no need to mock
 
@@ -62,10 +52,7 @@ func TestLocalExecutor_ExecuteStep_Build(t *testing.T) {
 }
 
 func TestLocalExecutor_ExecuteStep_Test(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Logger is used directly via logger.L() - no need to mock
 	// Note: The coverage log and config call won't happen because the step fails early
@@ -81,10 +68,7 @@ func TestLocalExecutor_ExecuteStep_Test(t *testing.T) {
 }
 
 func TestLocalExecutor_ExecuteStep_Lint(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Logger is used directly via logger.L() - no need to mock
 
@@ -99,10 +83,7 @@ func TestLocalExecutor_ExecuteStep_Lint(t *testing.T) {
 }
 
 func TestLocalExecutor_ExecuteStep_Security(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Logger is used directly via logger.L() - no need to mock
 
@@ -117,10 +98,7 @@ func TestLocalExecutor_ExecuteStep_Security(t *testing.T) {
 }
 
 func TestLocalExecutor_ExecuteStep_Unknown(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Logger is used directly via logger.L() - no need to mock
 
@@ -133,10 +111,7 @@ func TestLocalExecutor_ExecuteStep_Unknown(t *testing.T) {
 }
 
 func TestLocalExecutor_IsGoProject(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	executor := NewLocalExecutor(mockConfig)
 
@@ -150,10 +125,7 @@ func TestLocalExecutor_IsGoProject(t *testing.T) {
 }
 
 func TestLocalExecutor_IsCommandAvailable(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	executor := NewLocalExecutor(mockConfig)
 
@@ -167,29 +139,41 @@ func TestLocalExecutor_IsCommandAvailable(t *testing.T) {
 }
 
 func TestLocalExecutor_GetCoverageThreshold(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	executor := NewLocalExecutor(mockConfig)
 
 	t.Run("with valid coverage from config", func(t *testing.T) {
-		mockConfig.EXPECT().Get("pipeline.coverage").Return(85.0).Times(1)
+		mockConfig.GetFunc = func(key string) any {
+			if key == "pipeline.coverage" {
+				return 85.0
+			}
+			return nil
+		}
 
 		threshold := executor.getCoverageThreshold()
 		assert.InDelta(t, 85.0, threshold, 0.001)
 	})
 
 	t.Run("with invalid coverage from config", func(t *testing.T) {
-		mockConfig.EXPECT().Get("pipeline.coverage").Return("invalid").Times(1)
+		mockConfig.GetFunc = func(key string) any {
+			if key == "pipeline.coverage" {
+				return "invalid"
+			}
+			return nil
+		}
 
 		threshold := executor.getCoverageThreshold()
 		assert.InDelta(t, 90.0, threshold, 0.001) // Default value
 	})
 
 	t.Run("with nil coverage from config", func(t *testing.T) {
-		mockConfig.EXPECT().Get("pipeline.coverage").Return(nil).Times(1)
+		mockConfig.GetFunc = func(key string) any {
+			if key == "pipeline.coverage" {
+				return nil
+			}
+			return nil
+		}
 
 		threshold := executor.getCoverageThreshold()
 		assert.InDelta(t, 90.0, threshold, 0.001) // Default value
@@ -197,10 +181,7 @@ func TestLocalExecutor_GetCoverageThreshold(t *testing.T) {
 }
 
 func TestLocalExecutor_CheckCoverageThreshold(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	executor := NewLocalExecutor(mockConfig)
 
@@ -224,11 +205,9 @@ func TestLocalExecutor_CheckCoverageThreshold(t *testing.T) {
 }
 
 func TestLocalExecutor_ExecuteStep_ContextCancellation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Mock logger calls
 
@@ -274,11 +253,9 @@ func TestLocalExecutor_ExecuteStep_WithNilConfig_Old(t *testing.T) {
 
 // Test individual execution methods with Go project simulation
 func TestLocalExecutor_executeTest_WithGoProject(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
@@ -312,7 +289,12 @@ func main() {
 	// Mock logger calls for execution (will fail at coverage check)
 
 	// Mock config calls
-	mockConfig.EXPECT().Get("pipeline.coverage").Return(80.0).Times(1)
+	mockConfig.GetFunc = func(key string) any {
+		if key == "pipeline.coverage" {
+			return 80.0
+		}
+		return nil
+	}
 
 	executor := NewLocalExecutor(mockConfig)
 
@@ -325,11 +307,9 @@ func main() {
 }
 
 func TestLocalExecutor_executeLint_WithGoProject(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
@@ -374,11 +354,9 @@ func main() {
 }
 
 func TestLocalExecutor_executeSecurity_WithGoProject(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
@@ -423,11 +401,9 @@ func main() {
 }
 
 func TestLocalExecutor_executeSetup_WithGoProject(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
@@ -471,11 +447,9 @@ func main() {
 }
 
 func TestLocalExecutor_executeBuild_WithGoProject(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()
@@ -519,11 +493,9 @@ func main() {
 }
 
 func TestLocalExecutor_executeSecurity_WithGoProject_WithGosec(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Logger is used directly via logger.L() - no need to mock
-	mockConfig := mocks.NewMockConfiguration(ctrl)
+	mockConfig := NewMockConfiguration()
 
 	// Create a temporary directory with go.mod to simulate Go project
 	tempDir := t.TempDir()

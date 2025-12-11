@@ -4,10 +4,8 @@ import (
 	"testing"
 
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 func TestValidateConvertedConfig(t *testing.T) {
@@ -20,9 +18,7 @@ func TestValidateConvertedConfig(t *testing.T) {
 		{
 			name: "valid converted config",
 			cfg: func() interfaces.Configuration {
-				ctrl := gomock.NewController(t)
-				defer ctrl.Finish()
-				mockConfig := mocks.NewMockConfiguration(ctrl)
+				mockConfig := NewMockConfiguration()
 				setupMockConfigForConvertConfig(mockConfig)
 				return mockConfig
 			}(),
@@ -31,13 +27,20 @@ func TestValidateConvertedConfig(t *testing.T) {
 		{
 			name: "invalid registry URL in converted config",
 			cfg: func() interfaces.Configuration {
-				ctrl := gomock.NewController(t)
-				defer ctrl.Finish()
-				mockConfig := mocks.NewMockConfiguration(ctrl)
-				mockConfig.EXPECT().Environment().Return("dev").AnyTimes()
-				mockConfig.EXPECT().GetString("registry.base_url").Return("https://").AnyTimes() // Invalid: no host
-				mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.25.5").AnyTimes()
-				mockConfig.EXPECT().GetString("git.repo").Return("").AnyTimes()
+				mockConfig := NewMockConfiguration()
+				mockConfig.EnvironmentFunc = func() string { return "dev" }
+				mockConfig.GetStringFunc = func(key string) string {
+					switch key {
+					case "registry.base_url":
+						return "https://" // Invalid: no host
+					case "pipeline.go_version":
+						return "1.25.5"
+					case "git.repo":
+						return ""
+					default:
+						return ""
+					}
+				}
 				return mockConfig
 			}(),
 			wantErr: true,
@@ -46,13 +49,20 @@ func TestValidateConvertedConfig(t *testing.T) {
 		{
 			name: "invalid Go version in converted config",
 			cfg: func() interfaces.Configuration {
-				ctrl := gomock.NewController(t)
-				defer ctrl.Finish()
-				mockConfig := mocks.NewMockConfiguration(ctrl)
-				mockConfig.EXPECT().Environment().Return("dev").AnyTimes()
-				mockConfig.EXPECT().GetString("registry.base_url").Return("https://registry.example.com").AnyTimes()
-				mockConfig.EXPECT().GetString("pipeline.go_version").Return("v1.25.1").AnyTimes()
-				mockConfig.EXPECT().GetString("git.repo").Return("").AnyTimes()
+				mockConfig := NewMockConfiguration()
+				mockConfig.EnvironmentFunc = func() string { return "dev" }
+				mockConfig.GetStringFunc = func(key string) string {
+					switch key {
+					case "registry.base_url":
+						return "https://registry.example.com"
+					case "pipeline.go_version":
+						return "v1.25.1"
+					case "git.repo":
+						return ""
+					default:
+						return ""
+					}
+				}
 				return mockConfig
 			}(),
 			wantErr: true,
@@ -61,13 +71,20 @@ func TestValidateConvertedConfig(t *testing.T) {
 		{
 			name: "invalid Git repo URL in converted config",
 			cfg: func() interfaces.Configuration {
-				ctrl := gomock.NewController(t)
-				defer ctrl.Finish()
-				mockConfig := mocks.NewMockConfiguration(ctrl)
-				mockConfig.EXPECT().Environment().Return("dev").AnyTimes()
-				mockConfig.EXPECT().GetString("registry.base_url").Return("https://registry.example.com").AnyTimes()
-				mockConfig.EXPECT().GetString("pipeline.go_version").Return("1.25.5").AnyTimes()
-				mockConfig.EXPECT().GetString("git.repo").Return("not-a-valid-url").AnyTimes()
+				mockConfig := NewMockConfiguration()
+				mockConfig.EnvironmentFunc = func() string { return "dev" }
+				mockConfig.GetStringFunc = func(key string) string {
+					switch key {
+					case "registry.base_url":
+						return "https://registry.example.com"
+					case "pipeline.go_version":
+						return "1.25.5"
+					case "git.repo":
+						return "not-a-valid-url"
+					default:
+						return ""
+					}
+				}
 				return mockConfig
 			}(),
 			wantErr: true,
@@ -91,13 +108,10 @@ func TestValidateConvertedConfig(t *testing.T) {
 }
 
 func TestConvertConfig_WithValidation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockConfig := mocks.NewMockConfiguration(ctrl)
-	mockConfig.EXPECT().Environment().Return("dev").AnyTimes()
-	mockConfig.EXPECT().GetBool(gomock.Any()).Return(false).AnyTimes()
-	mockConfig.EXPECT().GetString(gomock.Any()).DoAndReturn(func(key string) string {
+	mockConfig := NewMockConfiguration()
+	mockConfig.EnvironmentFunc = func() string { return "dev" }
+	mockConfig.GetBoolFunc = func(key string) bool { return false }
+	mockConfig.GetStringFunc = func(key string) string {
 		switch key {
 		case "git.ref":
 			return "main"
@@ -110,8 +124,8 @@ func TestConvertConfig_WithValidation(t *testing.T) {
 		default:
 			return ""
 		}
-	}).AnyTimes()
-	mockConfig.EXPECT().GetFloat(gomock.Any()).Return(90.0).AnyTimes()
+	}
+	mockConfig.GetFloatFunc = func(key string) float64 { return 90.0 }
 
 	// Convert config
 	converted := convertConfig(mockConfig)
@@ -127,4 +141,3 @@ func TestConvertConfig_WithValidation(t *testing.T) {
 		assert.NotEmpty(t, converted.RegistryURL)
 	}
 }
-

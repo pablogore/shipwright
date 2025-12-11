@@ -19,6 +19,7 @@ import (
 	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
 	goservice "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-service"
 	infra "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/infra"
+	"github.com/getsyntegrity/syntegrity-dagger/internal/plugins"
 )
 
 const (
@@ -123,6 +124,7 @@ func (c *Container) registerComponents() {
 	c.registerExecutorComponents()
 	c.registerStepComponents()
 	c.registerHookComponents()
+	c.registerPluginComponents()
 }
 
 // registerDaggerComponents registers Dagger-related components.
@@ -593,6 +595,31 @@ func (c *Container) registerStepComponents() {
 		}
 
 		return NewPipelineExecutor(registry.(interfaces.StepRegistry), hookManager.(interfaces.HookManager)), nil
+	})
+}
+
+// registerPluginComponents registers plugin-related components.
+func (c *Container) registerPluginComponents() {
+	// Plugin Loader
+	c.Register("pluginLoader", func() (any, error) {
+		loader := plugins.NewLoader()
+
+		// Register built-in plugins
+		loader.RegisterBuiltin("nomad-deploy", func() plugins.Plugin {
+			return plugins.NewNomadDeployPlugin()
+		})
+
+		return loader, nil
+	})
+
+	// Plugin Registry
+	c.Register("pluginRegistry", func() (any, error) {
+		loader, err := c.Get("pluginLoader")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get plugin loader: %w", err)
+		}
+
+		return plugins.NewRegistry(loader.(plugins.PluginLoader)), nil
 	})
 }
 

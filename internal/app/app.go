@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"dagger.io/dagger"
+
 	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/getsyntegrity/syntegrity-dagger/internal/plugins"
 )
 
 var (
@@ -115,6 +118,12 @@ func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
 		return fmt.Errorf("failed to get pipeline %s: %w", pipelineName, err)
 	}
 
+	// Load and initialize plugins before executing pipeline
+	if err := a.loadAndInitializePlugins(ctx, pipelineName, initialPipeline); err != nil {
+		logger.L().WarnContext(ctx, "Failed to load plugins, continuing without plugins", "error", err)
+		// Don't fail the pipeline if plugins fail to load
+	}
+
 	// Execute pipeline steps
 	steps := initialPipeline.GetAvailableSteps()
 
@@ -137,6 +146,13 @@ func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
 	}
 
 	logger.L().InfoContext(ctx, "Pipeline completed successfully", "name", pipelineName)
+
+	// Cleanup plugins after pipeline execution
+	if err := a.cleanupPlugins(ctx); err != nil {
+		logger.L().WarnContext(ctx, "Failed to cleanup plugins", "error", err)
+		// Don't fail the pipeline if plugin cleanup fails
+	}
+
 	return nil
 }
 
@@ -184,4 +200,77 @@ func (a *App) GetPipelineInfo(pipelineName string) (map[string]any, error) {
 	}
 
 	return info, nil
+}
+
+// loadAndInitializePlugins loads and initializes plugins for the pipeline.
+func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string, pipeline interfaces.Pipeline) error {
+	// Get plugin registry
+	registry, err := a.container.Get("pluginRegistry")
+	if err != nil {
+		return fmt.Errorf("failed to get plugin registry: %w", err)
+	}
+
+	pluginRegistry := registry.(plugins.PluginRegistry)
+
+	// Get Dagger client (may be nil)
+	var daggerClient *dagger.Client
+	client, err := a.container.Get("daggerClient")
+	if err == nil && client != nil {
+		daggerClient = client.(*dagger.Client)
+	}
+
+	// Get hook manager
+	hookManager, err := a.container.Get("hookManager")
+	if err != nil {
+		return fmt.Errorf("failed to get hook manager: %w", err)
+	}
+
+	// Get step registry
+	stepRegistry, err := a.container.Get("stepRegistry")
+	if err != nil {
+		return fmt.Errorf("failed to get step registry: %w", err)
+	}
+
+	// Get pipeline config
+	cfg := a.container.GetConfiguration()
+	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
+
+	// Get logger (using go-kit-logger directly)
+	// Create plugin context
+	pluginCtx := plugins.NewPluginContext(
+		daggerClient,
+		cfg,
+		hookManager.(interfaces.HookManager),
+		stepRegistry.(interfaces.StepRegistry),
+		pipeline,
+		pipelineConfig,
+		nil, // Logger is accessed via logger.L() directly
+	)
+
+	// Load plugins from configuration
+	if err := pluginRegistry.LoadPluginsFromConfig(ctx, pluginCtx); err != nil {
+		return fmt.Errorf("failed to load plugins from config: %w", err)
+	}
+
+	logger.L().InfoContext(ctx, "Plugins loaded and initialized", "count", len(pluginRegistry.ListPlugins()))
+
+	return nil
+}
+
+// cleanupPlugins cleans up all loaded plugins.
+func (a *App) cleanupPlugins(ctx context.Context) error {
+	// Get plugin registry
+	registry, err := a.container.Get("pluginRegistry")
+	if err != nil {
+		return fmt.Errorf("failed to get plugin registry: %w", err)
+	}
+
+	pluginRegistry := registry.(plugins.PluginRegistry)
+
+	// Cleanup all plugins
+	if err := pluginRegistry.CleanupAll(ctx); err != nil {
+		return fmt.Errorf("failed to cleanup plugins: %w", err)
+	}
+
+	return nil
 }

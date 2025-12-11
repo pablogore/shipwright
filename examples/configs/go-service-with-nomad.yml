@@ -1,0 +1,52 @@
+pipeline:
+  name: "go-service"
+  environment: "production"
+  coverage: 90.0
+  go_version: "1.25.5"
+
+# Steps para servicio con deploy a Nomad
+steps:
+  - setup
+  - build
+  - test
+  - package
+  - tag
+  - push
+  - deploy-nomad  # Step personalizado agregado por el plugin
+
+# Configuración de plugins
+plugins:
+  nomad-deploy:
+    type: builtin
+    name: nomad-deploy
+    config:
+      # Dirección del cluster Nomad
+      nomad_addr: "http://nomad-cluster.example.com:4646"
+      
+      # Archivo de job de Nomad (opcional, por defecto busca nomad.hcl)
+      nomad_job_file: "nomad.hcl"
+      
+      # Auto-deploy después de push (opcional, por defecto false)
+      auto_deploy: true
+      
+      # Job de Nomad como string (alternativa a nomad_job_file)
+      # nomad_job: |
+      #   job "my-service" {
+      #     datacenters = ["dc1"]
+      #     type = "service"
+      #     group "app" {
+      #       task "server" {
+      #         driver = "docker"
+      #         config {
+      #           image = "${IMAGE_REF}"
+      #         }
+      #       }
+      #     }
+      #   }
+
+security:
+  enable_vuln_check: true
+  enable_linting: true
+
+logging:
+  level: "info"
