@@ -102,19 +102,26 @@ jobs:
     - name: Configure Git and Go for private repos
       env:
         SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GIT_TERMINAL_PROMPT: 0
       run: |
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}" >> ~/.netrc
         chmod 600 ~/.netrc
-        # Configure Git authentication
+        
+        # Configure Git authentication with token
         git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        
+        # Verify authentication setup
+        echo "✅ Git and Go configured for private repos"
+        echo "GOPRIVATE: $(go env GOPRIVATE)"
         
     - name: Clean Go module cache
       run: |
@@ -142,9 +149,23 @@ jobs:
     - name: Download dependencies
       env:
         SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GIT_TERMINAL_PROMPT: 0
       run: |
         echo "📦 Downloading Go dependencies..."
-        go mod download
+        # Re-ensure authentication is configured (in case cache restore cleared it)
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}@github.com/".insteadOf "git@github.com:"
+        
+        # Download dependencies with error handling
+        if ! go mod download; then
+          echo "❌ Failed to download dependencies"
+          echo "Checking authentication configuration..."
+          echo "GOPRIVATE: $(go env GOPRIVATE)"
+          git config --global --list | grep -i url || true
+          echo "Testing GitHub access..."
+          git ls-remote --heads https://github.com/getsyntegrity/go-kit-logger.git || true
+          exit 1
+        fi
         echo "✅ Dependencies downloaded"
       
     - name: Verify dependencies
