@@ -277,3 +277,5 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 | **Requisitos** | Go instalado | Docker + Dagger |
 
 **Recomendación**: Usa local para desarrollo diario, CI/CD para validación final.
+
+

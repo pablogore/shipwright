@@ -174,9 +174,10 @@ func (c *Container) registerDaggerComponents() {
 	c.Register("daggerClient", func() (any, error) {
 		timeout := c.config.GetDuration("dagger.timeout")
 		if timeout == 0 {
-			// Increased default timeout to 60 seconds for CI environments
-			// where Dagger engine may take longer to start
-			timeout = 60 * time.Second
+			// Increased default timeout to 120 seconds for CI environments
+			// where Dagger engine may take longer to start, especially on first run
+			// The daemon needs time to pull images and initialize
+			timeout = 120 * time.Second
 		}
 
 		// Use a longer context for connection attempts
@@ -192,10 +193,21 @@ func (c *Container) registerDaggerComponents() {
 				ErrFailedToCreateDaggerClient, err)
 		}
 
+		// Give Docker a moment to be fully ready before attempting Dagger connection
+		// This helps avoid race conditions where Docker is available but not fully initialized
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("%w: context cancelled while waiting for Docker to be ready",
+				ErrFailedToCreateDaggerClient)
+		case <-time.After(2 * time.Second):
+			// Continue with connection attempt
+		}
+
 		// Retry connection with exponential backoff
 		// This helps handle cases where the engine is still starting
-		maxRetries := 3
-		retryDelay := 2 * time.Second
+		// Increased retries and delays to handle slow daemon startup
+		maxRetries := 10
+		retryDelay := 3 * time.Second
 
 		var client *dagger.Client
 		var lastErr error
@@ -204,8 +216,8 @@ func (c *Container) registerDaggerComponents() {
 			if attempt > 0 {
 				// Wait before retrying (exponential backoff)
 				waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
-				if waitTime > 10*time.Second {
-					waitTime = 10 * time.Second // Cap at 10 seconds
+				if waitTime > 15*time.Second {
+					waitTime = 15 * time.Second // Cap at 15 seconds
 				}
 
 				select {
@@ -219,10 +231,24 @@ func (c *Container) registerDaggerComponents() {
 
 			// Connect to Dagger engine (which uses Docker)
 			// dagger.Connect() automatically manages the Dagger engine via Docker
+			// It may take time for the daemon to start, especially on first run
 			client, lastErr = dagger.Connect(ctx, dagger.WithLogOutput(nil))
 			if lastErr == nil {
-				// Connection successful - Dagger handles connection management internally
-				return client, nil
+				// Connection successful, but verify daemon is actually ready
+				// by performing a simple operation
+				verifyCtx, verifyCancel := context.WithTimeout(ctx, 10*time.Second)
+				_, verifyErr := client.Container().From("alpine:latest").ID(verifyCtx)
+				verifyCancel()
+
+				if verifyErr == nil {
+					// Daemon is ready and responding
+					return client, nil
+				}
+
+				// Connection succeeded but daemon not ready yet
+				// Close the client and retry
+				client.Close()
+				lastErr = fmt.Errorf("daemon connected but not ready: %w", verifyErr)
 			}
 
 			// Log retry attempt (if logger is available)
@@ -235,7 +261,8 @@ func (c *Container) registerDaggerComponents() {
 		// All retries failed
 		return nil, fmt.Errorf("%w: failed after %d attempts: %v. "+
 			"Ensure Dagger engine is running (try 'dagger run echo test' to verify). "+
-			"In GitHub Actions, ensure Docker service is available.",
+			"In GitHub Actions, ensure Docker service is available. "+
+			"The daemon may take up to 60 seconds to start on first run.",
 			ErrFailedToCreateDaggerClient, maxRetries+1, lastErr)
 	})
 }

@@ -1,10 +1,12 @@
 package shared
 
 import (
+	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"dagger.io/dagger"
-	"golang.org/x/net/context"
 )
 
 // GoBuilder encapsulates the logic for building Go binaries.
@@ -82,19 +84,102 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 
 	// Run Go commands: tidy dependencies and build the binary
 	// Using Sync() to ensure commands complete before proceeding
-	_, err := container.
-		WithExec([]string{"go", "mod", "tidy"}).
-		WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", target, "main.go"}).
-		Sync(ctx)
+	// Add retry logic for connection errors with exponential backoff
+	maxRetries := 3
+	retryDelay := 2 * time.Second
+	var err error
+	var result *dagger.Container
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Wait before retrying (exponential backoff)
+			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
+			if waitTime > 10*time.Second {
+				waitTime = 10 * time.Second // Cap at 10 seconds
+			}
+
+			select {
+			case <-ctx.Done():
+				return "", fmt.Errorf("context cancelled during build retry: %w", ctx.Err())
+			case <-time.After(waitTime):
+				// Continue with retry
+			}
+		}
+
+		result, err = container.
+			WithExec([]string{"go", "mod", "tidy"}).
+			WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", target, "main.go"}).
+			Sync(ctx)
+
+		if err == nil {
+			break // Success
+		}
+
+		// Check if error is a connection error that should be retried
+		errStr := err.Error()
+		isConnectionError := strings.Contains(errStr, "connection refused") ||
+			strings.Contains(errStr, "dial tcp") ||
+			strings.Contains(errStr, "connection reset") ||
+			strings.Contains(errStr, "no connection could be made")
+
+		if !isConnectionError || attempt >= maxRetries {
+			// Not a connection error or max retries reached
+			return "", fmt.Errorf("failed to build Go binary: %w", err)
+		}
+
+		// Log retry attempt
+		fmt.Printf("⚠️  Build connection attempt %d/%d failed: %v. Retrying...\n",
+			attempt+1, maxRetries+1, err)
+	}
+
 	if err != nil {
-		return "", fmt.Errorf("failed to build Go binary: %w", err)
+		return "", fmt.Errorf("failed to build Go binary after %d attempts: %w", maxRetries+1, err)
 	}
 
 	// Export the built binary to the host filesystem
-	file := container.File("/app/" + target)
-	_, err = file.Export(ctx, outPath)
+	// Use the result container from Sync() for export
+	// Add retry logic for connection errors during export
+	file := result.File("/app/" + target)
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Wait before retrying (exponential backoff)
+			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
+			if waitTime > 10*time.Second {
+				waitTime = 10 * time.Second // Cap at 10 seconds
+			}
+
+			select {
+			case <-ctx.Done():
+				return "", fmt.Errorf("context cancelled during export retry: %w", ctx.Err())
+			case <-time.After(waitTime):
+				// Continue with retry
+			}
+		}
+
+		_, err = file.Export(ctx, outPath)
+		if err == nil {
+			break // Success
+		}
+
+		// Check if error is a connection error that should be retried
+		errStr := err.Error()
+		isConnectionError := strings.Contains(errStr, "connection refused") ||
+			strings.Contains(errStr, "dial tcp") ||
+			strings.Contains(errStr, "connection reset") ||
+			strings.Contains(errStr, "no connection could be made")
+
+		if !isConnectionError || attempt >= maxRetries {
+			// Not a connection error or max retries reached
+			return "", fmt.Errorf("failed to export binary to %s: %w", outPath, err)
+		}
+
+		// Log retry attempt
+		fmt.Printf("⚠️  Export connection attempt %d/%d failed: %v. Retrying...\n",
+			attempt+1, maxRetries+1, err)
+	}
+
 	if err != nil {
-		return "", fmt.Errorf("failed to export binary to %s: %w", outPath, err)
+		return "", fmt.Errorf("failed to export binary to %s after %d attempts: %w", outPath, maxRetries+1, err)
 	}
 
 	return outPath, nil
