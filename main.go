@@ -303,6 +303,41 @@ func (c *CLI) executeSingleStep(ctx context.Context, flags *Flags) error {
 		return c.executeStepWithExecutor(ctx, flags)
 	}
 
+	// Try to use executor selector automatically (native first, then docker)
+	// This allows execution without Docker when Go is available
+	container := c.app.GetContainer()
+	selector, err := container.Get("executorSelector")
+	if err == nil {
+		executorSelector := selector.(*executors.Selector)
+
+		// Get Dagger client (may be nil for native execution)
+		var daggerClient *dagger.Client
+		client, err := container.Get("daggerClient")
+		if err == nil && client != nil {
+			daggerClient = client.(*dagger.Client)
+		}
+
+		// Get config
+		cfg := container.GetConfiguration()
+		pipelineConfig := app.ConvertConfigToPipelinesConfig(cfg)
+
+		// Try to select executor automatically (native first, then docker)
+		executor, err := executorSelector.SelectExecutor(ctx, daggerClient, pipelineConfig, "")
+		if err == nil {
+			fmt.Printf("🔧 Auto-selected executor: %s\n", executor.Name())
+			fmt.Printf("▶️  Executing step: %s\n", flags.step)
+
+			if err := executor.ExecuteStep(ctx, flags.step); err != nil {
+				return fmt.Errorf("step %s failed: %w", flags.step, err)
+			}
+
+			fmt.Printf("✅ Step completed: %s\n", flags.step)
+			return nil
+		}
+		// If executor selection fails, fall through to RunPipelineStep
+	}
+
+	// Fallback to RunPipelineStep (requires Dagger)
 	fmt.Printf("🎯 Executing step '%s' in pipeline: %s\n", flags.step, flags.pipelineName)
 
 	return c.app.RunPipelineStep(ctx, flags.pipelineName, flags.step)
