@@ -71,6 +71,19 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Verify Docker is available
+      shell: bash
+      run: |
+        echo "🐳 Verifying Docker is available..."
+        if ! docker info > /dev/null 2>&1; then
+          echo "❌ Docker is not running"
+          exit 1
+        fi
+        echo "✅ Docker is available (version: $(docker --version))"
+
     - name: Determine binary URL
       id: binary-url
       shell: bash
@@ -153,6 +166,21 @@ runs:
         echo "✅ Syntegrity Dagger $INSTALLED_VERSION ready"
         echo "binary-path=${BINARY_PATH}" >> $GITHUB_OUTPUT
         echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Ensure Docker and Dagger daemon are ready
+      shell: bash
+      run: |
+        echo "🐳 Verifying Docker is available..."
+        if ! docker info > /dev/null 2>&1; then
+          echo "❌ Docker is not running"
+          exit 1
+        fi
+        echo "✅ Docker is available (version: $(docker --version))"
+        
+        # syntegrity-dagger uses Dagger internally, which requires the Dagger daemon
+        # The daemon will be started automatically by syntegrity-dagger when needed
+        # We just need to ensure Docker is available
+        echo "✅ Docker is ready - syntegrity-dagger will handle Dagger daemon startup"
 
     - name: Execute Pipeline Stage
       id: execute
