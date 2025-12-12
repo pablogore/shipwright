@@ -527,13 +527,6 @@ jobs:
           echo "📋 Main/Develop/PR: Running full test suite with coverage"
           go test -race -coverprofile=coverage.out $TEST_PACKAGES
         fi
-      
-    - name: Upload coverage
-      if: needs.determine-pipeline.outputs.run-coverage == 'true'
-      uses: codecov/codecov-action@v5
-      with:
-        files: ./coverage.out
-        fail_ci_if_error: false
 
   # Stage 5: Security (only for main/develop/PRs)
   security:
