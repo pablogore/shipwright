@@ -340,6 +340,10 @@ jobs:
           fi
         fi
         
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -349,6 +353,12 @@ jobs:
         echo "login x-access-token" >> ~/.netrc
         echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
+        
+        # Verify Go environment
+        echo "📋 Go environment:"
+        echo "GOPRIVATE: $(go env GOPRIVATE)"
+        echo "GONOPROXY: $(go env GONOPROXY)"
+        echo "GONOSUMDB: $(go env GONOSUMDB)"
         
         go build -o ${{ env.BINARY_NAME }} .
         echo "✅ Build completed"
@@ -371,6 +381,10 @@ jobs:
             exit 1
           fi
         fi
+        
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
