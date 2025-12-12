@@ -109,6 +109,8 @@ jobs:
         if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
+            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
@@ -173,6 +175,8 @@ jobs:
         if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
+            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
@@ -196,18 +200,36 @@ jobs:
         if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
           echo "✅ Authentication test successful"
         else
-          echo "⚠️ Authentication test failed, but continuing..."
+          echo "⚠️ Authentication test failed - token may not have access to private repository"
+          echo "⚠️ This will likely cause 'go mod download' to fail"
+          echo "⚠️ Consider configuring SYNTEGRITY_DAGGER_TOKEN with a token that has 'repo' scope"
         fi
         
         # Download dependencies with error handling
         if ! go mod download; then
           echo "❌ Failed to download dependencies"
-          echo "Checking authentication configuration..."
+          echo ""
+          echo "🔍 Debugging information:"
           echo "GOPRIVATE: $(go env GOPRIVATE)"
           echo "Git URL config:"
           git config --global --get-regexp url || echo "No URL config found"
+          echo ""
           echo "Testing GitHub access with token..."
-          git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" || true
+          if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+            echo "✅ Token has access to repository"
+          else
+            echo "❌ Token does not have access to repository"
+            echo ""
+            echo "💡 Solution:"
+            echo "1. Create a Personal Access Token (PAT) with 'repo' scope at:"
+            echo "   https://github.com/settings/tokens"
+            echo "2. Add it as a secret named 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   Repository Settings → Secrets and variables → Actions"
+            echo "3. The token must have access to the private repository:"
+            echo "   github.com/getsyntegrity/go-kit-logger"
+            echo ""
+            echo "⚠️ GITHUB_TOKEN (default) does not have access to private organization repositories"
+          fi
           exit 1
         fi
         echo "✅ Dependencies downloaded"
