@@ -412,12 +412,30 @@ jobs:
         echo "GONOPROXY: $(go env GONOPROXY)"
         echo "GONOSUMDB: $(go env GONOSUMDB)"
         
-        # Test git authentication
+        # Test git authentication with detailed output
         echo "🔍 Testing git authentication..."
-        if git ls-remote --heads "https://github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+        echo "Testing with credential store..."
+        GIT_AUTH_TEST=$(git ls-remote --heads "https://github.com/getsyntegrity/go-kit-logger.git" 2>&1)
+        GIT_AUTH_EXIT=$?
+        
+        if [ $GIT_AUTH_EXIT -eq 0 ]; then
           echo "✅ Git authentication working"
         else
-          echo "⚠️ Warning: Git authentication test failed, but continuing..."
+          echo "⚠️ Warning: Git authentication test failed (exit code: $GIT_AUTH_EXIT)"
+          echo "Error output: $GIT_AUTH_TEST"
+          echo ""
+          echo "📋 Debugging information:"
+          echo "Git credential helper: $(git config --global credential.helper)"
+          echo "Git URL rewrite config:"
+          git config --global --get-regexp url || echo "No URL rewrite config"
+          echo "Netrc file exists: $([ -f ~/.netrc ] && echo 'yes' || echo 'no')"
+          echo "Git credentials file exists: $([ -f ~/.git-credentials ] && echo 'yes' || echo 'no')"
+          if [ -f ~/.git-credentials ]; then
+            echo "Git credentials file content (masked):"
+            sed 's/:[^@]*@/:***@/g' ~/.git-credentials
+          fi
+          echo ""
+          echo "⚠️ Continuing with build - Go may still authenticate via other methods..."
         fi
         
         go build -o ${{ env.BINARY_NAME }} .
