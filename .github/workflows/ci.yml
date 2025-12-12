@@ -769,6 +769,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [determine-pipeline, security]
     if: |
+      # Only trigger on direct push to main (after merge), never on PRs
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       needs.determine-pipeline.outputs.is-release == 'true' &&
