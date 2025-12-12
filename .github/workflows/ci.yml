@@ -104,6 +104,45 @@ jobs:
         
         # If any indicator suggests PR merge, allow it
         if [[ "$IS_PR_MERGE" == "true" ]]; then
+          # Additional check: detect direct merge from develop to main (without PR)
+          if [[ "$BRANCH" == "main" ]]; then
+            # Check if this merge is from develop branch directly (not via PR)
+            # PR merges will have PR number in commit message (#123)
+            # Direct merges from develop won't have PR reference
+            if echo "$COMMIT_MSG" | grep -qiE "#[0-9]+"; then
+              # Has PR number - this is a PR merge, allow it
+              echo "✅ Push appears to be from PR merge to main - allowing"
+              echo "   Commit: ${{ github.sha }}"
+              echo "   Branch: $BRANCH"
+              echo "   Author: $COMMIT_AUTHOR"
+              exit 0
+            else
+              # No PR number but detected as merge - check if it's from develop
+              # This could be a direct merge from develop to main (not allowed)
+              if echo "$COMMIT_MSG" | grep -qiE "(develop|from develop)"; then
+                echo "❌ ERROR: Direct merge from develop to main detected!"
+                echo ""
+                echo "🚫 Merges from develop to main must go through a Pull Request"
+                echo ""
+                echo "📋 Correct workflow:"
+                echo "   1. Create a Pull Request from develop to main"
+                echo "   2. Get PR approved"
+                echo "   3. Merge PR using squash merge"
+                echo ""
+                echo "Current commit: ${{ github.sha }}"
+                echo "Commit message: $(echo "$COMMIT_MSG" | head -1)"
+                echo "Author: $COMMIT_AUTHOR"
+                echo "Branch: $BRANCH"
+                echo ""
+                echo "💡 To fix this:"
+                echo "   - Revert this merge"
+                echo "   - Create a Pull Request from develop to main"
+                echo "   - Merge the PR instead"
+                exit 1
+              fi
+            fi
+          fi
+          
           echo "✅ Push appears to be from PR merge - allowing"
           echo "   Commit: ${{ github.sha }}"
           echo "   Branch: $BRANCH"
@@ -145,8 +184,15 @@ jobs:
       pipeline-type: ${{ steps.determine.outputs.type }}
       run-security: ${{ steps.determine.outputs.security }}
       run-coverage: ${{ steps.determine.outputs.coverage }}
+      run-tests: ${{ steps.determine.outputs.run-tests }}
+      run-build: ${{ steps.determine.outputs.run-build }}
       is-release: ${{ steps.determine.outputs.release }}
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    
     - name: Determine pipeline type
       id: determine
       run: |
@@ -167,6 +213,8 @@ jobs:
             echo "type=pr-main" >> $GITHUB_OUTPUT
             echo "security=true" >> $GITHUB_OUTPUT
             echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "run-tests=true" >> $GITHUB_OUTPUT
+            echo "run-build=true" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
             echo "📋 Pipeline: PR to main (full pipeline with security and coverage)"
           elif [[ "$BASE_BRANCH" == "develop" ]]; then
@@ -175,6 +223,8 @@ jobs:
             echo "type=pr-develop" >> $GITHUB_OUTPUT
             echo "security=false" >> $GITHUB_OUTPUT
             echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "run-tests=true" >> $GITHUB_OUTPUT
+            echo "run-build=true" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
             echo "📋 Pipeline: PR to develop (lightweight: build, test, coverage - no security)"
           else
@@ -182,30 +232,113 @@ jobs:
             echo "type=pr" >> $GITHUB_OUTPUT
             echo "security=false" >> $GITHUB_OUTPUT
             echo "coverage=false" >> $GITHUB_OUTPUT
+            echo "run-tests=true" >> $GITHUB_OUTPUT
+            echo "run-build=true" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
             echo "📋 Pipeline: PR to other branch (lightweight: build and test only)"
           fi
         elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          # Main branch: full pipeline + release
-          echo "type=main" >> $GITHUB_OUTPUT
-          echo "security=true" >> $GITHUB_OUTPUT
-          echo "coverage=true" >> $GITHUB_OUTPUT
-          echo "release=true" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Main branch (full pipeline + release)"
+          # Push to main: check if it's a hotfix merge or develop merge
+          COMMIT_MSG=$(git log -1 --pretty=%B "${{ github.sha }}")
+          COMMIT_AUTHOR=$(git log -1 --pretty=%an "${{ github.sha }}")
+          
+          # Detect if this is a PR merge
+          IS_PR_MERGE=false
+          if echo "$COMMIT_MSG" | grep -qiE "(#[0-9]+|Merge pull request|Squash and merge|from [^ ]+ into)"; then
+            IS_PR_MERGE=true
+          elif [[ "$COMMIT_AUTHOR" == "GitHub" ]] || [[ "$COMMIT_AUTHOR" == *"github"* ]]; then
+            IS_PR_MERGE=true
+          fi
+          
+          # Detect if it's a hotfix merge
+          IS_HOTFIX=false
+          if echo "$COMMIT_MSG" | grep -qiE "(hotfix|hot-fix|hot_fix)"; then
+            IS_HOTFIX=true
+            echo "✅ Detected hotfix merge to main"
+          fi
+          
+          # Check branch name in commit message or git history
+          if [[ "$IS_HOTFIX" == "false" ]]; then
+            # Check if source branch was hotfix
+            SOURCE_BRANCH=$(echo "$COMMIT_MSG" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
+            if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+              IS_HOTFIX=true
+              echo "✅ Detected hotfix merge to main (from branch: $SOURCE_BRANCH)"
+            fi
+          fi
+          
+          if [[ "$IS_HOTFIX" == "true" ]]; then
+            # Hotfix merge to main: full pipeline (build + tests + security + coverage)
+            # Hotfixes need full validation since they bypass develop
+            echo "type=main-hotfix" >> $GITHUB_OUTPUT
+            echo "security=true" >> $GITHUB_OUTPUT
+            echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "run-tests=true" >> $GITHUB_OUTPUT
+            echo "run-build=true" >> $GITHUB_OUTPUT
+            echo "release=true" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: Hotfix merge to main (full pipeline: build + tests + security + coverage + release)"
+          elif [[ "$IS_PR_MERGE" == "true" ]]; then
+            # Develop merge to main via PR: only build (tests already ran in PR)
+            echo "type=main-develop-merge" >> $GITHUB_OUTPUT
+            echo "security=true" >> $GITHUB_OUTPUT
+            echo "coverage=false" >> $GITHUB_OUTPUT
+            echo "run-tests=false" >> $GITHUB_OUTPUT
+            echo "run-build=true" >> $GITHUB_OUTPUT
+            echo "release=true" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: Develop merge to main via PR (build + security + release - tests already passed in PR)"
+          else
+            # Direct push to main: should not happen (only via PR)
+            echo "⚠️ WARNING: Direct push to main detected (should only happen via PR)"
+            echo "type=main-direct" >> $GITHUB_OUTPUT
+            echo "security=false" >> $GITHUB_OUTPUT
+            echo "coverage=false" >> $GITHUB_OUTPUT
+            echo "run-tests=false" >> $GITHUB_OUTPUT
+            echo "run-build=false" >> $GITHUB_OUTPUT
+            echo "release=false" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: Direct push to main (minimal - should only happen via PR)"
+          fi
         elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
-          # Direct push to develop: should not happen (only via PR)
-          # Fail or run minimal pipeline
-          echo "⚠️ WARNING: Direct push to develop detected"
-          echo "type=develop-direct" >> $GITHUB_OUTPUT
-          echo "security=false" >> $GITHUB_OUTPUT
-          echo "coverage=false" >> $GITHUB_OUTPUT
-          echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Direct push to develop (should only happen via PR)"
+          # Push to develop: check if it's a PR merge or direct push
+          COMMIT_MSG=$(git log -1 --pretty=%B "${{ github.sha }}")
+          COMMIT_AUTHOR=$(git log -1 --pretty=%an "${{ github.sha }}")
+          
+          # Detect if this is a PR merge
+          IS_PR_MERGE=false
+          if echo "$COMMIT_MSG" | grep -qiE "(#[0-9]+|Merge pull request|Squash and merge|from [^ ]+ into)"; then
+            IS_PR_MERGE=true
+            echo "✅ Detected PR merge to develop (commit message indicates PR merge)"
+          elif [[ "$COMMIT_AUTHOR" == "GitHub" ]] || [[ "$COMMIT_AUTHOR" == *"github"* ]]; then
+            IS_PR_MERGE=true
+            echo "✅ Detected PR merge to develop (GitHub author)"
+          fi
+          
+          if [[ "$IS_PR_MERGE" == "true" ]]; then
+            # PR merge to develop: only build (tests already ran in PR)
+            echo "type=develop-merge" >> $GITHUB_OUTPUT
+            echo "security=false" >> $GITHUB_OUTPUT
+            echo "coverage=false" >> $GITHUB_OUTPUT
+            echo "run-tests=false" >> $GITHUB_OUTPUT
+            echo "run-build=true" >> $GITHUB_OUTPUT
+            echo "release=false" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: PR merge to develop (build only - tests already passed in PR)"
+          else
+            # Direct push to develop: should not happen (only via PR)
+            echo "⚠️ WARNING: Direct push to develop detected"
+            echo "type=develop-direct" >> $GITHUB_OUTPUT
+            echo "security=false" >> $GITHUB_OUTPUT
+            echo "coverage=false" >> $GITHUB_OUTPUT
+            echo "run-tests=false" >> $GITHUB_OUTPUT
+            echo "run-build=false" >> $GITHUB_OUTPUT
+            echo "release=false" >> $GITHUB_OUTPUT
+            echo "📋 Pipeline: Direct push to develop (minimal - should only happen via PR)"
+          fi
         else
           # Feature branch push: lightweight pipeline
           echo "type=feature" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT
           echo "coverage=false" >> $GITHUB_OUTPUT
+          echo "run-tests=true" >> $GITHUB_OUTPUT
+          echo "run-build=true" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Feature branch (lightweight: build and test only)"
         fi
@@ -390,6 +523,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [determine-pipeline, setup]
+    if: needs.determine-pipeline.outputs.run-build == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -538,6 +672,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: [determine-pipeline, setup]
+    if: needs.determine-pipeline.outputs.run-tests == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -845,7 +980,8 @@ jobs:
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       needs.determine-pipeline.outputs.is-release == 'true' &&
-      needs.determine-pipeline.outputs.pipeline-type == 'main'
+      (needs.determine-pipeline.outputs.pipeline-type == 'main-hotfix' ||
+       needs.determine-pipeline.outputs.pipeline-type == 'main-develop-merge')
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -936,12 +1072,18 @@ jobs:
           FAILED_JOBS="${FAILED_JOBS}setup "
         fi
         
-        if [[ "${{ needs.build.result }}" != "success" ]]; then
-          FAILED_JOBS="${FAILED_JOBS}build "
+        # Build is conditional - only check if it was supposed to run
+        if [[ "${{ needs.determine-pipeline.outputs.run-build }}" == "true" ]]; then
+          if [[ "${{ needs.build.result }}" != "success" ]]; then
+            FAILED_JOBS="${FAILED_JOBS}build "
+          fi
         fi
         
-        if [[ "${{ needs.test.result }}" != "success" ]]; then
-          FAILED_JOBS="${FAILED_JOBS}test "
+        # Test is conditional - only check if it was supposed to run
+        if [[ "${{ needs.determine-pipeline.outputs.run-tests }}" == "true" ]]; then
+          if [[ "${{ needs.test.result }}" != "success" ]]; then
+            FAILED_JOBS="${FAILED_JOBS}test "
+          fi
         fi
         
         # Security is conditional - only check if it was supposed to run
@@ -960,8 +1102,16 @@ jobs:
           echo "📋 Job results:"
           echo "   - determine-pipeline: ${{ needs.determine-pipeline.result }}"
           echo "   - setup: ${{ needs.setup.result }}"
-          echo "   - build: ${{ needs.build.result }}"
-          echo "   - test: ${{ needs.test.result }}"
+          if [[ "${{ needs.determine-pipeline.outputs.run-build }}" == "true" ]]; then
+            echo "   - build: ${{ needs.build.result }}"
+          else
+            echo "   - build: skipped (not required for this pipeline type)"
+          fi
+          if [[ "${{ needs.determine-pipeline.outputs.run-tests }}" == "true" ]]; then
+            echo "   - test: ${{ needs.test.result }}"
+          else
+            echo "   - test: skipped (not required for this pipeline type)"
+          fi
           if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
             echo "   - security: ${{ needs.security.result }}"
           else
@@ -976,8 +1126,16 @@ jobs:
           echo "📋 Job results:"
           echo "   - determine-pipeline: ✅ ${{ needs.determine-pipeline.result }}"
           echo "   - setup: ✅ ${{ needs.setup.result }}"
-          echo "   - build: ✅ ${{ needs.build.result }}"
-          echo "   - test: ✅ ${{ needs.test.result }}"
+          if [[ "${{ needs.determine-pipeline.outputs.run-build }}" == "true" ]]; then
+            echo "   - build: ✅ ${{ needs.build.result }}"
+          else
+            echo "   - build: ⏭️  skipped (not required for this pipeline type)"
+          fi
+          if [[ "${{ needs.determine-pipeline.outputs.run-tests }}" == "true" ]]; then
+            echo "   - test: ✅ ${{ needs.test.result }}"
+          else
+            echo "   - test: ⏭️  skipped (not required for this pipeline type)"
+          fi
           if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
             echo "   - security: ✅ ${{ needs.security.result }}"
           else
