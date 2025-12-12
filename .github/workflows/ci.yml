@@ -838,3 +838,78 @@ jobs:
               throw error;
             }
           }
+
+  # Final stage: Verify all critical jobs passed (blocks merge if any failed)
+  verify-pipeline-success:
+    runs-on: ubuntu-latest
+    needs: [determine-pipeline, setup, build, test, security]
+    if: |
+      always() &&
+      github.event_name == 'pull_request'
+    steps:
+    - name: Verify all critical jobs passed
+      run: |
+        echo "🔍 Verifying all critical pipeline jobs completed successfully..."
+        echo ""
+        
+        FAILED_JOBS=""
+        
+        # Check each critical job
+        if [[ "${{ needs.determine-pipeline.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}determine-pipeline "
+        fi
+        
+        if [[ "${{ needs.setup.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}setup "
+        fi
+        
+        if [[ "${{ needs.build.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}build "
+        fi
+        
+        if [[ "${{ needs.test.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}test "
+        fi
+        
+        # Security is conditional - only check if it was supposed to run
+        if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
+          if [[ "${{ needs.security.result }}" != "success" ]]; then
+            FAILED_JOBS="${FAILED_JOBS}security "
+          fi
+        fi
+        
+        if [[ -n "$FAILED_JOBS" ]]; then
+          echo "❌ ERROR: The following critical jobs failed:"
+          echo "   $FAILED_JOBS"
+          echo ""
+          echo "🚫 This Pull Request cannot be merged until all jobs pass"
+          echo ""
+          echo "📋 Job results:"
+          echo "   - determine-pipeline: ${{ needs.determine-pipeline.result }}"
+          echo "   - setup: ${{ needs.setup.result }}"
+          echo "   - build: ${{ needs.build.result }}"
+          echo "   - test: ${{ needs.test.result }}"
+          if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
+            echo "   - security: ${{ needs.security.result }}"
+          else
+            echo "   - security: skipped (not required for this pipeline type)"
+          fi
+          echo ""
+          echo "💡 Please fix the failing jobs and push new commits to retry"
+          exit 1
+        else
+          echo "✅ All critical jobs passed successfully"
+          echo ""
+          echo "📋 Job results:"
+          echo "   - determine-pipeline: ✅ ${{ needs.determine-pipeline.result }}"
+          echo "   - setup: ✅ ${{ needs.setup.result }}"
+          echo "   - build: ✅ ${{ needs.build.result }}"
+          echo "   - test: ✅ ${{ needs.test.result }}"
+          if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
+            echo "   - security: ✅ ${{ needs.security.result }}"
+          else
+            echo "   - security: ⏭️  skipped (not required for this pipeline type)"
+          fi
+          echo ""
+          echo "✅ This Pull Request is ready to be merged"
+        fi
