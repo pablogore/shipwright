@@ -274,12 +274,24 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Configure Git for private repos
-      run: |
-        # Configure Git to use GITHUB_TOKEN for authentication
-        git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+    - name: Configure Git and Go for private repos
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GIT_TERMINAL_PROMPT: 0
+      run: |
+        # Configure Go to treat getsyntegrity repos as private
+        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
+        
+        # Configure Git to use GITHUB_TOKEN for authentication
+        git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+        
+        # Create .netrc file for authentication
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password ${GITHUB_TOKEN}" >> ~/.netrc
+        chmod 600 ~/.netrc
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -289,13 +301,28 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
           
-    - name: Build
+    - name: Download dependencies
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GIT_TERMINAL_PROMPT: 0
       run: |
-        echo "🔨 Building application..."
+        echo "📦 Downloading Go dependencies..."
         # Clean VCS cache to remove any cached unauthenticated URLs
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         # Re-configure Git authentication (cache restore may have cleared it)
-        git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+        # Re-create .netrc in case it was cleared
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password ${GITHUB_TOKEN}" >> ~/.netrc
+        chmod 600 ~/.netrc
+        # Download dependencies
+        go mod download
+        echo "✅ Dependencies downloaded"
+          
+    - name: Build
+      run: |
+        echo "🔨 Building application..."
         go build -o ${{ env.BINARY_NAME }} .
         echo "✅ Build completed"
       env:
