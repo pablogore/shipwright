@@ -438,6 +438,17 @@ jobs:
           echo "⚠️ Continuing with build - Go may still authenticate via other methods..."
         fi
         
+        # Download dependencies first with authentication
+        echo "📦 Downloading Go modules with authentication..."
+        go mod download || {
+          echo "❌ Failed to download modules"
+          echo "Attempting to clean module cache and retry..."
+          go clean -modcache
+          rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+          go mod download
+        }
+        
+        echo "✅ Modules downloaded, building..."
         go build -o ${{ env.BINARY_NAME }} .
         echo "✅ Build completed"
         
