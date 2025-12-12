@@ -22,6 +22,38 @@ env:
   CACHE_VERSION: v1
 
 jobs:
+  # Stage 0: Verify no direct pushes to protected branches
+  verify-branch-protection:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+    - name: Verify branch protection
+      run: |
+        BRANCH="${{ github.ref_name }}"
+        
+        if [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "develop" ]]; then
+          echo "❌ ERROR: Direct push to protected branch '$BRANCH' detected!"
+          echo ""
+          echo "🚫 Protected branches (main, develop) can only be updated via Pull Requests"
+          echo ""
+          echo "📋 Correct workflow:"
+          echo "   1. Create a feature branch from develop"
+          echo "   2. Make your changes"
+          echo "   3. Create a Pull Request to develop (for features) or main (for hotfixes)"
+          echo "   4. Get PR approved and merged"
+          echo ""
+          echo "Current commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          echo "Branch: $BRANCH"
+          echo ""
+          echo "💡 To fix this:"
+          echo "   - Create a new branch from your current commit"
+          echo "   - Push that branch and create a PR instead"
+          exit 1
+        else
+          echo "✅ Branch '$BRANCH' is not protected - direct push allowed"
+        fi
+
   # Stage 1: Determine pipeline type and configuration
   determine-pipeline:
     runs-on: ubuntu-latest
