@@ -367,14 +367,15 @@ jobs:
           echo "⚠️ Warning: SYNTEGRITY_DAGGER_TOKEN is empty"
         else
           echo "Token is set (length: ${#SYNTEGRITY_DAGGER_TOKEN} characters)"
-          AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1)
+          # Use || true to ensure this never fails the script
+          AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
           AUTH_EXIT_CODE=$?
           
           if [ $AUTH_EXIT_CODE -eq 0 ]; then
             echo "✅ Authentication verified via git ls-remote"
           else
             echo "⚠️ Warning: git ls-remote test failed (exit code: $AUTH_EXIT_CODE)"
-            echo "Error: $AUTH_TEST"
+            echo "Error output: $AUTH_TEST"
             echo ""
             echo "📋 This is a warning, not an error. Go may still be able to download modules using:"
             echo "   - .netrc file authentication"
@@ -501,16 +502,17 @@ jobs:
         echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
-        # Verify authentication before running tests
+        # Verify authentication before running tests (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
-        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1)
+        # Use || true to ensure this never fails the script
+        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
         AUTH_EXIT_CODE=$?
         
         if [ $AUTH_EXIT_CODE -eq 0 ]; then
           echo "✅ Authentication verified"
         else
-          echo "❌ Authentication test failed (exit code: $AUTH_EXIT_CODE)"
+          echo "⚠️ Warning: Authentication test failed (exit code: $AUTH_EXIT_CODE)"
           echo "Error output: $AUTH_TEST"
           echo ""
           echo "⚠️ Continuing with tests anyway - authentication may work for go mod download"
@@ -648,16 +650,17 @@ jobs:
         echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
-        # Verify authentication before installing tools
+        # Verify authentication before installing tools (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
-        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1)
+        # Use || true to ensure this never fails the script
+        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
         AUTH_EXIT_CODE=$?
         
         if [ $AUTH_EXIT_CODE -eq 0 ]; then
           echo "✅ Authentication verified"
         else
-          echo "❌ Authentication test failed (exit code: $AUTH_EXIT_CODE)"
+          echo "⚠️ Warning: Authentication test failed (exit code: $AUTH_EXIT_CODE)"
           echo "Error output: $AUTH_TEST"
           echo ""
           echo "⚠️ Continuing with security scan anyway - authentication may work for go mod download"
