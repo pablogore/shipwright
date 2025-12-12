@@ -360,14 +360,29 @@ jobs:
         echo "GONOPROXY: $(go env GONOPROXY)"
         echo "GONOSUMDB: $(go env GONOSUMDB)"
         
-        # Verify authentication before building
+        # Verify authentication before building (non-blocking)
         echo "🔍 Testing authentication..."
-        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
-          echo "✅ Authentication verified"
+        echo "Testing access to private repository..."
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          echo "⚠️ Warning: SYNTEGRITY_DAGGER_TOKEN is empty"
         else
-          echo "❌ Authentication test failed"
-          echo "⚠️ Token may not have access to private repository"
-          exit 1
+          echo "Token is set (length: ${#SYNTEGRITY_DAGGER_TOKEN} characters)"
+          AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1)
+          AUTH_EXIT_CODE=$?
+          
+          if [ $AUTH_EXIT_CODE -eq 0 ]; then
+            echo "✅ Authentication verified via git ls-remote"
+          else
+            echo "⚠️ Warning: git ls-remote test failed (exit code: $AUTH_EXIT_CODE)"
+            echo "Error: $AUTH_TEST"
+            echo ""
+            echo "📋 This is a warning, not an error. Go may still be able to download modules using:"
+            echo "   - .netrc file authentication"
+            echo "   - Git URL rewrite configuration"
+            echo "   - Go's built-in authentication mechanisms"
+            echo ""
+            echo "Continuing with build - go build will test actual module access..."
+          fi
         fi
         
         go build ./...
@@ -488,12 +503,17 @@ jobs:
         
         # Verify authentication before running tests
         echo "🔍 Testing authentication..."
-        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+        echo "Testing access to private repository..."
+        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1)
+        AUTH_EXIT_CODE=$?
+        
+        if [ $AUTH_EXIT_CODE -eq 0 ]; then
           echo "✅ Authentication verified"
         else
-          echo "❌ Authentication test failed"
-          echo "⚠️ Token may not have access to private repository"
-          exit 1
+          echo "❌ Authentication test failed (exit code: $AUTH_EXIT_CODE)"
+          echo "Error output: $AUTH_TEST"
+          echo ""
+          echo "⚠️ Continuing with tests anyway - authentication may work for go mod download"
         fi
         
         # Exclude examples and mocks directories from test coverage
@@ -630,12 +650,17 @@ jobs:
         
         # Verify authentication before installing tools
         echo "🔍 Testing authentication..."
-        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+        echo "Testing access to private repository..."
+        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1)
+        AUTH_EXIT_CODE=$?
+        
+        if [ $AUTH_EXIT_CODE -eq 0 ]; then
           echo "✅ Authentication verified"
         else
-          echo "❌ Authentication test failed"
-          echo "⚠️ Token may not have access to private repository"
-          exit 1
+          echo "❌ Authentication test failed (exit code: $AUTH_EXIT_CODE)"
+          echo "Error output: $AUTH_TEST"
+          echo ""
+          echo "⚠️ Continuing with security scan anyway - authentication may work for go mod download"
         fi
         
         echo "📋 Go version: $(go version)"
