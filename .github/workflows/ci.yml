@@ -695,13 +695,15 @@ jobs:
         fi
 
   # Stage 6: Trigger release workflow for develop->main merges
+  # IMPORTANT: Only triggers on main branch, never on develop
   trigger-release:
     runs-on: ubuntu-latest
     needs: [determine-pipeline, security]
     if: |
       needs.determine-pipeline.outputs.is-release == 'true' &&
       needs.determine-pipeline.outputs.pipeline-type == 'main' &&
-      github.event_name != 'pull_request'
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main'
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
