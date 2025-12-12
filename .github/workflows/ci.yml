@@ -723,11 +723,15 @@ jobs:
           SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
         fi
         
+        # Trigger release for merges from develop or hotfix branches
         if [[ "$SOURCE_BRANCH" == "develop" ]] || echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
           echo "✅ Merge from develop detected: $SOURCE_BRANCH"
           echo "should_trigger=true" >> $GITHUB_OUTPUT
+        elif echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+          echo "✅ Merge from hotfix detected: $SOURCE_BRANCH"
+          echo "should_trigger=true" >> $GITHUB_OUTPUT
         else
-          echo "⏭️ Merge is not from develop (detected: $SOURCE_BRANCH) - skipping release trigger"
+          echo "⏭️ Merge is not from develop or hotfix (detected: $SOURCE_BRANCH) - skipping release trigger"
           echo "should_trigger=false" >> $GITHUB_OUTPUT
         fi
     
