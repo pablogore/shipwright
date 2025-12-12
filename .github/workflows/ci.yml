@@ -44,26 +44,32 @@ jobs:
         
         # Determine pipeline type based on context
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          # Pull request: full pipeline with security and coverage checks
+          # Pull request: determine based on base branch and source branch
           BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
+          
           if [[ "$BASE_BRANCH" == "main" ]]; then
+            # PR to main: full pipeline (develop->main or hotfix->main)
             echo "type=pr-main" >> $GITHUB_OUTPUT
             echo "security=true" >> $GITHUB_OUTPUT
             echo "coverage=true" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
             echo "📋 Pipeline: PR to main (full pipeline with security and coverage)"
           elif [[ "$BASE_BRANCH" == "develop" ]]; then
+            # PR to develop: lightweight pipeline (feature->develop)
+            # Features should be validated but don't need full security scan yet
             echo "type=pr-develop" >> $GITHUB_OUTPUT
-            echo "security=true" >> $GITHUB_OUTPUT
+            echo "security=false" >> $GITHUB_OUTPUT
             echo "coverage=true" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
-            echo "📋 Pipeline: PR to develop (full pipeline with security and coverage)"
+            echo "📋 Pipeline: PR to develop (lightweight: build, test, coverage - no security)"
           else
+            # PR to other branch: lightweight pipeline
             echo "type=pr" >> $GITHUB_OUTPUT
-            echo "security=true" >> $GITHUB_OUTPUT
-            echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "security=false" >> $GITHUB_OUTPUT
+            echo "coverage=false" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
-            echo "📋 Pipeline: PR to other branch (full pipeline)"
+            echo "📋 Pipeline: PR to other branch (lightweight: build and test only)"
           fi
         elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           # Main branch: full pipeline + release
@@ -73,19 +79,39 @@ jobs:
           echo "release=true" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Main branch (full pipeline + release)"
         elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
-          # Develop branch: full pipeline only
-          echo "type=develop" >> $GITHUB_OUTPUT
-          echo "security=true" >> $GITHUB_OUTPUT
-          echo "coverage=true" >> $GITHUB_OUTPUT
+          # Direct push to develop: should not happen (only via PR)
+          # Fail or run minimal pipeline
+          echo "type=develop-direct" >> $GITHUB_OUTPUT
+          echo "security=false" >> $GITHUB_OUTPUT
+          echo "coverage=false" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Develop branch (full pipeline)"
+          echo "⚠️ WARNING: Direct push to develop detected" >> $GITHUB_OUTPUT
+          echo "📋 Pipeline: Direct push to develop (should only happen via PR)"
         else
+          # Feature branch push: lightweight pipeline
           echo "type=feature" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT
           echo "coverage=false" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Feature branch (lightweight pipeline)"
+          echo "📋 Pipeline: Feature branch (lightweight: build and test only)"
         fi
+
+  # Stage 1.5: Warn about direct pushes to develop (should only happen via PR)
+  warn-direct-develop:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop'
+    steps:
+    - name: Warn about direct push to develop
+      run: |
+        echo "⚠️ WARNING: Direct push to develop branch detected!"
+        echo "⚠️ Develop should only be updated via Pull Requests from feature branches"
+        echo "⚠️ This pipeline will run minimal checks only"
+        echo "⚠️ For proper validation, create a PR from your feature branch to develop"
+        echo ""
+        echo "Current commit: ${{ github.sha }}"
+        echo "Author: ${{ github.actor }}"
 
   # Stage 2: Setup and Dependencies (always runs)
   setup:
