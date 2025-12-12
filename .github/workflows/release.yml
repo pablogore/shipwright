@@ -23,6 +23,7 @@ permissions:
 env:
   GO_VERSION: '1.25.5'
   BINARY_NAME: 'syntegrity-dagger'
+  CACHE_VERSION: v1
 
 jobs:
   # Job 1: Validate tag and prepare release
@@ -276,61 +277,217 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
+            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+          else
+            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            exit 1
+          fi
+        fi
+        
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         
-        # Configure Git to use GITHUB_TOKEN for authentication
-        git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-        
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password ${GITHUB_TOKEN}" >> ~/.netrc
+        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
+        
+        # Configure Git authentication with token (escape special characters)
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        
+        # Verify authentication setup
+        echo "✅ Git and Go configured for private repos"
+        echo "GOPRIVATE: $(go env GOPRIVATE)"
+        echo "Git URL config:"
+        git config --global --get-regexp url || echo "No URL config found"
+        
+    - name: Clean Go module cache
+      run: |
+        echo "🧹 Cleaning Go module cache..."
+        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
+        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        sudo rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        mkdir -p ~/go/pkg/mod
+        mkdir -p ~/.cache/go-build
+        echo "✅ Go module cache and VCS cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
         restore-keys: |
-          ${{ runner.os }}-go-
+          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
+          go-mod-${{ hashFiles('go.sum') }}-
+          go-mod-
+        fail-on-cache-miss: false
           
     - name: Download dependencies
       env:
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "📦 Downloading Go dependencies..."
+        
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
+            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+          else
+            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            exit 1
+          fi
+        fi
+        
         # Clean VCS cache to remove any cached unauthenticated URLs
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
-        # Re-configure Git authentication (cache restore may have cleared it)
-        git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+        
+        # Re-ensure authentication is configured (in case cache restore cleared it)
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password ${GITHUB_TOKEN}" >> ~/.netrc
+        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        # Download dependencies
-        go mod download
+        
+        # Test authentication before downloading
+        echo "Testing GitHub authentication..."
+        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          echo "✅ Authentication test successful"
+        else
+          echo "⚠️ Authentication test failed - token may not have access to private repository"
+          echo "⚠️ This will likely cause 'go mod download' to fail"
+          echo "⚠️ Consider configuring SYNTEGRITY_DAGGER_TOKEN with a token that has 'repo' scope"
+        fi
+        
+        # Download dependencies with error handling
+        if ! go mod download; then
+          echo "❌ Failed to download dependencies"
+          echo ""
+          echo "🔍 Debugging information:"
+          echo "GOPRIVATE: $(go env GOPRIVATE)"
+          echo "Git URL config:"
+          git config --global --get-regexp url || echo "No URL config found"
+          echo ""
+          echo "Testing GitHub access with token..."
+          if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+            echo "✅ Token has access to repository"
+          else
+            echo "❌ Token does not have access to repository"
+            echo ""
+            echo "💡 Solution:"
+            echo "1. Create a Personal Access Token (PAT) with 'repo' scope at:"
+            echo "   https://github.com/settings/tokens"
+            echo "2. Add it as a secret named 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   Repository Settings → Secrets and variables → Actions"
+            echo "3. The token must have access to the private repository:"
+            echo "   github.com/getsyntegrity/go-kit-logger"
+            echo ""
+            echo "⚠️ GITHUB_TOKEN (default) does not have access to private organization repositories"
+          fi
+          exit 1
+        fi
         echo "✅ Dependencies downloaded"
+        
+    - name: Verify dependencies
+      run: |
+        echo "🔍 Verifying dependencies..."
+        go mod verify
+        echo "✅ Dependencies verified"
           
     - name: Build
+      env:
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🔨 Building application..."
+        
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+          else
+            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            exit 1
+          fi
+        fi
+        
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        
+        # Re-ensure authentication is configured (in case cache restore cleared it)
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        
+        # Re-create .netrc in case it was cleared
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        chmod 600 ~/.netrc
+        
         go build -o ${{ env.BINARY_NAME }} .
         echo "✅ Build completed"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Run tests
+      env:
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🧪 Running tests..."
+        
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+          else
+            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            exit 1
+          fi
+        fi
+        
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        
+        # Re-ensure authentication is configured (in case cache restore cleared it)
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        
+        # Re-create .netrc in case it was cleared
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        chmod 600 ~/.netrc
+        
         # Exclude examples and mocks directories from tests
         TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
         go test -v $TEST_PACKAGES
