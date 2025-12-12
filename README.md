@@ -1,5 +1,7 @@
 # Syntegrity Dagger
 
+[![Release Pipeline](https://github.com/getsyntegrity/syntegrity-dagger/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/getsyntegrity/syntegrity-dagger/actions/workflows/release.yml)
+
 A unified CI/CD pipeline library for Go projects, built on top of Dagger SDK. Syntegrity Dagger provides standardized, reusable pipelines that can be easily integrated into any Go project's CI/CD workflow.
 
 ## 🚀 Features
