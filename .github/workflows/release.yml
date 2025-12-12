@@ -285,8 +285,9 @@ jobs:
     - name: Build
       run: |
         echo "🔨 Building application..."
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         go build -o ${{ env.BINARY_NAME }} .
-        echo "✅ Build completed"
         echo "✅ Build completed"
         
     - name: Run tests
