@@ -303,9 +303,10 @@ jobs:
         echo "🧹 Cleaning Go module cache..."
         sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
         sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        sudo rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
-        echo "✅ Go module cache cleaned"
+        echo "✅ Go module cache and VCS cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -339,6 +340,10 @@ jobs:
           fi
         fi
         
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -348,6 +353,22 @@ jobs:
         echo "login x-access-token" >> ~/.netrc
         echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
+        
+        # Verify Go environment
+        echo "📋 Go environment:"
+        echo "GOPRIVATE: $(go env GOPRIVATE)"
+        echo "GONOPROXY: $(go env GONOPROXY)"
+        echo "GONOSUMDB: $(go env GONOSUMDB)"
+        
+        # Verify authentication before building
+        echo "🔍 Testing authentication..."
+        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          echo "✅ Authentication verified"
+        else
+          echo "❌ Authentication test failed"
+          echo "⚠️ Token may not have access to private repository"
+          exit 1
+        fi
         
         go build ./...
 
@@ -414,9 +435,10 @@ jobs:
         echo "🧹 Cleaning Go module cache..."
         sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
         sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        sudo rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
-        echo "✅ Go module cache cleaned"
+        echo "✅ Go module cache and VCS cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -450,6 +472,10 @@ jobs:
           fi
         fi
         
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -459,6 +485,16 @@ jobs:
         echo "login x-access-token" >> ~/.netrc
         echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
+        
+        # Verify authentication before running tests
+        echo "🔍 Testing authentication..."
+        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          echo "✅ Authentication verified"
+        else
+          echo "❌ Authentication test failed"
+          echo "⚠️ Token may not have access to private repository"
+          exit 1
+        fi
         
         # Exclude examples and mocks directories from test coverage
         TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
@@ -541,9 +577,10 @@ jobs:
         echo "🧹 Cleaning Go module cache..."
         sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
         sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        sudo rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
-        echo "✅ Go module cache cleaned"
+        echo "✅ Go module cache and VCS cache cleaned"
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -577,6 +614,10 @@ jobs:
           fi
         fi
         
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -586,6 +627,16 @@ jobs:
         echo "login x-access-token" >> ~/.netrc
         echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
+        
+        # Verify authentication before installing tools
+        echo "🔍 Testing authentication..."
+        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          echo "✅ Authentication verified"
+        else
+          echo "❌ Authentication test failed"
+          echo "⚠️ Token may not have access to private repository"
+          exit 1
+        fi
         
         echo "📋 Go version: $(go version)"
         go install golang.org/x/vuln/cmd/govulncheck@latest
