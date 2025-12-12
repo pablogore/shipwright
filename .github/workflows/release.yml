@@ -321,6 +321,35 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
           
+    - name: Clean VCS cache after restore
+      env:
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GIT_TERMINAL_PROMPT: 0
+      run: |
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          if [ -n "$GITHUB_TOKEN" ]; then
+            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+          fi
+        fi
+        
+        # Clean VCS cache that may have been restored with unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache after restore..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        
+        # Re-ensure authentication is configured (cache restore may have cleared it)
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        
+        # Re-create .netrc in case it was cleared
+        echo "machine github.com" > ~/.netrc
+        echo "login x-access-token" >> ~/.netrc
+        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        chmod 600 ~/.netrc
+        
+        echo "✅ VCS cache cleaned and authentication re-established"
+          
     - name: Build
       env:
         SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
@@ -419,6 +448,10 @@ jobs:
             exit 1
           fi
         fi
+        
+        # Clean VCS cache to remove any cached unauthenticated URLs
+        echo "🧹 Cleaning Go VCS cache..."
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
