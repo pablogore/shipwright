@@ -274,6 +274,13 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
+    - name: Configure Git for private repos
+      run: |
+        # Configure Git to use GITHUB_TOKEN for authentication
+        git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
@@ -287,8 +294,12 @@ jobs:
         echo "🔨 Building application..."
         # Clean VCS cache to remove any cached unauthenticated URLs
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        # Re-configure Git authentication (cache restore may have cleared it)
+        git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
         go build -o ${{ env.BINARY_NAME }} .
         echo "✅ Build completed"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Run tests
       run: |
