@@ -25,10 +25,15 @@ jobs:
   # Stage 0: Verify no direct pushes to protected branches
   verify-branch-protection:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
     steps:
     - name: Verify branch protection
       run: |
+        # Only check for direct pushes, PRs are allowed
+        if [[ "${{ github.event_name }}" != "push" ]]; then
+          echo "✅ Not a direct push (event: ${{ github.event_name }}) - branch protection check skipped"
+          exit 0
+        fi
+        
         BRANCH="${{ github.ref_name }}"
         
         if [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "develop" ]]; then
@@ -59,10 +64,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [verify-branch-protection]
     # Skip CI for tag pushes (handled by release workflow)
+    # Only proceed if branch protection check passed (or was skipped for PRs)
     if: |
-      always() &&
-      needs.verify-branch-protection.result == 'success' &&
-      !startsWith(github.ref, 'refs/tags/')
+      !startsWith(github.ref, 'refs/tags/') &&
+      needs.verify-branch-protection.result == 'success'
     outputs:
       pipeline-type: ${{ steps.determine.outputs.type }}
       run-security: ${{ steps.determine.outputs.security }}
