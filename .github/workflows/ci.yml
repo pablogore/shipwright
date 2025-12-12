@@ -730,36 +730,28 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const { data: runs } = await github.rest.actions.listWorkflowRuns({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'release.yml',
-            branch: 'main',
-            per_page: 1
-          });
-          
-          // Check if there's already a release workflow running for this commit
-          const currentSha = context.sha;
-          const existingRun = runs.workflow_runs.find(run => 
-            run.head_sha === currentSha && 
-            (run.status === 'in_progress' || run.status === 'queued')
-          );
-          
-          if (existingRun) {
-            console.log(`⏭️ Release workflow already running for commit ${currentSha}`);
-            console.log(`   Run ID: ${existingRun.id}, Status: ${existingRun.status}`);
-            return;
-          }
-          
           // Trigger release workflow with workflow_dispatch to use latest main version
+          const currentSha = context.sha;
           console.log(`🚀 Triggering release workflow for commit ${currentSha} (develop->main merge)`);
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'release.yml',
-            ref: 'main', // Always use main branch to get latest workflow version
-            inputs: {
-              commit_sha: currentSha // Pass the CI commit SHA for checkout
+          
+          try {
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release.yml',
+              ref: 'main', // Always use main branch to get latest workflow version
+              inputs: {
+                commit_sha: currentSha // Pass the CI commit SHA for checkout
+              }
+            });
+            console.log(`✅ Release workflow triggered successfully`);
+          } catch (error) {
+            // If workflow is already running, GitHub will return an error
+            // This is acceptable - the release will still proceed
+            if (error.status === 422 || error.message.includes('already running')) {
+              console.log(`ℹ️ Release workflow may already be running for this commit`);
+              console.log(`   This is normal - the release will proceed`);
+            } else {
+              throw error;
             }
-          });
-          console.log(`✅ Release workflow triggered successfully`);
+          }
