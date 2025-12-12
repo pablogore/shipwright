@@ -22,11 +22,52 @@ env:
   CACHE_VERSION: v1
 
 jobs:
+  # Stage 0: Verify no direct pushes to protected branches
+  verify-branch-protection:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify branch protection
+      run: |
+        # Only check for direct pushes, PRs are allowed
+        if [[ "${{ github.event_name }}" != "push" ]]; then
+          echo "✅ Not a direct push (event: ${{ github.event_name }}) - branch protection check skipped"
+          exit 0
+        fi
+        
+        BRANCH="${{ github.ref_name }}"
+        
+        if [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "develop" ]]; then
+          echo "❌ ERROR: Direct push to protected branch '$BRANCH' detected!"
+          echo ""
+          echo "🚫 Protected branches (main, develop) can only be updated via Pull Requests"
+          echo ""
+          echo "📋 Correct workflow:"
+          echo "   1. Create a feature branch from develop"
+          echo "   2. Make your changes"
+          echo "   3. Create a Pull Request to develop (for features) or main (for hotfixes)"
+          echo "   4. Get PR approved and merged"
+          echo ""
+          echo "Current commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          echo "Branch: $BRANCH"
+          echo ""
+          echo "💡 To fix this:"
+          echo "   - Create a new branch from your current commit"
+          echo "   - Push that branch and create a PR instead"
+          exit 1
+        else
+          echo "✅ Branch '$BRANCH' is not protected - direct push allowed"
+        fi
+
   # Stage 1: Determine pipeline type and configuration
   determine-pipeline:
     runs-on: ubuntu-latest
+    needs: [verify-branch-protection]
     # Skip CI for tag pushes (handled by release workflow)
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    # Only proceed if branch protection check passed (or was skipped for PRs)
+    if: |
+      !startsWith(github.ref, 'refs/tags/') &&
+      needs.verify-branch-protection.result == 'success'
     outputs:
       pipeline-type: ${{ steps.determine.outputs.type }}
       run-security: ${{ steps.determine.outputs.security }}
@@ -44,26 +85,32 @@ jobs:
         
         # Determine pipeline type based on context
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          # Pull request: full pipeline with security and coverage checks
+          # Pull request: determine based on base branch and source branch
           BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
+          
           if [[ "$BASE_BRANCH" == "main" ]]; then
+            # PR to main: full pipeline (develop->main or hotfix->main)
             echo "type=pr-main" >> $GITHUB_OUTPUT
             echo "security=true" >> $GITHUB_OUTPUT
             echo "coverage=true" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
             echo "📋 Pipeline: PR to main (full pipeline with security and coverage)"
           elif [[ "$BASE_BRANCH" == "develop" ]]; then
+            # PR to develop: lightweight pipeline (feature->develop)
+            # Features should be validated but don't need full security scan yet
             echo "type=pr-develop" >> $GITHUB_OUTPUT
-            echo "security=true" >> $GITHUB_OUTPUT
+            echo "security=false" >> $GITHUB_OUTPUT
             echo "coverage=true" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
-            echo "📋 Pipeline: PR to develop (full pipeline with security and coverage)"
+            echo "📋 Pipeline: PR to develop (lightweight: build, test, coverage - no security)"
           else
+            # PR to other branch: lightweight pipeline
             echo "type=pr" >> $GITHUB_OUTPUT
-            echo "security=true" >> $GITHUB_OUTPUT
-            echo "coverage=true" >> $GITHUB_OUTPUT
+            echo "security=false" >> $GITHUB_OUTPUT
+            echo "coverage=false" >> $GITHUB_OUTPUT
             echo "release=false" >> $GITHUB_OUTPUT
-            echo "📋 Pipeline: PR to other branch (full pipeline)"
+            echo "📋 Pipeline: PR to other branch (lightweight: build and test only)"
           fi
         elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           # Main branch: full pipeline + release
@@ -73,23 +120,45 @@ jobs:
           echo "release=true" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Main branch (full pipeline + release)"
         elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
-          # Develop branch: full pipeline only
-          echo "type=develop" >> $GITHUB_OUTPUT
-          echo "security=true" >> $GITHUB_OUTPUT
-          echo "coverage=true" >> $GITHUB_OUTPUT
+          # Direct push to develop: should not happen (only via PR)
+          # Fail or run minimal pipeline
+          echo "type=develop-direct" >> $GITHUB_OUTPUT
+          echo "security=false" >> $GITHUB_OUTPUT
+          echo "coverage=false" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Develop branch (full pipeline)"
+          echo "⚠️ WARNING: Direct push to develop detected" >> $GITHUB_OUTPUT
+          echo "📋 Pipeline: Direct push to develop (should only happen via PR)"
         else
+          # Feature branch push: lightweight pipeline
           echo "type=feature" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT
           echo "coverage=false" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "📋 Pipeline: Feature branch (lightweight pipeline)"
+          echo "📋 Pipeline: Feature branch (lightweight: build and test only)"
         fi
+
+  # Stage 1.5: Warn about direct pushes to develop (should only happen via PR)
+  warn-direct-develop:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop'
+    steps:
+    - name: Warn about direct push to develop
+      run: |
+        echo "⚠️ WARNING: Direct push to develop branch detected!"
+        echo "⚠️ Develop should only be updated via Pull Requests from feature branches"
+        echo "⚠️ This pipeline will run minimal checks only"
+        echo "⚠️ For proper validation, create a PR from your feature branch to develop"
+        echo ""
+        echo "Current commit: ${{ github.sha }}"
+        echo "Author: ${{ github.actor }}"
 
   # Stage 2: Setup and Dependencies (always runs)
   setup:
     runs-on: ubuntu-latest
+    needs: [determine-pipeline]
+    if: needs.determine-pipeline.result == 'success'
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -524,12 +593,12 @@ jobs:
         
         # Exclude examples and mocks directories from test coverage
         TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
-        if [[ "${{ needs.determine-pipeline.outputs.pipeline-type }}" == "feature" ]]; then
-          echo "📋 Feature branch: Running basic tests"
-          go test -race $TEST_PACKAGES
-        else
-          echo "📋 Main/Develop/PR: Running full test suite with coverage"
+        if [[ "${{ needs.determine-pipeline.outputs.run-coverage }}" == "true" ]]; then
+          echo "📋 Running full test suite with coverage"
           go test -race -coverprofile=coverage.out $TEST_PACKAGES
+        else
+          echo "📋 Running basic tests (no coverage)"
+          go test -race $TEST_PACKAGES
         fi
 
   # Stage 5: Security (only for main/develop/PRs)
@@ -694,16 +763,17 @@ jobs:
           echo "✅ Security scan completed."
         fi
 
-  # Stage 6: Trigger release workflow for develop->main merges
-  # IMPORTANT: Only triggers on main branch, never on develop
+  # Stage 6: Trigger release workflow for develop->main or hotfix->main merges
+  # IMPORTANT: Only triggers on main branch after merge, never on PRs, develop, or feature branches
   trigger-release:
     runs-on: ubuntu-latest
     needs: [determine-pipeline, security]
     if: |
+      # Only trigger on direct push to main (after merge), never on PRs
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
       needs.determine-pipeline.outputs.is-release == 'true' &&
-      needs.determine-pipeline.outputs.pipeline-type == 'main' &&
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/main'
+      needs.determine-pipeline.outputs.pipeline-type == 'main'
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -723,11 +793,15 @@ jobs:
           SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
         fi
         
+        # Trigger release for merges from develop or hotfix branches
         if [[ "$SOURCE_BRANCH" == "develop" ]] || echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
           echo "✅ Merge from develop detected: $SOURCE_BRANCH"
           echo "should_trigger=true" >> $GITHUB_OUTPUT
+        elif echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+          echo "✅ Merge from hotfix detected: $SOURCE_BRANCH"
+          echo "should_trigger=true" >> $GITHUB_OUTPUT
         else
-          echo "⏭️ Merge is not from develop (detected: $SOURCE_BRANCH) - skipping release trigger"
+          echo "⏭️ Merge is not from develop or hotfix (detected: $SOURCE_BRANCH) - skipping release trigger"
           echo "should_trigger=false" >> $GITHUB_OUTPUT
         fi
     
@@ -765,3 +839,78 @@ jobs:
               throw error;
             }
           }
+
+  # Final stage: Verify all critical jobs passed (blocks merge if any failed)
+  verify-pipeline-success:
+    runs-on: ubuntu-latest
+    needs: [determine-pipeline, setup, build, test, security]
+    if: |
+      always() &&
+      github.event_name == 'pull_request'
+    steps:
+    - name: Verify all critical jobs passed
+      run: |
+        echo "🔍 Verifying all critical pipeline jobs completed successfully..."
+        echo ""
+        
+        FAILED_JOBS=""
+        
+        # Check each critical job
+        if [[ "${{ needs.determine-pipeline.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}determine-pipeline "
+        fi
+        
+        if [[ "${{ needs.setup.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}setup "
+        fi
+        
+        if [[ "${{ needs.build.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}build "
+        fi
+        
+        if [[ "${{ needs.test.result }}" != "success" ]]; then
+          FAILED_JOBS="${FAILED_JOBS}test "
+        fi
+        
+        # Security is conditional - only check if it was supposed to run
+        if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
+          if [[ "${{ needs.security.result }}" != "success" ]]; then
+            FAILED_JOBS="${FAILED_JOBS}security "
+          fi
+        fi
+        
+        if [[ -n "$FAILED_JOBS" ]]; then
+          echo "❌ ERROR: The following critical jobs failed:"
+          echo "   $FAILED_JOBS"
+          echo ""
+          echo "🚫 This Pull Request cannot be merged until all jobs pass"
+          echo ""
+          echo "📋 Job results:"
+          echo "   - determine-pipeline: ${{ needs.determine-pipeline.result }}"
+          echo "   - setup: ${{ needs.setup.result }}"
+          echo "   - build: ${{ needs.build.result }}"
+          echo "   - test: ${{ needs.test.result }}"
+          if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
+            echo "   - security: ${{ needs.security.result }}"
+          else
+            echo "   - security: skipped (not required for this pipeline type)"
+          fi
+          echo ""
+          echo "💡 Please fix the failing jobs and push new commits to retry"
+          exit 1
+        else
+          echo "✅ All critical jobs passed successfully"
+          echo ""
+          echo "📋 Job results:"
+          echo "   - determine-pipeline: ✅ ${{ needs.determine-pipeline.result }}"
+          echo "   - setup: ✅ ${{ needs.setup.result }}"
+          echo "   - build: ✅ ${{ needs.build.result }}"
+          echo "   - test: ✅ ${{ needs.test.result }}"
+          if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
+            echo "   - security: ✅ ${{ needs.security.result }}"
+          else
+            echo "   - security: ⏭️  skipped (not required for this pipeline type)"
+          fi
+          echo ""
+          echo "✅ This Pull Request is ready to be merged"
+        fi
