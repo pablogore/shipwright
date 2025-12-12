@@ -550,12 +550,12 @@ jobs:
         
         # Exclude examples and mocks directories from test coverage
         TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
-        if [[ "${{ needs.determine-pipeline.outputs.pipeline-type }}" == "feature" ]]; then
-          echo "📋 Feature branch: Running basic tests"
-          go test -race $TEST_PACKAGES
-        else
-          echo "📋 Main/Develop/PR: Running full test suite with coverage"
+        if [[ "${{ needs.determine-pipeline.outputs.run-coverage }}" == "true" ]]; then
+          echo "📋 Running full test suite with coverage"
           go test -race -coverprofile=coverage.out $TEST_PACKAGES
+        else
+          echo "📋 Running basic tests (no coverage)"
+          go test -race $TEST_PACKAGES
         fi
 
   # Stage 5: Security (only for main/develop/PRs)
