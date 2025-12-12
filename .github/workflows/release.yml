@@ -82,7 +82,6 @@ jobs:
     if: |
       always() &&
       (
-        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
         (github.event_name == 'workflow_dispatch' && (inputs.commit_sha != '' || needs.check-admin.result == 'success' || needs.check-admin.result == 'skipped')) ||
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
       )
@@ -124,7 +123,7 @@ jobs:
     - name: Determine release type and version
       id: tag
       run: |
-        # Determine if this is a tag push or workflow_run from main
+        # Determine if this is a tag push or workflow_dispatch from CI
         if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
           # Manual release via tag
           echo "🏷️ Manual release via tag: ${{ github.ref_name }}"
@@ -132,7 +131,7 @@ jobs:
           VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           echo "type=manual" >> $GITHUB_OUTPUT
           echo "source_branch=tag" >> $GITHUB_OUTPUT
-        elif [[ "${{ github.event_name }}" == "workflow_run" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.commit_sha }}" ]]; then
+        elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.commit_sha }}" ]]; then
           # Automatic release via workflow_dispatch from CI (with commit_sha)
           echo "🚀 Automatic release triggered by CI via workflow_dispatch (commit: ${{ inputs.commit_sha }})"
           
@@ -163,7 +162,7 @@ jobs:
           
           echo "✅ Merge from develop detected - proceeding with automatic release"
           
-          # Continue with automatic release logic (only for workflow_run from develop)
+          # Continue with automatic release logic (only for workflow_dispatch from CI with develop merge)
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
           # Get latest tag
@@ -329,12 +328,11 @@ jobs:
   create-release:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     needs: [validate-release]
-    # Only run if triggered by workflow_run (develop->main), workflow_dispatch (manual admin or CI), or tag push
+    # Only run if triggered by workflow_dispatch (manual admin or CI), or tag push
     if: |
       always() &&
       needs.validate-release.result == 'success' &&
       (
-        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
         (github.event_name == 'workflow_dispatch') ||
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
       )
@@ -346,7 +344,7 @@ jobs:
         fetch-tags: true  # Fetch all tags to ensure tag validation works
         # For workflow_dispatch, use commit_sha input if provided, otherwise use main
         # For tag push, use the tag
-        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'workflow_dispatch' && (inputs.commit_sha || 'main')) || github.sha }}
+        ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.commit_sha || 'main') || github.sha }}
         # token: Uses GITHUB_TOKEN by default (automatically provided by GitHub Actions)
         
     - name: Set up Go
