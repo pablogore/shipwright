@@ -195,11 +195,11 @@ jobs:
         elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
           # Direct push to develop: should not happen (only via PR)
           # Fail or run minimal pipeline
+          echo "⚠️ WARNING: Direct push to develop detected"
           echo "type=develop-direct" >> $GITHUB_OUTPUT
           echo "security=false" >> $GITHUB_OUTPUT
           echo "coverage=false" >> $GITHUB_OUTPUT
           echo "release=false" >> $GITHUB_OUTPUT
-          echo "⚠️ WARNING: Direct push to develop detected" >> $GITHUB_OUTPUT
           echo "📋 Pipeline: Direct push to develop (should only happen via PR)"
         else
           # Feature branch push: lightweight pipeline
