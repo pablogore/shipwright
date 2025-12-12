@@ -14,6 +14,13 @@ on:
       - completed
     branches:
       - main
+  workflow_dispatch:
+    # Allow manual trigger or trigger from CI workflow
+    inputs:
+      ci_sha:
+        description: 'Commit SHA from CI workflow (for workflow_run compatibility)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -28,11 +35,12 @@ jobs:
   # Job 1: Validate tag and prepare release
   validate-release:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
-    # Only run if CI workflow completed successfully, or if triggered by tag push
+    # Only run if CI workflow completed successfully, or if triggered by tag push or workflow_dispatch
     # The branches filter in workflow_run already ensures this only runs for main branch
     # We just need to check that CI completed successfully
     if: |
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch') ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
@@ -46,7 +54,8 @@ jobs:
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
         # For workflow_run events, checkout the commit from the CI workflow
-        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+        # For workflow_dispatch, use ci_sha input if provided, otherwise use main
+        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'workflow_dispatch' && inputs.ci_sha) || github.sha }}
         # token: Uses GITHUB_TOKEN by default (automatically provided by GitHub Actions)
         
     - name: Set up Go
@@ -257,11 +266,12 @@ jobs:
   create-release:
     runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
     needs: [validate-release]
-    # Only run if CI workflow completed successfully, or if triggered by tag push
+    # Only run if CI workflow completed successfully, or if triggered by tag push or workflow_dispatch
     # The branches filter in workflow_run already ensures this only runs for main branch
     # We just need to check that CI completed successfully
     if: |
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch') ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     steps:
     - name: Checkout code
@@ -270,7 +280,8 @@ jobs:
         fetch-depth: 0
         fetch-tags: true  # Fetch all tags to ensure tag validation works
         # For workflow_run events, checkout the commit from the CI workflow
-        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+        # For workflow_dispatch, use ci_sha input if provided, otherwise use main
+        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'workflow_dispatch' && inputs.ci_sha) || github.sha }}
         # token: Uses GITHUB_TOKEN by default (automatically provided by GitHub Actions)
         
     - name: Set up Go
