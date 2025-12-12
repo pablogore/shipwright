@@ -689,3 +689,77 @@ jobs:
           cat vuln_report.txt
           echo "✅ Security scan completed."
         fi
+
+  # Stage 6: Trigger release workflow for develop->main merges
+  trigger-release:
+    runs-on: ubuntu-latest
+    needs: [determine-pipeline, security]
+    if: |
+      needs.determine-pipeline.outputs.is-release == 'true' &&
+      needs.determine-pipeline.outputs.pipeline-type == 'main' &&
+      github.event_name != 'pull_request'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+      
+    - name: Detect source branch
+      id: detect-source
+      run: |
+        # Detect source branch from merge commit message
+        SOURCE_BRANCH=""
+        MERGE_COMMIT=$(git log -1 --pretty=%B)
+        if echo "$MERGE_COMMIT" | grep -qE "Merge pull request|Merge branch"; then
+          SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
+        fi
+        if [[ -z "$SOURCE_BRANCH" ]]; then
+          SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
+        fi
+        
+        if [[ "$SOURCE_BRANCH" == "develop" ]] || echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
+          echo "✅ Merge from develop detected: $SOURCE_BRANCH"
+          echo "should_trigger=true" >> $GITHUB_OUTPUT
+        else
+          echo "⏭️ Merge is not from develop (detected: $SOURCE_BRANCH) - skipping release trigger"
+          echo "should_trigger=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Trigger release workflow
+      if: steps.detect-source.outputs.should_trigger == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: runs } = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'release.yml',
+            branch: 'main',
+            per_page: 1
+          });
+          
+          // Check if there's already a release workflow running for this commit
+          const currentSha = context.sha;
+          const existingRun = runs.workflow_runs.find(run => 
+            run.head_sha === currentSha && 
+            (run.status === 'in_progress' || run.status === 'queued')
+          );
+          
+          if (existingRun) {
+            console.log(`⏭️ Release workflow already running for commit ${currentSha}`);
+            console.log(`   Run ID: ${existingRun.id}, Status: ${existingRun.status}`);
+            return;
+          }
+          
+          // Trigger release workflow with workflow_dispatch to use latest main version
+          console.log(`🚀 Triggering release workflow for commit ${currentSha} (develop->main merge)`);
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'release.yml',
+            ref: 'main', // Always use main branch to get latest workflow version
+            inputs: {
+              commit_sha: currentSha // Pass the CI commit SHA for checkout
+            }
+          });
+          console.log(`✅ Release workflow triggered successfully`);
