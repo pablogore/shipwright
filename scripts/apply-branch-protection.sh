@@ -35,7 +35,7 @@ echo "📋 Ruleset configuration:"
 echo "   - Target branches: main, develop"
 echo "   - Required approvals: 1"
 echo "   - Required status checks: build, test, security"
-echo "   - Allowed merge methods: squash, rebase"
+echo "   - Allowed merge methods: squash"
 echo ""
 
 # Apply ruleset to repository
