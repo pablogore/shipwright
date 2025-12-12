@@ -338,6 +338,23 @@ jobs:
         echo "🧹 Cleaning Go VCS cache after restore..."
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
+        # Configure Git credential helper to use token
+        # Store credentials in git credential store
+        git config --global credential.helper store
+        echo "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com" > ~/.git-credentials
+        chmod 600 ~/.git-credentials
+        
+        # Also create GIT_ASKPASS helper for interactive prompts
+        cat > ~/.git-askpass-helper << EOF
+#!/bin/sh
+case "\$1" in
+  Username*) echo "x-access-token" ;;
+  Password*) echo "${SYNTEGRITY_DAGGER_TOKEN}" ;;
+esac
+EOF
+        chmod +x ~/.git-askpass-helper
+        export GIT_ASKPASS=~/.git-askpass-helper
+        
         # Re-ensure authentication is configured (cache restore may have cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -347,6 +364,9 @@ jobs:
         echo "login x-access-token" >> ~/.netrc
         echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
+        
+        # Set GIT_TERMINAL_PROMPT to prevent prompts
+        export GIT_TERMINAL_PROMPT=0
         
         echo "✅ VCS cache cleaned and authentication re-established"
           
@@ -373,6 +393,11 @@ jobs:
         echo "🧹 Cleaning Go VCS cache..."
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
+        # Configure Git credential helper to use token
+        git config --global credential.helper store
+        echo "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com" > ~/.git-credentials
+        chmod 600 ~/.git-credentials
+        
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -388,6 +413,14 @@ jobs:
         echo "GOPRIVATE: $(go env GOPRIVATE)"
         echo "GONOPROXY: $(go env GONOPROXY)"
         echo "GONOSUMDB: $(go env GONOSUMDB)"
+        
+        # Test git authentication
+        echo "🔍 Testing git authentication..."
+        if git ls-remote --heads "https://github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          echo "✅ Git authentication working"
+        else
+          echo "⚠️ Warning: Git authentication test failed, but continuing..."
+        fi
         
         go build -o ${{ env.BINARY_NAME }} .
         echo "✅ Build completed"
