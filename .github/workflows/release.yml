@@ -339,19 +339,17 @@ jobs:
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
         # Configure Git credential helper to use token
-        # Store credentials in git credential store
+        # Store credentials in git credential store (most reliable method)
         git config --global credential.helper store
         echo "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com" > ~/.git-credentials
         chmod 600 ~/.git-credentials
         
-        # Also create GIT_ASKPASS helper for interactive prompts
-        cat > ~/.git-askpass-helper << EOF
-#!/bin/sh
-case "\$1" in
-  Username*) echo "x-access-token" ;;
-  Password*) echo "${SYNTEGRITY_DAGGER_TOKEN}" ;;
-esac
-EOF
+        # Also create GIT_ASKPASS helper for interactive prompts (fallback)
+        echo '#!/bin/sh' > ~/.git-askpass-helper
+        echo 'case "$1" in' >> ~/.git-askpass-helper
+        echo '  Username*) echo "x-access-token" ;;' >> ~/.git-askpass-helper
+        echo "  Password*) echo \"${SYNTEGRITY_DAGGER_TOKEN}\" ;;" >> ~/.git-askpass-helper
+        echo 'esac' >> ~/.git-askpass-helper
         chmod +x ~/.git-askpass-helper
         export GIT_ASKPASS=~/.git-askpass-helper
         
