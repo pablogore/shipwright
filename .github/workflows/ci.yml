@@ -732,7 +732,10 @@ jobs:
     - name: Trigger release workflow
       if: steps.detect-source.outputs.should_trigger == 'true'
       uses: actions/github-script@v7
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN }}
       with:
+        github-token: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN }}
         script: |
           // Trigger release workflow with workflow_dispatch to use latest main version
           const currentSha = context.sha;
@@ -756,6 +759,7 @@ jobs:
               console.log(`ℹ️ Release workflow may already be running for this commit`);
               console.log(`   This is normal - the release will proceed`);
             } else {
+              console.error(`❌ Error triggering release workflow: ${error.message}`);
               throw error;
             }
           }
