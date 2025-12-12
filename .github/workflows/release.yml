@@ -167,22 +167,8 @@ jobs:
           fi
           
           echo "✅ Merge from develop detected - proceeding with automatic release"
-        else
-          # Manual release via workflow_dispatch
-          echo "🔧 Manual release triggered by admin via workflow_dispatch"
-          SOURCE_BRANCH="manual"
           
-          # Check if version was provided manually
-          if [[ -n "${{ inputs.version }}" ]]; then
-            TAG="${{ inputs.version }}"
-            VERSION=$(echo "$TAG" | sed 's/^v//')
-            echo "type=manual" >> $GITHUB_OUTPUT
-            echo "source_branch=manual" >> $GITHUB_OUTPUT
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
+          # Continue with automatic release logic (only for workflow_run from develop)
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
           # Get latest tag
@@ -193,16 +179,38 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "Commit message: $COMMIT_MSG"
           
-          # For manual releases, default to patch version bump
-          echo "📝 Manual release: defaulting to patch version bump"
-          VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-          VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+          # Check if merge comes from hotfix branch
+          if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+            # Hotfix: always bump patch version
+            echo "🔥 Hotfix detected from branch: $SOURCE_BRANCH - bumping patch version"
+            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
+          else
+            # Merge from develop: determine based on commit messages
+            echo "🌿 Merge from develop branch - analyzing commits"
+
+            # Check commit messages in the merge
+            if echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
+              # Breaking change: bump major version
+              echo "⚠️ Breaking change detected: bumping major version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
+            elif echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
+              # Feature: bump minor version
+              echo "📦 Feature detected: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            else
+              # Default for develop: bump minor version (develop usually has features)
+              echo "📝 Default for develop: bumping minor version"
+              VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
+              VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
+            fi
+          fi
+          
           TAG="v$VERSION"
-          echo "type=manual" >> $GITHUB_OUTPUT
-          echo "source_branch=manual" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          exit 0
+          echo "type=automatic" >> $GITHUB_OUTPUT
+          echo "auto_tag=true" >> $GITHUB_OUTPUT
         else
           # Manual release via workflow_dispatch
           echo "🔧 Manual release triggered by admin via workflow_dispatch"
@@ -236,50 +244,6 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           exit 0
         fi
-        
-        # Continue with automatic release logic (only for workflow_run from develop)
-        echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
-
-        # Get latest tag
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-        echo "Latest tag: $LATEST_TAG"
-        
-        # Determine version bump based on source branch and commit messages
-        COMMIT_MSG=$(git log -1 --pretty=%B)
-        echo "Commit message: $COMMIT_MSG"
-        
-        # Check if merge comes from hotfix branch
-        if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
-          # Hotfix: always bump patch version
-          echo "🔥 Hotfix detected from branch: $SOURCE_BRANCH - bumping patch version"
-          VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-          VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2"."$3+1}')
-        else
-          # Merge from develop: determine based on commit messages
-          echo "🌿 Merge from develop branch - analyzing commits"
-
-          # Check commit messages in the merge
-          if echo "$COMMIT_MSG" | grep -qiE "^(breaking|BREAKING)"; then
-            # Breaking change: bump major version
-            echo "⚠️ Breaking change detected: bumping major version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1+1".0.0"}')
-          elif echo "$COMMIT_MSG" | grep -qiE "^(feat|feature)(\(.+\))?:"; then
-            # Feature: bump minor version
-            echo "📦 Feature detected: bumping minor version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
-          else
-            # Default for develop: bump minor version (develop usually has features)
-            echo "📝 Default for develop: bumping minor version"
-            VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
-            VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
-          fi
-        fi
-        
-        TAG="v$VERSION"
-        echo "type=automatic" >> $GITHUB_OUTPUT
-        echo "auto_tag=true" >> $GITHUB_OUTPUT
         
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
