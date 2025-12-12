@@ -50,7 +50,6 @@ curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/mai
 curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
 chmod +x syntegrity-dagger
 ```
-
 ### Manual Installation
 
 ```bash
