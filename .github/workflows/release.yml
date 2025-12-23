@@ -362,10 +362,21 @@ jobs:
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
             echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo ""
+            echo "📋 For FREE GitHub accounts:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
-            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            echo ""
+            echo "📋 For FREE GitHub accounts - Setup Instructions:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
             exit 1
           fi
         fi
@@ -510,11 +521,14 @@ jobs:
       run: |
         if ! command -v gh &> /dev/null; then
           echo "Installing GitHub CLI..."
+          # Note: sudo is required for system package installation
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
           sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           sudo apt update
           sudo apt install gh -y
+        else
+          echo "✅ GitHub CLI already installed"
         fi
         gh --version
     
