@@ -43,8 +43,10 @@ jobs:
           # This is a tag, not a branch
           BRANCH_NAME=""
         else
-          # Try to extract from any ref format
-          BRANCH_NAME="${BRANCH##*/}"
+          # Safer fallback: strip "refs/" prefix if present, otherwise use as-is
+          # This preserves branch names with slashes (e.g., "feature/main" stays as "feature/main")
+          # Using ${BRANCH#refs/} instead of ${BRANCH##*/} prevents truncating branch names
+          BRANCH_NAME="${BRANCH#refs/}"
         fi
         
         # Validate that branch name was extracted correctly
