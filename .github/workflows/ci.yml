@@ -3,7 +3,8 @@ name: CI/CD Pipeline
 # This workflow runs when:
 # 1. Push to main or develop branches (includes PR merges)
 # 2. Pull requests targeting main or develop (for pre-merge validation)
-# 3. Manual trigger via workflow_dispatch
+# 3. Branch deletion events (to prevent deletion of protected branches)
+# 4. Manual trigger via workflow_dispatch
 # Note: PR merges trigger push events, so we handle both to avoid duplicates
 on:
   push:
@@ -11,6 +12,7 @@ on:
   pull_request:
     branches: [ main, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
+  delete:
   workflow_dispatch:
 
 permissions:
@@ -22,6 +24,53 @@ env:
   CACHE_VERSION: v1
 
 jobs:
+  # Stage -1: Prevent deletion of protected branches
+  prevent-branch-deletion:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch'
+    steps:
+    - name: Prevent branch deletion
+      run: |
+        BRANCH="${{ github.event.ref }}"
+        BRANCH_NAME="${{ github.event.ref_name }}"
+        REF_TYPE="${{ github.event.ref_type }}"
+        
+        # Only check for branches (not tags)
+        if [[ "$REF_TYPE" != "branch" ]]; then
+          echo "✅ Deletion is for a tag, not a branch - allowing"
+          exit 0
+        fi
+        
+        # Check if it's a protected branch
+        if [[ "$BRANCH_NAME" != "main" ]] && [[ "$BRANCH_NAME" != "develop" ]]; then
+          echo "✅ Branch '$BRANCH_NAME' is not protected - deletion allowed"
+          exit 0
+        fi
+        
+        # If we get here, it's an attempt to delete a protected branch
+        echo "❌ ERROR: Attempt to delete protected branch detected!"
+        echo ""
+        echo "🚫 Protected branches (main, develop) CANNOT be deleted under any circumstances"
+        echo ""
+        echo "📋 Branch information:"
+        echo "   - Branch ref: $BRANCH"
+        echo "   - Branch name: $BRANCH_NAME"
+        echo "   - Ref type: $REF_TYPE"
+        echo "   - Actor: ${{ github.actor }}"
+        echo "   - Event: ${{ github.event_name }}"
+        echo ""
+        echo "🔒 Branch protection rules prevent deletion of:"
+        echo "   - main"
+        echo "   - develop"
+        echo ""
+        echo "💡 If you need to restore a branch:"
+        echo "   - Contact repository administrators"
+        echo "   - Use git reflog to find the commit SHA"
+        echo "   - Restore the branch from a backup or previous commit"
+        echo ""
+        echo "🚨 This workflow will fail to prevent branch deletion"
+        exit 1
+
   # Stage 0: Verify no direct pushes to protected branches
   verify-branch-protection:
     runs-on: ubuntu-latest
@@ -372,6 +421,66 @@ jobs:
         # For PRs, checkout the PR head commit
         ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       
+    - name: Validate GitHub account and token access
+      env:
+        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "🔍 Validating GitHub account and token access..."
+        echo ""
+        echo "📋 GitHub Account Information:"
+        echo "   - Repository: ${{ github.repository }}"
+        echo "   - Actor: ${{ github.actor }}"
+        echo "   - Event: ${{ github.event_name }}"
+        echo ""
+        
+        # Check if we have a token
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ] && [ -z "$GITHUB_TOKEN" ]; then
+          echo "❌ ERROR: No token available"
+          echo "   Please configure SYNTEGRITY_DAGGER_TOKEN or GITHUB_TOKEN"
+          exit 1
+        fi
+        
+        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise GITHUB_TOKEN
+        TOKEN="${SYNTEGRITY_DAGGER_TOKEN:-$GITHUB_TOKEN}"
+        TOKEN_TYPE="SYNTEGRITY_DAGGER_TOKEN"
+        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+          TOKEN_TYPE="GITHUB_TOKEN"
+          echo "⚠️ Using GITHUB_TOKEN (SYNTEGRITY_DAGGER_TOKEN not set)"
+          echo "⚠️ GITHUB_TOKEN may not have access to private organization repositories"
+        else
+          echo "✅ Using SYNTEGRITY_DAGGER_TOKEN"
+        fi
+        
+        # Test access to private repository
+        echo ""
+        echo "🔍 Testing access to private repository: github.com/getsyntegrity/go-kit-logger"
+        if git ls-remote --heads "https://x-access-token:${TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          echo "✅ Token has access to private repository"
+        else
+          echo "❌ Token does NOT have access to private repository"
+          echo ""
+          echo "📋 For FREE GitHub accounts - Setup Instructions:"
+          echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+          echo "   2. Select scopes: 'repo' (full control of private repositories)"
+          echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+          echo "      Repository Settings → Secrets and variables → Actions"
+          echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
+          echo ""
+          echo "💡 Why this is needed:"
+          echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
+          echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
+          echo "   - This is a GitHub limitation for free accounts"
+          echo ""
+          echo "⚠️ Pipeline will continue but may fail during 'go mod download'"
+        fi
+        
+        echo ""
+        echo "📊 GitHub Actions Limits (Free Accounts):"
+        echo "   - Private repos: 2,000 minutes/month"
+        echo "   - Public repos: Unlimited minutes"
+        echo "   - Concurrent jobs: Limited"
+      
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
@@ -390,10 +499,27 @@ jobs:
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
             echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo ""
+            echo "📋 For FREE GitHub accounts:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
-            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            echo ""
+            echo "📋 For FREE GitHub accounts - Setup Instructions:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
+            echo ""
+            echo "💡 Why this is needed:"
+            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
+            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
             exit 1
           fi
         fi
@@ -423,8 +549,9 @@ jobs:
       run: |
         echo "🧹 Cleaning Go module cache..."
         # Clean any existing module cache to avoid conflicts
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
+        # Note: Using rm without sudo for free GitHub accounts (sudo may not be available)
+        rm -rf ~/go/pkg/mod 2>/dev/null || true
+        rm -rf ~/.cache/go-build 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache cleaned"
@@ -456,10 +583,27 @@ jobs:
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
             echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo ""
+            echo "📋 For FREE GitHub accounts:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
-            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            echo ""
+            echo "📋 For FREE GitHub accounts - Setup Instructions:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
+            echo ""
+            echo "💡 Why this is needed:"
+            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
+            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
             exit 1
           fi
         fi
@@ -499,15 +643,17 @@ jobs:
           else
             echo "❌ Token does not have access to repository"
             echo ""
-            echo "💡 Solution:"
+            echo "💡 Solution for FREE GitHub accounts:"
             echo "1. Create a Personal Access Token (PAT) with 'repo' scope at:"
             echo "   https://github.com/settings/tokens"
-            echo "2. Add it as a secret named 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "2. Select scopes: 'repo' (full control of private repositories)"
+            echo "3. Add it as a secret named 'SYNTEGRITY_DAGGER_TOKEN' in:"
             echo "   Repository Settings → Secrets and variables → Actions"
-            echo "3. The token must have access to the private repository:"
+            echo "4. The token must have access to the private repository:"
             echo "   github.com/getsyntegrity/go-kit-logger"
             echo ""
             echo "⚠️ GITHUB_TOKEN (default) does not have access to private organization repositories"
+            echo "⚠️ Free accounts require a PAT with 'repo' scope for private repo access"
           fi
           exit 1
         fi
@@ -549,10 +695,27 @@ jobs:
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
             echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo ""
+            echo "📋 For FREE GitHub accounts:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
-            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            echo ""
+            echo "📋 For FREE GitHub accounts - Setup Instructions:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
+            echo ""
+            echo "💡 Why this is needed:"
+            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
+            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
             exit 1
           fi
         fi
@@ -581,9 +744,10 @@ jobs:
     - name: Clean Go module cache
       run: |
         echo "🧹 Cleaning Go module cache..."
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
-        sudo rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        # Note: Using rm without sudo for free GitHub accounts (sudo may not be available)
+        rm -rf ~/go/pkg/mod 2>/dev/null || true
+        rm -rf ~/.cache/go-build 2>/dev/null || true
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache and VCS cache cleaned"
@@ -698,10 +862,27 @@ jobs:
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
             echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo ""
+            echo "📋 For FREE GitHub accounts:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
-            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            echo ""
+            echo "📋 For FREE GitHub accounts - Setup Instructions:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
+            echo ""
+            echo "💡 Why this is needed:"
+            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
+            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
             exit 1
           fi
         fi
@@ -730,9 +911,10 @@ jobs:
     - name: Clean Go module cache
       run: |
         echo "🧹 Cleaning Go module cache..."
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
-        sudo rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        # Note: Using rm without sudo for free GitHub accounts (sudo may not be available)
+        rm -rf ~/go/pkg/mod 2>/dev/null || true
+        rm -rf ~/.cache/go-build 2>/dev/null || true
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache and VCS cache cleaned"
@@ -839,10 +1021,27 @@ jobs:
             echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
             echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo ""
+            echo "📋 For FREE GitHub accounts:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
           else
             echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
-            echo "Please configure SYNTEGRITY_DAGGER_TOKEN secret in repository settings"
+            echo ""
+            echo "📋 For FREE GitHub accounts - Setup Instructions:"
+            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
+            echo "   2. Select scopes: 'repo' (full control of private repositories)"
+            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "      Repository Settings → Secrets and variables → Actions"
+            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
+            echo ""
+            echo "💡 Why this is needed:"
+            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
+            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
             exit 1
           fi
         fi
@@ -871,9 +1070,10 @@ jobs:
     - name: Clean Go module cache
       run: |
         echo "🧹 Cleaning Go module cache..."
-        sudo rm -rf ~/go/pkg/mod 2>/dev/null || true
-        sudo rm -rf ~/.cache/go-build 2>/dev/null || true
-        sudo rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
+        # Note: Using rm without sudo for free GitHub accounts (sudo may not be available)
+        rm -rf ~/go/pkg/mod 2>/dev/null || true
+        rm -rf ~/.cache/go-build 2>/dev/null || true
+        rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache and VCS cache cleaned"
