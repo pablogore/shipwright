@@ -33,7 +33,19 @@ jobs:
       run: |
         # For delete events, github.event.ref_name doesn't exist
         # We must use github.event.ref and extract the branch name from it
-
+        BRANCH="${{ github.event.ref }}"
+        REF_TYPE="${{ github.event.ref_type }}"
+        
+        # Extract branch name from ref (e.g., "refs/heads/main" -> "main")
+        if [[ "$BRANCH" =~ ^refs/heads/(.+)$ ]]; then
+          BRANCH_NAME="${BASH_REMATCH[1]}"
+        elif [[ "$BRANCH" =~ ^refs/tags/(.+)$ ]]; then
+          # This is a tag, not a branch
+          BRANCH_NAME=""
+        else
+          # Try to extract from any ref format
+          BRANCH_NAME="${BRANCH##*/}"
+        fi
         
         # Validate that branch name was extracted correctly
         if [[ -z "$BRANCH_NAME" ]]; then
