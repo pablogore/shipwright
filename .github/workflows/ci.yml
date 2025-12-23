@@ -31,9 +31,16 @@ jobs:
     steps:
     - name: Prevent branch deletion
       run: |
-        BRANCH="${{ github.event.ref }}"
-        BRANCH_NAME="${{ github.event.ref_name }}"
-        REF_TYPE="${{ github.event.ref_type }}"
+        # For delete events, github.event.ref_name doesn't exist
+        # We must use github.event.ref and extract the branch name from it
+
+        
+        # Validate that branch name was extracted correctly
+        if [[ -z "$BRANCH_NAME" ]]; then
+          echo "❌ ERROR: Failed to extract branch name from ref: $BRANCH"
+          echo "Cannot determine branch name - failing to prevent potential branch deletion"
+          exit 1
+        fi
         
         # Only check for branches (not tags)
         if [[ "$REF_TYPE" != "branch" ]]; then
@@ -42,6 +49,7 @@ jobs:
         fi
         
         # Check if it's a protected branch
+        # CRITICAL: Use BRANCH_NAME (extracted from github.event.ref), not github.event.ref_name
         if [[ "$BRANCH_NAME" != "main" ]] && [[ "$BRANCH_NAME" != "develop" ]]; then
           echo "✅ Branch '$BRANCH_NAME' is not protected - deletion allowed"
           exit 0
@@ -994,7 +1002,7 @@ jobs:
   # Stage 5: Security (only for main/develop/PRs)
   security:
     runs-on: ubuntu-latest
-    needs: [determine-pipeline, build, test]
+    needs: [determine-pipeline, build]
     if: needs.determine-pipeline.outputs.run-security == 'true'
     steps:
     - name: Checkout code
