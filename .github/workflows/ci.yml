@@ -30,11 +30,15 @@ jobs:
     if: github.event_name == 'delete' && github.event.ref_type == 'branch'
     steps:
     - name: Prevent branch deletion
+      env:
+        BRANCH: ${{ github.event.ref }}
+        REF_TYPE: ${{ github.event.ref_type }}
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
       run: |
         # For delete events, github.event.ref_name doesn't exist
         # We must use github.event.ref and extract the branch name from it
-        BRANCH="${{ github.event.ref }}"
-        REF_TYPE="${{ github.event.ref_type }}"
+        # SECURITY: Using env: block prevents shell injection from branch names
         
         # Extract branch name from ref (e.g., "refs/heads/main" -> "main")
         if [[ "$BRANCH" =~ ^refs/heads/(.+)$ ]]; then
@@ -78,8 +82,8 @@ jobs:
         echo "   - Branch ref: $BRANCH"
         echo "   - Branch name: $BRANCH_NAME"
         echo "   - Ref type: $REF_TYPE"
-        echo "   - Actor: ${{ github.actor }}"
-        echo "   - Event: ${{ github.event_name }}"
+        echo "   - Actor: $GITHUB_ACTOR"
+        echo "   - Event: $GITHUB_EVENT_NAME"
         echo ""
         echo "🔒 Branch protection rules prevent deletion of:"
         echo "   - main"
