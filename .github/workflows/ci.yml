@@ -107,14 +107,20 @@ jobs:
         fetch-depth: 0
     
     - name: Verify branch protection
+      env:
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_EVENT_COMMITS: ${{ toJSON(github.event.commits) }}
       run: |
+        # SECURITY: Using env: block prevents shell injection from GitHub context variables
         # Only check for direct pushes, PRs are allowed
-        if [[ "${{ github.event_name }}" != "push" ]]; then
-          echo "✅ Not a direct push (event: ${{ github.event_name }}) - branch protection check skipped"
+        if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+          echo "✅ Not a direct push (event: $GITHUB_EVENT_NAME) - branch protection check skipped"
           exit 0
         fi
         
-        BRANCH="${{ github.ref_name }}"
+        BRANCH="$GITHUB_REF_NAME"
         
         # Skip check for non-protected branches
         if [[ "$BRANCH" != "main" ]] && [[ "$BRANCH" != "develop" ]]; then
@@ -127,8 +133,8 @@ jobs:
         # We check multiple indicators to determine if this is a merge from a PR
         
         IS_PR_MERGE=false
-        COMMIT_MSG=$(git log -1 --pretty=%B "${{ github.sha }}")
-        COMMIT_AUTHOR=$(git log -1 --pretty=%an "${{ github.sha }}")
+        COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
+        COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
         
         # Method 1: Check if commit message contains PR reference or merge keywords
         if echo "$COMMIT_MSG" | grep -qiE "(#[0-9]+|Merge pull request|Merge branch|Squash and merge|from [^ ]+ into)"; then
@@ -137,14 +143,15 @@ jobs:
         fi
         
         # Method 2: Check if commit has multiple parents (merge commit, not squash)
-        PARENT_COUNT=$(git rev-list --count "${{ github.sha }}^..${{ github.sha }}" 2>/dev/null || echo "0")
+        PARENT_COUNT=$(git rev-list --count "$GITHUB_SHA^..$GITHUB_SHA" 2>/dev/null || echo "0")
         if [[ "$PARENT_COUNT" -gt 1 ]]; then
           echo "📋 Commit has multiple parents (merge commit)"
           IS_PR_MERGE=true
         fi
         
         # Method 3: Check if there are multiple commits in this push (indicates merge)
-        COMMIT_COUNT=$(echo "${{ github.event.commits }}" | jq '. | length' 2>/dev/null || echo "0")
+        # Note: github.event.commits is a JSON array, we need to pass it via env
+        COMMIT_COUNT=$(echo "$GITHUB_EVENT_COMMITS" | jq '. | length' 2>/dev/null || echo "0")
         if [[ "$COMMIT_COUNT" -gt 1 ]]; then
           echo "📋 Multiple commits in push (likely from PR merge)"
           IS_PR_MERGE=true
@@ -159,7 +166,7 @@ jobs:
         # Method 5: For squash merge, check if commit is not directly on the branch history
         # Squash merges create a new commit that's not in the feature branch history
         # We check if the parent commit is the HEAD of the target branch before the merge
-        PARENT_SHA=$(git rev-parse "${{ github.sha }}^" 2>/dev/null || echo "")
+        PARENT_SHA=$(git rev-parse "$GITHUB_SHA^" 2>/dev/null || echo "")
         if [[ -n "$PARENT_SHA" ]]; then
           # Check if parent is in the branch history (if not, it might be a squash merge)
           # This is a heuristic: if the commit message doesn't match typical direct push patterns
@@ -187,7 +194,7 @@ jobs:
             if echo "$COMMIT_MSG" | grep -qiE "#[0-9]+"; then
               # Has PR number - this is a PR merge, allow it
               echo "✅ Push appears to be from PR merge to main - allowing"
-              echo "   Commit: ${{ github.sha }}"
+              echo "   Commit: $GITHUB_SHA"
               echo "   Branch: $BRANCH"
               echo "   Author: $COMMIT_AUTHOR"
               exit 0
@@ -204,7 +211,7 @@ jobs:
                 echo "   2. Get PR approved"
                 echo "   3. Merge PR using squash merge"
                 echo ""
-                echo "Current commit: ${{ github.sha }}"
+                echo "Current commit: $GITHUB_SHA"
                 echo "Commit message: $(echo "$COMMIT_MSG" | head -1)"
                 echo "Author: $COMMIT_AUTHOR"
                 echo "Branch: $BRANCH"
@@ -219,7 +226,7 @@ jobs:
           fi
           
           echo "✅ Push appears to be from PR merge - allowing"
-          echo "   Commit: ${{ github.sha }}"
+          echo "   Commit: $GITHUB_SHA"
           echo "   Branch: $BRANCH"
           echo "   Author: $COMMIT_AUTHOR"
           exit 0
@@ -236,7 +243,7 @@ jobs:
         echo "   3. Create a Pull Request to develop (for features) or main (for hotfixes)"
         echo "   4. Get PR approved and merged"
         echo ""
-        echo "Current commit: ${{ github.sha }}"
+        echo "Current commit: $GITHUB_SHA"
         echo "Commit message: $(echo "$COMMIT_MSG" | head -1)"
         echo "Author: $COMMIT_AUTHOR"
         echo "Branch: $BRANCH"
@@ -270,18 +277,27 @@ jobs:
     
     - name: Determine pipeline type
       id: determine
+      env:
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_REF: ${{ github.ref }}
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        GITHUB_PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        GITHUB_PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       run: |
+        # SECURITY: Using env: block prevents shell injection from GitHub context variables
         echo "🔍 Analyzing pipeline context..."
-        echo "Event: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "Base ref: ${{ github.base_ref }}"
-        echo "Commit message: ${{ github.event.head_commit.message }}"
+        echo "Event: $GITHUB_EVENT_NAME"
+        echo "Ref: $GITHUB_REF"
+        echo "Base ref: $GITHUB_BASE_REF"
+        echo "Commit message: $GITHUB_HEAD_COMMIT_MESSAGE"
         
         # Determine pipeline type based on context
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+        if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
           # Pull request: determine based on base branch and source branch
-          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-          HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
+          BASE_BRANCH="$GITHUB_PR_BASE_REF"
+          HEAD_BRANCH="$GITHUB_PR_HEAD_REF"
           
           if [[ "$BASE_BRANCH" == "main" ]]; then
             # PR to main: full pipeline (develop->main or hotfix->main)
@@ -312,10 +328,10 @@ jobs:
             echo "release=false" >> $GITHUB_OUTPUT
             echo "📋 Pipeline: PR to other branch (lightweight: build and test only)"
           fi
-        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+        elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
           # Push to main: check if it's a hotfix merge or develop merge
-          COMMIT_MSG=$(git log -1 --pretty=%B "${{ github.sha }}")
-          COMMIT_AUTHOR=$(git log -1 --pretty=%an "${{ github.sha }}")
+          COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
+          COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
           
           # Detect if this is a PR merge
           IS_PR_MERGE=false
@@ -372,10 +388,10 @@ jobs:
             echo "release=false" >> $GITHUB_OUTPUT
             echo "📋 Pipeline: Direct push to main (minimal - should only happen via PR)"
           fi
-        elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+        elif [[ "$GITHUB_REF" == "refs/heads/develop" ]]; then
           # Push to develop: check if it's a PR merge or direct push
-          COMMIT_MSG=$(git log -1 --pretty=%B "${{ github.sha }}")
-          COMMIT_AUTHOR=$(git log -1 --pretty=%an "${{ github.sha }}")
+          COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
+          COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
           
           # Detect if this is a PR merge
           IS_PR_MERGE=false
@@ -426,14 +442,18 @@ jobs:
       github.ref == 'refs/heads/develop'
     steps:
     - name: Warn about direct push to develop
+      env:
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_ACTOR: ${{ github.actor }}
       run: |
+        # SECURITY: Using env: block prevents shell injection from GitHub context variables
         echo "⚠️ WARNING: Direct push to develop branch detected!"
         echo "⚠️ Develop should only be updated via Pull Requests from feature branches"
         echo "⚠️ This pipeline will run minimal checks only"
         echo "⚠️ For proper validation, create a PR from your feature branch to develop"
         echo ""
-        echo "Current commit: ${{ github.sha }}"
-        echo "Author: ${{ github.actor }}"
+        echo "Current commit: $GITHUB_SHA"
+        echo "Author: $GITHUB_ACTOR"
 
   # Stage 2: Setup and Dependencies (always runs)
   setup:
@@ -451,13 +471,17 @@ jobs:
       env:
         SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
       run: |
+        # SECURITY: Using env: block prevents shell injection from GitHub context variables
         echo "🔍 Validating GitHub account and token access..."
         echo ""
         echo "📋 GitHub Account Information:"
-        echo "   - Repository: ${{ github.repository }}"
-        echo "   - Actor: ${{ github.actor }}"
-        echo "   - Event: ${{ github.event_name }}"
+        echo "   - Repository: $GITHUB_REPOSITORY"
+        echo "   - Actor: $GITHUB_ACTOR"
+        echo "   - Event: $GITHUB_EVENT_NAME"
         echo ""
         
         # Check if we have a token
