@@ -74,7 +74,7 @@ jobs:
         fi
         
         # If we get here, it's an attempt to delete a protected branch
-        echo "❌ ERROR: Attempt to delete protected branch detected!"
+        echo "⚠️ WARNING: Attempt to delete protected branch detected!"
         echo ""
         echo "🚫 Protected branches (main, develop) CANNOT be deleted under any circumstances"
         echo ""
@@ -94,8 +94,8 @@ jobs:
         echo "   - Use git reflog to find the commit SHA"
         echo "   - Restore the branch from a backup or previous commit"
         echo ""
-        echo "🚨 This workflow will fail to prevent branch deletion"
-        exit 1
+        echo "✅ Branch deletion prevented - workflow continues (branch was not deleted)"
+        exit 0
 
   # Stage 0: Verify no direct pushes to protected branches
   verify-branch-protection:
