@@ -213,6 +213,8 @@ jobs:
           TAG="v$VERSION"
           echo "type=automatic" >> $GITHUB_OUTPUT
           echo "auto_tag=true" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
         else
           # Manual release via workflow_dispatch
           echo "🔧 Manual release triggered by admin via workflow_dispatch"
@@ -420,9 +422,20 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo "🏷️ Creating/updating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
-        
         TAG="${{ needs.validate-release.outputs.tag }}"
+        
+        # Validate that tag is not empty
+        if [[ -z "$TAG" ]]; then
+          echo "❌ Error: Tag is empty. validate-release job did not set tag output."
+          echo "   Release type: ${{ needs.validate-release.outputs.type }}"
+          echo "   Source branch: ${{ needs.validate-release.outputs.source_branch }}"
+          echo "   This usually means the release validation failed or was skipped."
+          echo "   Check the validate-release job logs for details."
+          exit 1
+        fi
+        
+        echo "🏷️ Creating/updating tag ${TAG} for automatic release..."
+        
         CURRENT_COMMIT=$(git rev-parse HEAD)
         
         # Configure git for pushing tags
@@ -466,6 +479,15 @@ jobs:
     - name: Verify tag points to current commit
       run: |
         TAG="${{ needs.validate-release.outputs.tag }}"
+        
+        # Validate that tag is not empty
+        if [[ -z "$TAG" ]]; then
+          echo "❌ Error: Tag is empty. validate-release job did not set tag output."
+          echo "   This usually means the release validation failed or was skipped."
+          echo "   Check the validate-release job logs for details."
+          exit 1
+        fi
+        
         CURRENT_COMMIT=$(git rev-parse HEAD)
         
         # Fetch tags to ensure we have the latest
@@ -492,6 +514,15 @@ jobs:
         echo "📥 Fetching tags for GoReleaser..."
         git fetch --tags --force
         TAG="${{ needs.validate-release.outputs.tag }}"
+        
+        # Validate that tag is not empty
+        if [[ -z "$TAG" ]]; then
+          echo "❌ Error: Tag is empty. validate-release job did not set tag output."
+          echo "   This usually means the release validation failed or was skipped."
+          echo "   Check the validate-release job logs for details."
+          exit 1
+        fi
+        
         echo "✅ Available tags:"
         git tag -l | grep -E "^${TAG}$|^v" | head -10 || echo "No matching tags found"
         if git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
