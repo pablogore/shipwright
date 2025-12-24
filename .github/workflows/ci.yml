@@ -1227,11 +1227,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [determine-pipeline, security]
     if: |
+      always() &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       needs.determine-pipeline.outputs.is-release == 'true' &&
       (needs.determine-pipeline.outputs.pipeline-type == 'main-hotfix' ||
-       needs.determine-pipeline.outputs.pipeline-type == 'main-develop-merge')
+       needs.determine-pipeline.outputs.pipeline-type == 'main-develop-merge') &&
+      (needs.security.result == 'success' || needs.security.result == 'skipped')
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -1241,14 +1243,30 @@ jobs:
     - name: Detect source branch
       id: detect-source
       run: |
-        # Detect source branch from merge commit message
+        echo "🔍 Detecting source branch for release trigger..."
+        echo "Pipeline type: ${{ needs.determine-pipeline.outputs.pipeline-type }}"
+        echo "Is release: ${{ needs.determine-pipeline.outputs.is-release }}"
+        
+        # If determine-pipeline already detected this as a release-worthy merge, trust it
+        PIPELINE_TYPE="${{ needs.determine-pipeline.outputs.pipeline-type }}"
+        if [[ "$PIPELINE_TYPE" == "main-develop-merge" ]] || [[ "$PIPELINE_TYPE" == "main-hotfix" ]]; then
+          echo "✅ Pipeline type indicates release should be triggered: $PIPELINE_TYPE"
+          echo "should_trigger=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Fallback: Detect source branch from merge commit message
         SOURCE_BRANCH=""
         MERGE_COMMIT=$(git log -1 --pretty=%B)
+        echo "Merge commit message: $MERGE_COMMIT"
+        
         if echo "$MERGE_COMMIT" | grep -qE "Merge pull request|Merge branch"; then
           SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
+          echo "Detected source branch from merge message: $SOURCE_BRANCH"
         fi
         if [[ -z "$SOURCE_BRANCH" ]]; then
           SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
+          echo "Detected source branch from commit history: $SOURCE_BRANCH"
         fi
         
         # Trigger release for merges from develop or hotfix branches
@@ -1267,16 +1285,22 @@ jobs:
       if: steps.detect-source.outputs.should_trigger == 'true'
       uses: actions/github-script@v7
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN || secrets.GITHUB_TOKEN }}
       with:
-        github-token: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        github-token: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN || secrets.GITHUB_TOKEN }}
         script: |
           // Trigger release workflow with workflow_dispatch to use latest main version
           const currentSha = context.sha;
-          console.log(`🚀 Triggering release workflow for commit ${currentSha} (develop->main merge)`);
+          const hasPat = process.env.GITHUB_PAT ? 'GITHUB_PAT' : (process.env.SYNTEGRITY_DAGGER_TOKEN ? 'SYNTEGRITY_DAGGER_TOKEN' : 'GITHUB_TOKEN');
+          
+          console.log(`🚀 Triggering release workflow for commit ${currentSha}`);
+          console.log(`📋 Using token: ${hasPat}`);
+          console.log(`📋 Repository: ${context.repo.owner}/${context.repo.repo}`);
+          console.log(`📋 Workflow: release.yml`);
+          console.log(`📋 Ref: main`);
           
           try {
-            await github.rest.actions.createWorkflowDispatch({
+            const response = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'release.yml',
@@ -1286,12 +1310,26 @@ jobs:
               }
             });
             console.log(`✅ Release workflow triggered successfully`);
+            console.log(`📋 Response status: ${response.status || 'N/A'}`);
           } catch (error) {
             // If workflow is already running, GitHub will return an error
             // This is acceptable - the release will still proceed
+            console.error(`❌ Error details:`, {
+              status: error.status,
+              message: error.message,
+              response: error.response?.data
+            });
+            
             if (error.status === 422 || error.message.includes('already running')) {
               console.log(`ℹ️ Release workflow may already be running for this commit`);
               console.log(`   This is normal - the release will proceed`);
+            } else if (error.status === 404) {
+              console.error(`❌ Workflow 'release.yml' not found. Please verify the workflow file exists.`);
+              throw error;
+            } else if (error.status === 403) {
+              console.error(`❌ Permission denied. Token may not have 'actions: write' permission.`);
+              console.error(`   Please verify the token has the correct permissions.`);
+              throw error;
             } else {
               console.error(`❌ Error triggering release workflow: ${error.message}`);
               throw error;
