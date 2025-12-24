@@ -417,11 +417,20 @@ jobs:
 
     - name: Create tag (automatic release only)
       if: needs.validate-release.outputs.type == 'automatic'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "🏷️ Creating/updating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
         
         TAG="${{ needs.validate-release.outputs.tag }}"
         CURRENT_COMMIT=$(git rev-parse HEAD)
+        
+        # Configure git for pushing tags
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        # Set up authentication for pushing tags
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
         
         # Check if tag exists
         if git tag -l | grep -q "^${TAG}$"; then
@@ -451,10 +460,16 @@ jobs:
           echo "✅ Tag created and pushed: ${TAG}"
         fi
         
+        # Fetch tags to ensure they're available locally
+        git fetch --tags
+        
     - name: Verify tag points to current commit
       run: |
         TAG="${{ needs.validate-release.outputs.tag }}"
         CURRENT_COMMIT=$(git rev-parse HEAD)
+        
+        # Fetch tags to ensure we have the latest
+        git fetch --tags --force
         
         if git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
           TAG_COMMIT=$(git rev-parse "${TAG}^{commit}")
@@ -466,7 +481,24 @@ jobs:
             echo "✅ Tag ${TAG} correctly points to current commit ${CURRENT_COMMIT}"
           fi
         else
-          echo "⚠️ Warning: Tag ${TAG} not found locally, but will be validated by GoReleaser"
+          echo "❌ Error: Tag ${TAG} not found locally after fetch"
+          echo "   Available tags:"
+          git tag -l | head -10
+          exit 1
+        fi
+    
+    - name: Fetch tags for GoReleaser
+      run: |
+        echo "📥 Fetching tags for GoReleaser..."
+        git fetch --tags --force
+        TAG="${{ needs.validate-release.outputs.tag }}"
+        echo "✅ Available tags:"
+        git tag -l | grep -E "^${TAG}$|^v" | head -10 || echo "No matching tags found"
+        if git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
+          echo "✅ Tag ${TAG} is available locally"
+          git show-ref --tags | grep "${TAG}"
+        else
+          echo "⚠️ Warning: Tag ${TAG} not found locally, but GoReleaser will fetch it"
         fi
     
     - name: Run GoReleaser
