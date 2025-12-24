@@ -144,18 +144,33 @@ jobs:
             fi
           fi
           
-          # Only proceed if merge comes from develop branch
-          if [[ "$SOURCE_BRANCH" != "develop" ]] && ! echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
-            echo "⚠️ Release skipped: Merge is not from develop branch (detected: $SOURCE_BRANCH)"
-            echo "ℹ️ Only merges from develop to main trigger automatic releases"
+          # Only proceed if merge comes from develop branch or hotfix branch
+          IS_DEVELOP=false
+          IS_HOTFIX=false
+          
+          if [[ "$SOURCE_BRANCH" == "develop" ]] || echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
+            IS_DEVELOP=true
+          fi
+          
+          if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+            IS_HOTFIX=true
+          fi
+          
+          if [[ "$IS_DEVELOP" == "false" ]] && [[ "$IS_HOTFIX" == "false" ]]; then
+            echo "⚠️ Release skipped: Merge is not from develop or hotfix branch (detected: $SOURCE_BRANCH)"
+            echo "ℹ️ Only merges from develop or hotfix to main trigger automatic releases"
             echo "ℹ️ Use workflow_dispatch without commit_sha for manual releases"
             echo "skip_release=true" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          echo "✅ Merge from develop detected - proceeding with automatic release"
+          if [[ "$IS_HOTFIX" == "true" ]]; then
+            echo "✅ Merge from hotfix detected - proceeding with automatic release"
+          else
+            echo "✅ Merge from develop detected - proceeding with automatic release"
+          fi
           
-          # Continue with automatic release logic (only for workflow_dispatch from CI with develop merge)
+          # Continue with automatic release logic (for workflow_dispatch from CI with develop or hotfix merge)
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
           # Get latest tag
@@ -166,8 +181,8 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "Commit message: $COMMIT_MSG"
           
-          # Check if merge comes from hotfix branch
-          if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
+          # Check if merge comes from hotfix branch (using already detected IS_HOTFIX)
+          if [[ "$IS_HOTFIX" == "true" ]]; then
             # Hotfix: always bump patch version
             echo "🔥 Hotfix detected from branch: $SOURCE_BRANCH - bumping patch version"
             VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
