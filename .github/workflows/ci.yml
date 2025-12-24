@@ -74,9 +74,15 @@ jobs:
         fi
         
         # If we get here, it's an attempt to delete a protected branch
-        echo "⚠️ WARNING: Attempt to delete protected branch detected!"
+        # NOTE: GitHub's delete event fires AFTER deletion occurs, so we cannot prevent it
+        # This workflow serves as a detection and alert mechanism
+        echo "❌ SECURITY ALERT: Protected branch deletion detected!"
         echo ""
-        echo "🚫 Protected branches (main, develop) CANNOT be deleted under any circumstances"
+        echo "🚨 CRITICAL: A protected branch has been deleted!"
+        echo ""
+        echo "⚠️  IMPORTANT: GitHub's delete event fires AFTER deletion occurs."
+        echo "   This workflow cannot prevent deletions - it only detects and alerts."
+        echo "   The branch '$BRANCH_NAME' has already been deleted."
         echo ""
         echo "📋 Branch information:"
         echo "   - Branch ref: $BRANCH"
@@ -85,17 +91,22 @@ jobs:
         echo "   - Actor: $GITHUB_ACTOR"
         echo "   - Event: $GITHUB_EVENT_NAME"
         echo ""
-        echo "🔒 Branch protection rules prevent deletion of:"
+        echo "🔒 Protected branches that should not be deleted:"
         echo "   - main"
         echo "   - develop"
         echo ""
-        echo "💡 If you need to restore a branch:"
-        echo "   - Contact repository administrators"
-        echo "   - Use git reflog to find the commit SHA"
-        echo "   - Restore the branch from a backup or previous commit"
+        echo "🚨 IMMEDIATE ACTION REQUIRED:"
+        echo "   - Contact repository administrators immediately"
+        echo "   - Investigate who deleted the branch and why"
+        echo "   - Restore the branch if deletion was accidental"
         echo ""
-        echo "✅ Branch deletion prevented - workflow continues (branch was not deleted)"
-        exit 0
+        echo "💡 To restore a deleted branch:"
+        echo "   - Use git reflog to find the commit SHA"
+        echo "   - Restore from a backup or previous commit"
+        echo "   - Contact GitHub support if needed"
+        echo ""
+        echo "❌ This workflow will fail to alert maintainers of this security incident"
+        exit 1
 
   # Stage 0: Verify no direct pushes to protected branches
   verify-branch-protection:
@@ -1230,6 +1241,7 @@ jobs:
       always() &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
+      needs.determine-pipeline.result == 'success' &&
       needs.determine-pipeline.outputs.is-release == 'true' &&
       (needs.determine-pipeline.outputs.pipeline-type == 'main-hotfix' ||
        needs.determine-pipeline.outputs.pipeline-type == 'main-develop-merge') &&
