@@ -73,10 +73,15 @@ jobs:
           exit 0
         fi
         
-        # If we get here, it's an attempt to delete a protected branch
-        echo "⚠️ WARNING: Attempt to delete protected branch detected!"
+        # If we get here, a protected branch has been deleted
+        # CRITICAL: The 'delete' event fires AFTER deletion, so the branch is already gone
+        echo "🚨 SECURITY ALERT: Protected branch deletion detected!"
         echo ""
-        echo "🚫 Protected branches (main, develop) CANNOT be deleted under any circumstances"
+        echo "❌ CRITICAL: Protected branch '$BRANCH_NAME' has been DELETED"
+        echo ""
+        echo "⚠️  IMPORTANT: The GitHub 'delete' event fires AFTER successful deletion."
+        echo "   This workflow cannot prevent deletion - it can only detect it after the fact."
+        echo "   The branch '$BRANCH_NAME' is already gone from the repository."
         echo ""
         echo "📋 Branch information:"
         echo "   - Branch ref: $BRANCH"
@@ -85,17 +90,20 @@ jobs:
         echo "   - Actor: $GITHUB_ACTOR"
         echo "   - Event: $GITHUB_EVENT_NAME"
         echo ""
-        echo "🔒 Branch protection rules prevent deletion of:"
+        echo "🔒 Protected branches that should never be deleted:"
         echo "   - main"
         echo "   - develop"
         echo ""
-        echo "💡 If you need to restore a branch:"
-        echo "   - Contact repository administrators"
-        echo "   - Use git reflog to find the commit SHA"
-        echo "   - Restore the branch from a backup or previous commit"
+        echo "🚨 IMMEDIATE ACTION REQUIRED:"
+        echo "   1. Contact repository administrators immediately"
+        echo "   2. Verify if deletion was intentional or unauthorized"
+        echo "   3. Restore the branch if deletion was accidental:"
+        echo "      - Use git reflog to find the last commit SHA"
+        echo "      - Restore from backup or previous commit"
+        echo "      - Re-push the branch: git push origin <branch-name>"
         echo ""
-        echo "✅ Branch deletion prevented - workflow continues (branch was not deleted)"
-        exit 0
+        echo "❌ This workflow is failing to alert administrators of the security event"
+        exit 1
 
   # Stage 0: Verify no direct pushes to protected branches
   verify-branch-protection:
