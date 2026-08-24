@@ -9,6 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEnvPrefix(t *testing.T) {
+	assert.Equal(t, "SHIPWRIGHT_", EnvPrefix)
+}
+
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -23,11 +27,11 @@ func TestNew(t *testing.T) {
 		{
 			name: "with environment variables",
 			envVars: map[string]string{
-				"SYNTEGRITY_DAGGER_PIPELINE_NAME":         "test-pipeline",
-				"SYNTEGRITY_DAGGER_PIPELINE_COVERAGE":     "95.5",
-				"SYNTEGRITY_DAGGER_REGISTRY_BASE_URL":     "test-registry.com",
-				"SYNTEGRITY_DAGGER_PIPELINE_GO_VERSION":   "1.21",
-				"SYNTEGRITY_DAGGER_SECURITY_LINT_TIMEOUT": "10m",
+				"SHIPWRIGHT_PIPELINE_NAME":         "test-pipeline",
+				"SHIPWRIGHT_PIPELINE_COVERAGE":     "95.5",
+				"SHIPWRIGHT_REGISTRY_BASE_URL":     "test-registry.com",
+				"SHIPWRIGHT_PIPELINE_GO_VERSION":   "1.21",
+				"SHIPWRIGHT_SECURITY_LINT_TIMEOUT": "10m",
 			},
 			wantErr: false,
 		},

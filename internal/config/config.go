@@ -41,7 +41,7 @@ const (
 	DefaultDaggerTimeout   = 30 * time.Second
 
 	// Environment prefix.
-	EnvPrefix = "SYNTEGRITY_DAGGER_"
+	EnvPrefix = "SHIPWRIGHT_"
 )
 
 // koanfInstance is created fresh for each configuration load to avoid test interference
@@ -194,7 +194,7 @@ func loadDotEnv() error {
 }
 
 // New creates a new configuration with the following precedence:
-// 1. Environment variables (SYNTEGRITY_DAGGER_*)
+// 1. Environment variables (SHIPWRIGHT_*)
 // 2. Default values.
 func New() (*Config, error) {
 	if err := loadDotEnv(); err != nil {
