@@ -1,12 +1,12 @@
-name: 'Syntegrity Dagger'
-description: 'Execute Syntegrity Dagger pipeline stages in GitHub Actions'
+name: 'Shipwright'
+description: 'Execute Shipwright pipeline stages in GitHub Actions'
 branding:
   icon: 'play-circle'
   color: 'blue'
 
 inputs:
   version:
-    description: 'Version of syntegrity-dagger to use (e.g., "latest", "v1.0.0")'
+    description: 'Version of shipwright to use (e.g., "latest", "v1.0.0")'
     required: false
     default: 'latest'
   pipeline:
@@ -19,7 +19,7 @@ inputs:
   config:
     description: 'Path to configuration file'
     required: false
-    default: '.syntegrity-dagger.yml'
+    default: '.shipwright.yml'
   env:
     description: 'Environment (dev, staging, prod)'
     required: false
@@ -59,13 +59,13 @@ inputs:
 
 outputs:
   binary-path:
-    description: 'Path to the syntegrity-dagger binary'
+    description: 'Path to the shipwright binary'
     value: ${{ steps.setup.outputs.binary-path }}
   version:
-    description: 'Version of syntegrity-dagger used'
+    description: 'Version of shipwright used'
     value: ${{ steps.setup.outputs.version }}
   exit-code:
-    description: 'Exit code from syntegrity-dagger execution'
+    description: 'Exit code from shipwright execution'
     value: ${{ steps.execute.outputs.exit-code || steps.execute-full.outputs.exit-code }}
 
 runs:
@@ -106,9 +106,9 @@ runs:
         esac
         
         if [ "$VERSION" = "latest" ]; then
-          URL="https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-${OS}-${ARCH}"
+          URL="https://github.com/pablogore/shipwright/releases/latest/download/shipwright-${OS}-${ARCH}"
         else
-          URL="https://github.com/getsyntegrity/syntegrity-dagger/releases/download/${VERSION}/syntegrity-dagger-${OS}-${ARCH}"
+          URL="https://github.com/pablogore/shipwright/releases/download/${VERSION}/shipwright-${OS}-${ARCH}"
         fi
         
         echo "url=$URL" >> $GITHUB_OUTPUT
@@ -116,24 +116,24 @@ runs:
         echo "arch=$ARCH" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Cache Syntegrity Dagger binary
+    - name: Cache Shipwright binary
       id: cache-binary
       if: inputs.skip-cache != 'true'
       uses: actions/cache@v4
       with:
-        path: ${{ runner.tool_cache }}/syntegrity-dagger
-        key: syntegrity-dagger-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-${{ steps.binary-url.outputs.arch }}
+        path: ${{ runner.tool_cache }}/shipwright
+        key: shipwright-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-${{ steps.binary-url.outputs.arch }}
         restore-keys: |
-          syntegrity-dagger-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-
-          syntegrity-dagger-${{ steps.binary-url.outputs.version }}-
-          syntegrity-dagger-
+          shipwright-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-
+          shipwright-${{ steps.binary-url.outputs.version }}-
+          shipwright-
 
-    - name: Setup Syntegrity Dagger
+    - name: Setup Shipwright
       id: setup
       shell: bash
       run: |
-        BINARY_NAME="syntegrity-dagger"
-        CACHE_DIR="${{ runner.tool_cache }}/syntegrity-dagger"
+        BINARY_NAME="shipwright"
+        CACHE_DIR="${{ runner.tool_cache }}/shipwright"
         BINARY_PATH="./${BINARY_NAME}"
         
         # Try to use cached binary first
@@ -147,7 +147,7 @@ runs:
         
         # Download if not cached or cache disabled
         if [ ! -f "${BINARY_PATH}" ] || [ ! -x "${BINARY_PATH}" ]; then
-          echo "📥 Downloading Syntegrity Dagger from ${{ steps.binary-url.outputs.url }}"
+          echo "📥 Downloading Shipwright from ${{ steps.binary-url.outputs.url }}"
           curl -L "${{ steps.binary-url.outputs.url }}" -o "${BINARY_PATH}" || {
             echo "❌ Failed to download binary"
             exit 1
@@ -163,7 +163,7 @@ runs:
         
         # Verify binary works
         INSTALLED_VERSION=$("${BINARY_PATH}" --version 2>&1 | head -n1 | awk '{print $3}' || echo "unknown")
-        echo "✅ Syntegrity Dagger $INSTALLED_VERSION ready"
+        echo "✅ Shipwright $INSTALLED_VERSION ready"
         echo "binary-path=${BINARY_PATH}" >> $GITHUB_OUTPUT
         echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
 
@@ -177,10 +177,10 @@ runs:
         fi
         echo "✅ Docker is available (version: $(docker --version))"
         
-        # syntegrity-dagger uses Dagger internally, which requires the Dagger daemon
-        # The daemon will be started automatically by syntegrity-dagger when needed
+        # shipwright uses Dagger internally, which requires the Dagger daemon
+        # The daemon will be started automatically by shipwright when needed
         # We just need to ensure Docker is available
-        echo "✅ Docker is ready - syntegrity-dagger will handle Dagger daemon startup"
+        echo "✅ Docker is ready - shipwright will handle Dagger daemon startup"
 
     - name: Execute Pipeline Stage
       id: execute

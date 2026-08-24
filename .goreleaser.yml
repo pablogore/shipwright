@@ -1,4 +1,4 @@
-# GoReleaser configuration for syntegrity-dagger
+# GoReleaser configuration for shipwright
 # https://goreleaser.com/
 
 before:
@@ -59,8 +59,8 @@ changelog:
 
 release:
   github:
-    owner: getsyntegrity
-    name: syntegrity-dagger
+    owner: pablogore
+    name: shipwright
   draft: false
   prerelease: auto
   name_template: "Release {{ .Tag }}"
@@ -79,17 +79,17 @@ release:
     
     ```bash
     # Linux/macOS
-    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/{{ .Tag }}/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger
-    chmod +x syntegrity-dagger
-    sudo mv syntegrity-dagger /usr/local/bin/
+    curl -L https://github.com/pablogore/shipwright/releases/download/{{ .Tag }}/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o shipwright
+    chmod +x shipwright
+    sudo mv shipwright /usr/local/bin/
     ```
     
     Available binaries:
-    - `syntegrity-dagger-linux-amd64` - Linux AMD64
-    - `syntegrity-dagger-linux-arm64` - Linux ARM64
-    - `syntegrity-dagger-darwin-amd64` - macOS AMD64
-    - `syntegrity-dagger-darwin-arm64` - macOS ARM64
-    - `syntegrity-dagger-windows-amd64.exe` - Windows AMD64
+    - `shipwright-linux-amd64` - Linux AMD64
+    - `shipwright-linux-arm64` - Linux ARM64
+    - `shipwright-darwin-amd64` - macOS AMD64
+    - `shipwright-darwin-arm64` - macOS ARM64
+    - `shipwright-windows-amd64.exe` - Windows AMD64
     
     ### Archive Download
     
@@ -97,11 +97,11 @@ release:
     
     ```bash
     # Linux/macOS
-    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/{{ .Tag }}/syntegrity-dagger_{{ .Version }}_$(uname -s)_$(uname -m).tar.gz | tar xz
-    sudo mv syntegrity-dagger /usr/local/bin/
+    curl -L https://github.com/pablogore/shipwright/releases/download/{{ .Tag }}/shipwright_{{ .Version }}_$(uname -s)_$(uname -m).tar.gz | tar xz
+    sudo mv shipwright /usr/local/bin/
     
     # Windows
-    # Download the .zip file and extract syntegrity-dagger.exe
+    # Download the .zip file and extract shipwright.exe
     ```
     
     ### For CI/CD Usage
@@ -109,25 +109,25 @@ release:
     Services can download and use the binary directly in their pipelines:
     
     ```yaml
-    - name: Download Syntegrity Dagger
+    - name: Download Shipwright
       run: |
-        curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/{{ .Tag }}/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-        chmod +x syntegrity-dagger
+        curl -L https://github.com/pablogore/shipwright/releases/download/{{ .Tag }}/shipwright-linux-amd64 -o shipwright
+        chmod +x shipwright
     ```
 
 # Docker builds disabled for testing - uncomment when Dockerfile is available
 # dockers:
 #   - image_templates:
-#       - "ghcr.io/getsyntegrity/syntegrity-dagger:{{ .Version }}"
-#       - "ghcr.io/getsyntegrity/syntegrity-dagger:latest"
+#       - "ghcr.io/pablogore/shipwright:{{ .Version }}"
+#       - "ghcr.io/pablogore/shipwright:latest"
 #     dockerfile: Dockerfile
 #     goos: linux
 #     goarch: amd64
 #     build_flag_templates:
 #       - --label=org.opencontainers.image.title={{ .ProjectName }}
 #       - --label=org.opencontainers.image.description={{ .ProjectName }}
-#       - --label=org.opencontainers.image.url=https://github.com/getsyntegrity/syntegrity-dagger
-#       - --label=org.opencontainers.image.source=https://github.com/getsyntegrity/syntegrity-dagger
+#       - --label=org.opencontainers.image.url=https://github.com/pablogore/shipwright
+#       - --label=org.opencontainers.image.source=https://github.com/pablogore/shipwright
 #       - --label=org.opencontainers.image.version={{ .Version }}
 #       - --label=org.opencontainers.image.created={{ .Date }}
 #       - --label=org.opencontainers.image.revision={{ .FullCommit }}

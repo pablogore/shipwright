@@ -11,8 +11,8 @@ registries:
     username: x-access-token
     # Note: This secret must be configured in Dependabot secrets, not just Actions secrets
     # Go to: Repository Settings → Secrets and variables → Dependabot
-    # Add secret: SYNTEGRITY_DAGGER_TOKEN with your PAT (Personal Access Token)
-    password: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+    # Add secret: SHIPWRIGHT_TOKEN with your PAT (Personal Access Token)
+    password: ${{ secrets.SHIPWRIGHT_TOKEN }}
 
 updates:
   # Go module updates - consolidated configuration
