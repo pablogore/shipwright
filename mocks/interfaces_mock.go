@@ -15,7 +15,7 @@ import (
 	time "time"
 
 	dagger "dagger.io/dagger"
-	interfaces "github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	interfaces "github.com/pablogore/shipwright/internal/interfaces"
 	gomock "go.uber.org/mock/gomock"
 )
 

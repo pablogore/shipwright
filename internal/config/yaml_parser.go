@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 	"gopkg.in/yaml.v3"
 )
 

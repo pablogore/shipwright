@@ -8,8 +8,8 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/plugins"
+	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/plugins"
 )
 
 var (

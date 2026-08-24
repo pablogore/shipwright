@@ -9,7 +9,7 @@ import (
 	"dagger.io/dagger"
 	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // BaseStepHandler provides common functionality for all step handlers.

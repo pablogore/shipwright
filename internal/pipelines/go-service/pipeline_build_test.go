@@ -3,7 +3,7 @@ package goservice
 import (
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

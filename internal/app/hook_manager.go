@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // HookManager implements the HookManager interface for managing pipeline hooks.

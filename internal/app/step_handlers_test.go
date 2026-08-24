@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

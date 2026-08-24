@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/stretchr/testify/require"
 )
 
@@ -115,12 +115,12 @@ func TestCheckGitRepo(t *testing.T) {
 		},
 		{
 			name:    "valid HTTPS repo URL",
-			repoURL: "https://github.com/getsyntegrity/syntegrity-dagger",
+			repoURL: "https://github.com/pablogore/shipwright",
 			wantErr: false, // May fail on actual connection, but format is valid
 		},
 		{
 			name:    "valid SSH repo URL",
-			repoURL: "git@github.com:getsyntegrity/syntegrity-dagger.git",
+			repoURL: "git@github.com:pablogore/shipwright.git",
 			wantErr: false, // May fail on actual connection, but format is valid
 		},
 	}

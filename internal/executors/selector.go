@@ -7,7 +7,7 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 // Selector selects the appropriate executor based on environment and configuration.

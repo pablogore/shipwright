@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // StepRegistry implements the StepRegistry interface for managing pipeline steps.

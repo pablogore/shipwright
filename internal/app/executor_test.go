@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/executors"
+	"github.com/pablogore/shipwright/internal/config"
+	"github.com/pablogore/shipwright/internal/executors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

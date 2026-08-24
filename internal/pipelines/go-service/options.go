@@ -3,7 +3,7 @@ package goservice
 import (
 	"time"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 // BuildMode defines the build mode for the pipeline.

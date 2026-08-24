@@ -10,10 +10,10 @@ import (
 	"dagger.io/dagger"
 	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/app"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/executors"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/app"
+	"github.com/pablogore/shipwright/internal/config"
+	"github.com/pablogore/shipwright/internal/executors"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // CLI represents the command line interface for the application.

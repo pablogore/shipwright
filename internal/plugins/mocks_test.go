@@ -9,8 +9,8 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 func TestMockPlugin(t *testing.T) {

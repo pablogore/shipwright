@@ -10,7 +10,7 @@ import (
 
 	"dagger.io/dagger"
 	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // CheckDaggerEngine verifies that the Dagger engine is accessible and responsive.

@@ -10,8 +10,8 @@ import (
 
 	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 // NomadDeployPlugin is a plugin that adds Nomad deployment capability to pipelines.
