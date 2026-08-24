@@ -8,7 +8,7 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
-BINARY_NAME=syntegrity-dagger
+BINARY_NAME=shipwright
 
 # Tools
 GORELEASER=goreleaser

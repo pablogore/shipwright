@@ -83,7 +83,7 @@ func TestMain_ErrorOutput(t *testing.T) {
 	}()
 
 	// Test with invalid args that should cause an error
-	os.Args = []string{"syntegrity-dagger", "-invalid-flag"}
+	os.Args = []string{cliName, "-invalid-flag"}
 
 	// We can't actually call main() in a test easily, but we can verify
 	// that the error handling code path exists and doesn't use log.Fatalf
@@ -91,4 +91,16 @@ func TestMain_ErrorOutput(t *testing.T) {
 	require.True(t, true, "Error handling structure verified")
 }
 
+func TestCLIIdentityConstants(t *testing.T) {
+	// The CLI flagset name drives the "Usage of <name>:" line printed by
+	// --help, and the version/init log messages are shown by --version and
+	// on successful startup. Both MUST present the Shipwright identity and
+	// MUST NOT contain any trace of the legacy Syntegrity Dagger identity.
+	assert.Equal(t, "shipwright", cliName)
+	assert.Equal(t, "Shipwright version", versionLogMessage)
+	assert.Equal(t, "Shipwright initialized successfully", initLogMessage)
 
+	assert.NotContains(t, cliName, "syntegrity")
+	assert.NotContains(t, versionLogMessage, "Syntegrity")
+	assert.NotContains(t, initLogMessage, "Syntegrity")
+}
