@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: 'CI/CD Pipeline'
 
 # This workflow runs when:
 # 1. Push to main or develop branches (includes PR merges)
@@ -8,38 +8,38 @@ name: CI/CD Pipeline
 # Note: PR merges trigger push events, so we handle both to avoid duplicates
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ 'main', 'develop' ]
   pull_request:
-    branches: [ main, develop ]
-    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [ 'main', 'develop' ]
+    types: ['opened', 'synchronize', 'reopened', 'ready_for_review']
   delete:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  actions: write  # Required to trigger workflow_dispatch
+  contents: 'read'
+  actions: 'write'  # Required to trigger workflow_dispatch
 
 env:
   GO_VERSION: '1.25.5'
-  CACHE_VERSION: v1
+  CACHE_VERSION: 'v1'
 
 jobs:
   # Stage -1: Prevent deletion of protected branches
   prevent-branch-deletion:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'delete' && github.event.ref_type == 'branch'
+    runs-on: 'ubuntu-latest'
+    if: "github.event_name == 'delete' && github.event.ref_type == 'branch'"
     steps:
-    - name: Prevent branch deletion
+    - name: 'Prevent branch deletion'
       env:
-        BRANCH: ${{ github.event.ref }}
-        REF_TYPE: ${{ github.event.ref_type }}
-        GITHUB_ACTOR: ${{ github.actor }}
-        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        BRANCH: '${{ github.event.ref }}'
+        REF_TYPE: '${{ github.event.ref_type }}'
+        GITHUB_ACTOR: '${{ github.actor }}'
+        GITHUB_EVENT_NAME: '${{ github.event_name }}'
       run: |
         # For delete events, github.event.ref_name doesn't exist
         # We must use github.event.ref and extract the branch name from it
         # SECURITY: Using env: block prevents shell injection from branch names
-        
+
         # Extract branch name from ref (e.g., "refs/heads/main" -> "main")
         if [[ "$BRANCH" =~ ^refs/heads/(.+)$ ]]; then
           BRANCH_NAME="${BASH_REMATCH[1]}"
@@ -52,27 +52,27 @@ jobs:
           # Using ${BRANCH#refs/} instead of ${BRANCH##*/} prevents truncating branch names
           BRANCH_NAME="${BRANCH#refs/}"
         fi
-        
+
         # Validate that branch name was extracted correctly
         if [[ -z "$BRANCH_NAME" ]]; then
           echo "❌ ERROR: Failed to extract branch name from ref: $BRANCH"
           echo "Cannot determine branch name - failing to prevent potential branch deletion"
           exit 1
         fi
-        
+
         # Only check for branches (not tags)
         if [[ "$REF_TYPE" != "branch" ]]; then
           echo "✅ Deletion is for a tag, not a branch - allowing"
           exit 0
         fi
-        
+
         # Check if it's a protected branch
         # CRITICAL: Use BRANCH_NAME (extracted from github.event.ref), not github.event.ref_name
         if [[ "$BRANCH_NAME" != "main" ]] && [[ "$BRANCH_NAME" != "develop" ]]; then
           echo "✅ Branch '$BRANCH_NAME' is not protected - deletion allowed"
           exit 0
         fi
-        
+
         # If we get here, it's an attempt to delete a protected branch
         echo "⚠️ WARNING: Attempt to delete protected branch detected!"
         echo ""
@@ -99,19 +99,19 @@ jobs:
 
   # Stage 0: Verify no direct pushes to protected branches
   verify-branch-protection:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         fetch-depth: 0
-    
-    - name: Verify branch protection
+
+    - name: 'Verify branch protection'
       env:
-        GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_REF_NAME: ${{ github.ref_name }}
-        GITHUB_SHA: ${{ github.sha }}
-        GITHUB_EVENT_COMMITS: ${{ toJSON(github.event.commits) }}
+        GITHUB_EVENT_NAME: '${{ github.event_name }}'
+        GITHUB_REF_NAME: '${{ github.ref_name }}'
+        GITHUB_SHA: '${{ github.sha }}'
+        GITHUB_EVENT_COMMITS: '${{ toJSON(github.event.commits) }}'
       run: |
         # SECURITY: Using env: block prevents shell injection from GitHub context variables
         # Only check for direct pushes, PRs are allowed
@@ -119,36 +119,36 @@ jobs:
           echo "✅ Not a direct push (event: $GITHUB_EVENT_NAME) - branch protection check skipped"
           exit 0
         fi
-        
+
         BRANCH="$GITHUB_REF_NAME"
-        
+
         # Skip check for non-protected branches
         if [[ "$BRANCH" != "main" ]] && [[ "$BRANCH" != "develop" ]]; then
           echo "✅ Branch '$BRANCH' is not protected - direct push allowed"
           exit 0
         fi
-        
+
         # Check if this push is from a PR merge (squash/merge/rebase)
         # When a PR is merged, GitHub creates a commit that may have PR information
         # We check multiple indicators to determine if this is a merge from a PR
-        
+
         IS_PR_MERGE=false
         COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
         COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
-        
+
         # Method 1: Check if commit message contains PR reference or merge keywords
         if echo "$COMMIT_MSG" | grep -qiE "(#[0-9]+|Merge pull request|Merge branch|Squash and merge|from [^ ]+ into)"; then
           echo "📋 Commit message indicates PR merge: $(echo "$COMMIT_MSG" | head -1)"
           IS_PR_MERGE=true
         fi
-        
+
         # Method 2: Check if commit has multiple parents (merge commit, not squash)
         PARENT_COUNT=$(git rev-list --count "$GITHUB_SHA^..$GITHUB_SHA" 2>/dev/null || echo "0")
         if [[ "$PARENT_COUNT" -gt 1 ]]; then
           echo "📋 Commit has multiple parents (merge commit)"
           IS_PR_MERGE=true
         fi
-        
+
         # Method 3: Check if there are multiple commits in this push (indicates merge)
         # Note: github.event.commits is a JSON array, we need to pass it via env
         COMMIT_COUNT=$(echo "$GITHUB_EVENT_COMMITS" | jq '. | length' 2>/dev/null || echo "0")
@@ -156,13 +156,13 @@ jobs:
           echo "📋 Multiple commits in push (likely from PR merge)"
           IS_PR_MERGE=true
         fi
-        
+
         # Method 4: Check if author is GitHub (common for automated merges)
         if [[ "$COMMIT_AUTHOR" == "GitHub" ]] || [[ "$COMMIT_AUTHOR" == *"github"* ]]; then
           echo "📋 Commit author is GitHub (likely automated merge)"
           IS_PR_MERGE=true
         fi
-        
+
         # Method 5: For squash merge, check if commit is not directly on the branch history
         # Squash merges create a new commit that's not in the feature branch history
         # We check if the parent commit is the HEAD of the target branch before the merge
@@ -178,12 +178,12 @@ jobs:
             # Don't set IS_PR_MERGE=true here, just log it
           fi
         fi
-        
+
         # Method 6: Most reliable - check if this commit was created via GitHub UI merge
         # GitHub adds a "Co-authored-by" or specific metadata for PR merges
         # We'll be lenient: if we can't definitively prove it's a direct push, allow it
         # This prevents false positives while still catching obvious direct pushes
-        
+
         # If any indicator suggests PR merge, allow it
         if [[ "$IS_PR_MERGE" == "true" ]]; then
           # Additional check: detect direct merge from develop to main (without PR)
@@ -224,14 +224,14 @@ jobs:
               fi
             fi
           fi
-          
+
           echo "✅ Push appears to be from PR merge - allowing"
           echo "   Commit: $GITHUB_SHA"
           echo "   Branch: $BRANCH"
           echo "   Author: $COMMIT_AUTHOR"
           exit 0
         fi
-        
+
         # If we get here, it's likely a direct push
         echo "❌ ERROR: Direct push to protected branch '$BRANCH' detected!"
         echo ""
@@ -255,36 +255,36 @@ jobs:
 
   # Stage 1: Determine pipeline type and configuration
   determine-pipeline:
-    runs-on: ubuntu-latest
-    needs: [verify-branch-protection]
+    runs-on: 'ubuntu-latest'
+    needs: ['verify-branch-protection']
     # Skip CI for tag pushes (handled by release workflow)
     # Only proceed if branch protection check passed (or was skipped for PRs)
     if: |
       !startsWith(github.ref, 'refs/tags/') &&
       needs.verify-branch-protection.result == 'success'
     outputs:
-      pipeline-type: ${{ steps.determine.outputs.type }}
-      run-security: ${{ steps.determine.outputs.security }}
-      run-coverage: ${{ steps.determine.outputs.coverage }}
-      run-tests: ${{ steps.determine.outputs.run-tests }}
-      run-build: ${{ steps.determine.outputs.run-build }}
-      is-release: ${{ steps.determine.outputs.release }}
+      pipeline-type: '${{ steps.determine.outputs.type }}'
+      run-security: '${{ steps.determine.outputs.security }}'
+      run-coverage: '${{ steps.determine.outputs.coverage }}'
+      run-tests: '${{ steps.determine.outputs.run-tests }}'
+      run-build: '${{ steps.determine.outputs.run-build }}'
+      is-release: '${{ steps.determine.outputs.release }}'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         fetch-depth: 0
-    
-    - name: Determine pipeline type
-      id: determine
+
+    - name: 'Determine pipeline type'
+      id: 'determine'
       env:
-        GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_REF: ${{ github.ref }}
-        GITHUB_BASE_REF: ${{ github.base_ref }}
-        GITHUB_SHA: ${{ github.sha }}
-        GITHUB_HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-        GITHUB_PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-        GITHUB_PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        GITHUB_EVENT_NAME: '${{ github.event_name }}'
+        GITHUB_REF: '${{ github.ref }}'
+        GITHUB_BASE_REF: '${{ github.base_ref }}'
+        GITHUB_SHA: '${{ github.sha }}'
+        GITHUB_HEAD_COMMIT_MESSAGE: '${{ github.event.head_commit.message }}'
+        GITHUB_PR_BASE_REF: '${{ github.event.pull_request.base.ref }}'
+        GITHUB_PR_HEAD_REF: '${{ github.event.pull_request.head.ref }}'
       run: |
         # SECURITY: Using env: block prevents shell injection from GitHub context variables
         echo "🔍 Analyzing pipeline context..."
@@ -292,13 +292,13 @@ jobs:
         echo "Ref: $GITHUB_REF"
         echo "Base ref: $GITHUB_BASE_REF"
         echo "Commit message: $GITHUB_HEAD_COMMIT_MESSAGE"
-        
+
         # Determine pipeline type based on context
         if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
           # Pull request: determine based on base branch and source branch
           BASE_BRANCH="$GITHUB_PR_BASE_REF"
           HEAD_BRANCH="$GITHUB_PR_HEAD_REF"
-          
+
           if [[ "$BASE_BRANCH" == "main" ]]; then
             # PR to main: full pipeline (develop->main or hotfix->main)
             echo "type=pr-main" >> $GITHUB_OUTPUT
@@ -332,7 +332,7 @@ jobs:
           # Push to main: check if it's a hotfix merge or develop merge
           COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
           COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
-          
+
           # Detect if this is a PR merge
           IS_PR_MERGE=false
           if echo "$COMMIT_MSG" | grep -qiE "(#[0-9]+|Merge pull request|Squash and merge|from [^ ]+ into)"; then
@@ -340,14 +340,14 @@ jobs:
           elif [[ "$COMMIT_AUTHOR" == "GitHub" ]] || [[ "$COMMIT_AUTHOR" == *"github"* ]]; then
             IS_PR_MERGE=true
           fi
-          
+
           # Detect if it's a hotfix merge
           IS_HOTFIX=false
           if echo "$COMMIT_MSG" | grep -qiE "(hotfix|hot-fix|hot_fix)"; then
             IS_HOTFIX=true
             echo "✅ Detected hotfix merge to main"
           fi
-          
+
           # Check branch name in commit message or git history
           if [[ "$IS_HOTFIX" == "false" ]]; then
             # Check if source branch was hotfix
@@ -357,7 +357,7 @@ jobs:
               echo "✅ Detected hotfix merge to main (from branch: $SOURCE_BRANCH)"
             fi
           fi
-          
+
           if [[ "$IS_HOTFIX" == "true" ]]; then
             # Hotfix merge to main: full pipeline (build + tests + security + coverage)
             # Hotfixes need full validation since they bypass develop
@@ -392,7 +392,7 @@ jobs:
           # Push to develop: check if it's a PR merge or direct push
           COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
           COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
-          
+
           # Detect if this is a PR merge
           IS_PR_MERGE=false
           if echo "$COMMIT_MSG" | grep -qiE "(#[0-9]+|Merge pull request|Squash and merge|from [^ ]+ into)"; then
@@ -402,7 +402,7 @@ jobs:
             IS_PR_MERGE=true
             echo "✅ Detected PR merge to develop (GitHub author)"
           fi
-          
+
           if [[ "$IS_PR_MERGE" == "true" ]]; then
             # PR merge to develop: only build (tests already ran in PR)
             echo "type=develop-merge" >> $GITHUB_OUTPUT
@@ -436,15 +436,15 @@ jobs:
 
   # Stage 1.5: Warn about direct pushes to develop (should only happen via PR)
   warn-direct-develop:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     if: |
       github.event_name == 'push' &&
       github.ref == 'refs/heads/develop'
     steps:
-    - name: Warn about direct push to develop
+    - name: 'Warn about direct push to develop'
       env:
-        GITHUB_SHA: ${{ github.sha }}
-        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_SHA: '${{ github.sha }}'
+        GITHUB_ACTOR: '${{ github.actor }}'
       run: |
         # SECURITY: Using env: block prevents shell injection from GitHub context variables
         echo "⚠️ WARNING: Direct push to develop branch detected!"
@@ -457,23 +457,23 @@ jobs:
 
   # Stage 2: Setup and Dependencies (always runs)
   setup:
-    runs-on: ubuntu-latest
-    needs: [determine-pipeline]
-    if: needs.determine-pipeline.result == 'success'
+    runs-on: 'ubuntu-latest'
+    needs: ['determine-pipeline']
+    if: "needs.determine-pipeline.result == 'success'"
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         # For PRs, checkout the PR head commit
-        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      
-    - name: Validate GitHub account and token access
+        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+
+    - name: 'Validate GitHub account and token access'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_ACTOR: ${{ github.actor }}
-        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        GITHUB_REPOSITORY: '${{ github.repository }}'
+        GITHUB_ACTOR: '${{ github.actor }}'
+        GITHUB_EVENT_NAME: '${{ github.event_name }}'
       run: |
         # SECURITY: Using env: block prevents shell injection from GitHub context variables
         echo "🔍 Validating GitHub account and token access..."
@@ -483,14 +483,14 @@ jobs:
         echo "   - Actor: $GITHUB_ACTOR"
         echo "   - Event: $GITHUB_EVENT_NAME"
         echo ""
-        
+
         # Check if we have a token
         if [ -z "$SHIPWRIGHT_TOKEN" ] && [ -z "$GITHUB_TOKEN" ]; then
           echo "❌ ERROR: No token available"
           echo "   Please configure SHIPWRIGHT_TOKEN or GITHUB_TOKEN"
           exit 1
         fi
-        
+
         # Use SHIPWRIGHT_TOKEN if available, otherwise GITHUB_TOKEN
         TOKEN="${SHIPWRIGHT_TOKEN:-$GITHUB_TOKEN}"
         TOKEN_TYPE="SHIPWRIGHT_TOKEN"
@@ -501,7 +501,7 @@ jobs:
         else
           echo "✅ Using SHIPWRIGHT_TOKEN"
         fi
-        
+
         # Test access to private repository
         echo ""
         echo "🔍 Testing access to private repository: github.com/getsyntegrity/go-kit-logger"
@@ -524,23 +524,23 @@ jobs:
           echo ""
           echo "⚠️ Pipeline will continue but may fail during 'go mod download'"
         fi
-        
+
         echo ""
         echo "📊 GitHub Actions Limits (Free Accounts):"
         echo "   - Private repos: 2,000 minutes/month"
         echo "   - Public repos: Unlimited minutes"
         echo "   - Concurrent jobs: Limited"
-      
-    - name: Set up Go
-      uses: actions/setup-go@v6
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v6'
       with:
-        go-version: ${{ env.GO_VERSION }}
+        go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
-        
-    - name: Configure Git and Go for private repos
+
+    - name: 'Configure Git and Go for private repos'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
@@ -573,29 +573,29 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        
+
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Configure Git authentication with token (escape special characters)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
         echo "Git URL config:"
         git config --global --get-regexp url || echo "No URL config found"
-        
-    - name: Clean Go module cache
+
+    - name: 'Clean Go module cache'
       run: |
         echo "🧹 Cleaning Go module cache..."
         # Clean any existing module cache to avoid conflicts
@@ -605,28 +605,28 @@ jobs:
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache cleaned"
-        
-    - name: Cache Go modules                                                      
-      uses: actions/cache@v4
+
+    - name: 'Cache Go modules'
+      uses: 'actions/cache@v4'
       with:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
+        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
         restore-keys: |
           go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
         fail-on-cache-miss: false
-          
-    - name: Download dependencies
+
+    - name: 'Download dependencies'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "📦 Downloading Go dependencies..."
-        
+
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
         if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
@@ -657,17 +657,17 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Test authentication before downloading
         echo "Testing GitHub authentication..."
         if git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
@@ -677,7 +677,7 @@ jobs:
           echo "⚠️ This will likely cause 'go mod download' to fail"
           echo "⚠️ Consider configuring SHIPWRIGHT_TOKEN with a token that has 'repo' scope"
         fi
-        
+
         # Download dependencies with error handling
         if ! go mod download; then
           echo "❌ Failed to download dependencies"
@@ -708,8 +708,8 @@ jobs:
           exit 1
         fi
         echo "✅ Dependencies downloaded"
-      
-    - name: Verify dependencies
+
+    - name: 'Verify dependencies'
       run: |
         echo "🔍 Verifying dependencies..."
         go mod verify
@@ -717,26 +717,26 @@ jobs:
 
   # Stage 3: Build (runs in parallel with tests and lint)
   build:
-    runs-on: ubuntu-latest
-    needs: [determine-pipeline, setup]
-    if: needs.determine-pipeline.outputs.run-build == 'true'
+    runs-on: 'ubuntu-latest'
+    needs: ['determine-pipeline', 'setup']
+    if: "needs.determine-pipeline.outputs.run-build == 'true'"
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         # For PRs, checkout the PR head commit
-        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      
-    - name: Set up Go
-      uses: actions/setup-go@v6
+        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v6'
       with:
-        go-version: ${{ env.GO_VERSION }}
+        go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
-        
-    - name: Configure Git and Go for private repos
+
+    - name: 'Configure Git and Go for private repos'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
@@ -769,29 +769,29 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        
+
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Configure Git authentication with token (escape special characters)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
         echo "Git URL config:"
         git config --global --get-regexp url || echo "No URL config found"
-        
-    - name: Clean Go module cache
+
+    - name: 'Clean Go module cache'
       run: |
         echo "🧹 Cleaning Go module cache..."
         # Note: Using rm without sudo for free GitHub accounts (sudo may not be available)
@@ -801,28 +801,28 @@ jobs:
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache and VCS cache cleaned"
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
+
+    - name: 'Cache Go modules'
+      uses: 'actions/cache@v4'
       with:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
+        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
         restore-keys: |
           go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
         fail-on-cache-miss: false
-          
-    - name: Build
+
+    - name: 'Build'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🔨 Building application..."
-        
+
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
         if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
@@ -833,27 +833,27 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Clean VCS cache to remove any cached unauthenticated URLs
         echo "🧹 Cleaning Go VCS cache..."
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
-        
+
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Verify Go environment
         echo "📋 Go environment:"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
         echo "GONOPROXY: $(go env GONOPROXY)"
         echo "GONOSUMDB: $(go env GONOSUMDB)"
-        
+
         # Verify authentication before building (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
@@ -864,7 +864,7 @@ jobs:
           # Use || true to ensure this never fails the script
           AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
           AUTH_EXIT_CODE=$?
-          
+
           if [ $AUTH_EXIT_CODE -eq 0 ]; then
             echo "✅ Authentication verified via git ls-remote"
           else
@@ -879,31 +879,31 @@ jobs:
             echo "Continuing with build - go build will test actual module access..."
           fi
         fi
-        
+
         go build ./...
 
   # Stage 4: Tests (runs in parallel with build)
   test:
-    runs-on: ubuntu-latest
-    needs: [determine-pipeline, setup]
-    if: needs.determine-pipeline.outputs.run-tests == 'true'
+    runs-on: 'ubuntu-latest'
+    needs: ['determine-pipeline', 'setup']
+    if: "needs.determine-pipeline.outputs.run-tests == 'true'"
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         # For PRs, checkout the PR head commit
-        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      
-    - name: Set up Go
-      uses: actions/setup-go@v6
+        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v6'
       with:
-        go-version: ${{ env.GO_VERSION }}
+        go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
-        
-    - name: Configure Git and Go for private repos
+
+    - name: 'Configure Git and Go for private repos'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
@@ -936,29 +936,29 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        
+
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Configure Git authentication with token (escape special characters)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
         echo "Git URL config:"
         git config --global --get-regexp url || echo "No URL config found"
-        
-    - name: Clean Go module cache
+
+    - name: 'Clean Go module cache'
       run: |
         echo "🧹 Cleaning Go module cache..."
         # Note: Using rm without sudo for free GitHub accounts (sudo may not be available)
@@ -968,28 +968,28 @@ jobs:
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache and VCS cache cleaned"
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
+
+    - name: 'Cache Go modules'
+      uses: 'actions/cache@v4'
       with:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
+        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
         restore-keys: |
           go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
         fail-on-cache-miss: false
-          
-    - name: Run tests
+
+    - name: 'Run tests'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🧪 Running tests..."
-        
+
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
         if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
@@ -1000,28 +1000,28 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Clean VCS cache to remove any cached unauthenticated URLs
         echo "🧹 Cleaning Go VCS cache..."
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
-        
+
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Verify authentication before running tests (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
         # Use || true to ensure this never fails the script
         AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
         AUTH_EXIT_CODE=$?
-        
+
         if [ $AUTH_EXIT_CODE -eq 0 ]; then
           echo "✅ Authentication verified"
         else
@@ -1030,7 +1030,7 @@ jobs:
           echo ""
           echo "⚠️ Continuing with tests anyway - authentication may work for go mod download"
         fi
-        
+
         # Exclude examples and mocks directories from test coverage
         TEST_PACKAGES=$(go list ./... | grep -v "/examples" | grep -v "/mocks")
         if [[ "${{ needs.determine-pipeline.outputs.run-coverage }}" == "true" ]]; then
@@ -1043,26 +1043,26 @@ jobs:
 
   # Stage 5: Security (only for main/develop/PRs)
   security:
-    runs-on: ubuntu-latest
-    needs: [determine-pipeline, build]
-    if: needs.determine-pipeline.outputs.run-security == 'true'
+    runs-on: 'ubuntu-latest'
+    needs: ['determine-pipeline', 'build']
+    if: "needs.determine-pipeline.outputs.run-security == 'true'"
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         # For PRs, checkout the PR head commit
-        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      
-    - name: Set up Go
-      uses: actions/setup-go@v6
+        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v6'
       with:
-        go-version: ${{ env.GO_VERSION }}
+        go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
-        
-    - name: Configure Git and Go for private repos
+
+    - name: 'Configure Git and Go for private repos'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
@@ -1095,29 +1095,29 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        
+
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Configure Git authentication with token (escape special characters)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
         echo "Git URL config:"
         git config --global --get-regexp url || echo "No URL config found"
-        
-    - name: Clean Go module cache
+
+    - name: 'Clean Go module cache'
       run: |
         echo "🧹 Cleaning Go module cache..."
         # Note: Using rm without sudo for free GitHub accounts (sudo may not be available)
@@ -1127,28 +1127,28 @@ jobs:
         mkdir -p ~/go/pkg/mod
         mkdir -p ~/.cache/go-build
         echo "✅ Go module cache and VCS cache cleaned"
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
+
+    - name: 'Cache Go modules'
+      uses: 'actions/cache@v4'
       with:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}
+        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
         restore-keys: |
           go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
           go-mod-${{ hashFiles('go.sum') }}-
           go-mod-
         fail-on-cache-miss: false
-          
-    - name: Check for vulnerabilities
+
+    - name: 'Check for vulnerabilities'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🔒 Running security scan..."
-        
+
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
         if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
@@ -1159,28 +1159,28 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Clean VCS cache to remove any cached unauthenticated URLs
         echo "🧹 Cleaning Go VCS cache..."
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
-        
+
         # Re-ensure authentication is configured (in case cache restore cleared it)
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Verify authentication before installing tools (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
         # Use || true to ensure this never fails the script
         AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
         AUTH_EXIT_CODE=$?
-        
+
         if [ $AUTH_EXIT_CODE -eq 0 ]; then
           echo "✅ Authentication verified"
         else
@@ -1189,13 +1189,13 @@ jobs:
           echo ""
           echo "⚠️ Continuing with security scan anyway - authentication may work for go mod download"
         fi
-        
+
         echo "📋 Go version: $(go version)"
         go install golang.org/x/vuln/cmd/govulncheck@latest
-        
+
         # Run vulnerability check and capture output
         govulncheck ./... > vuln_report.txt 2>&1 || true
-        
+
         # Check if there are vulnerabilities in dependencies (not stdlib)
         if grep -q "Your code is affected" vuln_report.txt; then
           # Check if vulnerabilities are only in stdlib
@@ -1224,8 +1224,8 @@ jobs:
   # Stage 6: Trigger release workflow for develop->main or hotfix->main merges
   # IMPORTANT: Only triggers on main branch after merge, never on PRs, develop, or feature branches
   trigger-release:
-    runs-on: ubuntu-latest
-    needs: [determine-pipeline, security]
+    runs-on: 'ubuntu-latest'
+    needs: ['determine-pipeline', 'security']
     if: |
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
@@ -1233,13 +1233,13 @@ jobs:
       (needs.determine-pipeline.outputs.pipeline-type == 'main-hotfix' ||
        needs.determine-pipeline.outputs.pipeline-type == 'main-develop-merge')
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         fetch-depth: 0
-      
-    - name: Detect source branch
-      id: detect-source
+
+    - name: 'Detect source branch'
+      id: 'detect-source'
       run: |
         # Detect source branch from merge commit message
         SOURCE_BRANCH=""
@@ -1250,7 +1250,7 @@ jobs:
         if [[ -z "$SOURCE_BRANCH" ]]; then
           SOURCE_BRANCH=$(git log --oneline -10 | grep -iE "hotfix|develop" | head -1 | grep -oE "(hotfix|develop)[^ ]*" | head -1 || echo "")
         fi
-        
+
         # Trigger release for merges from develop or hotfix branches
         if [[ "$SOURCE_BRANCH" == "develop" ]] || echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
           echo "✅ Merge from develop detected: $SOURCE_BRANCH"
@@ -1262,19 +1262,19 @@ jobs:
           echo "⏭️ Merge is not from develop or hotfix (detected: $SOURCE_BRANCH) - skipping release trigger"
           echo "should_trigger=false" >> $GITHUB_OUTPUT
         fi
-    
-    - name: Trigger release workflow
-      if: steps.detect-source.outputs.should_trigger == 'true'
-      uses: actions/github-script@v7
+
+    - name: 'Trigger release workflow'
+      if: "steps.detect-source.outputs.should_trigger == 'true'"
+      uses: 'actions/github-script@v7'
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}
+        GITHUB_TOKEN: '${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}'
       with:
-        github-token: ${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}
+        github-token: '${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}'
         script: |
           // Trigger release workflow with workflow_dispatch to use latest main version
           const currentSha = context.sha;
           console.log(`🚀 Triggering release workflow for commit ${currentSha} (develop->main merge)`);
-          
+
           try {
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
@@ -1300,49 +1300,49 @@ jobs:
 
   # Final stage: Verify all critical jobs passed (blocks merge if any failed)
   verify-pipeline-success:
-    runs-on: ubuntu-latest
-    needs: [determine-pipeline, setup, build, test, security]
+    runs-on: 'ubuntu-latest'
+    needs: ['determine-pipeline', 'setup', 'build', 'test', 'security']
     if: |
       always() &&
       github.event_name == 'pull_request'
     steps:
-    - name: Verify all critical jobs passed
+    - name: 'Verify all critical jobs passed'
       run: |
         echo "🔍 Verifying all critical pipeline jobs completed successfully..."
         echo ""
-        
+
         FAILED_JOBS=""
-        
+
         # Check each critical job
         if [[ "${{ needs.determine-pipeline.result }}" != "success" ]]; then
           FAILED_JOBS="${FAILED_JOBS}determine-pipeline "
         fi
-        
+
         if [[ "${{ needs.setup.result }}" != "success" ]]; then
           FAILED_JOBS="${FAILED_JOBS}setup "
         fi
-        
+
         # Build is conditional - only check if it was supposed to run
         if [[ "${{ needs.determine-pipeline.outputs.run-build }}" == "true" ]]; then
           if [[ "${{ needs.build.result }}" != "success" ]]; then
             FAILED_JOBS="${FAILED_JOBS}build "
           fi
         fi
-        
+
         # Test is conditional - only check if it was supposed to run
         if [[ "${{ needs.determine-pipeline.outputs.run-tests }}" == "true" ]]; then
           if [[ "${{ needs.test.result }}" != "success" ]]; then
             FAILED_JOBS="${FAILED_JOBS}test "
           fi
         fi
-        
+
         # Security is conditional - only check if it was supposed to run
         if [[ "${{ needs.determine-pipeline.outputs.run-security }}" == "true" ]]; then
           if [[ "${{ needs.security.result }}" != "success" ]]; then
             FAILED_JOBS="${FAILED_JOBS}security "
           fi
         fi
-        
+
         if [[ -n "$FAILED_JOBS" ]]; then
           echo "❌ ERROR: The following critical jobs failed:"
           echo "   $FAILED_JOBS"
