@@ -532,7 +532,7 @@ jobs:
         echo "   - Concurrent jobs: Limited"
 
     - name: 'Set up Go'
-      uses: 'actions/setup-go@v6'
+      uses: 'actions/setup-go@v7'
       with:
         go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
@@ -728,7 +728,7 @@ jobs:
         ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
 
     - name: 'Set up Go'
-      uses: 'actions/setup-go@v6'
+      uses: 'actions/setup-go@v7'
       with:
         go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
@@ -895,7 +895,7 @@ jobs:
         ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
 
     - name: 'Set up Go'
-      uses: 'actions/setup-go@v6'
+      uses: 'actions/setup-go@v7'
       with:
         go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
@@ -1054,7 +1054,7 @@ jobs:
         ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
 
     - name: 'Set up Go'
-      uses: 'actions/setup-go@v6'
+      uses: 'actions/setup-go@v7'
       with:
         go-version: '${{ env.GO_VERSION }}'
         cache: false  # Disable default cache to use our custom one
