@@ -93,16 +93,16 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 6 — Graph + Kahn + kind checks (`workflow-execution`)
 
-- [ ] 6.1 RED: self-edge rejected.
-- [ ] 6.2 RED: mutual pair rejected.
-- [ ] 6.3 RED: long cycle (4+) rejected.
-- [ ] 6.4 RED: diamond fan-in ACCEPTED (`b`,`c` need `a`; `d` needs `b`,`c`) — no cycle false-positive.
-- [ ] 6.5 RED: disconnected components (multiple roots) accepted.
-- [ ] 6.6 RED: unknown `needs` id rejected, error DISTINCT from a cycle error.
-- [ ] 6.7 RED: duplicate step ids rejected.
-- [ ] 6.8 RED: data reference without a declared `needs` edge rejected (prevents unordered read of another step's output).
-- [ ] 6.9 RED: output-kind/input-kind mismatch rejected before anything runs.
-- [ ] 6.10 GREEN: Kahn's algorithm (in-degree waves); cycle error enumerates residual-in-degree ids.
+- [x] 6.1 RED: self-edge rejected.
+- [x] 6.2 RED: mutual pair rejected.
+- [x] 6.3 RED: long cycle (4+) rejected.
+- [x] 6.4 RED: diamond fan-in ACCEPTED (`b`,`c` need `a`; `d` needs `b`,`c`) — no cycle false-positive.
+- [x] 6.5 RED: disconnected components (multiple roots) accepted.
+- [x] 6.6 RED: unknown `needs` id rejected, error DISTINCT from a cycle error.
+- [x] 6.7 RED: duplicate step ids rejected.
+- [x] 6.8 RED: data reference without a declared `needs` edge rejected (prevents unordered read of another step's output).
+- [x] 6.9 RED: output-kind/input-kind mismatch rejected before anything runs — PARTIAL BY DESIGN, see apply-progress: only the statically-knowable case (a `secrets.*` reference used as a step's `input`) is checked; `with`-field kind compatibility and `steps.<id>.output` kind checks are deferred to Phase 7 (require provider `WithSchema`).
+- [x] 6.10 GREEN: Kahn's algorithm (in-degree waves); cycle error enumerates residual-in-degree ids.
 
 ## Phase 7 — Provider registry + resolution (`workflow-execution`)
 
