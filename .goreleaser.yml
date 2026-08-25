@@ -23,7 +23,7 @@ builds:
       - -X main.Version={{.Version}}
       - -X main.BuildTime={{.Date}}
       - -X main.GitCommit={{.Commit}}
-    binary: syntegrity-dagger
+    binary: shipwright
     # Rename binaries to include platform info for direct download
     id: default
 

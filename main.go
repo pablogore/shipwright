@@ -16,6 +16,14 @@ import (
 	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
+// CLI identity constants — presented in the --help usage line, --version
+// output, and structured startup log messages.
+const (
+	cliName           = "shipwright"
+	versionLogMessage = "Shipwright version"
+	initLogMessage    = "Shipwright initialized successfully"
+)
+
 // CLI represents the command line interface for the application.
 type CLI struct {
 	app        *app.App
@@ -86,7 +94,7 @@ func (c *CLI) Run(args []string) error {
 	defer app.Reset()
 
 	// Log successful initialization using go-kit-logger
-	logger.L().InfoContext(ctx, "Syntegrity Dagger initialized successfully",
+	logger.L().InfoContext(ctx, initLogMessage,
 		"pipeline", flags.pipelineName,
 		"environment", flags.env,
 		"verbose", flags.verbose)
@@ -136,7 +144,7 @@ type Flags struct {
 // parseFlags parses command line arguments.
 // Returns parsed flags and an error if flag parsing fails.
 func (c *CLI) parseFlags(args []string) (*Flags, error) {
-	flagSet := flag.NewFlagSet("syntegrity-dagger", flag.ContinueOnError)
+	flagSet := flag.NewFlagSet(cliName, flag.ContinueOnError)
 
 	defaultGitAuth := "ssh"
 	if os.Getenv("CI_JOB_TOKEN") != "" {
@@ -208,7 +216,7 @@ func (c *CLI) executePipeline(ctx context.Context, flags *Flags) error {
 	if c.isCIEnvironment() && flags.step == "" {
 		logger.L().WarnContext(ctx, "Executing full pipeline in CI environment",
 			"recommendation", "For better visibility in CI/CD UI, execute steps individually using --step flag",
-			"example", "syntegrity-dagger --pipeline go-service --step build")
+			"example", cliName+" --pipeline go-service --step build")
 	}
 
 	if shouldUseLocal {
@@ -602,7 +610,7 @@ var (
 
 // showVersion displays version information
 func (c *CLI) showVersion() {
-	logger.L().InfoContext(context.Background(), "Syntegrity Dagger version",
+	logger.L().InfoContext(context.Background(), versionLogMessage,
 		"version", Version,
 		"go_version", runtime.Version(),
 		"os", runtime.GOOS,
