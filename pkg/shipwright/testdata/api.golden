@@ -77,8 +77,9 @@ type SourceConfig struct {
 	// GitUserName is the Git user name used for any commits made during
 	// the pipeline.
 	GitUserName	string
-	// SSHPrivateKey is the SSH private key used for Git authentication.
-	SSHPrivateKey	string
+	// SSHPrivateKey is the SSH private key used for Git authentication,
+	// carried as a Dagger secret so it never surfaces as plaintext.
+	SSHPrivateKey	*dagger.Secret
 }
 
 type TestConfig struct {

@@ -117,6 +117,28 @@ func TestConfigStructs_DoNotCarryLiveDaggerHandles(t *testing.T) {
 	}
 }
 
+// TestSourceConfig_SSHPrivateKeyIsSecretTyped is a security-relevant
+// RED/GREEN follow-up: SSHPrivateKey MUST be *dagger.Secret, never a
+// plaintext string, on the public config surface — the same invariant
+// TestArtifactConfig_CredentialFieldsAreSecretTyped already enforces for
+// RegistryPass/RegistryToken/Token, extended to SourceConfig's credential.
+func TestSourceConfig_SSHPrivateKeyIsSecretTyped(t *testing.T) {
+	t.Parallel()
+
+	secretType := reflect.TypeFor[*dagger.Secret]()
+	sourceConfigType := reflect.TypeFor[shipwright.SourceConfig]()
+
+	field, ok := sourceConfigType.FieldByName("SSHPrivateKey")
+	if !ok {
+		t.Fatalf("shipwright.SourceConfig has no field %q", "SSHPrivateKey")
+	}
+
+	if field.Type != secretType {
+		t.Fatalf("shipwright.SourceConfig.SSHPrivateKey type = %s, want %s (credentials MUST cross the public contract as *dagger.Secret, never string)",
+			field.Type, secretType)
+	}
+}
+
 // TestArtifactConfig_CredentialFieldsAreSecretTyped is the security-relevant
 // RED/GREEN task (1.5): RegistryPass, RegistryToken, and Token MUST be
 // *dagger.Secret, never a plaintext string, on the public config surface.

@@ -6,6 +6,11 @@ import "dagger.io/dagger"
 // checkout, credentials). It carries no Build/Test/Artifact/Deploy/Run
 // field — decomposed per design.md D-D so orthogonality is
 // compiler-enforced rather than documented.
+//
+// Security-relevant: SSHPrivateKey is a *dagger.Secret, never a plaintext
+// string — credentials MUST cross the public contract as *dagger.Secret
+// only (design.md D-D, Threat Matrix), the same invariant already enforced
+// for ArtifactConfig's credential fields.
 type SourceConfig struct {
 	// GitRepo is the Git repository URL.
 	GitRepo string
@@ -19,8 +24,9 @@ type SourceConfig struct {
 	// GitUserName is the Git user name used for any commits made during
 	// the pipeline.
 	GitUserName string
-	// SSHPrivateKey is the SSH private key used for Git authentication.
-	SSHPrivateKey string
+	// SSHPrivateKey is the SSH private key used for Git authentication,
+	// carried as a Dagger secret so it never surfaces as plaintext.
+	SSHPrivateKey *dagger.Secret
 }
 
 // BuildConfig configures a Builder implementation.
