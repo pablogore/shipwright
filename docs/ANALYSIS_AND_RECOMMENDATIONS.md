@@ -1640,8 +1640,8 @@ type Plugin interface {
 
 // Cargar plugins desde:
 // - Directorio local: ./plugins/
-// - URL remota: https://plugins.syntegrity.io/
-// - Registro de plugins: syntegrity-plugin-registry
+// - URL remota: https://plugins.shipwright.io/
+// - Registro de plugins: shipwright-plugin-registry
 ```
 
 #### 5.2. Pipeline como Código (No DSL YAML)
@@ -1683,7 +1683,7 @@ jobs:
 
 **❌ Evitar DSL YAML oculto:**
 ```yaml
-# .syntegrity-pipeline.yml  # ❌ NO RECOMENDADO
+# .shipwright-pipeline.yml  # ❌ NO RECOMENDADO
 # Oculta la configuración del pipeline
 # No es visible en GitHub Actions UI
 # Dificulta el debugging y colaboración
