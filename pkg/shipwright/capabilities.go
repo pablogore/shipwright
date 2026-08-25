@@ -18,6 +18,16 @@ import (
 // Builder builds a source Directory into a build-output Directory. It has no
 // knowledge of Test, Artifact, Deploy, or Run — capabilities compose, they
 // do not depend on siblings.
+//
+// Name collision (temporary, by design): internal/pipelines/pipeline.go
+// also declares a "Builder" — an unused, incompatible single-method
+// interface (`Build(ctx) error`, no Directory in/out) predating this
+// capability contract. That legacy type, along with the rest of
+// internal/pipelines/pipeline.go, is deleted in a later work unit of this
+// change (design.md's Migration Sequence) once nothing references it. Until
+// then the two coexist in sibling packages; do not rename this one to work
+// around it — this exported name is what design.md/spec fix as the public
+// Builder capability.
 type Builder interface {
 	Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error)
 }
@@ -25,6 +35,9 @@ type Builder interface {
 // Tester runs tests against a build-output Directory and returns a report
 // File. Multiple independent Tester implementations MAY exist for the same
 // input (unit, lint, vulnerability scan, ...); none is privileged.
+//
+// Same temporary name collision as Builder, with internal/pipelines's
+// unused legacy Tester interface — see the Builder doc comment above.
 type Tester interface {
 	Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error)
 }

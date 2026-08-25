@@ -74,20 +74,34 @@ func renderExportedSurface(t *testing.T) string {
 		t.Fatalf("package %q not found while parsing %s", "shipwright", pkgDir)
 	}
 
+	return renderPackageSurface(t, fset, pkg)
+}
+
+// renderPackageSurface walks every top-level declaration in pkg and prints
+// the exported ones deterministically. Extracted from renderExportedSurface
+// so the rendering logic itself — not just the real pkg/shipwright
+// directory — can be exercised directly against synthetic fixtures.
+func renderPackageSurface(t *testing.T, fset *token.FileSet, pkg *ast.Package) string {
+	t.Helper()
+
 	var decls []string
 
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
-			genDecl, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
-			}
-
-			switch genDecl.Tok {
-			case token.TYPE:
-				decls = append(decls, renderExportedTypeSpecs(t, fset, genDecl)...)
-			case token.CONST:
-				decls = append(decls, renderExportedValueSpecs(t, fset, genDecl, "const")...)
+			switch d := decl.(type) {
+			case *ast.GenDecl:
+				switch d.Tok {
+				case token.TYPE:
+					decls = append(decls, renderExportedTypeSpecs(t, fset, d)...)
+				case token.CONST:
+					decls = append(decls, renderExportedValueSpecs(t, fset, d, "const")...)
+				case token.VAR:
+					decls = append(decls, renderExportedValueSpecs(t, fset, d, "var")...)
+				}
+			case *ast.FuncDecl:
+				if r := renderExportedFuncDecl(t, fset, d); r != "" {
+					decls = append(decls, r)
+				}
 			}
 		}
 	}
@@ -101,6 +115,29 @@ func renderExportedSurface(t *testing.T) string {
 	}
 
 	return b.String()
+}
+
+// renderExportedFuncDecl prints an exported top-level function or method's
+// signature (never its body — the golden file records the guaranteed
+// surface shape, not implementation). Returns "" for an unexported func,
+// which the caller must skip rather than append.
+func renderExportedFuncDecl(t *testing.T, fset *token.FileSet, funcDecl *ast.FuncDecl) string {
+	t.Helper()
+
+	if !funcDecl.Name.IsExported() {
+		return ""
+	}
+
+	sigOnly := *funcDecl
+	sigOnly.Body = nil
+	sigOnly.Doc = nil
+
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, &sigOnly); err != nil {
+		t.Fatalf("failed to print func decl %s: %v", funcDecl.Name.Name, err)
+	}
+
+	return strings.TrimSpace(buf.String())
 }
 
 func renderExportedTypeSpecs(t *testing.T, fset *token.FileSet, genDecl *ast.GenDecl) []string {
@@ -136,19 +173,13 @@ func renderExportedValueSpecs(t *testing.T, fset *token.FileSet, genDecl *ast.Ge
 			continue
 		}
 
-		exportedAny := false
-		for _, name := range valueSpec.Names {
-			if name.IsExported() {
-				exportedAny = true
-				break
-			}
-		}
-		if !exportedAny {
+		filtered := filterExportedValueSpec(valueSpec)
+		if filtered == nil {
 			continue
 		}
 
 		var buf bytes.Buffer
-		if err := printer.Fprint(&buf, fset, valueSpec); err != nil {
+		if err := printer.Fprint(&buf, fset, filtered); err != nil {
 			t.Fatalf("failed to print value spec: %v", err)
 		}
 
@@ -158,8 +189,139 @@ func renderExportedValueSpecs(t *testing.T, fset *token.FileSet, genDecl *ast.Ge
 	return rendered
 }
 
+// filterExportedValueSpec returns a copy of valueSpec containing only its
+// exported names — and, when Values is one-to-one with Names, only the
+// correspondingly-indexed values — or nil if none of its names are
+// exported. Without this, a mixed grouped declaration like
+// `const Foo, internalBar = "x", "y"` would leak the unexported name
+// (and its value) into the guaranteed-surface golden file the moment any
+// one name in the group is exported.
+func filterExportedValueSpec(valueSpec *ast.ValueSpec) *ast.ValueSpec {
+	parallelValues := len(valueSpec.Values) == len(valueSpec.Names)
+
+	var names []*ast.Ident
+	var values []ast.Expr
+
+	for i, name := range valueSpec.Names {
+		if !name.IsExported() {
+			continue
+		}
+		names = append(names, name)
+		if parallelValues {
+			values = append(values, valueSpec.Values[i])
+		}
+	}
+
+	if len(names) == 0 {
+		return nil
+	}
+
+	filtered := *valueSpec
+	filtered.Names = names
+	if parallelValues {
+		filtered.Values = values
+	}
+	return &filtered
+}
+
 // nonTestGoFile is a parser.ParseDir filter that excludes _test.go files,
 // so the golden test reflects only the package's public production source.
 func nonTestGoFile(info os.FileInfo) bool {
 	return !strings.HasSuffix(info.Name(), "_test.go")
+}
+
+// parseFixturePackage parses a synthetic single-file "shipwright" package
+// from source, so renderPackageSurface's rendering logic can be exercised
+// directly without depending on the real pkg/shipwright directory contents.
+func parseFixturePackage(t *testing.T, fset *token.FileSet, source string) *ast.Package {
+	t.Helper()
+
+	file, err := parser.ParseFile(fset, "fixture.go", source, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("failed to parse fixture source: %v", err)
+	}
+
+	return &ast.Package{
+		Name:  "shipwright",
+		Files: map[string]*ast.File{"fixture.go": file},
+	}
+}
+
+// TestRenderPackageSurface_IncludesExportedVar guards against the golden
+// test silently missing an exported top-level var — renderPackageSurface's
+// GenDecl switch previously handled only token.TYPE and token.CONST.
+func TestRenderPackageSurface_IncludesExportedVar(t *testing.T) {
+	t.Parallel()
+
+	fset := token.NewFileSet()
+	pkg := parseFixturePackage(t, fset, `package shipwright
+
+var ExportedVar = 1
+
+var unexportedVar = 2
+`)
+
+	got := renderPackageSurface(t, fset, pkg)
+
+	if !strings.Contains(got, "ExportedVar") {
+		t.Fatalf("rendered surface missing exported var ExportedVar:\n%s", got)
+	}
+	if strings.Contains(got, "unexportedVar") {
+		t.Fatalf("rendered surface leaked unexported var unexportedVar:\n%s", got)
+	}
+}
+
+// TestRenderPackageSurface_IncludesExportedFunc guards against the golden
+// test silently missing an exported top-level function or method —
+// *ast.FuncDecl previously wasn't handled at all (only *ast.GenDecl was).
+func TestRenderPackageSurface_IncludesExportedFunc(t *testing.T) {
+	t.Parallel()
+
+	fset := token.NewFileSet()
+	pkg := parseFixturePackage(t, fset, `package shipwright
+
+func ExportedFunc(x int) string {
+	return "unused body must not leak into the golden file"
+}
+
+func unexportedFunc() {}
+`)
+
+	got := renderPackageSurface(t, fset, pkg)
+
+	if !strings.Contains(got, "func ExportedFunc(x int) string") {
+		t.Fatalf("rendered surface missing exported func signature:\n%s", got)
+	}
+	if strings.Contains(got, "unused body must not leak") {
+		t.Fatalf("rendered surface leaked function body, not just its signature:\n%s", got)
+	}
+	if strings.Contains(got, "unexportedFunc") {
+		t.Fatalf("rendered surface leaked unexported func unexportedFunc:\n%s", got)
+	}
+}
+
+// TestRenderPackageSurface_MixedConstGroupExcludesUnexportedName guards
+// against a mixed grouped declaration leaking its unexported name (and
+// value) into the golden file the moment one name in the group is
+// exported — the pre-fix behavior rendered the whole ValueSpec verbatim.
+func TestRenderPackageSurface_MixedConstGroupExcludesUnexportedName(t *testing.T) {
+	t.Parallel()
+
+	fset := token.NewFileSet()
+	pkg := parseFixturePackage(t, fset, `package shipwright
+
+const Foo, internalBar = "x", "y"
+`)
+
+	got := renderPackageSurface(t, fset, pkg)
+
+	if !strings.Contains(got, "Foo") || !strings.Contains(got, `"x"`) {
+		t.Fatalf("rendered surface missing exported const Foo = \"x\":\n%s", got)
+	}
+	if strings.Contains(got, "internalBar") {
+		t.Fatalf("rendered surface leaked unexported name internalBar from a mixed group:\n%s", got)
+	}
+	if strings.Contains(got, `"y"`) {
+		t.Fatalf("rendered surface leaked unexported value \"y\" from a mixed group:\n%s", got)
+	}
 }
