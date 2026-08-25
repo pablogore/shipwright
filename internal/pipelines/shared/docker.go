@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // DockerDeployer encapsula la lógica para construir y publicar una imagen Docker.

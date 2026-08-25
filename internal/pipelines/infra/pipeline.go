@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 	"github.com/pablogore/shipwright/internal/pipelines"
 	"github.com/pablogore/shipwright/internal/pipelines/shared"
 )

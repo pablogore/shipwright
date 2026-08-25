@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // extractHostFromRepoURL extracts the host from a repository URL.

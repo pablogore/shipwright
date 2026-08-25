@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // GenerateTag generates a tag and saves it on the host as .tag_name.

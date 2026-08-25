@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"plugin"
 
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // loader implements PluginLoader interface.

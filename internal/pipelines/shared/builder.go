@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // GoBuilder encapsulates the logic for building Go binaries.

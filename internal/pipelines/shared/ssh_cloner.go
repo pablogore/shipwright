@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 type SSHCloner struct{}

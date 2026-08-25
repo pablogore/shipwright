@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // registry implements PluginRegistry interface.

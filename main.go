@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 
 	"github.com/pablogore/shipwright/internal/app"
 	"github.com/pablogore/shipwright/internal/config"
