@@ -102,7 +102,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         fetch-depth: 0
 
@@ -271,7 +271,7 @@ jobs:
       is-release: '${{ steps.determine.outputs.release }}'
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         fetch-depth: 0
 
@@ -462,7 +462,7 @@ jobs:
     if: "needs.determine-pipeline.result == 'success'"
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         # For PRs, checkout the PR head commit
         ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
@@ -722,7 +722,7 @@ jobs:
     if: "needs.determine-pipeline.outputs.run-build == 'true'"
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         # For PRs, checkout the PR head commit
         ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
@@ -889,7 +889,7 @@ jobs:
     if: "needs.determine-pipeline.outputs.run-tests == 'true'"
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         # For PRs, checkout the PR head commit
         ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
@@ -1048,7 +1048,7 @@ jobs:
     if: "needs.determine-pipeline.outputs.run-security == 'true'"
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         # For PRs, checkout the PR head commit
         ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
@@ -1234,7 +1234,7 @@ jobs:
        needs.determine-pipeline.outputs.pipeline-type == 'main-develop-merge')
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         fetch-depth: 0
 
