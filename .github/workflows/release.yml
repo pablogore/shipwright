@@ -27,7 +27,7 @@ permissions:
   id-token: 'write'
 
 env:
-  GO_VERSION: '1.26.0'
+  GO_VERSION: '1.26.1'
   BINARY_NAME: 'shipwright'
 
 jobs:
