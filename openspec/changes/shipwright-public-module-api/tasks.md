@@ -59,11 +59,12 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 2 — Module wiring + `Plan` (`public-module-api`/`composition-model`)
 
-- [ ] 2.1 SPIKE: prove/refute interface-typed `Plan` chaining state survives Dagger v0.21.8 serialization.
-- [ ] 2.2 CONTINGENCY (only if 2.1 refutes): collapse to flat `Plan(ctx, source, build, test, artifact, deploy, run)` per D-A fallback.
-- [ ] 2.3 GREEN: `dagger.json`, `.dagger/**` (Dagger Interfaces, `Shipwright`/`Plan` Objects, thin adapters only).
-- [ ] 2.4 RED/GREEN: pin-parity test — root `go.mod` `dagger.io/dagger` == `dagger.json` `engineVersion`.
-- [ ] 2.5 GREEN: `make dagger-test`; confirm root build/test never traverses `.dagger/`.
+- [x] 2.1 SPIKE: prove/refute interface-typed `Plan` chaining state survives Dagger v0.21.8 serialization. VERDICT: GO, with a signature caveat — see apply-progress for the full transcript. Interface-typed Object field state round-trips correctly (verified via a real chained call producing an actual artifact, not a hardcoded result). Dagger v0.21.8's Go SDK codegen cannot compile a client proxy for an interface method returning a lazy-chainable Dagger core type (`*dagger.Directory`/`*dagger.File`/`*dagger.Container`) together with `error`; `Builder.Build`/`Tester.Test`/`Runner.Run` drop the `error` return accordingly (Dagger's own lazy-chainable idiom). Scalar-returning methods (`(string, error)`) are unaffected.
+- [x] 2.2 CONTINGENCY: not triggered — 2.1 confirmed GO, not refutation.
+- [x] 2.3 RISK: not triggered — `dagger init --engine-version` resolved to `v0.21.8` verbatim (installed CLI is exactly v0.21.8), matching root `go.mod`'s existing pin with no bump needed.
+- [x] 2.4 GREEN: `dagger.json`, `.dagger/**` (Dagger Interfaces, `Shipwright`/`Plan` Objects, thin adapters only) — signatures adjusted per the 2.1 spike finding.
+- [x] 2.5 RED/GREEN: pin-parity test — root `go.mod` `dagger.io/dagger` == `dagger.json` `engineVersion` (`internal/daggerpin`).
+- [x] 2.6 GREEN: `make dagger-test`; confirmed root `go build ./...`/`go test -race ./...` never traverse `.dagger/`.
 
 ## Phase 3 — Capability implementations (`composition-model`)
 
