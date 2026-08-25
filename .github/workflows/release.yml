@@ -86,7 +86,7 @@ jobs:
       source_branch: '${{ steps.tag.outputs.source_branch }}'
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
         # For workflow_dispatch, use commit_sha input if provided, otherwise use main
@@ -331,7 +331,7 @@ jobs:
       )
     steps:
     - name: 'Checkout code'
-      uses: 'actions/checkout@v6'
+      uses: 'actions/checkout@v7'
       with:
         fetch-depth: 0
         fetch-tags: true  # Fetch all tags to ensure tag validation works
