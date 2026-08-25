@@ -85,11 +85,11 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 5 — Interpolation + typed values (`workflow-execution`) [SECURITY-CRITICAL]
 
-- [ ] 5.1 RED: every rejected grammar form — operator, function call, nested placeholder, unknown namespace, trailing path segment — stage-4 parse error, never literal-text fallback.
-- [ ] 5.2 SECURITY RED: compile-level assertion that no exported accessor on `Value` returns a secret as `string`.
-- [ ] 5.3 SECURITY RED: `secrets.*` reference in a non-secret-typed field rejected (stage-7 `forbidPlaintext`).
-- [ ] 5.4 SECURITY RED: secret+literal concatenation (`"Bearer ${{ secrets.tok }}"`) rejected — concatenation would require a string form.
-- [ ] 5.5 GREEN: hand-written scanner, closed grammar (`variables.`/`secrets.`/`steps.<id>.output`); `Value{kind,str,secret}` — `KindSecret` has no string accessor.
+- [x] 5.1 RED: every rejected grammar form — operator, function call, nested placeholder, unknown namespace, trailing path segment — stage-4 parse error, never literal-text fallback.
+- [x] 5.2 SECURITY RED: compile-level assertion that no exported accessor on `Value` returns a secret as `string`.
+- [x] 5.3 SECURITY RED: `secrets.*` reference in a non-secret-typed field rejected (stage-7 `forbidPlaintext`). PARTIAL BY DESIGN — see apply-progress: full enforcement needs provider `WithSchema` (Phase 7); this WU ships `Reference.StaticKind()`, the primitive Phase 7's check will call, with its own RED/GREEN tests.
+- [x] 5.4 SECURITY RED: secret+literal concatenation (`"Bearer ${{ secrets.tok }}"`) rejected — concatenation would require a string form.
+- [x] 5.5 GREEN: hand-written scanner, closed grammar (`variables.`/`secrets.`/`steps.<id>.output`); `Value{kind,str,secret}` — `KindSecret` has no string accessor.
 
 ## Phase 6 — Graph + Kahn + kind checks (`workflow-execution`)
 
