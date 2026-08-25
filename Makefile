@@ -1,4 +1,4 @@
-# Syntegrity Dagger Makefile
+# Shipwright Makefile
 # Usage: make [target] [options]
 
 # Variables
@@ -36,7 +36,7 @@ NC := \033[0m # No Color
 # Help target
 .PHONY: help
 help: ## Show this help message
-	@echo -e "$(BLUE)🚀 Syntegrity Dagger - Makefile$(NC)"
+	@echo -e "$(BLUE)🚀 Shipwright - Makefile$(NC)"
 	@echo "=================================="
 	@echo ""
 	@echo "Available targets:"

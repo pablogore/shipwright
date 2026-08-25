@@ -1,4 +1,4 @@
-name: Release Pipeline
+name: 'Release Pipeline'
 
 # This workflow runs when:
 # 1. A tag is pushed (manual release via git tag)
@@ -15,16 +15,16 @@ on:
       version:
         description: 'Version to release (e.g., v1.0.0) - Leave empty to auto-detect'
         required: false
-        type: string
+        type: 'string'
       commit_sha:
         description: 'Commit SHA to release (defaults to latest main)'
         required: false
-        type: string
+        type: 'string'
 
 permissions:
-  contents: write
-  packages: write
-  id-token: write
+  contents: 'write'
+  packages: 'write'
+  id-token: 'write'
 
 env:
   GO_VERSION: '1.25.5'
@@ -34,44 +34,44 @@ jobs:
   # Job 0: Verify admin permissions (only for manual workflow_dispatch without commit_sha)
   # Tag pushes and automatic releases (with commit_sha) don't need this check
   check-admin:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    runs-on: 'ubuntu-latest'
+    if: "github.event_name == 'workflow_dispatch'"
     steps:
-    - name: Check if manual trigger (no commit_sha)
-      id: check-manual
+    - name: 'Check if manual trigger (no commit_sha)'
+      id: 'check-manual'
       run: |
         if [[ -z "${{ inputs.commit_sha }}" ]]; then
           echo "is_manual=true" >> $GITHUB_OUTPUT
         else
           echo "is_manual=false" >> $GITHUB_OUTPUT
         fi
-    - name: Check admin permissions
-      if: steps.check-manual.outputs.is_manual == 'true'
-      uses: actions/github-script@v7
+    - name: 'Check admin permissions'
+      if: "steps.check-manual.outputs.is_manual == 'true'"
+      uses: 'actions/github-script@v7'
       with:
         script: |
           const { data: user } = await github.rest.users.getByUsername({
             username: context.actor
           });
-          
+
           // Check if user is admin (has write/admin permissions)
           const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
             owner: context.repo.owner,
             repo: context.repo.repo,
             username: context.actor
           });
-          
+
           if (permission.permission !== 'admin' && permission.permission !== 'write') {
             core.setFailed(`❌ Access denied: Only repository admins can trigger releases. Current permission: ${permission.permission}`);
             return;
           }
-          
+
           console.log(`✅ Admin permission verified for ${context.actor} (${permission.permission})`);
 
   # Job 1: Validate tag and prepare release
   validate-release:
-    runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
-    needs: [check-admin]
+    runs-on: 'ubuntu-latest'  # Changed from [self-hosted,linux,go] for testing
+    needs: ['check-admin']
     if: |
       always() &&
       (
@@ -79,42 +79,42 @@ jobs:
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
       )
     outputs:
-      tag: ${{ steps.tag.outputs.tag }}
-      version: ${{ steps.tag.outputs.version }}
-      type: ${{ steps.tag.outputs.type }}
-      changelog: ${{ steps.changelog.outputs.changelog }}
-      source_branch: ${{ steps.tag.outputs.source_branch }}
+      tag: '${{ steps.tag.outputs.tag }}'
+      version: '${{ steps.tag.outputs.version }}'
+      type: '${{ steps.tag.outputs.type }}'
+      changelog: '${{ steps.changelog.outputs.changelog }}'
+      source_branch: '${{ steps.tag.outputs.source_branch }}'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         fetch-depth: 0  # Fetch all history for changelog generation
         # For workflow_dispatch, use commit_sha input if provided, otherwise use main
         # For tag push, use the tag
-        ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.commit_sha || 'main') || github.sha }}
+        ref: "${{ github.event_name == 'workflow_dispatch' && (inputs.commit_sha || 'main') || github.sha }}"
         # token: Uses GITHUB_TOKEN by default (automatically provided by GitHub Actions)
-        
-    - name: Set up Go
-      uses: actions/setup-go@v6
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v6'
       with:
-        go-version: ${{ env.GO_VERSION }}
-        
-    - name: Configure Git
+        go-version: '${{ env.GO_VERSION }}'
+
+    - name: 'Configure Git'
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        
-    - name: Configure Git for private repos
+
+    - name: 'Configure Git for private repos'
       continue-on-error: true
       run: |
         if [ -n "$SHIPWRIGHT_TOKEN" ]; then
           git config --global url."https://$SHIPWRIGHT_TOKEN@github.com/".insteadOf "https://github.com/"
         fi
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        
-    - name: Determine release type and version
-      id: tag
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+
+    - name: 'Determine release type and version'
+      id: 'tag'
       run: |
         # Determine if this is a tag push or workflow_dispatch from CI
         if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
@@ -127,7 +127,7 @@ jobs:
         elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.commit_sha }}" ]]; then
           # Automatic release via workflow_dispatch from CI (with commit_sha)
           echo "🚀 Automatic release triggered by CI via workflow_dispatch (commit: ${{ inputs.commit_sha }})"
-          
+
           # Detect source branch from merge commit message or recent commits
           SOURCE_BRANCH=""
           MERGE_COMMIT=$(git log -1 --pretty=%B)
@@ -143,7 +143,7 @@ jobs:
               echo "📋 Detected source branch from commit history: $SOURCE_BRANCH"
             fi
           fi
-          
+
           # Only proceed if merge comes from develop branch
           if [[ "$SOURCE_BRANCH" != "develop" ]] && ! echo "$SOURCE_BRANCH" | grep -qiE "^develop"; then
             echo "⚠️ Release skipped: Merge is not from develop branch (detected: $SOURCE_BRANCH)"
@@ -152,20 +152,20 @@ jobs:
             echo "skip_release=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           echo "✅ Merge from develop detected - proceeding with automatic release"
-          
+
           # Continue with automatic release logic (only for workflow_dispatch from CI with develop merge)
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
-          
+
           # Determine version bump based on source branch and commit messages
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "Commit message: $COMMIT_MSG"
-          
+
           # Check if merge comes from hotfix branch
           if echo "$SOURCE_BRANCH" | grep -qiE "^hotfix/"; then
             # Hotfix: always bump patch version
@@ -194,7 +194,7 @@ jobs:
               VERSION=$(echo $VERSION_NUMBER | awk -F. '{print $1"."$2+1".0"}')
             fi
           fi
-          
+
           TAG="v$VERSION"
           echo "type=automatic" >> $GITHUB_OUTPUT
           echo "auto_tag=true" >> $GITHUB_OUTPUT
@@ -202,7 +202,7 @@ jobs:
           # Manual release via workflow_dispatch
           echo "🔧 Manual release triggered by admin via workflow_dispatch"
           SOURCE_BRANCH="manual"
-          
+
           # Check if version was provided manually
           if [[ -n "${{ inputs.version }}" ]]; then
             TAG="${{ inputs.version }}"
@@ -213,13 +213,13 @@ jobs:
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
-          
+
           # For manual releases, default to patch version bump
           echo "📝 Manual release: defaulting to patch version bump"
           VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/v//')
@@ -231,64 +231,64 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           exit 0
         fi
-        
+
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "✅ Release information determined: $TAG"
-        
-    - name: Generate changelog
-      id: changelog
+
+    - name: 'Generate changelog'
+      id: 'changelog'
       run: |
         echo "📝 Generating changelog for release..."
-        
+
         # Get the latest tag (before this release)
         LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
         echo "Latest tag: $LATEST_TAG"
-        
+
         # Get the version that will be released
         RELEASE_VERSION="${{ steps.tag.outputs.version }}"
         RELEASE_TAG="${{ steps.tag.outputs.tag }}"
-        
+
         if [[ -n "$LATEST_TAG" ]]; then
           # Generate changelog since previous tag
           echo "Generating changelog from $LATEST_TAG to HEAD..."
-          
+
           # Get commits since last tag, grouped by type
           FEATURES=$(git log --pretty=format:"- %s (%h)" --grep="^feat" --grep="^feature" -i $LATEST_TAG..HEAD 2>/dev/null || echo "")
           FIXES=$(git log --pretty=format:"- %s (%h)" --grep="^fix" --grep="^bugfix" --grep="^hotfix" -i $LATEST_TAG..HEAD 2>/dev/null || echo "")
           BREAKING=$(git log --pretty=format:"- %s (%h)" --grep="BREAKING" -i $LATEST_TAG..HEAD 2>/dev/null || echo "")
           OTHERS=$(git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD --grep="^feat" --grep="^feature" --grep="^fix" --grep="^bugfix" --grep="^hotfix" --grep="BREAKING" -i --invert-grep 2>/dev/null || echo "")
-          
+
           # Build structured changelog
           CHANGELOG="## Release $RELEASE_TAG"
           CHANGELOG="$CHANGELOG"$'\n'$'\n'"**Release Date:** $(date +%Y-%m-%d)"
           CHANGELOG="$CHANGELOG"$'\n'$'\n'"### Changes since $LATEST_TAG"
           CHANGELOG="$CHANGELOG"$'\n'$'\n'
-          
+
           if [[ -n "$BREAKING" ]]; then
             CHANGELOG="$CHANGELOG"$'\n'"#### ⚠️ Breaking Changes"
             CHANGELOG="$CHANGELOG"$'\n'"$BREAKING"
             CHANGELOG="$CHANGELOG"$'\n'$'\n'
           fi
-          
+
           if [[ -n "$FEATURES" ]]; then
             CHANGELOG="$CHANGELOG"$'\n'"#### ✨ Features"
             CHANGELOG="$CHANGELOG"$'\n'"$FEATURES"
             CHANGELOG="$CHANGELOG"$'\n'$'\n'
           fi
-          
+
           if [[ -n "$FIXES" ]]; then
             CHANGELOG="$CHANGELOG"$'\n'"#### 🐛 Bug Fixes"
             CHANGELOG="$CHANGELOG"$'\n'"$FIXES"
             CHANGELOG="$CHANGELOG"$'\n'$'\n'
           fi
-          
+
           if [[ -n "$OTHERS" ]]; then
             CHANGELOG="$CHANGELOG"$'\n'"#### 📝 Other Changes"
             CHANGELOG="$CHANGELOG"$'\n'"$OTHERS"
             CHANGELOG="$CHANGELOG"$'\n'$'\n'
           fi
-          
+
           # If no categorized commits, get all commits
           if [[ -z "$FEATURES" && -z "$FIXES" && -z "$BREAKING" && -z "$OTHERS" ]]; then
             ALL_COMMITS=$(git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD)
@@ -304,13 +304,13 @@ jobs:
           CHANGELOG="$CHANGELOG"$'\n'$'\n'"### Initial Release"
           CHANGELOG="$CHANGELOG"$'\n'$'\n'"$ALL_COMMITS"
         fi
-        
+
         # Save changelog to file for GoReleaser
         echo "$CHANGELOG" > CHANGELOG.md
         echo "changelog<<EOF" >> $GITHUB_OUTPUT
         echo "$CHANGELOG" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
-        
+
         echo "✅ Changelog generated for release"
         echo ""
         echo "Preview:"
@@ -319,8 +319,8 @@ jobs:
   # Job 2: Create release with GoReleaser
   # Note: Build and test are already validated by CI workflow before this release runs
   create-release:
-    runs-on: ubuntu-latest  # Changed from [self-hosted,linux,go] for testing
-    needs: [validate-release]
+    runs-on: 'ubuntu-latest'  # Changed from [self-hosted,linux,go] for testing
+    needs: ['validate-release']
     # Only run if triggered by workflow_dispatch (manual admin or CI), or tag push
     if: |
       always() &&
@@ -330,30 +330,30 @@ jobs:
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
       )
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v6'
       with:
         fetch-depth: 0
         fetch-tags: true  # Fetch all tags to ensure tag validation works
         # For workflow_dispatch, use commit_sha input if provided, otherwise use main
         # For tag push, use the tag
-        ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.commit_sha || 'main') || github.sha }}
+        ref: "${{ github.event_name == 'workflow_dispatch' && (inputs.commit_sha || 'main') || github.sha }}"
         # token: Uses GITHUB_TOKEN by default (automatically provided by GitHub Actions)
-        
-    - name: Set up Go
-      uses: actions/setup-go@v6
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v6'
       with:
-        go-version: ${{ env.GO_VERSION }}
-        
-    - name: Configure Git
+        go-version: '${{ env.GO_VERSION }}'
+
+    - name: 'Configure Git'
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        
-    - name: Configure Git and Go for private repos
+
+    - name: 'Configure Git and Go for private repos'
       env:
-        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         GIT_TERMINAL_PROMPT: 0
       run: |
         # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
@@ -380,48 +380,48 @@ jobs:
             exit 1
           fi
         fi
-        
+
         # Configure Go to treat getsyntegrity repos as private
         go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
         go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        
+
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
         echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
-        
+
         # Configure Git authentication with token
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-        
+
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
 
-    - name: Create tag (automatic release only)
-      if: needs.validate-release.outputs.type == 'automatic'
+    - name: 'Create tag (automatic release only)'
+      if: "needs.validate-release.outputs.type == 'automatic'"
       run: |
         echo "🏷️ Creating/updating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
-        
+
         TAG="${{ needs.validate-release.outputs.tag }}"
         CURRENT_COMMIT=$(git rev-parse HEAD)
-        
+
         # Check if tag exists
         if git tag -l | grep -q "^${TAG}$"; then
           TAG_COMMIT=$(git rev-parse ${TAG}^{commit} 2>/dev/null || echo "")
-          
+
           if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
             echo "⚠️ Tag ${TAG} exists but points to different commit"
             echo "   Tag commit: ${TAG_COMMIT}"
             echo "   Current commit: ${CURRENT_COMMIT}"
             echo "🔄 Updating tag to point to current commit..."
-            
+
             # Delete tag locally and remotely
             git tag -d "${TAG}" || true
             git push origin ":refs/tags/${TAG}" || true
-            
+
             # Create new tag pointing to current commit
             git tag -a "${TAG}" -m "Release ${TAG}"
             git push origin "${TAG}"
@@ -435,12 +435,12 @@ jobs:
           git push origin "${TAG}"
           echo "✅ Tag created and pushed: ${TAG}"
         fi
-        
-    - name: Verify tag points to current commit
+
+    - name: 'Verify tag points to current commit'
       run: |
         TAG="${{ needs.validate-release.outputs.tag }}"
         CURRENT_COMMIT=$(git rev-parse HEAD)
-        
+
         if git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
           TAG_COMMIT=$(git rev-parse "${TAG}^{commit}")
           if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
@@ -453,24 +453,24 @@ jobs:
         else
           echo "⚠️ Warning: Tag ${TAG} not found locally, but will be validated by GoReleaser"
         fi
-    
-    - name: Run GoReleaser
-      uses: goreleaser/goreleaser-action@v5
+
+    - name: 'Run GoReleaser'
+      uses: 'goreleaser/goreleaser-action@v5'
       with:
-        distribution: goreleaser
-        version: latest
-        args: release --clean
+        distribution: 'goreleaser'
+        version: 'latest'
+        args: 'release --clean'
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Prepare raw binaries for direct download
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+
+    - name: 'Prepare raw binaries for direct download'
       run: |
         echo "📦 Preparing raw binaries for direct download..."
         mkdir -p raw-binaries
-        
+
         # Extract binaries from archives and rename them
         cd dist
-        
+
         # Process Linux binaries
         for file in shipwright_*_linux_amd64.tar.gz; do
           if [ -f "$file" ]; then
@@ -479,7 +479,7 @@ jobs:
             chmod +x ../raw-binaries/shipwright-linux-amd64
           fi
         done
-        
+
         for file in shipwright_*_linux_arm64.tar.gz; do
           if [ -f "$file" ]; then
             tar -xzf "$file" shipwright
@@ -487,7 +487,7 @@ jobs:
             chmod +x ../raw-binaries/shipwright-linux-arm64
           fi
         done
-        
+
         # Process Darwin (macOS) binaries
         for file in shipwright_*_darwin_amd64.tar.gz; do
           if [ -f "$file" ]; then
@@ -496,7 +496,7 @@ jobs:
             chmod +x ../raw-binaries/shipwright-darwin-amd64
           fi
         done
-        
+
         for file in shipwright_*_darwin_arm64.tar.gz; do
           if [ -f "$file" ]; then
             tar -xzf "$file" shipwright
@@ -504,7 +504,7 @@ jobs:
             chmod +x ../raw-binaries/shipwright-darwin-arm64
           fi
         done
-        
+
         # Process Windows binaries
         for file in shipwright_*_windows_amd64.zip; do
           if [ -f "$file" ]; then
@@ -512,12 +512,12 @@ jobs:
             mv shipwright.exe ../raw-binaries/shipwright-windows-amd64.exe
           fi
         done
-        
+
         cd ..
         echo "✅ Raw binaries prepared:"
         ls -lh raw-binaries/
-    
-    - name: Setup GitHub CLI
+
+    - name: 'Setup GitHub CLI'
       run: |
         if ! command -v gh &> /dev/null; then
           echo "Installing GitHub CLI..."
@@ -531,12 +531,12 @@ jobs:
           echo "✅ GitHub CLI already installed"
         fi
         gh --version
-    
-    - name: Upload raw binaries to GitHub Release
+
+    - name: 'Upload raw binaries to GitHub Release'
       run: |
         echo "Uploading raw binaries to GitHub Release..."
         cd raw-binaries
-        
+
         # Upload each binary to the release
         for binary in *; do
           if [ -f "$binary" ]; then
@@ -544,31 +544,31 @@ jobs:
             gh release upload "${{ needs.validate-release.outputs.tag }}" "$binary" --clobber
           fi
         done
-        
+
         echo "✅ Raw binaries uploaded successfully"
         echo ""
         echo "📦 Available binaries for download:"
         ls -lh
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Update CHANGELOG.md in repository
-      if: needs.validate-release.outputs.type == 'automatic'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+
+    - name: 'Update CHANGELOG.md in repository'
+      if: "needs.validate-release.outputs.type == 'automatic'"
       run: |
         echo "📝 Updating CHANGELOG.md in repository..."
-        
+
         # Checkout the repository to update CHANGELOG.md
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        
+
         # Read the generated changelog
         NEW_CHANGELOG_ENTRY=$(cat CHANGELOG.md)
-        
+
         # Read existing CHANGELOG.md
         if [ -f CHANGELOG.md ]; then
           # Create backup
           cp CHANGELOG.md CHANGELOG.md.backup
-          
+
           # Prepend new release to CHANGELOG.md
           {
             echo "$NEW_CHANGELOG_ENTRY"
@@ -577,7 +577,7 @@ jobs:
             echo ""
             cat CHANGELOG.md.backup | sed '/^## \[Unreleased\]/,$d'
           } > CHANGELOG.md.new
-          
+
           # Add Unreleased section back if it existed
           if grep -q "^## \[Unreleased\]" CHANGELOG.md.backup; then
             {
@@ -591,12 +591,12 @@ jobs:
           else
             mv CHANGELOG.md.new CHANGELOG.md
           fi
-          
+
           # Commit and push the updated CHANGELOG.md
           git add CHANGELOG.md
           git commit -m "docs: update CHANGELOG.md for ${{ needs.validate-release.outputs.tag }}" || echo "No changes to commit"
           git push origin main || echo "Push failed or no changes"
-          
+
           echo "✅ CHANGELOG.md updated in repository"
         else
           echo "⚠️ CHANGELOG.md not found, creating new one"
@@ -606,18 +606,18 @@ jobs:
           git push origin main
         fi
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v5
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+
+    - name: 'Upload release artifacts'
+      uses: 'actions/upload-artifact@v5'
       with:
-        name: release-artifacts-${{ needs.validate-release.outputs.tag }}
+        name: 'release-artifacts-${{ needs.validate-release.outputs.tag }}'
         path: |
           dist/*
           raw-binaries/*
         retention-days: 30
-        
-    - name: Release summary
+
+    - name: 'Release summary'
       run: |
         echo "🎉 Release ${{ needs.validate-release.outputs.tag }} created successfully!"
         echo "📦 Artifacts uploaded to GitHub Releases"

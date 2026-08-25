@@ -6,13 +6,13 @@
 version: 2
 registries:
   github-ep:
-    type: git
-    url: https://github.com
-    username: x-access-token
+    type: "git"
+    url: "https://github.com"
+    username: "x-access-token"
     # Note: This secret must be configured in Dependabot secrets, not just Actions secrets
     # Go to: Repository Settings → Secrets and variables → Dependabot
     # Add secret: SHIPWRIGHT_TOKEN with your PAT (Personal Access Token)
-    password: ${{ secrets.SHIPWRIGHT_TOKEN }}
+    password: "${{ secrets.SHIPWRIGHT_TOKEN }}"
 
 updates:
   # Go module updates - consolidated configuration
@@ -23,11 +23,11 @@ updates:
       interval: "daily"
     open-pull-requests-limit: 10
     registries:
-      - github-ep
+      - "github-ep"
     groups:
       # Security updates - grouped for daily processing
       security-updates:
-        applies-to: security-updates
+        applies-to: "security-updates"
         patterns:
           - "*"
         update-types:

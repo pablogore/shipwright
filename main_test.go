@@ -95,7 +95,7 @@ func TestCLIIdentityConstants(t *testing.T) {
 	// The CLI flagset name drives the "Usage of <name>:" line printed by
 	// --help, and the version/init log messages are shown by --version and
 	// on successful startup. Both MUST present the Shipwright identity and
-	// MUST NOT contain any trace of the legacy Syntegrity Dagger identity.
+	// MUST NOT contain any trace of the pre-rebrand product identity.
 	assert.Equal(t, "shipwright", cliName)
 	assert.Equal(t, "Shipwright version", versionLogMessage)
 	assert.Equal(t, "Shipwright initialized successfully", initLogMessage)
