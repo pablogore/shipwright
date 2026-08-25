@@ -33,6 +33,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"dagger/shipwright/internal/dagger"
 )
@@ -76,8 +77,11 @@ type Shipwright struct{}
 
 // ContractVersion mirrors pkg/shipwright.ContractVersion (D-E). Layer 2
 // cannot import Layer 1 (see package doc), so this is a duplicated literal,
-// not a shared constant; keep it equal to pkg/shipwright.ContractVersion by
-// hand until a cross-module parity guard exists.
+// not a shared constant. Keep it equal to pkg/shipwright.ContractVersion by
+// hand — a bump here without the matching bump there fails
+// pkg/shipwright's TestContractVersion_MatchesDaggerLayer2Literal, a
+// root-module test that parses this file's source text (no import, no
+// live engine) and asserts the two literals match.
 func (m *Shipwright) ContractVersion() string {
 	return "1.0.0"
 }
@@ -155,6 +159,20 @@ func (p *Plan) Execute(ctx context.Context) (string, error) {
 	output := p.Source
 	if p.Build != nil {
 		output = p.Build.Build(ctx, output)
+		// Build returns a lazy *dagger.Directory: Dagger does not execute
+		// the underlying container operations until something forces
+		// evaluation (Sync, Entries, or being passed into another synced
+		// call). Without this unconditional Sync, a Plan chaining only
+		// WithBuild + WithDeploy (no WithTest/WithArtifact/WithRun) never
+		// touches `output` again — Deploy only receives the scalar
+		// `result` string, not the Directory — so a failing Build would
+		// silently never surface its error and Execute could return
+		// success (PR #148 review finding 1). Sync unconditionally,
+		// regardless of what's chained after Build, so a Build failure
+		// always surfaces at the point Build actually happened.
+		if _, err := output.Sync(ctx); err != nil {
+			return "", fmt.Errorf("build failed: %w", err)
+		}
 	}
 
 	if p.Test != nil {
@@ -173,6 +191,14 @@ func (p *Plan) Execute(ctx context.Context) (string, error) {
 	}
 
 	if p.Deploy != nil {
+		// Fail closed (design.md Threat Matrix): Deploy must never run
+		// with an empty artifactRef just because WithArtifact wasn't
+		// chained. This is a pure Go control-flow guard — checked before
+		// any interface method call (PR #148 review finding 2).
+		if p.Artifact == nil {
+			return "", fmt.Errorf("deploy requires an artifact to be chained first (WithArtifact before WithDeploy)")
+		}
+
 		deployed, err := p.Deploy.Deploy(ctx, result, p.Environment, p.DeployCreds)
 		if err != nil {
 			return "", err

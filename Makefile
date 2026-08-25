@@ -96,7 +96,7 @@ test: ## Run all tests
 
 dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT part of `test`/`check`/`quality`/`all` — see design.md D-B isolation)
 	@echo -e "$(BLUE)Running .dagger module tests...$(NC)"
-	cd .dagger && $(GOTEST) -race ./...
+	cd .dagger && dagger run $(GOTEST) -race ./...
 	@echo -e "$(GREEN)✅ .dagger module tests completed$(NC)"
 
 deps: ## Download and tidy dependencies

@@ -63,3 +63,31 @@ func TestGoModDaggerVersion_MissingRequireFailsClosed(t *testing.T) {
 		t.Fatal("GoModDaggerVersion() must return an error when go.mod has no dagger.io/dagger requirement")
 	}
 }
+
+// TestGoModDaggerVersion_ReplaceDirectiveWins guards against the gap found in
+// PR #148 review: a `replace dagger.io/dagger => ...` directive changes what
+// actually gets built, so the pin-parity guard must report the REPLACED
+// version, not the bare `require` version — otherwise the guard silently
+// stops detecting drift the moment a replace directive is introduced
+// (design.md D-B: "Drift fails RED instead of surviving review").
+func TestGoModDaggerVersion_ReplaceDirectiveWins(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "go.mod")
+	content := "module example.com/replaced\n\n" +
+		"go 1.26.1\n\n" +
+		"require dagger.io/dagger v0.21.8\n\n" +
+		"replace dagger.io/dagger => dagger.io/dagger v0.22.0\n"
+	if err := os.WriteFile(modPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v, want nil", modPath, err)
+	}
+
+	got, err := GoModDaggerVersion(modPath)
+	if err != nil {
+		t.Fatalf("GoModDaggerVersion() error = %v, want nil", err)
+	}
+
+	const want = "v0.22.0"
+	if got != want {
+		t.Fatalf("GoModDaggerVersion() = %q, want %q (the replace directive's version, not the require version v0.21.8)", got, want)
+	}
+}

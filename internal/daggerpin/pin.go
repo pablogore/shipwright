@@ -32,8 +32,12 @@ func EngineVersion(path string) (string, error) {
 	return doc.EngineVersion, nil
 }
 
-// GoModDaggerVersion reads the root go.mod's dagger.io/dagger requirement
-// version.
+// GoModDaggerVersion reads the root go.mod's effective dagger.io/dagger
+// version: the `require` version, UNLESS a `replace dagger.io/dagger =>
+// ...` directive exists, in which case the replace directive's version is
+// what actually gets built and therefore wins. Checking only `f.Require`
+// would let a future replace directive silently defeat this guard's
+// purpose (design.md D-B: drift must fail RED, never survive review).
 func GoModDaggerVersion(path string) (string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -45,11 +49,25 @@ func GoModDaggerVersion(path string) (string, error) {
 		return "", fmt.Errorf("daggerpin: parse %s: %w", path, err)
 	}
 
+	requireVersion := ""
+	requireFound := false
 	for _, req := range f.Require {
 		if req.Mod.Path == "dagger.io/dagger" {
-			return req.Mod.Version, nil
+			requireVersion = req.Mod.Version
+			requireFound = true
+			break
 		}
 	}
 
-	return "", fmt.Errorf("daggerpin: %s has no dagger.io/dagger requirement", path)
+	if !requireFound {
+		return "", fmt.Errorf("daggerpin: %s has no dagger.io/dagger requirement", path)
+	}
+
+	for _, rep := range f.Replace {
+		if rep.Old.Path == "dagger.io/dagger" {
+			return rep.New.Version, nil
+		}
+	}
+
+	return requireVersion, nil
 }
