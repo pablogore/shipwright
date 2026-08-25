@@ -2,372 +2,255 @@
 
 [![Release Pipeline](https://github.com/pablogore/shipwright/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/pablogore/shipwright/actions/workflows/release.yml)
 
-A unified CI/CD pipeline library for Go projects, built on top of Dagger SDK. Shipwright provides standardized, reusable pipelines that can be easily integrated into any Go project's CI/CD workflow.
+Shipwright is a Dagger-powered software delivery engine: it defines CI/CD
+pipelines as code, once, so they can run the same way on your laptop and in
+any CI provider.
 
-## 🚀 Features
+## Why Shipwright?
 
-- **Unified Pipeline Architecture**: Standardized CI/CD pipelines for different Go project types
-- **Local & Cloud Execution**: Run pipelines locally without Docker or in CI/CD with full container support
-- **Multiple Executors**: Native execution (no Docker) or Docker-based execution via Dagger
-- **Auto-Detection**: Automatically detects local vs CI/CD environment and selects appropriate executor
-- **Multiple Pipeline Types**: Support for go-service (generic), infra, and custom pipelines
-- **Flexible Configuration**: YAML-based configuration with environment variable overrides
-- **Extensible Design**: Plugin architecture for custom steps and hooks
-- **Cross-Platform**: Works on Linux, macOS, and Windows
-- **Security First**: Built-in vulnerability scanning and security checks
-- **Smart Caching**: Multi-level caching for faster execution (modules, build, Docker layers)
+CI/CD logic tends to spread out and drift: provider YAML (GitHub Actions,
+GitLab CI, Jenkins) accumulates business delivery logic, local scripts
+reimplement a looser version of the same thing for developer convenience,
+and every repository re-derives its own version of "lint, test, build,
+scan, package, publish." Shipwright's premise is that this logic should live
+in one place, as code, executed consistently — with CI providers reduced to
+thin triggers instead of the source of truth for delivery behavior.
 
-## 📋 Supported Pipeline Types
+## Status
 
-### Go-Service Pipeline (Generic)
-Generic pipeline for Go microservices with configurable options:
-- **Build Modes**: Binary-only, Docker-only, or both
-- **Framework Support**: Standard Go, go-kit, Gin, Echo
-- **Dependency management**: Automatic Go modules handling
-- **Unit testing**: With configurable coverage thresholds
-- **Linting**: golangci-lint integration
-- **Security scanning**: govulncheck integration
-- **Docker image building**: Optional, configurable
-- **Container registry publishing**: Optional, configurable
+Shipwright is under active architectural evolution. It started as a
+Go-specific pipeline library and is moving toward a provider-neutral,
+polyglot delivery engine built on [Dagger](https://dagger.io). Some of what
+follows already works today; some of it is the direction the project is
+heading. They are marked accordingly — do not assume a "planned" item is
+already usable.
 
-### Infrastructure Pipeline
-For infrastructure and deployment automation:
-- Terraform validation
-- Infrastructure testing
-- Deployment automation
-- Environment management
+**Available today**
+- A compiled Go CLI/binary (`shipwright`) with a working `go-service`
+  pipeline: setup, test (with coverage), lint, vulnerability scan, build
+  (binary and/or Docker image), package, tag, push.
+- Native (Docker-free) local execution for a subset of steps, and a
+  Docker/Dagger-based execution path for the full pipeline.
+- YAML + environment-variable configuration (`.shipwright.yml`,
+  `SHIPWRIGHT_*`).
+- A GitHub Actions composite action that wraps the CLI.
+- A plugin/hook registration system at the infrastructure level.
 
-## 🛠️ Installation
+**Planned / evolving**
+- A public, versionable Dagger Module API (today Shipwright is a binary you
+  run, not a `dagger call`-able module).
+- One unified pipeline/step abstraction (two structurally similar `Pipeline`
+  interfaces exist internally today, bridged by an adapter).
+- Typed artifacts between steps (today steps communicate through struct
+  fields and host paths).
+- Reusable step composition — configuring, disabling, replacing, or
+  inserting steps without forking Shipwright.
+- Additional language toolchains (Rust, Java) — not implemented today.
+- Build-once/promote artifact handling and an explicit Git-lifecycle
+  (feature/develop/release/main/hotfix) model.
+- GitLab CI and Jenkins integration with parity to the GitHub Actions path.
 
-### Quick Install
+See [docs/PRD.md](docs/PRD.md) for the full product vision, current-state
+detail, and roadmap.
 
-```bash
-# Install latest version
-curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash
+## How it works today
 
-# Install specific version
-curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash -s -- -v v1.0.0
-
-# Download binary directly
-curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
-chmod +x shipwright
-```
-### Manual Installation
-
-```bash
-# Download binary for your platform
-PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/')
-VERSION="latest"  # or specific version like "v1.0.0"
-
-curl -L "https://github.com/pablogore/shipwright/releases/download/${VERSION}/shipwright-${PLATFORM}" -o shipwright
-chmod +x shipwright
-sudo mv shipwright /usr/local/bin/
-```
-
-## 🚀 Quick Start
-
-### Running Locally in Your Project
-
-**Easiest way - Copy and run:**
+Shipwright ships as a single binary. It auto-detects whether it's running
+locally or in CI and picks a native (no Docker) or Dagger/Docker-based
+executor accordingly.
 
 ```bash
-# 1. Copy the script to your project root
-cp examples/local/run-local.sh .
-chmod +x run-local.sh
+# Build from source
+git clone https://github.com/pablogore/shipwright.git
+cd shipwright
+make build
 
-# 2. Run the pipeline
-./run-local.sh go-service
+# Run the go-service pipeline (auto-detects local vs CI execution)
+./shipwright --pipeline go-service
 
-# 3. Or run specific steps
-./run-local.sh go-service build
-./run-local.sh go-service test
+# Run a single step
+./shipwright --pipeline go-service --step test
+
+# Force local (native) execution, no Docker required
+./shipwright --pipeline go-service --local
+
+# Force the Docker/Dagger executor
+./shipwright --pipeline go-service --executor docker
+
+# List what's available
+./shipwright --list-pipelines
+./shipwright --list-steps --pipeline go-service
 ```
 
-**Or use directly (auto-detects local execution):**
+Locally, only `setup, build, test, lint, security` run natively; steps that
+need registry/cloud access (`package, tag, push, release`) are skipped in
+local mode rather than run against real infrastructure.
 
-```bash
-# Install shipwright (one time)
-curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o shipwright
-chmod +x shipwright
-sudo mv shipwright /usr/local/bin/
-
-# Run pipeline locally (auto-detects, no Docker needed)
-shipwright --pipeline go-service
-
-# Or explicitly force local execution
-shipwright --local --pipeline go-service
-
-# Run specific step
-shipwright --pipeline go-service --step test
-
-# Use native executor explicitly (fastest, no Docker)
-shipwright --executor native --pipeline go-service
-```
-
-**Key Benefits of Local Execution:**
-- ⚡ **Faster**: No Docker overhead
-- 💚 **Lower resource usage**: Uses your local Go installation
-- 🔧 **Same tools**: Uses your local golangci-lint, govulncheck if installed
-- 🏠 **Perfect for development**: Test pipelines before committing
-
-See [Local Usage Guide](docs/LOCAL_USAGE.md) for detailed instructions.
-
-### Basic Usage (With Docker/Dagger)
-
-```bash
-# Run go-service pipeline with Docker (for CI/CD validation)
-shipwright --executor docker --pipeline go-service --env dev --coverage 90
-
-# Run infrastructure pipeline
-shipwright --pipeline infra --env staging
-
-# Auto-detect executor (native if local, docker if CI/CD)
-shipwright --pipeline go-service --env prod
-```
-
-### Configuration File
-
-Create a `.shipwright.yml` file:
+Configuration can come from an optional `.shipwright.yml`:
 
 ```yaml
 pipeline:
-  name: go-kit
+  name: go-service
+  environment: dev
   coverage: 90
-  skip_push: false
-  only_build: false
-  only_test: false
-  verbose: true
-
-environment: dev
-
-git:
-  ref: main
-  protocol: ssh
+  goVersion: "1.26.1"
+  steps:
+    - setup
+    - build
+    - test
 
 registry:
-  url: registry.example.com
-  username: ${REGISTRY_USERNAME}
-  password: ${REGISTRY_PASSWORD}
+  baseUrl: registry.example.com
+  image: my-service
+  user: ${REGISTRY_USERNAME}
 
-steps:
-  - name: setup
-    required: true
-    timeout: 5m
-  - name: build
-    required: true
-    timeout: 10m
-  - name: test
-    required: true
-    timeout: 15m
+security:
+  enableVulnCheck: true
+  enableLinting: true
+
+git:
+  protocol: ssh
 ```
 
-## 🔧 Command Line Interface
+or overridden with CLI flags (`--env`, `--coverage`, `--executor`,
+`--skip-push`, `--only-build`, `--only-test`, `--verbose`, and more —
+run `shipwright --help` for the full set).
 
-### Available Commands
+### Building from source
 
 ```bash
-# Show help
-shipwright --help
-
-# Show version
-shipwright --version
-
-# List available pipelines
-shipwright --list-pipelines
-
-# List steps for a pipeline
-shipwright --list-steps --pipeline go-kit
-
-# Execute specific step
-shipwright --pipeline go-kit --step build
-
-# Execute with configuration file
-shipwright --config .shipwright.yml
+git clone https://github.com/pablogore/shipwright.git
+cd shipwright
+go mod download
+make build   # builds ./shipwright
+make test    # go test -race ./...
+make lint    # golangci-lint
 ```
 
-### Command Line Options
+Requires Go 1.26 (see `go.mod` / `.go-version`) and Docker if you intend to
+use the Docker/Dagger executor.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--pipeline` | Pipeline type to execute | Required |
-| `--env` | Environment (dev, staging, prod) | dev |
-| `--coverage` | Minimum test coverage percentage | 80 |
-| `--config` | Path to configuration file | - |
-| `--step` | Execute specific step only | - |
-| `--only-build` | Execute build step only | false |
-| `--only-test` | Execute test step only | false |
-| `--local` | Force local execution without Docker | false |
-| `--executor` | Executor to use: native, docker (empty for auto-detection) | auto |
-| `--verbose` | Enable verbose logging | false |
-
-## 🔄 CI/CD Integration
+Compiled release binaries for Linux/macOS/Windows (amd64/arm64) are
+published on the [GitHub Releases](https://github.com/pablogore/shipwright/releases)
+page.
 
 ### GitHub Actions
 
-```yaml
-name: CI/CD Pipeline
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v5
-    
-    - name: Install Shipwright
-      run: |
-        curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash
-    
-    - name: Run Pipeline
-      run: |
-        shipwright --pipeline go-kit --env dev --coverage 90
-      env:
-        REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-```
-
-### GitLab CI
+A composite action wraps the CLI so provider YAML stays a thin trigger:
 
 ```yaml
-stages:
-  - build
-  - test
-  - deploy
-
-variables:
-  SHIPWRIGHT_VERSION: "latest"
-
-before_script:
-  - curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash -s -- -v $SHIPWRIGHT_VERSION
-
-build:
-  stage: build
-  script:
-    - shipwright --pipeline go-kit --only-build
+- uses: actions/checkout@v4
+- uses: ./.github/actions/shipwright
+  with:
+    pipeline: go-service
+    stage: test
+    env: dev
+    coverage: '90'
 ```
 
-### Jenkins
+See [examples/github-actions](examples/github-actions/) for complete
+workflow examples.
 
-```groovy
-pipeline {
-    agent any
-    
-    stages {
-        stage('Setup') {
-            steps {
-                sh '''
-                    curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash
-                '''
-            }
-        }
-        
-        stage('Build') {
-            steps {
-                sh 'shipwright --pipeline go-kit --only-build'
-            }
-        }
-        
-        stage('Test') {
-            steps {
-                sh 'shipwright --pipeline go-kit --only-test --coverage 90'
-            }
-        }
-    }
-}
+## Architecture direction
+
+```
+GitHub Actions / GitLab CI / Jenkins / Local
+                    |
+                    v
+                Shipwright
+                    |
+        +-----------+-----------+
+        |           |           |
+    Lifecycle*  Pipeline    Toolchain*
+        |           |           |
+        +-----------+-----------+
+                    |
+                  Dagger
+                    |
+                    v
+          reproducible execution
 ```
 
-## 🏗️ Architecture
+`*` marks target components that do not exist as standalone abstractions
+yet — `Lifecycle` and `Toolchain` are goals of the ongoing architectural
+evolution, not shipped concepts. `Pipeline` exists today but as two
+overlapping internal interfaces rather than one unified model. `Dagger` is
+already the real execution substrate for the `go-service` pipeline's
+container-based steps.
 
-Shipwright follows a modular architecture with clear separation of concerns:
+## Current capabilities
 
-- **Application Layer**: CLI interface and application lifecycle management
-- **Pipeline Layer**: Pipeline implementations and registry
-- **Step Layer**: Individual pipeline steps (build, test, lint, etc.)
-- **Infrastructure Layer**: Dagger integration and container management
-- **Configuration Layer**: Configuration management and validation
+Verified against the repository:
 
-For detailed architecture documentation, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- `go-service` pipeline: test with coverage threshold, `golangci-lint`
+  linting, `govulncheck` vulnerability scanning, binary and/or Docker image
+  build, packaging, tagging, and registry push.
+- `infra` pipeline: registered, but only `Setup`/test-with-coverage is
+  implemented — build/package are no-ops and tag/push are not implemented.
+- Native local executor and Docker/Dagger executor, auto-selected or
+  forced via `--executor`/`--local`.
+- YAML config file + `SHIPWRIGHT_*` environment variable configuration.
+- Plugin registry/loader and a hook manager at the infrastructure layer
+  (one built-in plugin, `nomad-deploy`); pipelines do not yet invoke
+  before/after hooks.
+- GitHub Actions composite action and example workflows.
+- GoReleaser-based multi-platform release builds.
 
-## 🔧 Development
+## Roadmap
 
-### Prerequisites
+High-level themes (see [docs/PRD.md](docs/PRD.md) §22 for detail):
 
-- Go 1.25.1 or later
-- Docker (for container-based pipelines)
-- Make (for build automation)
+- Public, versionable Dagger Module API
+- Unified pipeline/step model (retire the duplicate `Pipeline` interfaces)
+- Typed artifacts between steps
+- Pipeline composition: configure, disable, add, replace, insert steps
+- Polyglot toolchains: Rust, Java
+- Explicit Git-lifecycle engine (feature/develop/release/main/hotfix)
+- Build-once, promote: immutable release artifacts
+- Provider-neutral integrations (GitLab CI, Jenkins) with GitHub Actions
+  parity
+- Reproducibility: eliminate mutable `latest` dependencies, pin toolchain
+  versions
+- Structured, queryable execution observability
 
-### Building from Source
+## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/pablogore/shipwright.git
-cd shipwright
-
-# Install dependencies
-go mod download
-
-# Build the binary
-make build
-
-# Run tests
-make test
-
-# Run linting
-make lint
+make build     # build the shipwright binary
+make test      # go test -race ./...
+make lint      # golangci-lint
+make coverage  # coverage report with threshold validation
 ```
 
-### Project Structure
+Project layout:
 
 ```
 shipwright/
-├── cmd/                    # CLI commands
+├── main.go                 # CLI entry point
 ├── internal/
-│   ├── app/               # Application layer
-│   ├── config/            # Configuration management
-│   ├── interfaces/        # Interface definitions
-│   └── pipelines/         # Pipeline implementations
-├── examples/              # Usage examples
-├── docs/                  # Documentation
-└── tests/                 # Integration tests
+│   ├── app/                # DI container, executors, plugin/hook wiring
+│   ├── config/             # configuration loading and validation
+│   ├── executors/          # native and Docker/Dagger execution
+│   ├── interfaces/         # shared interfaces
+│   ├── pipelines/          # pipeline implementations (go-service, infra)
+│   └── plugins/            # plugin/hook system
+├── examples/                # usage examples (GitHub Actions, Jenkins, local)
+└── docs/                    # documentation
 ```
 
-## 📚 Documentation
+## Documentation
 
-- [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
-- [Pipeline Development](docs/PIPELINE_DEVELOPMENT.md) - Creating custom pipelines
-- [Configuration Reference](docs/CONFIGURATION.md) - Configuration options
-- [API Reference](docs/API.md) - Programmatic API documentation
-- [Release Process](docs/RELEASE_PROCESS.md) - Automated release system
-- [Examples](examples/) - Usage examples and templates
+- [Product Requirements Document](docs/PRD.md) — canonical product vision,
+  current-state detail, target architecture, and roadmap
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [Local Usage Guide](docs/LOCAL_USAGE.md)
+- [Pipeline Development](docs/PIPELINE_DEVELOPMENT.md)
+- [Configuration Reference](docs/CONFIGURATION.md)
+- [API Reference](docs/API.md)
+- [Release Process](docs/RELEASE_PROCESS.md)
+- [Examples](examples/)
 
-## 🤝 Contributing
+## Support
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-## 🆘 Support
-
-- **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/pablogore/shipwright/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/pablogore/shipwright/discussions)
-
-## 🗺️ Roadmap
-
-- [ ] Support for additional programming languages
-- [ ] Kubernetes deployment pipelines
-- [ ] Advanced security scanning
-- [ ] Pipeline visualization and monitoring
-- [ ] Plugin marketplace
-
----
-
-**Shipwright** - Unified CI/CD pipelines for modern Go applications.
-# Test commit to verify GoReleaser fix
+- [GitHub Issues](https://github.com/pablogore/shipwright/issues)
+- [GitHub Discussions](https://github.com/pablogore/shipwright/discussions)
