@@ -137,7 +137,7 @@ func CheckGitRepo(ctx context.Context, repoURL string) error {
 		}
 
 		// Set User-Agent to avoid blocking
-		req.Header.Set("User-Agent", "syntegrity-dagger/1.0")
+		req.Header.Set("User-Agent", "shipwright/1.0")
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
