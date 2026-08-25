@@ -29,7 +29,7 @@ const (
 	DefaultEnvironment     = "development"
 	DefaultPipelineName    = "go-service"
 	DefaultCoverage        = 90.0
-	DefaultGoVersion       = "1.25.5"
+	DefaultGoVersion       = "1.26.1"
 	DefaultJavaVersion     = "17"
 	DefaultRegistryBaseURL = ""
 	DefaultRegistryUser    = ""
