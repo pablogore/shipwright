@@ -1,0 +1,87 @@
+# Runnable example manifest for Shipwright's declarative workflow layer
+# (design.md D-H, tasks.md 8.9): a build -> {unit, vuln} -> publish diamond
+# fan-in — two steps (unit, vuln) both depend on one prior step (build) and
+# both feed into one later step (publish).
+#
+# Adapted from design.md's own illustrative "Interfaces / Contracts"
+# example, with one deliberate correction: `publish` declares
+# `needs: [build, unit, vuln]`, not just `[unit, vuln]`. design.md's
+# illustrative snippet omits `build` from `publish`'s needs even though
+# `publish.input` reads `${{ steps.build.output }}` directly — per
+# internal/workflow/graph's "Explicit DAG Edges Via needs[]" invariant
+# (tasks.md 6.8), every step whose output a field directly reads MUST also
+# appear in that reader's own needs[], or graph.Build rejects the manifest
+# with an UndeclaredDataReferenceError. This file is the corrected,
+# actually-runnable shape; design.md's own field list was explicitly
+# documented as non-normative (D-H).
+apiVersion: shipwright.dev/v1
+kind: Workflow
+metadata:
+  name: go-service-release
+  description: >-
+    Build, unit-test, vulnerability-scan, and publish a Go service image —
+    the diamond fan-in reference example (tasks.md 8.9).
+spec:
+  source:
+    path: .
+  variables:
+    imageRef: ghcr.io/acme/api
+  secrets:
+    registry:
+      fromEnv: REGISTRY_PASSWORD
+  steps:
+    - id: build
+      capability: build
+      uses:
+        provider: go
+        version: "1"
+      with:
+        goVersion: "1.26.1"
+
+    - id: unit
+      capability: test
+      uses:
+        provider: go-test
+        version: "1"
+      needs: [build]
+      input: ${{ steps.build.output }}
+
+    - id: vuln
+      capability: test
+      uses:
+        provider: govulncheck
+        version: "1"
+      needs: [build]
+      input: ${{ steps.build.output }}
+
+    - id: publish
+      capability: artifact
+      uses:
+        provider: container
+        version: "1"
+      needs: [build, unit, vuln]
+      input: ${{ steps.build.output }}
+      with:
+        ref: ${{ variables.imageRef }}
+        creds: ${{ secrets.registry }}
+      when:
+        branch: [main]
+
+  execution:
+    concurrency:
+      maxParallel: 4
+    failFast: true
+    timeout: 30m
+
+  environments:
+    production:
+      approvals:
+        required: [platform-team]
+
+  policies:
+    dependencies:
+      forbidCycles: true
+    providers:
+      requireVersion: true
+    secrets:
+      forbidPlaintext: true
