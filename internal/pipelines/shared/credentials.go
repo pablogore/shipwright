@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // GitCredentials representa las credenciales para autenticación Git
