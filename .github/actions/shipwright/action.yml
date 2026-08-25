@@ -60,22 +60,22 @@ inputs:
 outputs:
   binary-path:
     description: 'Path to the shipwright binary'
-    value: ${{ steps.setup.outputs.binary-path }}
+    value: '${{ steps.setup.outputs.binary-path }}'
   version:
     description: 'Version of shipwright used'
-    value: ${{ steps.setup.outputs.version }}
+    value: '${{ steps.setup.outputs.version }}'
   exit-code:
     description: 'Exit code from shipwright execution'
-    value: ${{ steps.execute.outputs.exit-code || steps.execute-full.outputs.exit-code }}
+    value: '${{ steps.execute.outputs.exit-code || steps.execute-full.outputs.exit-code }}'
 
 runs:
   using: 'composite'
   steps:
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+    - name: 'Set up Docker Buildx'
+      uses: 'docker/setup-buildx-action@v3'
 
-    - name: Verify Docker is available
-      shell: bash
+    - name: 'Verify Docker is available'
+      shell: 'bash'
       run: |
         echo "🐳 Verifying Docker is available..."
         if ! docker info > /dev/null 2>&1; then
@@ -84,58 +84,58 @@ runs:
         fi
         echo "✅ Docker is available (version: $(docker --version))"
 
-    - name: Determine binary URL
-      id: binary-url
-      shell: bash
+    - name: 'Determine binary URL'
+      id: 'binary-url'
+      shell: 'bash'
       run: |
         VERSION="${{ inputs.version }}"
         OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
         ARCH="$(uname -m)"
-        
+
         # Normalize architecture
         case "$ARCH" in
           x86_64) ARCH="amd64" ;;
           aarch64|arm64) ARCH="arm64" ;;
         esac
-        
+
         # Normalize OS
         case "$OS" in
           darwin) OS="darwin" ;;
           linux) OS="linux" ;;
           *) OS="linux" ;;
         esac
-        
+
         if [ "$VERSION" = "latest" ]; then
           URL="https://github.com/pablogore/shipwright/releases/latest/download/shipwright-${OS}-${ARCH}"
         else
           URL="https://github.com/pablogore/shipwright/releases/download/${VERSION}/shipwright-${OS}-${ARCH}"
         fi
-        
+
         echo "url=$URL" >> $GITHUB_OUTPUT
         echo "os=$OS" >> $GITHUB_OUTPUT
         echo "arch=$ARCH" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Cache Shipwright binary
-      id: cache-binary
-      if: inputs.skip-cache != 'true'
-      uses: actions/cache@v4
+    - name: 'Cache Shipwright binary'
+      id: 'cache-binary'
+      if: "inputs.skip-cache != 'true'"
+      uses: 'actions/cache@v4'
       with:
-        path: ${{ runner.tool_cache }}/shipwright
-        key: shipwright-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-${{ steps.binary-url.outputs.arch }}
+        path: '${{ runner.tool_cache }}/shipwright'
+        key: 'shipwright-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-${{ steps.binary-url.outputs.arch }}'
         restore-keys: |
           shipwright-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-
           shipwright-${{ steps.binary-url.outputs.version }}-
           shipwright-
 
-    - name: Setup Shipwright
-      id: setup
-      shell: bash
+    - name: 'Setup Shipwright'
+      id: 'setup'
+      shell: 'bash'
       run: |
         BINARY_NAME="shipwright"
         CACHE_DIR="${{ runner.tool_cache }}/shipwright"
         BINARY_PATH="./${BINARY_NAME}"
-        
+
         # Try to use cached binary first
         if [ "${{ inputs.skip-cache }}" != "true" ] && [ "${{ steps.cache-binary.outputs.cache-hit }}" = "true" ]; then
           if [ -f "${CACHE_DIR}/${BINARY_NAME}" ]; then
@@ -144,7 +144,7 @@ runs:
             chmod +x "${BINARY_PATH}"
           fi
         fi
-        
+
         # Download if not cached or cache disabled
         if [ ! -f "${BINARY_PATH}" ] || [ ! -x "${BINARY_PATH}" ]; then
           echo "📥 Downloading Shipwright from ${{ steps.binary-url.outputs.url }}"
@@ -153,22 +153,22 @@ runs:
             exit 1
           }
           chmod +x "${BINARY_PATH}"
-          
+
           # Save to cache if caching is enabled
           if [ "${{ inputs.skip-cache }}" != "true" ]; then
             mkdir -p "${CACHE_DIR}"
             cp "${BINARY_PATH}" "${CACHE_DIR}/${BINARY_NAME}"
           fi
         fi
-        
+
         # Verify binary works
         INSTALLED_VERSION=$("${BINARY_PATH}" --version 2>&1 | head -n1 | awk '{print $3}' || echo "unknown")
         echo "✅ Shipwright $INSTALLED_VERSION ready"
         echo "binary-path=${BINARY_PATH}" >> $GITHUB_OUTPUT
         echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Ensure Docker and Dagger daemon are ready
-      shell: bash
+    - name: 'Ensure Docker and Dagger daemon are ready'
+      shell: 'bash'
       run: |
         echo "🐳 Verifying Docker is available..."
         if ! docker info > /dev/null 2>&1; then
@@ -176,42 +176,42 @@ runs:
           exit 1
         fi
         echo "✅ Docker is available (version: $(docker --version))"
-        
+
         # shipwright uses Dagger internally, which requires the Dagger daemon
         # The daemon will be started automatically by shipwright when needed
         # We just need to ensure Docker is available
         echo "✅ Docker is ready - shipwright will handle Dagger daemon startup"
 
-    - name: Execute Pipeline Stage
-      id: execute
-      if: inputs.stage != ''
-      shell: bash
+    - name: 'Execute Pipeline Stage'
+      id: 'execute'
+      if: "inputs.stage != ''"
+      shell: 'bash'
       run: |
         set +e  # Don't fail immediately, we want to capture exit code
-        
+
         echo "::group::Executing stage: ${{ inputs.stage }}"
         echo "🌍 Environment: GitHub Actions"
         echo "📦 Pipeline: ${{ inputs.pipeline }}"
         echo "🎯 Stage: ${{ inputs.stage }}"
-        
+
         CMD="${{ steps.setup.outputs.binary-path }}"
         CMD="$CMD --pipeline=${{ inputs.pipeline }}"
         CMD="$CMD --step=${{ inputs.stage }}"
         CMD="$CMD --config=${{ inputs.config }}"
         CMD="$CMD --env=${{ inputs.env }}"
         CMD="$CMD --coverage=${{ inputs.coverage }}"
-        
+
         # Auto-detect CI environment - don't use --local in CI
         # The binary will automatically detect CI via environment variables
-        
+
         if [ "${{ inputs.verbose }}" = "true" ]; then
           CMD="$CMD --verbose"
         fi
-        
+
         if [ "${{ inputs.skip-push }}" = "true" ]; then
           CMD="$CMD --skip-push"
         fi
-        
+
         if [ -n "${{ inputs.git-ref }}" ]; then
           CMD="$CMD --git-ref=${{ inputs.git-ref }}"
         else
@@ -220,62 +220,62 @@ runs:
             CMD="$CMD --git-ref=${{ github.ref_name }}"
           fi
         fi
-        
+
         if [ -n "${{ inputs.git-auth }}" ]; then
           CMD="$CMD --git-auth=${{ inputs.git-auth }}"
         else
           # Default to HTTPS in GitHub Actions
           CMD="$CMD --git-auth=https"
         fi
-        
+
         echo "Running: $CMD"
         eval "$CMD"
         EXIT_CODE=$?
-        
+
         echo "::endgroup::"
         echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
-        
+
         if [ $EXIT_CODE -ne 0 ]; then
           echo "::error::Stage ${{ inputs.stage }} failed with exit code $EXIT_CODE"
           exit $EXIT_CODE
         fi
 
-    - name: Execute Full Pipeline
-      id: execute-full
-      if: inputs.stage == ''
-      shell: bash
+    - name: 'Execute Full Pipeline'
+      id: 'execute-full'
+      if: "inputs.stage == ''"
+      shell: 'bash'
       run: |
         set +e  # Don't fail immediately, we want to capture exit code
-        
+
         echo "::group::Executing full pipeline: ${{ inputs.pipeline }}"
         echo "🌍 Environment: GitHub Actions"
         echo "📦 Pipeline: ${{ inputs.pipeline }}"
-        
+
         CMD="${{ steps.setup.outputs.binary-path }}"
         CMD="$CMD --pipeline=${{ inputs.pipeline }}"
         CMD="$CMD --config=${{ inputs.config }}"
         CMD="$CMD --env=${{ inputs.env }}"
         CMD="$CMD --coverage=${{ inputs.coverage }}"
-        
+
         # Auto-detect CI environment - don't use --local in CI
         # The binary will automatically detect CI via environment variables
-        
+
         if [ "${{ inputs.verbose }}" = "true" ]; then
           CMD="$CMD --verbose"
         fi
-        
+
         if [ "${{ inputs.only-build }}" = "true" ]; then
           CMD="$CMD --only-build"
         fi
-        
+
         if [ "${{ inputs.only-test }}" = "true" ]; then
           CMD="$CMD --only-test"
         fi
-        
+
         if [ "${{ inputs.skip-push }}" = "true" ]; then
           CMD="$CMD --skip-push"
         fi
-        
+
         if [ -n "${{ inputs.git-ref }}" ]; then
           CMD="$CMD --git-ref=${{ inputs.git-ref }}"
         else
@@ -284,23 +284,22 @@ runs:
             CMD="$CMD --git-ref=${{ github.ref_name }}"
           fi
         fi
-        
+
         if [ -n "${{ inputs.git-auth }}" ]; then
           CMD="$CMD --git-auth=${{ inputs.git-auth }}"
         else
           # Default to HTTPS in GitHub Actions
           CMD="$CMD --git-auth=https"
         fi
-        
+
         echo "Running: $CMD"
         eval "$CMD"
         EXIT_CODE=$?
-        
+
         echo "::endgroup::"
         echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
-        
+
         if [ $EXIT_CODE -ne 0 ]; then
           echo "::error::Pipeline ${{ inputs.pipeline }} failed with exit code $EXIT_CODE"
           exit $EXIT_CODE
         fi
-
