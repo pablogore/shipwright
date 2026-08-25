@@ -83,8 +83,7 @@ C4Component
     }
     
     Container_Boundary(pipelines, "Pipeline Implementations") {
-        Component(go_kit_pipeline, "Go-Kit Pipeline", "Go", "Microservice pipeline implementation")
-        Component(docker_go_pipeline, "Docker-Go Pipeline", "Go", "Docker-based Go application pipeline")
+        Component(go_service_pipeline, "Go-Service Pipeline", "Go", "Go service/microservice pipeline implementation")
         Component(infra_pipeline, "Infrastructure Pipeline", "Go", "Infrastructure deployment pipeline")
     }
     
@@ -106,8 +105,7 @@ C4Component
     Rel(pipeline_executor, hook_manager, "Triggers", "Pre/post hooks")
     Rel(local_executor, step_registry, "Executes", "Steps locally")
     
-    Rel(pipeline_registry, go_kit_pipeline, "Contains", "Pipeline implementation")
-    Rel(pipeline_registry, docker_go_pipeline, "Contains", "Pipeline implementation")
+    Rel(pipeline_registry, go_service_pipeline, "Contains", "Pipeline implementation")
     Rel(pipeline_registry, infra_pipeline, "Contains", "Pipeline implementation")
     
     Rel(step_registry, setup_step, "Contains", "Step implementation")
@@ -179,19 +177,14 @@ Multi-layered configuration system:
 
 ### Pipeline Implementations (`internal/pipelines/`)
 
-#### Go-Kit Pipeline (`go-kit/pipeline.go`)
-Optimized for microservices:
+#### Go-Service Pipeline (`go-service/pipeline.go`)
+Standard pipeline for Go services and microservices (the former Go-Kit and Docker-Go pipelines were merged into this one):
 - Repository cloning with SSH/HTTPS support
 - Dependency management
 - Unit testing with coverage reporting
-- Docker image building
+- Binary and/or Docker image builds (configurable build mode)
+- Multi-stage Docker builds and cross-platform compilation
 - Container registry publishing
-
-#### Docker-Go Pipeline (`docker-go/pipeline.go`)
-Standard Go application pipeline:
-- Multi-stage Docker builds
-- Cross-platform compilation
-- Container optimization
 - Health checks and validation
 
 #### Infrastructure Pipeline (`infra/pipeline.go`)

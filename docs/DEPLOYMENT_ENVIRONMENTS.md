@@ -66,13 +66,13 @@ Para ejecutar sin Docker, usa el flag `--local`:
 
 ```bash
 # Pipeline completo local
-shipwright --pipeline go-kit --local
+shipwright --pipeline go-service --local
 
 # Stage específico local
-shipwright --pipeline go-kit --step build --local
+shipwright --pipeline go-service --step build --local
 
 # Con configuración
-shipwright --pipeline go-kit --config .shipwright.yml --local
+shipwright --pipeline go-service --config .shipwright.yml --local
 ```
 
 ### Ejecución Local (Con Docker/Dagger)
@@ -81,10 +81,10 @@ Si tienes Docker y Dagger instalados, puedes ejecutar sin el flag `--local`:
 
 ```bash
 # Pipeline completo con Dagger
-shipwright --pipeline go-kit
+shipwright --pipeline go-service
 
 # Stage específico con Dagger
-shipwright --pipeline go-kit --step build
+shipwright --pipeline go-service --step build
 ```
 
 ### Requisitos Local
@@ -110,16 +110,16 @@ set -e
 echo "🏠 Running local CI pipeline"
 
 # Setup
-shipwright --pipeline go-kit --step setup --local
+shipwright --pipeline go-service --step setup --local
 
 # Build
-shipwright --pipeline go-kit --step build --local
+shipwright --pipeline go-service --step build --local
 
 # Test
-shipwright --pipeline go-kit --step test --local --coverage 90
+shipwright --pipeline go-service --step test --local --coverage 90
 
 # Lint
-shipwright --pipeline go-kit --step lint --local
+shipwright --pipeline go-service --step lint --local
 
 echo "✅ Local CI completed"
 ```
@@ -147,10 +147,10 @@ El binario detecta automáticamente que no está en GitHub Actions y usa Dagger 
 
 ```bash
 # Pipeline completo
-shipwright --pipeline go-kit --env production
+shipwright --pipeline go-service --env production
 
 # Stage específico
-shipwright --pipeline go-kit --step build --env staging
+shipwright --pipeline go-service --step build --env staging
 ```
 
 ### Configuración para On-Premise
@@ -160,7 +160,7 @@ Crea un archivo de configuración específico para on-premise:
 ```yaml
 # .shipwright.onpremise.yml
 pipeline:
-  name: go-kit
+  name: go-service
   steps:
     - setup
     - build
@@ -206,7 +206,7 @@ pipeline {
             steps {
                 sh '''
                     shipwright \
-                        --pipeline go-kit \
+                        --pipeline go-service \
                         --step setup \
                         --config .shipwright.onpremise.yml \
                         --env production
@@ -218,7 +218,7 @@ pipeline {
             steps {
                 sh '''
                     shipwright \
-                        --pipeline go-kit \
+                        --pipeline go-service \
                         --step build \
                         --config .shipwright.onpremise.yml \
                         --env production
@@ -230,7 +230,7 @@ pipeline {
             steps {
                 sh '''
                     shipwright \
-                        --pipeline go-kit \
+                        --pipeline go-service \
                         --step test \
                         --config .shipwright.onpremise.yml \
                         --env production \
@@ -243,7 +243,7 @@ pipeline {
             steps {
                 sh '''
                     shipwright \
-                        --pipeline go-kit \
+                        --pipeline go-service \
                         --step push \
                         --config .shipwright.onpremise.yml \
                         --env production
@@ -278,24 +278,24 @@ before_script:
 setup:
   stage: setup
   script:
-    - shipwright --pipeline go-kit --step setup --config .shipwright.yml
+    - shipwright --pipeline go-service --step setup --config .shipwright.yml
 
 build:
   stage: build
   script:
-    - shipwright --pipeline go-kit --step build --config .shipwright.yml
+    - shipwright --pipeline go-service --step build --config .shipwright.yml
 
 test:
   stage: test
   script:
-    - shipwright --pipeline go-kit --step test --config .shipwright.yml --coverage 90
+    - shipwright --pipeline go-service --step test --config .shipwright.yml --coverage 90
 
 push:
   stage: push
   only:
     - main
   script:
-    - shipwright --pipeline go-kit --step push --config .shipwright.yml --env production
+    - shipwright --pipeline go-service --step push --config .shipwright.yml --env production
 ```
 
 ---
@@ -316,7 +316,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: build
           version: v1.0.0
 ```
@@ -331,7 +331,7 @@ jobs:
 
 - name: Run Pipeline
   run: |
-    ./shipwright --pipeline go-kit --step build
+    ./shipwright --pipeline go-service --step build
 ```
 
 ### Ventajas de GitHub Actions
@@ -367,10 +367,10 @@ Ver [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) para más detalles.
 
 ```bash
 # Forzar modo local
-shipwright --pipeline go-kit --local
+shipwright --pipeline go-service --local
 
 # Forzar modo CI (sin --local)
-shipwright --pipeline go-kit
+shipwright --pipeline go-service
 ```
 
 ### Problema: Docker no disponible en on-premise
@@ -379,7 +379,7 @@ shipwright --pipeline go-kit
 
 ```bash
 # Opción 1: Usar modo local
-shipwright --pipeline go-kit --local
+shipwright --pipeline go-service --local
 
 # Opción 2: Instalar Docker
 # (depende de tu distribución)
@@ -391,10 +391,10 @@ shipwright --pipeline go-kit --local
 
 ```bash
 # Local (SSH)
-shipwright --pipeline go-kit --git-auth ssh
+shipwright --pipeline go-service --git-auth ssh
 
 # CI/On-Premise (HTTPS)
-shipwright --pipeline go-kit --git-auth https
+shipwright --pipeline go-service --git-auth https
 ```
 
 ### Problema: Variables de entorno no disponibles
@@ -405,10 +405,10 @@ shipwright --pipeline go-kit --git-auth https
 # On-Premise
 export REGISTRY_USERNAME="user"
 export REGISTRY_PASSWORD="pass"
-shipwright --pipeline go-kit --step push
+shipwright --pipeline go-service --step push
 
 # O usar archivo de configuración
-shipwright --pipeline go-kit --config .shipwright.yml
+shipwright --pipeline go-service --config .shipwright.yml
 ```
 
 ---
@@ -450,11 +450,11 @@ env:
 
 ```bash
 # ❌ No hacer
-shipwright --pipeline go-kit --env "password=secret"
+shipwright --pipeline go-service --env "password=secret"
 
 # ✅ Hacer
 export REGISTRY_PASSWORD="secret"
-shipwright --pipeline go-kit
+shipwright --pipeline go-service
 ```
 
 ### 4. Usar Caché cuando sea Posible

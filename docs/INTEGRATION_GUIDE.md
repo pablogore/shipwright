@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: build
 ```
 
@@ -48,7 +48,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 
 - name: Run Pipeline
   run: |
-    ./shipwright --pipeline go-kit --stage build
+    ./shipwright --pipeline go-service --stage build
 ```
 
 ---
@@ -60,7 +60,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 ```yaml
 - uses: ./.github/actions/shipwright
   with:
-    pipeline: go-kit
+    pipeline: go-service
     # Dejar 'stage' vacío ejecuta el pipeline completo
 ```
 
@@ -69,7 +69,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 ```yaml
 - uses: ./.github/actions/shipwright
   with:
-    pipeline: go-kit
+    pipeline: go-service
     stage: build  # Ejecuta solo el stage 'build'
 ```
 
@@ -79,7 +79,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 - uses: ./.github/actions/shipwright
   with:
     version: v1.0.0  # Versión específica
-    pipeline: go-kit
+    pipeline: go-service
     stage: build
 ```
 
@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: setup
 
   build:
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: build
 
   test:
@@ -123,7 +123,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: test
           coverage: 90
 ```
@@ -132,21 +132,14 @@ jobs:
 
 Los stages disponibles dependen del tipo de pipeline:
 
-#### Go-Kit Pipeline
+#### Go-Service Pipeline
 - `setup` - Preparar entorno y dependencias
-- `build` - Compilar la aplicación
+- `build` - Compilar la aplicación (binario y/o imagen Docker)
 - `test` - Ejecutar tests y coverage
 - `lint` - Verificar calidad de código
 - `security` - Escaneo de vulnerabilidades
-- `package` - Crear artefactos distribuibles
+- `package` - Crear artefactos distribuibles (binario o imagen Docker)
 - `push` - Publicar en registry
-
-#### Docker-Go Pipeline
-- `setup` - Preparar entorno
-- `build` - Construir imagen Docker
-- `test` - Ejecutar tests
-- `package` - Crear imagen final
-- `push` - Publicar imagen
 
 #### Infrastructure Pipeline
 - `setup` - Preparar entorno
@@ -163,7 +156,7 @@ Los stages disponibles dependen del tipo de pipeline:
 ```yaml
 - uses: ./.github/actions/shipwright
   with:
-    pipeline: go-kit
+    pipeline: go-service
     stage: push
   env:
     REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
@@ -186,11 +179,11 @@ Ejemplo de `.shipwright.yml`:
 
 ```yaml
 pipeline:
-  name: go-kit
+  name: go-service
   # ⚠️ NO uses 'steps' aquí si ejecutas en CI/CD
   # En su lugar, ejecuta steps individuales en GitHub Actions
   coverage: 90
-  go_version: "1.25.5"
+  go_version: "1.26.1"
   skip_push: false
 
 service:
@@ -216,7 +209,7 @@ Luego úsalo en la action:
 ```yaml
 - uses: ./.github/actions/shipwright
   with:
-    pipeline: go-kit
+    pipeline: go-service
     config: .shipwright.yml
 ```
 
@@ -225,7 +218,7 @@ Luego úsalo en la action:
 ```yaml
 - uses: ./.github/actions/shipwright
   with:
-    pipeline: go-kit
+    pipeline: go-service
     stage: build
     env: production
     coverage: 95
@@ -253,7 +246,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           env: dev
 ```
 
@@ -272,14 +265,14 @@ jobs:
   build:
     strategy:
       matrix:
-        go-version: ['1.25.1', '1.26.0']
+        go-version: ['1.25.5', '1.26.1']
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: build
 ```
 
@@ -301,7 +294,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: test
 
   deploy:
@@ -312,7 +305,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: push
           env: production
 ```
@@ -329,7 +322,7 @@ jobs:
 - uses: ./.github/actions/shipwright
   with:
     version: v1.0.0  # Asegúrate de que esta versión existe
-    pipeline: go-kit
+    pipeline: go-service
 ```
 
 ### Problema: Stage falla con error de dependencias
@@ -416,7 +409,7 @@ jobs:
     steps:
       - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: build
 ```
 

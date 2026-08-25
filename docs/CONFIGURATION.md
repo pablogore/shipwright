@@ -17,18 +17,18 @@ flowchart TD
     B --> C[Configuration Files]
     C --> D[Default Values]
     
-    A1[--pipeline go-kit] --> A
+    A1[--pipeline go-service] --> A
     A2[--env prod] --> A
     A3[--coverage 90] --> A
     
-    B1[SYNTERGRITY_PIPELINE] --> B
-    B2[SYNTERGRITY_ENV] --> B
-    B3[SYNTERGRITY_COVERAGE] --> B
+    B1[SHIPWRIGHT_PIPELINE] --> B
+    B2[SHIPWRIGHT_ENV] --> B
+    B3[SHIPWRIGHT_COVERAGE] --> B
     
     C1[.shipwright.yml] --> C
     C2[config/production.yml] --> C
     
-    D1[Pipeline: go-kit] --> D
+    D1[Pipeline: go-service] --> D
     D2[Environment: dev] --> D
     D3[Coverage: 80] --> D
 ```
@@ -42,7 +42,7 @@ Create a `.shipwright.yml` file in your project root:
 ```yaml
 # Pipeline Configuration
 pipeline:
-  name: go-kit                    # Pipeline type (go-kit, docker-go, infra)
+  name: go-service                    # Pipeline type (go-service, infra)
   coverage: 90                    # Minimum test coverage percentage
   skip_push: false               # Skip pushing to registry
   only_build: false              # Execute build step only
@@ -85,7 +85,7 @@ docker:
 
 # Build Configuration
 build:
-  go_version: 1.25.1            # Go version to use
+  go_version: 1.26.1            # Go version to use
   cgo_enabled: false            # Enable CGO
   build_flags:                  # Additional build flags
     - -ldflags=-s -w
@@ -185,58 +185,58 @@ cache:
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `SYNTERGRITY_PIPELINE` | Pipeline type to execute | `go-kit` | `docker-go` |
-| `SYNTERGRITY_ENV` | Environment name | `dev` | `production` |
-| `SYNTERGRITY_COVERAGE` | Minimum test coverage | `80` | `90` |
-| `SYNTERGRITY_VERBOSE` | Enable verbose logging | `false` | `true` |
-| `SYNTERGRITY_CONFIG` | Configuration file path | `.shipwright.yml` | `config/prod.yml` |
+| `SHIPWRIGHT_PIPELINE` | Pipeline type to execute | `go-service` | `infra` |
+| `SHIPWRIGHT_ENV` | Environment name | `dev` | `production` |
+| `SHIPWRIGHT_COVERAGE` | Minimum test coverage | `80` | `90` |
+| `SHIPWRIGHT_VERBOSE` | Enable verbose logging | `false` | `true` |
+| `SHIPWRIGHT_CONFIG` | Configuration file path | `.shipwright.yml` | `config/prod.yml` |
 
 ### Git Configuration
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `SYNTERGRITY_GIT_URL` | Git repository URL | - | `https://github.com/user/repo.git` |
-| `SYNTERGRITY_GIT_REF` | Git reference | `main` | `develop` |
-| `SYNTERGRITY_GIT_PROTOCOL` | Git protocol | `https` | `ssh` |
-| `SYNTERGRITY_GIT_USERNAME` | Git username | - | `git` |
-| `SYNTERGRITY_GIT_PASSWORD` | Git password/token | - | `ghp_xxx` |
-| `SYNTERGRITY_SSH_PRIVATE_KEY` | SSH private key | - | `-----BEGIN OPENSSH PRIVATE KEY-----` |
+| `SHIPWRIGHT_GIT_URL` | Git repository URL | - | `https://github.com/user/repo.git` |
+| `SHIPWRIGHT_GIT_REF` | Git reference | `main` | `develop` |
+| `SHIPWRIGHT_GIT_PROTOCOL` | Git protocol | `https` | `ssh` |
+| `SHIPWRIGHT_GIT_USERNAME` | Git username | - | `git` |
+| `SHIPWRIGHT_GIT_PASSWORD` | Git password/token | - | `ghp_xxx` |
+| `SHIPWRIGHT_SSH_PRIVATE_KEY` | SSH private key | - | `-----BEGIN OPENSSH PRIVATE KEY-----` |
 
 ### Registry Configuration
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `SYNTERGRITY_REGISTRY_URL` | Container registry URL | - | `registry.example.com` |
-| `SYNTERGRITY_REGISTRY_USERNAME` | Registry username | - | `myuser` |
-| `SYNTERGRITY_REGISTRY_PASSWORD` | Registry password | - | `mypassword` |
-| `SYNTERGRITY_REGISTRY_NAMESPACE` | Registry namespace | - | `myorg` |
-| `SYNTERGRITY_REGISTRY_INSECURE` | Allow insecure registry | `false` | `true` |
+| `SHIPWRIGHT_REGISTRY_URL` | Container registry URL | - | `registry.example.com` |
+| `SHIPWRIGHT_REGISTRY_USERNAME` | Registry username | - | `myuser` |
+| `SHIPWRIGHT_REGISTRY_PASSWORD` | Registry password | - | `mypassword` |
+| `SHIPWRIGHT_REGISTRY_NAMESPACE` | Registry namespace | - | `myorg` |
+| `SHIPWRIGHT_REGISTRY_INSECURE` | Allow insecure registry | `false` | `true` |
 
 ### Build Configuration
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `SYNTERGRITY_GO_VERSION` | Go version to use | `1.25.1` | `1.24.0` |
-| `SYNTERGRITY_CGO_ENABLED` | Enable CGO | `false` | `true` |
-| `SYNTERGRITY_BUILD_FLAGS` | Additional build flags | - | `-ldflags=-s -w` |
-| `SYNTERGRITY_TEST_FLAGS` | Additional test flags | - | `-race -cover` |
+| `SHIPWRIGHT_GO_VERSION` | Go version to use | `1.26.1` | `1.24.0` |
+| `SHIPWRIGHT_CGO_ENABLED` | Enable CGO | `false` | `true` |
+| `SHIPWRIGHT_BUILD_FLAGS` | Additional build flags | - | `-ldflags=-s -w` |
+| `SHIPWRIGHT_TEST_FLAGS` | Additional test flags | - | `-race -cover` |
 
 ### Security Configuration
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `SYNTERGRITY_SECURITY_ENABLED` | Enable security scanning | `true` | `false` |
-| `SYNTERGRITY_SECURITY_LEVEL` | Security scan level | `medium` | `high` |
-| `SYNTERGRITY_FAIL_ON_VULNERABILITIES` | Fail on vulnerabilities | `true` | `false` |
+| `SHIPWRIGHT_SECURITY_ENABLED` | Enable security scanning | `true` | `false` |
+| `SHIPWRIGHT_SECURITY_LEVEL` | Security scan level | `medium` | `high` |
+| `SHIPWRIGHT_FAIL_ON_VULNERABILITIES` | Fail on vulnerabilities | `true` | `false` |
 
 ### Notification Configuration
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `SYNTERGRITY_WEBHOOK_URL` | Webhook URL for notifications | - | `https://hooks.slack.com/xxx` |
-| `SYNTERGRITY_EMAIL_SMTP_SERVER` | SMTP server for email | - | `smtp.gmail.com` |
-| `SYNTERGRITY_EMAIL_USERNAME` | Email username | - | `user@gmail.com` |
-| `SYNTERGRITY_EMAIL_PASSWORD` | Email password | - | `password` |
+| `SHIPWRIGHT_WEBHOOK_URL` | Webhook URL for notifications | - | `https://hooks.slack.com/xxx` |
+| `SHIPWRIGHT_EMAIL_SMTP_SERVER` | SMTP server for email | - | `smtp.gmail.com` |
+| `SHIPWRIGHT_EMAIL_USERNAME` | Email username | - | `user@gmail.com` |
+| `SHIPWRIGHT_EMAIL_PASSWORD` | Email password | - | `password` |
 
 ## Command Line Options
 
@@ -258,7 +258,7 @@ shipwright [OPTIONS] [COMMAND]
 
 | Option | Description | Default | Example |
 |--------|-------------|---------|---------|
-| `--pipeline, -p` | Pipeline type to execute | Required | `--pipeline go-kit` |
+| `--pipeline, -p` | Pipeline type to execute | Required | `--pipeline go-service` |
 | `--env, -e` | Environment name | `dev` | `--env production` |
 | `--coverage` | Minimum test coverage | `80` | `--coverage 90` |
 | `--timeout` | Pipeline timeout | `30m` | `--timeout 1h` |
@@ -278,21 +278,24 @@ shipwright [OPTIONS] [COMMAND]
 | Option | Description | Default | Example |
 |--------|-------------|---------|---------|
 | `--list-pipelines` | List available pipelines | - | `--list-pipelines` |
-| `--list-steps` | List pipeline steps | - | `--list-steps --pipeline go-kit` |
+| `--list-steps` | List pipeline steps | - | `--list-steps --pipeline go-service` |
 | `--show-config` | Show resolved configuration | - | `--show-config` |
 
 ## Pipeline-Specific Configuration
 
-### Go-Kit Pipeline
+### Go-Service Pipeline
 
 ```yaml
 pipeline:
-  name: go-kit
-  
-# Go-Kit specific options
-go_kit:
+  name: go-service
+
+# Go-Service specific options
+go_service:
   service_name: my-service
   service_version: 1.0.0
+  build_mode: both              # binary, docker, or both
+  base_image: golang:1.26.1-alpine
+  final_image: alpine:3.18
   endpoints:
     - name: health
       path: /health
@@ -311,18 +314,6 @@ go_kit:
     grpc:
       port: 9090
       host: 0.0.0.0
-```
-
-### Docker-Go Pipeline
-
-```yaml
-pipeline:
-  name: docker-go
-  
-# Docker-Go specific options
-docker_go:
-  base_image: golang:1.25.1-alpine
-  final_image: alpine:3.18
   build_stages:
     - name: builder
       commands:
@@ -359,12 +350,12 @@ infrastructure:
       key: infrastructure/terraform.tfstate
     variables:
       - name: environment
-        value: ${SYNTERGRITY_ENV}
+        value: ${SHIPWRIGHT_ENV}
       - name: region
         value: us-west-2
   kubernetes:
     version: 1.28
-    namespace: ${SYNTERGRITY_ENV}
+    namespace: ${SHIPWRIGHT_ENV}
     resources:
       - name: deployment
         file: k8s/deployment.yaml
@@ -421,7 +412,7 @@ validation:
 ```yaml
 # .shipwright.yml
 pipeline:
-  name: go-kit
+  name: go-service
   coverage: 80
   verbose: true
 
@@ -438,7 +429,7 @@ registry:
   insecure: true
 
 build:
-  go_version: 1.25.1
+  go_version: 1.26.1
   test_flags:
     - -race
     - -short
@@ -457,7 +448,7 @@ notifications:
 ```yaml
 # config/production.yml
 pipeline:
-  name: go-kit
+  name: go-service
   coverage: 95
   verbose: false
   timeout: 1h
@@ -475,7 +466,7 @@ registry:
   insecure: false
 
 build:
-  go_version: 1.25.1
+  go_version: 1.26.1
   build_flags:
     - -ldflags=-s -w
     - -trimpath
@@ -504,7 +495,7 @@ notifications:
 ```yaml
 # config/base.yml
 pipeline:
-  name: go-kit
+  name: go-service
   coverage: 90
 
 git:
@@ -513,10 +504,10 @@ git:
 
 registry:
   url: registry.example.com
-  namespace: ${SYNTERGRITY_ENV}
+  namespace: ${SHIPWRIGHT_ENV}
 
 build:
-  go_version: 1.25.1
+  go_version: 1.26.1
 
 security:
   enable_scanning: true
@@ -575,13 +566,13 @@ security:
 
 ```bash
 # Show resolved configuration
-shipwright --show-config --pipeline go-kit
+shipwright --show-config --pipeline go-service
 
 # Validate configuration without execution
-shipwright --dry-run --pipeline go-kit
+shipwright --dry-run --pipeline go-service
 
 # Show configuration with verbose logging
-shipwright --verbose --pipeline go-kit
+shipwright --verbose --pipeline go-service
 ```
 
 ### Configuration Testing
@@ -591,8 +582,8 @@ shipwright --verbose --pipeline go-kit
 shipwright --config test-config.yml --dry-run
 
 # Validate specific environment
-SYNTERGRITY_ENV=production shipwright --show-config
+SHIPWRIGHT_ENV=production shipwright --show-config
 
 # Test with different configuration files
-shipwright --config config/dev.yml --pipeline go-kit --dry-run
+shipwright --config config/dev.yml --pipeline go-service --dry-run
 ```

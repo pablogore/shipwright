@@ -235,7 +235,7 @@ if err != nil {
 }
 
 // Get specific pipeline
-pipeline, err := registry.Get("go-kit", client, config)
+pipeline, err := registry.Get("go-service", client, config)
 if err != nil {
     log.Fatalf("Failed to get pipeline: %v", err)
 }
@@ -402,7 +402,7 @@ if err != nil {
 config.LoadFromEnvironment()
 
 // Set configuration values programmatically
-err = config.Set("pipeline.name", "go-kit")
+err = config.Set("pipeline.name", "go-service")
 if err != nil {
     log.Fatalf("Failed to set config: %v", err)
 }
@@ -453,7 +453,7 @@ ctx := context.Background()
 
 // Create container
 container := client.Container().
-    From("golang:1.25.1-alpine").
+    From("golang:1.26.1-alpine").
     WithMountedDirectory("/src", client.Host().Directory(".")).
     WithWorkdir("/src")
 
@@ -471,7 +471,7 @@ fmt.Printf("Build output: %s\n", result)
 ```go
 // Build Docker image
 image := client.Container().
-    From("golang:1.25.1-alpine").
+    From("golang:1.26.1-alpine").
     WithMountedDirectory("/src", client.Host().Directory(".")).
     WithWorkdir("/src").
     WithExec([]string{"go", "build", "-o", "app", "./cmd/app"}).
@@ -557,7 +557,7 @@ log := logger.(*LoggerAdapter)
 
 // Use structured logging
 log.Info("Pipeline execution started",
-    "pipeline", "go-kit",
+    "pipeline", "go-service",
     "environment", "production",
     "coverage", 90.0)
 
@@ -568,7 +568,7 @@ log.Error("Step execution failed",
 
 // Create child logger with additional context
 childLogger := log.WithFields(map[string]interface{}{
-    "pipeline": "go-kit",
+    "pipeline": "go-service",
     "step": "build",
 })
 
@@ -582,7 +582,7 @@ childLogger.Debug("Executing build step")
 ```go
 // Create mock configuration
 mockConfig := &mocks.MockConfiguration{}
-mockConfig.On("GetString", "pipeline.name").Return("go-kit")
+mockConfig.On("GetString", "pipeline.name").Return("go-service")
 mockConfig.On("GetFloat64", "pipeline.coverage").Return(90.0)
 mockConfig.On("Validate").Return(nil)
 
@@ -593,8 +593,8 @@ mockClient := &mocks.MockDaggerClient{}
 mockLogger := &mocks.MockLogger{}
 
 // Test pipeline creation
-pipeline := gokit.New(mockClient, mockConfig)
-assert.Equal(t, "go-kit", pipeline.Name())
+pipeline := goservice.New(mockClient, mockConfig)
+assert.Equal(t, "go-service", pipeline.Name())
 ```
 
 ### Integration Testing
@@ -615,7 +615,7 @@ func TestPipelineIntegration(t *testing.T) {
     
     // Create test configuration
     config := pipelines.Config{
-        PipelineName: "go-kit",
+        PipelineName: "go-service",
         Environment: "test",
         Coverage: 80.0,
         GitURL: "https://github.com/test/repo.git",
@@ -624,7 +624,7 @@ func TestPipelineIntegration(t *testing.T) {
     }
     
     // Create pipeline
-    pipeline := gokit.New(client, config)
+    pipeline := goservice.New(client, config)
     
     // Test pipeline execution
     err = pipeline.Setup(ctx)

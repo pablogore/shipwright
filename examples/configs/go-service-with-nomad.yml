@@ -2,7 +2,7 @@ pipeline:
   name: "go-service"
   environment: "production"
   coverage: 90.0
-  go_version: "1.25.5"
+  go_version: "1.26.1"
 
 # Steps para servicio con deploy a Nomad
 steps:

@@ -157,8 +157,7 @@ func (c *Container) registerPipelineComponents() {
         registry := NewPipelineRegistry()
 
         // Register default pipelines
-        registry.Register("go-kit", NewGoKitPipeline)
-        registry.Register("docker-go", NewDockerGoPipeline)
+        registry.Register("go-service", NewGoServicePipeline)
         registry.Register("infra", NewInfraPipeline)
         
         // Register your custom pipeline
@@ -214,7 +213,7 @@ func (h *MyCustomStepHandler) Execute(ctx context.Context) error {
     if h.client != nil {
         // Use Dagger client for container operations
         container := h.client.Container().
-            From("golang:1.25.1-alpine").
+            From("golang:1.26.1-alpine").
             WithMountedDirectory("/src", h.client.Host().Directory(".")).
             WithWorkdir("/src").
             WithExec([]string{"go", "build", "-o", "myapp", "./cmd/myapp"})
