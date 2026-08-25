@@ -93,13 +93,13 @@ func NewApp(container *Container) *App {
 
 // Start starts the application.
 func (a *App) Start(ctx context.Context) error {
-	logger.L().InfoContext(ctx, "Starting Syntegrity Dagger application...")
+	logger.L().InfoContext(ctx, "Starting Shipwright application...")
 	return a.container.Start(ctx)
 }
 
 // Stop stops the application.
 func (a *App) Stop(ctx context.Context) error {
-	logger.L().InfoContext(ctx, "Stopping Syntegrity Dagger application...")
+	logger.L().InfoContext(ctx, "Stopping Shipwright application...")
 	return a.container.Stop(ctx)
 }
 
