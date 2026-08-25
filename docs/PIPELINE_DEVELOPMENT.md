@@ -1,6 +1,6 @@
 # Pipeline Development Guide
 
-This guide explains how to create custom pipelines for Syntegrity Dagger, including pipeline implementation, step development, and integration patterns.
+This guide explains how to create custom pipelines for Shipwright, including pipeline implementation, step development, and integration patterns.
 
 ## Pipeline Architecture Overview
 
@@ -48,8 +48,8 @@ import (
     "fmt"
     
     "dagger.io/dagger"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
+    "github.com/pablogore/shipwright/internal/pipelines"
+    "github.com/pablogore/shipwright/internal/pipelines/shared"
 )
 
 // MyPipeline represents a custom pipeline implementation
@@ -181,7 +181,7 @@ import (
     "fmt"
     
     "dagger.io/dagger"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+    "github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // MyCustomStepHandler implements a custom pipeline step
@@ -299,7 +299,7 @@ import (
     "context"
     "fmt"
     
-    "github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+    "github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // MyCustomHook implements custom pre/post processing
@@ -401,8 +401,8 @@ import (
     
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/require"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-    "github.com/getsyntegrity/syntegrity-dagger/mocks"
+    "github.com/pablogore/shipwright/internal/pipelines"
+    "github.com/pablogore/shipwright/mocks"
 )
 
 func TestMyPipeline_Name(t *testing.T) {
@@ -546,8 +546,8 @@ import (
     "fmt"
     
     "dagger.io/dagger"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
+    "github.com/pablogore/shipwright/internal/pipelines"
+    "github.com/pablogore/shipwright/internal/pipelines/shared"
 )
 
 // NodePipeline implements a pipeline for Node.js applications

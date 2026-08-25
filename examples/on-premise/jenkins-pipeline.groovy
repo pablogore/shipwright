@@ -1,12 +1,12 @@
-// Jenkins Pipeline Example for Syntegrity Dagger
-// This example shows how to use Syntegrity Dagger in an on-premise Jenkins environment
+// Jenkins Pipeline Example for Shipwright
+// This example shows how to use Shipwright in an on-premise Jenkins environment
 
 pipeline {
     agent any
     
     environment {
-        // Version of Syntegrity Dagger to use
-        SYNTEGRITY_DAGGER_VERSION = 'v1.0.0'
+        // Version of Shipwright to use
+        SHIPWRIGHT_VERSION = 'v1.0.0'
         
         // Registry configuration
         REGISTRY_URL = credentials('registry-url')
@@ -44,28 +44,28 @@ pipeline {
     }
     
     stages {
-        stage('Install Syntegrity Dagger') {
+        stage('Install Shipwright') {
             steps {
                 script {
-                    // Check if syntegrity-dagger is already installed
+                    // Check if shipwright is already installed
                     def daggerInstalled = sh(
-                        script: 'which syntegrity-dagger || echo "not-found"',
+                        script: 'which shipwright || echo "not-found"',
                         returnStdout: true
                     ).trim()
                     
                     if (daggerInstalled == 'not-found') {
-                        echo "📥 Installing Syntegrity Dagger ${SYNTEGRITY_DAGGER_VERSION}"
+                        echo "📥 Installing Shipwright ${SHIPWRIGHT_VERSION}"
                         sh """
-                            curl -L "https://github.com/getsyntegrity/syntegrity-dagger/releases/download/${SYNTEGRITY_DAGGER_VERSION}/syntegrity-dagger-linux-amd64" -o syntegrity-dagger
-                            chmod +x syntegrity-dagger
-                            sudo mv syntegrity-dagger /usr/local/bin/
+                            curl -L "https://github.com/pablogore/shipwright/releases/download/${SHIPWRIGHT_VERSION}/shipwright-linux-amd64" -o shipwright
+                            chmod +x shipwright
+                            sudo mv shipwright /usr/local/bin/
                         """
                     } else {
-                        echo "✅ Syntegrity Dagger already installed"
+                        echo "✅ Shipwright already installed"
                     }
                     
                     // Verify installation
-                    sh 'syntegrity-dagger --version'
+                    sh 'shipwright --version'
                 }
             }
         }
@@ -74,10 +74,10 @@ pipeline {
             steps {
                 echo "🔧 Running setup stage"
                 sh """
-                    syntegrity-dagger \
+                    shipwright \
                         --pipeline=${params.PIPELINE_TYPE} \
                         --step=setup \
-                        --config=.syntegrity-dagger.yml \
+                        --config=.shipwright.yml \
                         --env=${params.ENVIRONMENT} \
                         --git-ref=${env.GIT_BRANCH} \
                         --git-auth=https \
@@ -90,10 +90,10 @@ pipeline {
             steps {
                 echo "🔨 Running build stage"
                 sh """
-                    syntegrity-dagger \
+                    shipwright \
                         --pipeline=${params.PIPELINE_TYPE} \
                         --step=build \
-                        --config=.syntegrity-dagger.yml \
+                        --config=.shipwright.yml \
                         --env=${params.ENVIRONMENT} \
                         --verbose
                 """
@@ -109,10 +109,10 @@ pipeline {
             steps {
                 echo "🧪 Running test stage"
                 sh """
-                    syntegrity-dagger \
+                    shipwright \
                         --pipeline=${params.PIPELINE_TYPE} \
                         --step=test \
-                        --config=.syntegrity-dagger.yml \
+                        --config=.shipwright.yml \
                         --env=${params.ENVIRONMENT} \
                         --coverage=90 \
                         --verbose
@@ -138,10 +138,10 @@ pipeline {
             steps {
                 echo "🔒 Running security scan"
                 sh """
-                    syntegrity-dagger \
+                    shipwright \
                         --pipeline=${params.PIPELINE_TYPE} \
                         --step=security \
-                        --config=.syntegrity-dagger.yml \
+                        --config=.shipwright.yml \
                         --env=${params.ENVIRONMENT} \
                         --verbose
                 """
@@ -158,10 +158,10 @@ pipeline {
             steps {
                 echo "📦 Running package stage"
                 sh """
-                    syntegrity-dagger \
+                    shipwright \
                         --pipeline=${params.PIPELINE_TYPE} \
                         --step=package \
-                        --config=.syntegrity-dagger.yml \
+                        --config=.shipwright.yml \
                         --env=${params.ENVIRONMENT} \
                         --verbose
                 """
@@ -181,10 +181,10 @@ pipeline {
             steps {
                 echo "🚀 Pushing to registry"
                 sh """
-                    syntegrity-dagger \
+                    shipwright \
                         --pipeline=${params.PIPELINE_TYPE} \
                         --step=push \
-                        --config=.syntegrity-dagger.yml \
+                        --config=.shipwright.yml \
                         --env=${params.ENVIRONMENT} \
                         --verbose
                 """

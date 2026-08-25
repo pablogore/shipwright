@@ -48,7 +48,7 @@ Este script:
 
 ```bash
 # Aplicar a un repositorio específico
-gh api repos/getsyntegrity/syntegrity-dagger/rulesets \
+gh api repos/pablogore/shipwright/rulesets \
   --method POST \
   --input .github/rulesets/branch-protection-rules.json
 

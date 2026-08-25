@@ -1,6 +1,6 @@
 # 🏠 Running Pipelines Locally
 
-This guide shows you how to run and test Syntegrity Dagger pipelines locally in your project **without needing cloud services or Docker**.
+This guide shows you how to run and test Shipwright pipelines locally in your project **without needing cloud services or Docker**.
 
 ## 🎯 Why Run Locally?
 
@@ -8,7 +8,7 @@ This guide shows you how to run and test Syntegrity Dagger pipelines locally in 
 - **No cloud required**: Run everything on your machine
 - **Cost-effective**: No cloud compute costs
 - **Debug easily**: Full access to logs and intermediate results
-- **Test configurations**: Validate your `.syntegrity-dagger.yml` before committing
+- **Test configurations**: Validate your `.shipwright.yml` before committing
 
 ## 🚀 Quick Start
 
@@ -33,21 +33,21 @@ This guide shows you how to run and test Syntegrity Dagger pipelines locally in 
 ### Option 2: Direct Command
 
 ```bash
-# Install syntegrity-dagger (if not already installed)
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
+# Install shipwright (if not already installed)
+curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o shipwright
+chmod +x shipwright
+sudo mv shipwright /usr/local/bin/
 
 # Run pipeline locally
-syntegrity-dagger --pipeline go-service --local
+shipwright --pipeline go-service --local
 
 # Run specific step
-syntegrity-dagger --pipeline go-service --step build --local
+shipwright --pipeline go-service --step build --local
 ```
 
 ## ⚙️ Configuration
 
-### Create `.syntegrity-dagger.yml` in your project root:
+### Create `.shipwright.yml` in your project root:
 
 ```yaml
 pipeline:
@@ -119,17 +119,17 @@ security:
 
 ```bash
 # Full pipeline
-syntegrity-dagger --pipeline go-service --local --config .syntegrity-dagger.yml
+shipwright --pipeline go-service --local --config .shipwright.yml
 
 # Only build step
-syntegrity-dagger --pipeline go-service --step build --local
+shipwright --pipeline go-service --step build --local
 
 # Only test step
-syntegrity-dagger --pipeline go-service --step test --local --coverage 95
+shipwright --pipeline go-service --step test --local --coverage 95
 
 # Build and test only
-syntegrity-dagger --pipeline go-service --only-build --local
-syntegrity-dagger --pipeline go-service --only-test --local
+shipwright --pipeline go-service --only-build --local
+shipwright --pipeline go-service --only-test --local
 ```
 
 ## 🔧 Requirements
@@ -184,7 +184,7 @@ Run the complete pipeline as it would run in CI:
 Check that your configuration is valid:
 
 ```bash
-syntegrity-dagger --pipeline go-service --config .syntegrity-dagger.yml --list-steps
+shipwright --pipeline go-service --config .shipwright.yml --list-steps
 ```
 
 ### 4. Test Different Configurations
@@ -214,8 +214,8 @@ xdg-open coverage/coverage.html  # Linux
 
 ## 🐛 Troubleshooting
 
-### Issue: "syntegrity-dagger not found"
-**Solution**: Install syntegrity-dagger (see Quick Start section)
+### Issue: "shipwright not found"
+**Solution**: Install shipwright (see Quick Start section)
 
 ### Issue: "Go is not installed"
 **Solution**: Install Go from https://golang.org/dl/
@@ -283,8 +283,8 @@ Before pushing to CI, validate locally:
 You can execute any supported step:
 
 ```bash
-syntegrity-dagger --pipeline go-service --step lint --local
-syntegrity-dagger --pipeline go-service --step security --local
+shipwright --pipeline go-service --step lint --local
+shipwright --pipeline go-service --step security --local
 ```
 
 ### Verbose Output
@@ -292,7 +292,7 @@ syntegrity-dagger --pipeline go-service --step security --local
 Enable verbose logging for debugging:
 
 ```bash
-syntegrity-dagger --pipeline go-service --local --verbose
+shipwright --pipeline go-service --local --verbose
 ```
 
 ### Environment-Specific Configs
@@ -301,16 +301,16 @@ Use different configs for different environments:
 
 ```bash
 # Development
-syntegrity-dagger --pipeline go-service --config .syntegrity-dagger.dev.yml --local
+shipwright --pipeline go-service --config .shipwright.dev.yml --local
 
 # Staging
-syntegrity-dagger --pipeline go-service --config .syntegrity-dagger.staging.yml --local
+shipwright --pipeline go-service --config .shipwright.staging.yml --local
 ```
 
 ## 🎓 Best Practices
 
 1. **Always test locally first**: Run pipelines locally before pushing to CI
-2. **Use version control**: Commit your `.syntegrity-dagger.yml` to version control
+2. **Use version control**: Commit your `.shipwright.yml` to version control
 3. **Match CI environment**: Use the same Go version locally as in CI
 4. **Keep dependencies updated**: Run `go mod tidy` regularly
 5. **Test incrementally**: Test individual steps before running full pipeline
@@ -318,5 +318,5 @@ syntegrity-dagger --pipeline go-service --config .syntegrity-dagger.staging.yml 
 ## 🆘 Getting Help
 
 - **Documentation**: See main [README.md](../../README.md)
-- **Issues**: [GitHub Issues](https://github.com/getsyntegrity/syntegrity-dagger/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/getsyntegrity/syntegrity-dagger/discussions)
+- **Issues**: [GitHub Issues](https://github.com/pablogore/shipwright/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/pablogore/shipwright/discussions)

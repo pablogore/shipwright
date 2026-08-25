@@ -18,7 +18,7 @@ Dependabot uses **separate secrets** from GitHub Actions. You need to configure 
 
 1. Go to: https://github.com/settings/tokens
 2. Click "Generate new token" → "Generate new token (classic)"
-3. Name: `SYNTEGRITY_DAGGER_TOKEN` (or any name you prefer)
+3. Name: `SHIPWRIGHT_TOKEN` (or any name you prefer)
 4. Select scopes:
    - **`repo`** (full control of private repositories) - Required for private repos
    - **`read:packages`** (optional, for package registries)
@@ -32,7 +32,7 @@ Dependabot uses **separate secrets** from GitHub Actions. You need to configure 
 1. Go to your repository
 2. Navigate to: `Settings` → `Secrets and variables` → `Dependabot`
 3. Click "New Dependabot secret"
-4. Name: `SYNTEGRITY_DAGGER_TOKEN`
+4. Name: `SHIPWRIGHT_TOKEN`
 5. Value: Paste your PAT
 6. Click "Add secret"
 
@@ -52,7 +52,7 @@ After adding the secret, Dependabot should be able to:
 | Access | Can be used in workflows | Only accessible to Dependabot |
 | Configuration | Same token can be used | Must be configured separately |
 
-**Important**: Even if you have `SYNTEGRITY_DAGGER_TOKEN` configured in Actions secrets, you **must also** add it to Dependabot secrets for Dependabot to work.
+**Important**: Even if you have `SHIPWRIGHT_TOKEN` configured in Actions secrets, you **must also** add it to Dependabot secrets for Dependabot to work.
 
 ## Troubleshooting
 
@@ -104,7 +104,7 @@ registries:
     type: git
     url: https://github.com
     username: x-access-token
-    password: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+    password: ${{ secrets.SHIPWRIGHT_TOKEN }}
 
 updates:
   - package-ecosystem: "gomod"
@@ -127,7 +127,7 @@ Free GitHub accounts have some limitations with Dependabot:
 
 ## Best Practices
 
-1. **Use the same token for both Actions and Dependabot**: Configure `SYNTEGRITY_DAGGER_TOKEN` in both:
+1. **Use the same token for both Actions and Dependabot**: Configure `SHIPWRIGHT_TOKEN` in both:
    - Actions secrets (for GitHub Actions workflows)
    - Dependabot secrets (for Dependabot updates)
 

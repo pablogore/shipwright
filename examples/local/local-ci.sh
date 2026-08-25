@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local CI Script for Syntegrity Dagger
+# Local CI Script for Shipwright
 # This script demonstrates how to run a complete CI pipeline locally
 
 set -e  # Exit on error
@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 PIPELINE_TYPE="${1:-go-service}"
 ENVIRONMENT="${2:-dev}"
 COVERAGE_THRESHOLD="${3:-90}"
-CONFIG_FILE="${4:-.syntegrity-dagger.yml}"
+CONFIG_FILE="${4:-.shipwright.yml}"
 
 echo -e "${BLUE}🏠 Local CI Pipeline${NC}"
 echo "===================="
@@ -25,19 +25,19 @@ echo "Coverage Threshold: $COVERAGE_THRESHOLD%"
 echo "Config: $CONFIG_FILE"
 echo ""
 
-# Check if syntegrity-dagger is installed
-if ! command -v syntegrity-dagger &> /dev/null; then
-    echo -e "${RED}❌ syntegrity-dagger not found${NC}"
+# Check if shipwright is installed
+if ! command -v shipwright &> /dev/null; then
+    echo -e "${RED}❌ shipwright not found${NC}"
     echo "Please install it first:"
-    echo "  curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o syntegrity-dagger"
-    echo "  chmod +x syntegrity-dagger"
-    echo "  sudo mv syntegrity-dagger /usr/local/bin/"
+    echo "  curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o shipwright"
+    echo "  chmod +x shipwright"
+    echo "  sudo mv shipwright /usr/local/bin/"
     exit 1
 fi
 
 # Show version
-echo -e "${BLUE}📋 Syntegrity Dagger Version:${NC}"
-syntegrity-dagger --version
+echo -e "${BLUE}📋 Shipwright Version:${NC}"
+shipwright --version
 echo ""
 
 # Function to run a stage
@@ -45,7 +45,7 @@ run_stage() {
     local stage=$1
     echo -e "${YELLOW}▶️  Running stage: $stage${NC}"
     
-    if syntegrity-dagger \
+    if shipwright \
         --pipeline="$PIPELINE_TYPE" \
         --step="$stage" \
         --config="$CONFIG_FILE" \

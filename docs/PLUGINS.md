@@ -27,7 +27,7 @@ package myplugin
 
 import (
     "context"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/plugins"
+    "github.com/pablogore/shipwright/internal/plugins"
 )
 
 type MyPlugin struct {
@@ -130,7 +130,7 @@ func (h *myStepHandler) Validate(stepName string, config interfaces.StepConfig) 
 
 ### Configuración YAML
 
-Agrega la configuración del plugin en tu archivo `.syntegrity-dagger.yml`:
+Agrega la configuración del plugin en tu archivo `.shipwright.yml`:
 
 ```yaml
 pipeline:
@@ -196,10 +196,10 @@ plugins:
 
 ```bash
 # Ejecutar pipeline completo (deploy automático si auto_deploy: true)
-syntegrity-dagger --pipeline go-service
+shipwright --pipeline go-service
 
 # Ejecutar solo el step de deploy
-syntegrity-dagger --pipeline go-service --step deploy-nomad
+shipwright --pipeline go-service --step deploy-nomad
 ```
 
 ## Acceso al Contexto del Pipeline

@@ -1,10 +1,10 @@
 # Configuration Reference
 
-This document provides a comprehensive reference for configuring Syntegrity Dagger pipelines, including all available options, environment variables, and configuration file formats.
+This document provides a comprehensive reference for configuring Shipwright pipelines, including all available options, environment variables, and configuration file formats.
 
 ## Configuration Hierarchy
 
-Syntegrity Dagger uses a layered configuration system with the following precedence (highest to lowest):
+Shipwright uses a layered configuration system with the following precedence (highest to lowest):
 
 1. **Command Line Flags** - Override all other settings
 2. **Environment Variables** - Override file and default settings
@@ -25,7 +25,7 @@ flowchart TD
     B2[SYNTERGRITY_ENV] --> B
     B3[SYNTERGRITY_COVERAGE] --> B
     
-    C1[.syntegrity-dagger.yml] --> C
+    C1[.shipwright.yml] --> C
     C2[config/production.yml] --> C
     
     D1[Pipeline: go-kit] --> D
@@ -37,7 +37,7 @@ flowchart TD
 
 ### YAML Configuration
 
-Create a `.syntegrity-dagger.yml` file in your project root:
+Create a `.shipwright.yml` file in your project root:
 
 ```yaml
 # Pipeline Configuration
@@ -189,7 +189,7 @@ cache:
 | `SYNTERGRITY_ENV` | Environment name | `dev` | `production` |
 | `SYNTERGRITY_COVERAGE` | Minimum test coverage | `80` | `90` |
 | `SYNTERGRITY_VERBOSE` | Enable verbose logging | `false` | `true` |
-| `SYNTERGRITY_CONFIG` | Configuration file path | `.syntegrity-dagger.yml` | `config/prod.yml` |
+| `SYNTERGRITY_CONFIG` | Configuration file path | `.shipwright.yml` | `config/prod.yml` |
 
 ### Git Configuration
 
@@ -243,14 +243,14 @@ cache:
 ### Global Options
 
 ```bash
-syntegrity-dagger [OPTIONS] [COMMAND]
+shipwright [OPTIONS] [COMMAND]
 ```
 
 | Option | Description | Default | Example |
 |--------|-------------|---------|---------|
 | `--help, -h` | Show help information | - | `--help` |
 | `--version, -v` | Show version information | - | `--version` |
-| `--config, -c` | Configuration file path | `.syntegrity-dagger.yml` | `--config prod.yml` |
+| `--config, -c` | Configuration file path | `.shipwright.yml` | `--config prod.yml` |
 | `--verbose` | Enable verbose logging | `false` | `--verbose` |
 | `--dry-run` | Show what would be executed | `false` | `--dry-run` |
 
@@ -419,7 +419,7 @@ validation:
 ### Development Environment
 
 ```yaml
-# .syntegrity-dagger.yml
+# .shipwright.yml
 pipeline:
   name: go-kit
   coverage: 80
@@ -575,24 +575,24 @@ security:
 
 ```bash
 # Show resolved configuration
-syntegrity-dagger --show-config --pipeline go-kit
+shipwright --show-config --pipeline go-kit
 
 # Validate configuration without execution
-syntegrity-dagger --dry-run --pipeline go-kit
+shipwright --dry-run --pipeline go-kit
 
 # Show configuration with verbose logging
-syntegrity-dagger --verbose --pipeline go-kit
+shipwright --verbose --pipeline go-kit
 ```
 
 ### Configuration Testing
 
 ```bash
 # Test configuration loading
-syntegrity-dagger --config test-config.yml --dry-run
+shipwright --config test-config.yml --dry-run
 
 # Validate specific environment
-SYNTERGRITY_ENV=production syntegrity-dagger --show-config
+SYNTERGRITY_ENV=production shipwright --show-config
 
 # Test with different configuration files
-syntegrity-dagger --config config/dev.yml --pipeline go-kit --dry-run
+shipwright --config config/dev.yml --pipeline go-kit --dry-run
 ```

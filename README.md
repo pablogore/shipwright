@@ -1,8 +1,8 @@
-# Syntegrity Dagger
+# Shipwright
 
-[![Release Pipeline](https://github.com/getsyntegrity/syntegrity-dagger/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/getsyntegrity/syntegrity-dagger/actions/workflows/release.yml)
+[![Release Pipeline](https://github.com/pablogore/shipwright/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/pablogore/shipwright/actions/workflows/release.yml)
 
-A unified CI/CD pipeline library for Go projects, built on top of Dagger SDK. Syntegrity Dagger provides standardized, reusable pipelines that can be easily integrated into any Go project's CI/CD workflow.
+A unified CI/CD pipeline library for Go projects, built on top of Dagger SDK. Shipwright provides standardized, reusable pipelines that can be easily integrated into any Go project's CI/CD workflow.
 
 ## 🚀 Features
 
@@ -43,14 +43,14 @@ For infrastructure and deployment automation:
 
 ```bash
 # Install latest version
-curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash
 
 # Install specific version
-curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash -s -- -v v1.0.0
+curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash -s -- -v v1.0.0
 
 # Download binary directly
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-chmod +x syntegrity-dagger
+curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+chmod +x shipwright
 ```
 ### Manual Installation
 
@@ -59,9 +59,9 @@ chmod +x syntegrity-dagger
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/')
 VERSION="latest"  # or specific version like "v1.0.0"
 
-curl -L "https://github.com/getsyntegrity/syntegrity-dagger/releases/download/${VERSION}/syntegrity-dagger-${PLATFORM}" -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
+curl -L "https://github.com/pablogore/shipwright/releases/download/${VERSION}/shipwright-${PLATFORM}" -o shipwright
+chmod +x shipwright
+sudo mv shipwright /usr/local/bin/
 ```
 
 ## 🚀 Quick Start
@@ -86,22 +86,22 @@ chmod +x run-local.sh
 **Or use directly (auto-detects local execution):**
 
 ```bash
-# Install syntegrity-dagger (one time)
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
+# Install shipwright (one time)
+curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o shipwright
+chmod +x shipwright
+sudo mv shipwright /usr/local/bin/
 
 # Run pipeline locally (auto-detects, no Docker needed)
-syntegrity-dagger --pipeline go-service
+shipwright --pipeline go-service
 
 # Or explicitly force local execution
-syntegrity-dagger --local --pipeline go-service
+shipwright --local --pipeline go-service
 
 # Run specific step
-syntegrity-dagger --pipeline go-service --step test
+shipwright --pipeline go-service --step test
 
 # Use native executor explicitly (fastest, no Docker)
-syntegrity-dagger --executor native --pipeline go-service
+shipwright --executor native --pipeline go-service
 ```
 
 **Key Benefits of Local Execution:**
@@ -116,18 +116,18 @@ See [Local Usage Guide](docs/LOCAL_USAGE.md) for detailed instructions.
 
 ```bash
 # Run go-service pipeline with Docker (for CI/CD validation)
-syntegrity-dagger --executor docker --pipeline go-service --env dev --coverage 90
+shipwright --executor docker --pipeline go-service --env dev --coverage 90
 
 # Run infrastructure pipeline
-syntegrity-dagger --pipeline infra --env staging
+shipwright --pipeline infra --env staging
 
 # Auto-detect executor (native if local, docker if CI/CD)
-syntegrity-dagger --pipeline go-service --env prod
+shipwright --pipeline go-service --env prod
 ```
 
 ### Configuration File
 
-Create a `.syntegrity-dagger.yml` file:
+Create a `.shipwright.yml` file:
 
 ```yaml
 pipeline:
@@ -167,22 +167,22 @@ steps:
 
 ```bash
 # Show help
-syntegrity-dagger --help
+shipwright --help
 
 # Show version
-syntegrity-dagger --version
+shipwright --version
 
 # List available pipelines
-syntegrity-dagger --list-pipelines
+shipwright --list-pipelines
 
 # List steps for a pipeline
-syntegrity-dagger --list-steps --pipeline go-kit
+shipwright --list-steps --pipeline go-kit
 
 # Execute specific step
-syntegrity-dagger --pipeline go-kit --step build
+shipwright --pipeline go-kit --step build
 
 # Execute with configuration file
-syntegrity-dagger --config .syntegrity-dagger.yml
+shipwright --config .shipwright.yml
 ```
 
 ### Command Line Options
@@ -214,13 +214,13 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     
-    - name: Install Syntegrity Dagger
+    - name: Install Shipwright
       run: |
-        curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash
+        curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash
     
     - name: Run Pipeline
       run: |
-        syntegrity-dagger --pipeline go-kit --env dev --coverage 90
+        shipwright --pipeline go-kit --env dev --coverage 90
       env:
         REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
         REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
@@ -235,15 +235,15 @@ stages:
   - deploy
 
 variables:
-  SYNTERGRITY_VERSION: "latest"
+  SHIPWRIGHT_VERSION: "latest"
 
 before_script:
-  - curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash -s -- -v $SYNTERGRITY_VERSION
+  - curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash -s -- -v $SHIPWRIGHT_VERSION
 
 build:
   stage: build
   script:
-    - syntegrity-dagger --pipeline go-kit --only-build
+    - shipwright --pipeline go-kit --only-build
 ```
 
 ### Jenkins
@@ -256,20 +256,20 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-                    curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash
+                    curl -fsSL https://raw.githubusercontent.com/pablogore/shipwright/main/install.sh | bash
                 '''
             }
         }
         
         stage('Build') {
             steps {
-                sh 'syntegrity-dagger --pipeline go-kit --only-build'
+                sh 'shipwright --pipeline go-kit --only-build'
             }
         }
         
         stage('Test') {
             steps {
-                sh 'syntegrity-dagger --pipeline go-kit --only-test --coverage 90'
+                sh 'shipwright --pipeline go-kit --only-test --coverage 90'
             }
         }
     }
@@ -278,7 +278,7 @@ pipeline {
 
 ## 🏗️ Architecture
 
-Syntegrity Dagger follows a modular architecture with clear separation of concerns:
+Shipwright follows a modular architecture with clear separation of concerns:
 
 - **Application Layer**: CLI interface and application lifecycle management
 - **Pipeline Layer**: Pipeline implementations and registry
@@ -300,8 +300,8 @@ For detailed architecture documentation, see [ARCHITECTURE.md](docs/ARCHITECTURE
 
 ```bash
 # Clone the repository
-git clone https://github.com/getsyntegrity/syntegrity-dagger.git
-cd syntegrity-dagger
+git clone https://github.com/pablogore/shipwright.git
+cd shipwright
 
 # Install dependencies
 go mod download
@@ -319,7 +319,7 @@ make lint
 ### Project Structure
 
 ```
-syntegrity-dagger/
+shipwright/
 ├── cmd/                    # CLI commands
 ├── internal/
 │   ├── app/               # Application layer
@@ -356,8 +356,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ## 🆘 Support
 
 - **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/getsyntegrity/syntegrity-dagger/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/getsyntegrity/syntegrity-dagger/discussions)
+- **Issues**: [GitHub Issues](https://github.com/pablogore/shipwright/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/pablogore/shipwright/discussions)
 
 ## 🗺️ Roadmap
 
@@ -369,5 +369,5 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ---
 
-**Syntegrity Dagger** - Unified CI/CD pipelines for modern Go applications.
+**Shipwright** - Unified CI/CD pipelines for modern Go applications.
 # Test commit to verify GoReleaser fix

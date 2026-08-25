@@ -1,4 +1,4 @@
-name: CI/CD with Syntegrity Dagger
+name: CI/CD with Shipwright
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  SYNTEGRITY_DAGGER_VERSION: "latest"
+  SHIPWRIGHT_VERSION: "latest"
 
 jobs:
   build-and-release:
@@ -22,37 +22,37 @@ jobs:
       with:
         go-version: '1.25.5'
         
-    # Cache Syntegrity Dagger binary
-    - name: Cache Syntegrity Dagger
+    # Cache Shipwright binary
+    - name: Cache Shipwright
       id: cache-dagger
       uses: actions/cache@v3
       with:
-        path: syntegrity-dagger
-        key: syntegrity-dagger-${{ env.SYNTEGRITY_DAGGER_VERSION }}-linux-amd64
+        path: shipwright
+        key: shipwright-${{ env.SHIPWRIGHT_VERSION }}-linux-amd64
         
-    # Download Syntegrity Dagger if not cached
-    - name: Download Syntegrity Dagger
+    # Download Shipwright if not cached
+    - name: Download Shipwright
       if: steps.cache-dagger.outputs.cache-hit != 'true'
       run: |
-        if [ "${{ env.SYNTEGRITY_DAGGER_VERSION }}" = "latest" ]; then
-          URL="https://github.com/syntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64"
+        if [ "${{ env.SHIPWRIGHT_VERSION }}" = "latest" ]; then
+          URL="https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64"
         else
-          URL="https://github.com/syntegrity/syntegrity-dagger/releases/download/${{ env.SYNTEGRITY_DAGGER_VERSION }}/syntegrity-dagger-linux-amd64"
+          URL="https://github.com/pablogore/shipwright/releases/download/${{ env.SHIPWRIGHT_VERSION }}/shipwright-linux-amd64"
         fi
         
-        echo "📥 Downloading Syntegrity Dagger from: $URL"
-        curl -L "$URL" -o syntegrity-dagger
-        chmod +x syntegrity-dagger
+        echo "📥 Downloading Shipwright from: $URL"
+        curl -L "$URL" -o shipwright
+        chmod +x shipwright
         
         # Verify download
-        ./syntegrity-dagger --version
+        ./shipwright --version
         
-    # Run Syntegrity Dagger Pipeline for go-service
-    - name: Run Syntegrity Dagger Pipeline
+    # Run Shipwright Pipeline for go-service
+    - name: Run Shipwright Pipeline
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REF_NAME: ${{ github.ref_name }}
       run: |
-        ./syntegrity-dagger \
-          -config=.syntegrity-dagger.yml \
+        ./shipwright \
+          -config=.shipwright.yml \
           -env=production

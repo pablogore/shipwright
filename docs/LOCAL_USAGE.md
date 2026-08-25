@@ -1,6 +1,6 @@
-# 🏠 Uso Local - Syntegrity Dagger
+# 🏠 Uso Local - Shipwright
 
-Esta guía explica cómo usar Syntegrity Dagger localmente para desarrollar, testear y ejecutar pipelines sin necesidad de Docker o servicios en la nube.
+Esta guía explica cómo usar Shipwright localmente para desarrollar, testear y ejecutar pipelines sin necesidad de Docker o servicios en la nube.
 
 ## 📋 Tabla de Contenidos
 
@@ -15,7 +15,7 @@ Esta guía explica cómo usar Syntegrity Dagger localmente para desarrollar, tes
 
 ## 🔍 Detección Automática
 
-Syntegrity Dagger detecta automáticamente si está ejecutándose localmente o en CI/CD:
+Shipwright detecta automáticamente si está ejecutándose localmente o en CI/CD:
 
 - **Local**: Si no se detectan variables de entorno de CI/CD, usa ejecución nativa por defecto
 - **CI/CD**: Si se detectan variables de CI/CD (GITHUB_ACTIONS, GITLAB_CI, etc.), usa Docker/Dagger
@@ -25,7 +25,7 @@ Syntegrity Dagger detecta automáticamente si está ejecutándose localmente o e
 Puedes forzar ejecución local usando el flag `--local`:
 
 ```bash
-./syntegrity-dagger --local --pipeline go-service
+./shipwright --local --pipeline go-service
 ```
 
 ### Seleccionar Ejecutor Manualmente
@@ -34,10 +34,10 @@ Puedes especificar el ejecutor usando el flag `--executor`:
 
 ```bash
 # Usar ejecutor nativo (sin Docker)
-./syntegrity-dagger --executor native --pipeline go-service
+./shipwright --executor native --pipeline go-service
 
 # Usar ejecutor Docker (requiere Docker)
-./syntegrity-dagger --executor docker --pipeline go-service
+./shipwright --executor docker --pipeline go-service
 ```
 
 ---
@@ -57,13 +57,13 @@ Para ejecución local nativa (sin Docker):
 
 ```bash
 # Ejecución automática (detecta local y usa native)
-./syntegrity-dagger --pipeline go-service
+./shipwright --pipeline go-service
 
 # Forzar ejecución local
-./syntegrity-dagger --local --pipeline go-service
+./shipwright --local --pipeline go-service
 
 # Con opciones específicas
-./syntegrity-dagger --local \
+./shipwright --local \
   --pipeline go-service \
   --coverage 95 \
   --env dev
@@ -73,13 +73,13 @@ Para ejecución local nativa (sin Docker):
 
 ```bash
 # Ejecutar solo tests
-./syntegrity-dagger --local --pipeline go-service --step test
+./shipwright --local --pipeline go-service --step test
 
 # Ejecutar solo build
-./syntegrity-dagger --local --pipeline go-service --step build
+./shipwright --local --pipeline go-service --step build
 
 # Ejecutar solo lint
-./syntegrity-dagger --local --pipeline go-service --step lint
+./shipwright --local --pipeline go-service --step lint
 ```
 
 ---
@@ -118,23 +118,23 @@ Ejecuta en contenedores Docker usando Dagger:
 
 ```bash
 # 1. Setup inicial
-./syntegrity-dagger --local --pipeline go-service --step setup
+./shipwright --local --pipeline go-service --step setup
 
 # 2. Ejecutar tests
-./syntegrity-dagger --local --pipeline go-service --step test
+./shipwright --local --pipeline go-service --step test
 
 # 3. Build
-./syntegrity-dagger --local --pipeline go-service --step build
+./shipwright --local --pipeline go-service --step build
 
 # 4. Lint
-./syntegrity-dagger --local --pipeline go-service --step lint
+./shipwright --local --pipeline go-service --step lint
 ```
 
 ### Pipeline Completo Local
 
 ```bash
 # Ejecutar todos los steps en orden
-./syntegrity-dagger --local \
+./shipwright --local \
   --pipeline go-service \
   --coverage 90 \
   --env dev
@@ -143,7 +143,7 @@ Ejecuta en contenedores Docker usando Dagger:
 ### Solo Tests con Coverage
 
 ```bash
-./syntegrity-dagger --local \
+./shipwright --local \
   --pipeline go-service \
   --step test \
   --coverage 95
@@ -153,8 +153,8 @@ Ejecuta en contenedores Docker usando Dagger:
 
 ```bash
 # Ejecutar lint y tests
-./syntegrity-dagger --local --pipeline go-service --step lint
-./syntegrity-dagger --local --pipeline go-service --step test
+./shipwright --local --pipeline go-service --step lint
+./shipwright --local --pipeline go-service --step test
 ```
 
 ---
@@ -163,7 +163,7 @@ Ejecuta en contenedores Docker usando Dagger:
 
 ### Archivo de Configuración
 
-Crea un archivo `.syntegrity-dagger.yml` en la raíz de tu proyecto:
+Crea un archivo `.shipwright.yml` en la raíz de tu proyecto:
 
 ```yaml
 pipeline:
@@ -185,14 +185,14 @@ logging:
 
 ### Variables de Entorno
 
-Puedes configurar usando variables de entorno con prefijo `SYNTEGRITY_DAGGER_`:
+Puedes configurar usando variables de entorno con prefijo `SHIPWRIGHT_`:
 
 ```bash
-export SYNTEGRITY_DAGGER_PIPELINE_COVERAGE=95.0
-export SYNTEGRITY_DAGGER_PIPELINE_GO_VERSION=1.25.5
-export SYNTEGRITY_DAGGER_ENVIRONMENT=dev
+export SHIPWRIGHT_PIPELINE_COVERAGE=95.0
+export SHIPWRIGHT_PIPELINE_GO_VERSION=1.25.5
+export SHIPWRIGHT_ENVIRONMENT=dev
 
-./syntegrity-dagger --local --pipeline go-service
+./shipwright --local --pipeline go-service
 ```
 
 ---
@@ -207,7 +207,7 @@ export SYNTEGRITY_DAGGER_ENVIRONMENT=dev
 
 ```bash
 cd /path/to/your/go/project
-./syntegrity-dagger --local --pipeline go-service
+./shipwright --local --pipeline go-service
 ```
 
 ### Error: "golangci-lint not available"
@@ -249,7 +249,7 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 
 ```bash
 # Reducir threshold temporalmente
-./syntegrity-dagger --local --pipeline go-service --coverage 80
+./shipwright --local --pipeline go-service --coverage 80
 
 # O mejorar el coverage del código
 ```
@@ -262,7 +262,7 @@ go install golang.org/x/vuln/cmd/govulncheck@latest
 2. **Usa Docker executor para validación**: Antes de hacer push, valida con Docker
 3. **Configura coverage threshold**: Ajusta según las necesidades del proyecto
 4. **Instala herramientas opcionales**: `golangci-lint` y `govulncheck` mejoran la calidad
-5. **Usa archivo de configuración**: `.syntegrity-dagger.yml` para configuración persistente
+5. **Usa archivo de configuración**: `.shipwright.yml` para configuración persistente
 
 ---
 

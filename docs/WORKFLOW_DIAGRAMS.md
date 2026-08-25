@@ -1,6 +1,6 @@
 # Workflow Diagrams
 
-This document contains Mermaid diagrams that illustrate the various workflows and processes in Syntegrity Dagger.
+This document contains Mermaid diagrams that illustrate the various workflows and processes in Shipwright.
 
 ## Pipeline Execution Flow
 
@@ -356,4 +356,4 @@ flowchart TD
     U --> V[Production Release]
 ```
 
-These diagrams provide a visual representation of the key workflows and processes in Syntegrity Dagger, helping users understand how the system operates and how different components interact with each other.
+These diagrams provide a visual representation of the key workflows and processes in Shipwright, helping users understand how the system operates and how different components interact with each other.
