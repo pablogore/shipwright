@@ -538,4 +538,4 @@ coverage.html
 coverage.txt
 
 coverage
-coverage/*syntegrity-dagger
+coverage/*shipwright

@@ -469,7 +469,7 @@ jobs:
       
     - name: Validate GitHub account and token access
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_ACTOR: ${{ github.actor }}
@@ -485,21 +485,21 @@ jobs:
         echo ""
         
         # Check if we have a token
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ] && [ -z "$GITHUB_TOKEN" ]; then
+        if [ -z "$SHIPWRIGHT_TOKEN" ] && [ -z "$GITHUB_TOKEN" ]; then
           echo "❌ ERROR: No token available"
-          echo "   Please configure SYNTEGRITY_DAGGER_TOKEN or GITHUB_TOKEN"
+          echo "   Please configure SHIPWRIGHT_TOKEN or GITHUB_TOKEN"
           exit 1
         fi
         
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise GITHUB_TOKEN
-        TOKEN="${SYNTEGRITY_DAGGER_TOKEN:-$GITHUB_TOKEN}"
-        TOKEN_TYPE="SYNTEGRITY_DAGGER_TOKEN"
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise GITHUB_TOKEN
+        TOKEN="${SHIPWRIGHT_TOKEN:-$GITHUB_TOKEN}"
+        TOKEN_TYPE="SHIPWRIGHT_TOKEN"
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           TOKEN_TYPE="GITHUB_TOKEN"
-          echo "⚠️ Using GITHUB_TOKEN (SYNTEGRITY_DAGGER_TOKEN not set)"
+          echo "⚠️ Using GITHUB_TOKEN (SHIPWRIGHT_TOKEN not set)"
           echo "⚠️ GITHUB_TOKEN may not have access to private organization repositories"
         else
-          echo "✅ Using SYNTEGRITY_DAGGER_TOKEN"
+          echo "✅ Using SHIPWRIGHT_TOKEN"
         fi
         
         # Test access to private repository
@@ -513,7 +513,7 @@ jobs:
           echo "📋 For FREE GitHub accounts - Setup Instructions:"
           echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
           echo "   2. Select scopes: 'repo' (full control of private repositories)"
-          echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+          echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
           echo "      Repository Settings → Secrets and variables → Actions"
           echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
           echo ""
@@ -539,31 +539,31 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
             echo ""
             echo "📋 For FREE GitHub accounts:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             echo ""
             echo "📋 For FREE GitHub accounts - Setup Instructions:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             echo ""
@@ -582,12 +582,12 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Configure Git authentication with token (escape special characters)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
@@ -621,33 +621,33 @@ jobs:
           
     - name: Download dependencies
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "📦 Downloading Go dependencies..."
         
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
             echo ""
             echo "📋 For FREE GitHub accounts:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             echo ""
             echo "📋 For FREE GitHub accounts - Setup Instructions:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             echo ""
@@ -659,23 +659,23 @@ jobs:
         fi
         
         # Re-ensure authentication is configured (in case cache restore cleared it)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Test authentication before downloading
         echo "Testing GitHub authentication..."
-        if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+        if git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
           echo "✅ Authentication test successful"
         else
           echo "⚠️ Authentication test failed - token may not have access to private repository"
           echo "⚠️ This will likely cause 'go mod download' to fail"
-          echo "⚠️ Consider configuring SYNTEGRITY_DAGGER_TOKEN with a token that has 'repo' scope"
+          echo "⚠️ Consider configuring SHIPWRIGHT_TOKEN with a token that has 'repo' scope"
         fi
         
         # Download dependencies with error handling
@@ -688,7 +688,7 @@ jobs:
           git config --global --get-regexp url || echo "No URL config found"
           echo ""
           echo "Testing GitHub access with token..."
-          if git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
+          if git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" > /dev/null 2>&1; then
             echo "✅ Token has access to repository"
           else
             echo "❌ Token does not have access to repository"
@@ -697,7 +697,7 @@ jobs:
             echo "1. Create a Personal Access Token (PAT) with 'repo' scope at:"
             echo "   https://github.com/settings/tokens"
             echo "2. Select scopes: 'repo' (full control of private repositories)"
-            echo "3. Add it as a secret named 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "3. Add it as a secret named 'SHIPWRIGHT_TOKEN' in:"
             echo "   Repository Settings → Secrets and variables → Actions"
             echo "4. The token must have access to the private repository:"
             echo "   github.com/getsyntegrity/go-kit-logger"
@@ -735,31 +735,31 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
             echo ""
             echo "📋 For FREE GitHub accounts:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             echo ""
             echo "📋 For FREE GitHub accounts - Setup Instructions:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             echo ""
@@ -778,12 +778,12 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Configure Git authentication with token (escape special characters)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
@@ -817,19 +817,19 @@ jobs:
           
     - name: Build
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🔨 Building application..."
         
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             exit 1
           fi
         fi
@@ -839,13 +839,13 @@ jobs:
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
         # Re-ensure authentication is configured (in case cache restore cleared it)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Verify Go environment
@@ -857,12 +857,12 @@ jobs:
         # Verify authentication before building (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
-          echo "⚠️ Warning: SYNTEGRITY_DAGGER_TOKEN is empty"
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
+          echo "⚠️ Warning: SHIPWRIGHT_TOKEN is empty"
         else
-          echo "Token is set (length: ${#SYNTEGRITY_DAGGER_TOKEN} characters)"
+          echo "Token is set (length: ${#SHIPWRIGHT_TOKEN} characters)"
           # Use || true to ensure this never fails the script
-          AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
+          AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
           AUTH_EXIT_CODE=$?
           
           if [ $AUTH_EXIT_CODE -eq 0 ]; then
@@ -902,31 +902,31 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
             echo ""
             echo "📋 For FREE GitHub accounts:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             echo ""
             echo "📋 For FREE GitHub accounts - Setup Instructions:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             echo ""
@@ -945,12 +945,12 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Configure Git authentication with token (escape special characters)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
@@ -984,19 +984,19 @@ jobs:
           
     - name: Run tests
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🧪 Running tests..."
         
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             exit 1
           fi
         fi
@@ -1006,20 +1006,20 @@ jobs:
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
         # Re-ensure authentication is configured (in case cache restore cleared it)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Verify authentication before running tests (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
         # Use || true to ensure this never fails the script
-        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
+        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
         AUTH_EXIT_CODE=$?
         
         if [ $AUTH_EXIT_CODE -eq 0 ]; then
@@ -1061,31 +1061,31 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
             echo ""
             echo "📋 For FREE GitHub accounts:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             echo ""
             echo "📋 For FREE GitHub accounts - Setup Instructions:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
             echo ""
@@ -1104,12 +1104,12 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Configure Git authentication with token (escape special characters)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
@@ -1143,19 +1143,19 @@ jobs:
           
     - name: Check for vulnerabilities
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
         echo "🔒 Running security scan..."
         
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             exit 1
           fi
         fi
@@ -1165,20 +1165,20 @@ jobs:
         rm -rf ~/go/pkg/mod/cache/vcs/* 2>/dev/null || true
         
         # Re-ensure authentication is configured (in case cache restore cleared it)
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Re-create .netrc in case it was cleared
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Verify authentication before installing tools (non-blocking)
         echo "🔍 Testing authentication..."
         echo "Testing access to private repository..."
         # Use || true to ensure this never fails the script
-        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
+        AUTH_TEST=$(git ls-remote --heads "https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/getsyntegrity/go-kit-logger.git" 2>&1) || true
         AUTH_EXIT_CODE=$?
         
         if [ $AUTH_EXIT_CODE -eq 0 ]; then
@@ -1267,9 +1267,9 @@ jobs:
       if: steps.detect-source.outputs.should_trigger == 'true'
       uses: actions/github-script@v7
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}
       with:
-        github-token: ${{ secrets.GITHUB_PAT || secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        github-token: ${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}
         script: |
           // Trigger release workflow with workflow_dispatch to use latest main version
           const currentSha = context.sha;

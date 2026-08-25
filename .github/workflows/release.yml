@@ -28,7 +28,7 @@ permissions:
 
 env:
   GO_VERSION: '1.25.5'
-  BINARY_NAME: 'syntegrity-dagger'
+  BINARY_NAME: 'shipwright'
 
 jobs:
   # Job 0: Verify admin permissions (only for manual workflow_dispatch without commit_sha)
@@ -107,11 +107,11 @@ jobs:
     - name: Configure Git for private repos
       continue-on-error: true
       run: |
-        if [ -n "$SYNTEGRITY_DAGGER_TOKEN" ]; then
-          git config --global url."https://$SYNTEGRITY_DAGGER_TOKEN@github.com/".insteadOf "https://github.com/"
+        if [ -n "$SHIPWRIGHT_TOKEN" ]; then
+          git config --global url."https://$SHIPWRIGHT_TOKEN@github.com/".insteadOf "https://github.com/"
         fi
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         
     - name: Determine release type and version
       id: tag
@@ -352,30 +352,30 @@ jobs:
         
     - name: Configure Git and Go for private repos
       env:
-        SYNTEGRITY_DAGGER_TOKEN: ${{ secrets.SYNTEGRITY_DAGGER_TOKEN }}
+        SHIPWRIGHT_TOKEN: ${{ secrets.SHIPWRIGHT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GIT_TERMINAL_PROMPT: 0
       run: |
-        # Use SYNTEGRITY_DAGGER_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SYNTEGRITY_DAGGER_TOKEN" ]; then
+        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
+        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SYNTEGRITY_DAGGER_TOKEN not set, using GITHUB_TOKEN as fallback"
+            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
             echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SYNTEGRITY_DAGGER_TOKEN secret with a token that has 'repo' scope"
+            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
             echo ""
             echo "📋 For FREE GitHub accounts:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
-            export SYNTEGRITY_DAGGER_TOKEN="$GITHUB_TOKEN"
+            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
           else
-            echo "❌ Error: Neither SYNTEGRITY_DAGGER_TOKEN nor GITHUB_TOKEN is available"
+            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
             echo ""
             echo "📋 For FREE GitHub accounts - Setup Instructions:"
             echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
             echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SYNTEGRITY_DAGGER_TOKEN' in:"
+            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
             echo "      Repository Settings → Secrets and variables → Actions"
             exit 1
           fi
@@ -389,12 +389,12 @@ jobs:
         # Create .netrc file for authentication
         echo "machine github.com" > ~/.netrc
         echo "login x-access-token" >> ~/.netrc
-        echo "password $SYNTEGRITY_DAGGER_TOKEN" >> ~/.netrc
+        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
         chmod 600 ~/.netrc
         
         # Configure Git authentication with token
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SYNTEGRITY_DAGGER_TOKEN}@github.com/".insteadOf "git@github.com:"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
         
         # Verify authentication setup
         echo "✅ Git and Go configured for private repos"
@@ -472,44 +472,44 @@ jobs:
         cd dist
         
         # Process Linux binaries
-        for file in syntegrity-dagger_*_linux_amd64.tar.gz; do
+        for file in shipwright_*_linux_amd64.tar.gz; do
           if [ -f "$file" ]; then
-            tar -xzf "$file" syntegrity-dagger
-            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-linux-amd64
-            chmod +x ../raw-binaries/syntegrity-dagger-linux-amd64
+            tar -xzf "$file" shipwright
+            mv shipwright ../raw-binaries/shipwright-linux-amd64
+            chmod +x ../raw-binaries/shipwright-linux-amd64
           fi
         done
         
-        for file in syntegrity-dagger_*_linux_arm64.tar.gz; do
+        for file in shipwright_*_linux_arm64.tar.gz; do
           if [ -f "$file" ]; then
-            tar -xzf "$file" syntegrity-dagger
-            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-linux-arm64
-            chmod +x ../raw-binaries/syntegrity-dagger-linux-arm64
+            tar -xzf "$file" shipwright
+            mv shipwright ../raw-binaries/shipwright-linux-arm64
+            chmod +x ../raw-binaries/shipwright-linux-arm64
           fi
         done
         
         # Process Darwin (macOS) binaries
-        for file in syntegrity-dagger_*_darwin_amd64.tar.gz; do
+        for file in shipwright_*_darwin_amd64.tar.gz; do
           if [ -f "$file" ]; then
-            tar -xzf "$file" syntegrity-dagger
-            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-darwin-amd64
-            chmod +x ../raw-binaries/syntegrity-dagger-darwin-amd64
+            tar -xzf "$file" shipwright
+            mv shipwright ../raw-binaries/shipwright-darwin-amd64
+            chmod +x ../raw-binaries/shipwright-darwin-amd64
           fi
         done
         
-        for file in syntegrity-dagger_*_darwin_arm64.tar.gz; do
+        for file in shipwright_*_darwin_arm64.tar.gz; do
           if [ -f "$file" ]; then
-            tar -xzf "$file" syntegrity-dagger
-            mv syntegrity-dagger ../raw-binaries/syntegrity-dagger-darwin-arm64
-            chmod +x ../raw-binaries/syntegrity-dagger-darwin-arm64
+            tar -xzf "$file" shipwright
+            mv shipwright ../raw-binaries/shipwright-darwin-arm64
+            chmod +x ../raw-binaries/shipwright-darwin-arm64
           fi
         done
         
         # Process Windows binaries
-        for file in syntegrity-dagger_*_windows_amd64.zip; do
+        for file in shipwright_*_windows_amd64.zip; do
           if [ -f "$file" ]; then
-            unzip -q "$file" syntegrity-dagger.exe
-            mv syntegrity-dagger.exe ../raw-binaries/syntegrity-dagger-windows-amd64.exe
+            unzip -q "$file" shipwright.exe
+            mv shipwright.exe ../raw-binaries/shipwright-windows-amd64.exe
           fi
         done
         
@@ -623,8 +623,8 @@ jobs:
         echo "📦 Artifacts uploaded to GitHub Releases"
         echo "📝 Changelog generated and included"
         echo "🔗 Raw binaries available for direct download:"
-        echo "   - syntegrity-dagger-linux-amd64"
-        echo "   - syntegrity-dagger-linux-arm64"
-        echo "   - syntegrity-dagger-darwin-amd64"
-        echo "   - syntegrity-dagger-darwin-arm64"
-        echo "   - syntegrity-dagger-windows-amd64.exe"
+        echo "   - shipwright-linux-amd64"
+        echo "   - shipwright-linux-arm64"
+        echo "   - shipwright-darwin-amd64"
+        echo "   - shipwright-darwin-arm64"
+        echo "   - shipwright-windows-amd64.exe"
