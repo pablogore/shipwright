@@ -4,26 +4,15 @@
 # https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 
 version: 2
-registries:
-  github-ep:
-    type: "git"
-    url: "https://github.com"
-    username: "x-access-token"
-    # Note: This secret must be configured in Dependabot secrets, not just Actions secrets
-    # Go to: Repository Settings → Secrets and variables → Dependabot
-    # Add secret: SHIPWRIGHT_TOKEN with your PAT (Personal Access Token)
-    password: "${{ secrets.SHIPWRIGHT_TOKEN }}"
 
 updates:
   # Go module updates - consolidated configuration
   - package-ecosystem: "gomod"
     directory: "/"
-    target-branch: "main"
+    target-branch: "develop"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
-    registries:
-      - "github-ep"
     groups:
       # Security updates - grouped for daily processing
       security-updates:
@@ -40,13 +29,17 @@ updates:
         update-types:
           - "minor"
           - "patch"
-        exclude-patterns:
-          - "github.com/getsyntegrity/*"  # Exclude private repos from auto-updates
       # Major updates - grouped for weekly processing with manual review
       major-updates:
         patterns:
           - "*"
         update-types:
           - "major"
-        exclude-patterns:
-          - "github.com/getsyntegrity/*"  # Exclude private repos from auto-updates
+
+  # GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
