@@ -25,6 +25,8 @@ Unprefixed skills are portable writing or work-unit skills.
 |---|---|---|
 | `shipwright-security` | Security-sensitive changes, secrets, registries, external inputs. | [`skills/security/SKILL.md`](skills/security/SKILL.md) |
 | `shipwright-testing` | Tests, mocks, test placement, CI validation. | [`skills/testing/SKILL.md`](skills/testing/SKILL.md) |
+| `shipwright-testing-strategy` | Test strategy, coverage threshold, test level, quality gate. | [`skills/testing-strategy/SKILL.md`](skills/testing-strategy/SKILL.md) |
+| `shipwright-testing-tdd` | TDD, red/green/refactor, test doubles, table-driven tests. | [`skills/testing-tdd/SKILL.md`](skills/testing-tdd/SKILL.md) |
 | `shipwright-issue-creation` | Creating bugs/features/issues. | [`skills/issue-creation/SKILL.md`](skills/issue-creation/SKILL.md) |
 | `shipwright-branch-pr` | Creating/preparing PRs. | [`skills/branch-pr/SKILL.md`](skills/branch-pr/SKILL.md) |
 | `shipwright-chained-pr` | Large work split into stacked PRs. | [`skills/chained-pr/SKILL.md`](skills/chained-pr/SKILL.md) |
