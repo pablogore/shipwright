@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	dagger "dagger.io/dagger"
-	shared "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
+	shared "github.com/pablogore/shipwright/internal/pipelines/shared"
 	gomock "go.uber.org/mock/gomock"
 )
 

@@ -1,4 +1,4 @@
-module github.com/getsyntegrity/syntegrity-dagger
+module github.com/pablogore/shipwright
 
 go 1.25.5
 

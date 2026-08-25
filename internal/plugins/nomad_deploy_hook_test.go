@@ -9,7 +9,7 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 func TestNomadDeployPlugin_createDeployHook(t *testing.T) {

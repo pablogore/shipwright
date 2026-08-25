@@ -6,8 +6,8 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 // MockConfiguration implements interfaces.Configuration interface for testing.

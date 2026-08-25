@@ -7,8 +7,8 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
+	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines/shared"
 )
 
 // DockerExecutor executes pipeline steps using Dagger/Docker containers.

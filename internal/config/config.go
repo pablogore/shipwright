@@ -12,7 +12,7 @@ import (
 	"github.com/knadh/koanf/providers/env"
 	koanfv2 "github.com/knadh/koanf/v2"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // Static errors for err113 compliance.

@@ -6,9 +6,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/app"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/app"
+	"github.com/pablogore/shipwright/internal/config"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // Complete example demonstrating the new dynamic pipeline architecture

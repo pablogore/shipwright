@@ -13,13 +13,13 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/executors"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-	goservice "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-service"
-	infra "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/infra"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/plugins"
+	"github.com/pablogore/shipwright/internal/config"
+	"github.com/pablogore/shipwright/internal/executors"
+	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/pipelines"
+	goservice "github.com/pablogore/shipwright/internal/pipelines/go-service"
+	infra "github.com/pablogore/shipwright/internal/pipelines/infra"
+	"github.com/pablogore/shipwright/internal/plugins"
 )
 
 const (

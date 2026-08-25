@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-	goService "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-service"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
-	"github.com/getsyntegrity/syntegrity-dagger/tests/mocks"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/pablogore/shipwright/internal/pipelines"
+	goService "github.com/pablogore/shipwright/internal/pipelines/go-service"
+	"github.com/pablogore/shipwright/internal/pipelines/shared"
+	"github.com/pablogore/shipwright/tests/mocks"
 )
 
 var _ = ginkgo.Describe("Go Pipeline", func() {

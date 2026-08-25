@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // PipelineExecutor implements the PipelineExecutor interface for executing pipelines.

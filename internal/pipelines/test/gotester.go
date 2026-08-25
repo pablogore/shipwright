@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 type GoTester struct {

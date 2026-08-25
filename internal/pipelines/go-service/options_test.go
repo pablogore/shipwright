@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 	"github.com/stretchr/testify/assert"
 )
 

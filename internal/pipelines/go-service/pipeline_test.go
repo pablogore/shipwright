@@ -3,8 +3,8 @@ package goservice
 import (
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-	"github.com/getsyntegrity/syntegrity-dagger/mocks"
+	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
