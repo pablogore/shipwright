@@ -76,12 +76,12 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 4 — Manifest schema + parser (`workflow-manifest`)
 
-- [ ] 4.1 RED: document-identity validation (missing `apiVersion`/`kind`/`metadata.name`).
-- [ ] 4.2 RED: structure validation (empty/duplicate step id, capability outside the five, missing `uses`, empty `uses.version`).
-- [ ] 4.3 RED: schema golden drift test (`testdata/schema.golden`); any accepted-field-set change forces an `apiVersion` decision in the same PR.
-- [ ] 4.4 SECURITY RED: oversized manifest rejected by an `io.LimitReader` cap (start 1 MiB; tune against 4.5's fixture).
-- [ ] 4.5 SECURITY RED: YAML alias-amplification ("billion laughs") fixture completes within a bounded time/memory budget — do not rely on yaml.v3's internal alias limits.
-- [ ] 4.6 GREEN: typed structs + `gopkg.in/yaml.v3` `KnownFields(true)` decode, stages 1–3; secrets referenced by name only, no inline plaintext accepted.
+- [x] 4.1 RED: document-identity validation (missing `apiVersion`/`kind`/`metadata.name`).
+- [x] 4.2 RED: structure validation (empty/duplicate step id, capability outside the five, missing `uses`, empty `uses.version`).
+- [x] 4.3 RED: schema golden drift test (`testdata/schema.golden`); any accepted-field-set change forces an `apiVersion` decision in the same PR.
+- [x] 4.4 SECURITY RED: oversized manifest rejected by an `io.LimitReader` cap (start 1 MiB; tune against 4.5's fixture).
+- [x] 4.5 SECURITY RED: YAML alias-amplification ("billion laughs") fixture completes within a bounded time/memory budget — do not rely on yaml.v3's internal alias limits.
+- [x] 4.6 GREEN: typed structs + `gopkg.in/yaml.v3` `KnownFields(true)` decode, stages 1–3; secrets referenced by name only, no inline plaintext accepted.
 
 ## Phase 5 — Interpolation + typed values (`workflow-execution`) [SECURITY-CRITICAL]
 

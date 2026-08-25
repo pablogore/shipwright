@@ -1,0 +1,91 @@
+type ApprovalSpec struct {
+	Required []string `yaml:"required,omitempty"`
+}
+
+type ArtifactsPolicy struct {
+	Immutable bool `yaml:"immutable,omitempty"`
+}
+
+type ConcurrencySpec struct {
+	MaxParallel int `yaml:"maxParallel,omitempty"`
+}
+
+type DependenciesPolicy struct {
+	ForbidCycles bool `yaml:"forbidCycles,omitempty"`
+}
+
+type Environment struct {
+	Approvals ApprovalSpec `yaml:"approvals,omitempty"`
+}
+
+type ExecutionSpec struct {
+	Concurrency	ConcurrencySpec	`yaml:"concurrency,omitempty"`
+	FailFast	bool		`yaml:"failFast,omitempty"`
+	Timeout		string		`yaml:"timeout,omitempty"`
+}
+
+type Manifest struct {
+	APIVersion	string		`yaml:"apiVersion"`
+	Kind		string		`yaml:"kind"`
+	Metadata	Metadata	`yaml:"metadata"`
+	Spec		Spec		`yaml:"spec"`
+}
+
+type Metadata struct {
+	Name		string			`yaml:"name"`
+	Description	string			`yaml:"description,omitempty"`
+	Labels		map[string]string	`yaml:"labels,omitempty"`
+}
+
+type Policies struct {
+	Secrets		SecretsPolicy		`yaml:"secrets,omitempty"`
+	Providers	ProvidersPolicy		`yaml:"providers,omitempty"`
+	Dependencies	DependenciesPolicy	`yaml:"dependencies,omitempty"`
+	Artifacts	ArtifactsPolicy		`yaml:"artifacts,omitempty"`
+}
+
+type ProvidersPolicy struct {
+	RequireVersion bool `yaml:"requireVersion,omitempty"`
+}
+
+type SecretSpec struct {
+	FromEnv string `yaml:"fromEnv"`
+}
+
+type SecretsPolicy struct {
+	ForbidPlaintext bool `yaml:"forbidPlaintext,omitempty"`
+}
+
+type SourceSpec struct {
+	Path		string	`yaml:"path,omitempty"`
+	Repo		string	`yaml:"repo,omitempty"`
+	Ref		string	`yaml:"ref,omitempty"`
+	AuthSecretRef	string	`yaml:"authSecretRef,omitempty"`
+}
+
+type Spec struct {
+	Source		SourceSpec		`yaml:"source"`
+	Variables	map[string]string	`yaml:"variables,omitempty"`
+	Secrets		map[string]SecretSpec	`yaml:"secrets,omitempty"`
+	Steps		[]Step			`yaml:"steps"`
+	Execution	ExecutionSpec		`yaml:"execution,omitempty"`
+	Environments	map[string]Environment	`yaml:"environments,omitempty"`
+	Policies	Policies		`yaml:"policies,omitempty"`
+}
+
+type Step struct {
+	ID		string			`yaml:"id"`
+	Capability	string			`yaml:"capability"`
+	Uses		UsesSpec		`yaml:"uses"`
+	Needs		[]string		`yaml:"needs,omitempty"`
+	Input		string			`yaml:"input,omitempty"`
+	With		map[string]any		`yaml:"with,omitempty"`
+	When		map[string][]string	`yaml:"when,omitempty"`
+}
+
+type UsesSpec struct {
+	Provider	string	`yaml:"provider,omitempty"`
+	Module		string	`yaml:"module,omitempty"`
+	Version		string	`yaml:"version"`
+}
+
