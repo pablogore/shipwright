@@ -607,7 +607,7 @@ jobs:
         echo "✅ Go module cache cleaned"
 
     - name: 'Cache Go modules'
-      uses: 'actions/cache@v4'
+      uses: 'actions/cache@v6'
       with:
         path: |
           ~/.cache/go-build
@@ -803,7 +803,7 @@ jobs:
         echo "✅ Go module cache and VCS cache cleaned"
 
     - name: 'Cache Go modules'
-      uses: 'actions/cache@v4'
+      uses: 'actions/cache@v6'
       with:
         path: |
           ~/.cache/go-build
@@ -970,7 +970,7 @@ jobs:
         echo "✅ Go module cache and VCS cache cleaned"
 
     - name: 'Cache Go modules'
-      uses: 'actions/cache@v4'
+      uses: 'actions/cache@v6'
       with:
         path: |
           ~/.cache/go-build
@@ -1129,7 +1129,7 @@ jobs:
         echo "✅ Go module cache and VCS cache cleaned"
 
     - name: 'Cache Go modules'
-      uses: 'actions/cache@v4'
+      uses: 'actions/cache@v6'
       with:
         path: |
           ~/.cache/go-build
