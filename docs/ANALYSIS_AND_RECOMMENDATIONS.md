@@ -1,8 +1,8 @@
-# Análisis y Recomendaciones del Proyecto Syntegrity Dagger
+# Análisis y Recomendaciones del Proyecto Shipwright
 
 ## 📊 Resumen Ejecutivo
 
-**Syntegrity Dagger** es una biblioteca de pipelines CI/CD unificada para proyectos Go, construida sobre Dagger SDK. El proyecto muestra una arquitectura sólida con separación clara de responsabilidades, pero hay oportunidades significativas de mejora en extensibilidad, flexibilidad de ejecución y optimización de pipelines.
+**Shipwright** es una biblioteca de pipelines CI/CD unificada para proyectos Go, construida sobre Dagger SDK. El proyecto muestra una arquitectura sólida con separación clara de responsabilidades, pero hay oportunidades significativas de mejora en extensibilidad, flexibilidad de ejecución y optimización de pipelines.
 
 ---
 
@@ -173,7 +173,7 @@ jobs:
     steps:
       - name: Build
         run: |
-          syntegrity-dagger --pipeline go-service --step build \
+          shipwright --pipeline go-service --step build \
             --build-mode docker \
             --binary-name my-service \
             --dockerfile-path ./Dockerfile
@@ -203,7 +203,7 @@ jobs:
 ```mermaid
 %%{init: {'theme':'dark'}}%%
 C4Container
-    title Arquitectura de Pipeline por Capas - Syntegrity Dagger
+    title Arquitectura de Pipeline por Capas - Shipwright
 
     Container_Boundary(execution, "Execution Layer") {
         Container(local_exec, "Local Executor", "Go", "Ejecución local sin contenedores")
@@ -337,8 +337,8 @@ type StepNode struct {
   - Jenkins: `Jenkinsfile`
   - CircleCI: `.circleci/config.yml`
   - Cualquier otro sistema CI/CD
-- ✅ **Syntegrity Dagger es una herramienta**, no un reemplazo del pipeline CI/CD
-- ✅ **No duplicar configuración** - No necesitamos `.syntegrity-dagger.yml` si el CI/CD ya lo define
+- ✅ **Shipwright es una herramienta**, no un reemplazo del pipeline CI/CD
+- ✅ **No duplicar configuración** - No necesitamos `.shipwright.yml` si el CI/CD ya lo define
 - ✅ **Mantener visualización completa** - Los desarrolladores ven todo el pipeline en la UI del CI/CD
 
 **Ventajas de este enfoque:**
@@ -355,7 +355,7 @@ type StepNode struct {
 - Cada job repite configuración
 - Caché duplicado en múltiples jobs
 - No hay reutilización de lógica común
-- Configuración duplicada entre CI/CD y `.syntegrity-dagger.yml`
+- Configuración duplicada entre CI/CD y `.shipwright.yml`
 
 **Solución Propuesta (Aplicable a cualquier CI/CD):**
 
@@ -408,16 +408,16 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
       
-      # ✅ Syntegrity Dagger como herramienta, no como reemplazo
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      # ✅ Shipwright como herramienta, no como reemplazo
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
           version: latest
       
       - name: Build
         run: |
-          syntegrity-dagger --pipeline go-service --step build --executor native
+          shipwright --pipeline go-service --step build --executor native
         # ✅ Todo visible: comandos, logs, errores en GitHub Actions UI
 
   # Test: Ejecutar tests con cobertura
@@ -431,14 +431,14 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
       
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       
       - name: Run tests
         run: |
-          syntegrity-dagger --pipeline go-service --step test \
+          shipwright --pipeline go-service --step test \
             --executor native \
             --coverage ${{ env.COVERAGE_THRESHOLD }}
       
@@ -457,14 +457,14 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       
       - name: Run linter
         run: |
-          syntegrity-dagger --pipeline go-service --step lint --executor native
+          shipwright --pipeline go-service --step lint --executor native
 
   # Security: Escaneo de vulnerabilidades (paralelo con test y lint)
   security:
@@ -476,14 +476,14 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       
       - name: Security scan
         run: |
-          syntegrity-dagger --pipeline go-service --step security --executor native
+          shipwright --pipeline go-service --step security --executor native
 
   # Package: Crear imagen Docker (solo si build, test, lint, security pasan)
   package:
@@ -493,14 +493,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       
       - name: Build Docker image
         run: |
-          syntegrity-dagger --pipeline go-service --step package --executor docker
+          shipwright --pipeline go-service --step package --executor docker
         env:
           REGISTRY: ghcr.io
           IMAGE_NAME: ${{ github.repository }}
@@ -513,14 +513,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       
       - name: Push to registry
         run: |
-          syntegrity-dagger --pipeline go-service --step push --executor docker
+          shipwright --pipeline go-service --step push --executor docker
         env:
           REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -548,12 +548,12 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: '1.25.5'
-      - name: Install Syntegrity Dagger
+      - name: Install Shipwright
         run: |
-          curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-          chmod +x syntegrity-dagger
+          curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+          chmod +x shipwright
       - name: Run tests
-        run: ./syntegrity-dagger --pipeline go-service --step test --executor native
+        run: ./shipwright --pipeline go-service --step test --executor native
 ```
 
 **GitLab CI:**
@@ -568,10 +568,10 @@ test:
   stage: test
   image: golang:1.25.5
   before_script:
-    - curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-    - chmod +x syntegrity-dagger
+    - curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+    - chmod +x shipwright
   script:
-    - ./syntegrity-dagger --pipeline go-service --step test --executor native
+    - ./shipwright --pipeline go-service --step test --executor native
 ```
 
 **Jenkins:**
@@ -583,9 +583,9 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-                    chmod +x syntegrity-dagger
-                    ./syntegrity-dagger --pipeline go-service --step test --executor native
+                    curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+                    chmod +x shipwright
+                    ./shipwright --pipeline go-service --step test --executor native
                 '''
             }
         }
@@ -604,13 +604,13 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install Syntegrity Dagger
+          name: Install Shipwright
           command: |
-            curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-            chmod +x syntegrity-dagger
+            curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+            chmod +x shipwright
       - run:
           name: Run tests
-          command: ./syntegrity-dagger --pipeline go-service --step test --executor native
+          command: ./shipwright --pipeline go-service --step test --executor native
 ```
 
 #### 2.3. Ejecución Nativa en CI/CD (Sin Docker)
@@ -699,14 +699,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run tests
-        run: syntegrity-dagger --pipeline go-service --step test --executor native
+        run: shipwright --pipeline go-service --step test --executor native
 
   lint:
     needs: setup  # ✅ Paralelo con test
     runs-on: ubuntu-latest
     steps:
       - name: Run linter
-        run: syntegrity-dagger --pipeline go-service --step lint --executor native
+        run: shipwright --pipeline go-service --step lint --executor native
 ```
 
 **GitLab CI:**
@@ -722,13 +722,13 @@ test:
   stage: test
   needs: [setup]
   script:
-    - syntegrity-dagger --pipeline go-service --step test --executor native
+    - shipwright --pipeline go-service --step test --executor native
 
 lint:
   stage: lint
   needs: [setup]  # ✅ Paralelo con test
   script:
-    - syntegrity-dagger --pipeline go-service --step lint --executor native
+    - shipwright --pipeline go-service --step lint --executor native
 ```
 
 **Jenkins:**
@@ -739,19 +739,19 @@ pipeline {
     stages {
         stage('Test') {
             steps {
-                sh 'syntegrity-dagger --pipeline go-service --step test --executor native'
+                sh 'shipwright --pipeline go-service --step test --executor native'
             }
         }
         stage('Lint') {
             parallel {
                 stage('Lint') {
                     steps {
-                        sh 'syntegrity-dagger --pipeline go-service --step lint --executor native'
+                        sh 'shipwright --pipeline go-service --step lint --executor native'
                     }
                 }
                 stage('Security') {
                     steps {
-                        sh 'syntegrity-dagger --pipeline go-service --step security --executor native'
+                        sh 'shipwright --pipeline go-service --step security --executor native'
                     }
                 }
             }
@@ -894,7 +894,7 @@ jobs:
       - name: Build
         if: steps.restore-binaries.outputs.cache-hit != 'true'
         run: |
-          syntegrity-dagger --pipeline go-service --step build --executor native
+          shipwright --pipeline go-service --step build --executor native
         # ✅ Solo build si no hay caché de binarios
 ```
 
@@ -1209,7 +1209,7 @@ func setupOpenTelemetry(ctx context.Context) (*trace.TracerProvider, error) {
         trace.WithBatcher(exporter),
         trace.WithResource(resource.NewWithAttributes(
             semconv.SchemaURL,
-            semconv.ServiceName("syntegrity-dagger"),
+            semconv.ServiceName("shipwright"),
             semconv.ServiceVersion("1.0.0"),
         )),
     )
@@ -1249,7 +1249,7 @@ import (
     "go.opentelemetry.io/otel/trace"
 )
 
-var tracer = otel.Tracer("syntegrity-dagger/pipeline")
+var tracer = otel.Tracer("shipwright/pipeline")
 
 // Wrapper para ejecutar steps con trazas
 func TraceStep(ctx context.Context, stepName string, fn func(context.Context) error) error {
@@ -1307,7 +1307,7 @@ import (
 )
 
 var (
-    meter = otel.Meter("syntegrity-dagger/pipeline")
+    meter = otel.Meter("shipwright/pipeline")
     
     // ✅ Contador de steps ejecutados
     stepsCounter metric.Int64Counter
@@ -1459,7 +1459,7 @@ func Setup(ctx context.Context, endpoint string) (func(), error) {
     // ✅ Crear resource con información del servicio
     res, err := resource.New(ctx,
         resource.WithAttributes(
-            semconv.ServiceName("syntegrity-dagger"),
+            semconv.ServiceName("shipwright"),
             semconv.ServiceVersion("1.0.0"),
             semconv.DeploymentEnvironment("production"),
         ),
@@ -1509,7 +1509,7 @@ func Setup(ctx context.Context, endpoint string) (func(), error) {
 
 #### 4.7. Uso en la Aplicación
 
-**Integrar en Syntegrity Dagger:**
+**Integrar en Shipwright:**
 
 ```go
 // main.go o app.go
@@ -1655,7 +1655,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup
-        run: syntegrity-dagger --pipeline go-service --step setup --executor native
+        run: shipwright --pipeline go-service --step setup --executor native
         timeout-minutes: 5
   
   build:
@@ -1663,7 +1663,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Build
-        run: syntegrity-dagger --pipeline go-service --step build --executor docker
+        run: shipwright --pipeline go-service --step build --executor docker
         env:
           DOCKER_IMAGE: golang:1.25.5
   
@@ -1676,7 +1676,7 @@ jobs:
     steps:
       - name: Test with coverage ${{ matrix.coverage }}
         run: |
-          syntegrity-dagger --pipeline go-service --step test \
+          shipwright --pipeline go-service --step test \
             --executor native \
             --coverage ${{ matrix.coverage }}
 ```
@@ -1703,7 +1703,7 @@ jobs:
 #### 6.1. Arquitectura Agnostica de Lenguaje
 
 **Principio Fundamental:**
-- ✅ **Syntegrity Dagger debe ser agnóstico de lenguaje**
+- ✅ **Shipwright debe ser agnóstico de lenguaje**
 - ✅ **Pipelines específicos por lenguaje** (go-service, python-service, node-service, etc.)
 - ✅ **Steps reutilizables** que se adaptan al lenguaje
 - ✅ **Builders específicos** por lenguaje pero con interfaz común
@@ -1713,7 +1713,7 @@ jobs:
 ```mermaid
 %%{init: {'theme':'dark'}}%%
 C4Component
-    title Arquitectura Multi-Lenguaje - Syntegrity Dagger
+    title Arquitectura Multi-Lenguaje - Shipwright
 
     Container_Boundary(pipelines, "Language-Specific Pipelines") {
         Component(go_pipeline, "Go Pipeline", "Go", "go-service pipeline")
@@ -2079,12 +2079,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Run tests
-        run: syntegrity-dagger --pipeline python-service --step test --executor native
+        run: shipwright --pipeline python-service --step test --executor native
 ```
 
 **GitHub Actions para Node.js:**
@@ -2098,12 +2098,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Build
-        run: syntegrity-dagger --pipeline node-service --step build --executor native
+        run: shipwright --pipeline node-service --step build --executor native
 ```
 
 **GitHub Actions para Java:**
@@ -2118,12 +2118,12 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Run tests
-        run: syntegrity-dagger --pipeline java-service --step test --executor native
+        run: shipwright --pipeline java-service --step test --executor native
 ```
 
 **GitHub Actions para Rust:**
@@ -2137,12 +2137,12 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Build
-        run: syntegrity-dagger --pipeline rust-service --step build --executor native
+        run: shipwright --pipeline rust-service --step build --executor native
 ```
 
 #### 6.7. Plugin System para Nuevos Lenguajes
@@ -2369,7 +2369,7 @@ C4Component
 
 ## 🎯 Respuestas a Preguntas Específicas
 
-### ¿Necesitamos `.syntegrity-dagger.yml` si ya tenemos CI/CD?
+### ¿Necesitamos `.shipwright.yml` si ya tenemos CI/CD?
 
 **NO, no es necesario.** De hecho, es mejor evitarlo.
 
@@ -2385,7 +2385,7 @@ C4Component
    - Versionado en el repositorio
    - Fácil de revisar y modificar
 
-2. **Syntegrity Dagger es una herramienta, no un reemplazo**
+2. **Shipwright es una herramienta, no un reemplazo**
    - Es un binario que se ejecuta dentro de los pipelines CI/CD
    - No oculta la configuración del pipeline
    - Los comandos son visibles en cada step/job
@@ -2406,7 +2406,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run tests
-        run: syntegrity-dagger --pipeline go-service --step test --executor native --coverage 90
+        run: shipwright --pipeline go-service --step test --executor native --coverage 90
         # ✅ Todo visible: comando, parámetros, logs
 ```
 
@@ -2416,7 +2416,7 @@ jobs:
 test:
   stage: test
   script:
-    - syntegrity-dagger --pipeline go-service --step test --executor native --coverage 90
+    - shipwright --pipeline go-service --step test --executor native --coverage 90
     # ✅ Todo visible: comando, parámetros, logs
 ```
 
@@ -2425,7 +2425,7 @@ test:
 // Jenkinsfile
 stage('Test') {
     steps {
-        sh 'syntegrity-dagger --pipeline go-service --step test --executor native --coverage 90'
+        sh 'shipwright --pipeline go-service --step test --executor native --coverage 90'
         // ✅ Todo visible: comando, parámetros, logs
     }
 }
@@ -2433,7 +2433,7 @@ stage('Test') {
 
 **Ejemplo a evitar:**
 ```yaml
-# .syntegrity-dagger.yml  # ❌ Configuración oculta
+# .shipwright.yml  # ❌ Configuración oculta
 pipeline:
   name: go-service
   coverage: 90
@@ -2442,7 +2442,7 @@ pipeline:
   # ❌ Duplica información del pipeline CI/CD
 ```
 
-**Cuándo SÍ usar `.syntegrity-dagger.yml`:**
+**Cuándo SÍ usar `.shipwright.yml`:**
 - Solo para ejecución local (desarrollo en máquina)
 - Configuración específica del desarrollador
 - No debe ser parte del pipeline de CI/CD
@@ -2532,12 +2532,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Setup
-        run: syntegrity-dagger --pipeline go-service --step setup --executor native
+        run: shipwright --pipeline go-service --step setup --executor native
 
   # Build: Compilar (necesita setup)
   build:
@@ -2549,12 +2549,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Build
-        run: syntegrity-dagger --pipeline go-service --step build --executor docker
+        run: shipwright --pipeline go-service --step build --executor docker
 
   # Test, Lint, Security: Ejecutar en paralelo (todos necesitan setup)
   test:
@@ -2566,13 +2566,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Run tests
         run: |
-          syntegrity-dagger --pipeline go-service --step test \
+          shipwright --pipeline go-service --step test \
             --executor native \
             --coverage ${{ env.COVERAGE_THRESHOLD }}
 
@@ -2584,12 +2584,12 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Run linter
-        run: syntegrity-dagger --pipeline go-service --step lint --executor native
+        run: shipwright --pipeline go-service --step lint --executor native
 
   security:
     needs: setup  # ✅ Paralelo con test y lint
@@ -2599,12 +2599,12 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Security scan
-        run: syntegrity-dagger --pipeline go-service --step security --executor native
+        run: shipwright --pipeline go-service --step security --executor native
 
   # Package: Solo si todo pasa (necesita build, test, lint, security)
   package:
@@ -2613,12 +2613,12 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     steps:
       - uses: actions/checkout@v4
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Package
-        run: syntegrity-dagger --pipeline go-service --step package --executor docker
+        run: shipwright --pipeline go-service --step package --executor docker
 
   # Push: Solo en main
   push:
@@ -2627,12 +2627,12 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
-      - name: Install Syntegrity Dagger
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Install Shipwright
+        uses: ./.github/actions/shipwright
         with:
           action: install
       - name: Push to registry
-        run: syntegrity-dagger --pipeline go-service --step push --executor docker
+        run: shipwright --pipeline go-service --step push --executor docker
         env:
           REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -2654,8 +2654,8 @@ jobs:
 3. **Extensibilidad por configuración**: Personalizar `go-service` vía opciones, no creando pipelines nuevos.
 4. **No es necesario Docker siempre**: La ejecución nativa es más rápida y económica para la mayoría de casos.
 5. **CI/CD como fuente de verdad**: El pipeline debe estar visible en los archivos de configuración del CI/CD (`.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile`, etc.), no oculto en YAML.
-6. **Syntegrity Dagger como herramienta**: Es un binario que se ejecuta dentro de los pipelines CI/CD, no un reemplazo.
-7. **Sin configuración duplicada**: No necesitamos `.syntegrity-dagger.yml` si el pipeline CI/CD ya define todo.
+6. **Shipwright como herramienta**: Es un binario que se ejecuta dentro de los pipelines CI/CD, no un reemplazo.
+7. **Sin configuración duplicada**: No necesitamos `.shipwright.yml` si el pipeline CI/CD ya define todo.
 8. **Visualización completa**: Los desarrolladores deben poder ver todo el pipeline en la UI del CI/CD (GitHub Actions, GitLab CI, Jenkins, etc.).
 9. **Agnóstico de CI/CD**: Funciona con cualquier sistema CI/CD, no solo GitHub Actions.
 10. **Extensibilidad multi-lenguaje**: El framework debe soportar Go, Python, Node.js, Java, Rust y ser extensible a más.
@@ -2675,6 +2675,6 @@ jobs:
 
 ---
 
-**Autor**: Análisis generado para Syntegrity Dagger  
+**Autor**: Análisis generado para Shipwright  
 **Fecha**: 2024  
 **Versión**: 1.0

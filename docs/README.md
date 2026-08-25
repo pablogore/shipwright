@@ -1,6 +1,6 @@
-# Syntegrity Dagger Documentation
+# Shipwright Documentation
 
-Welcome to the Syntegrity Dagger documentation. This directory contains comprehensive guides, references, and examples to help you understand and use Syntegrity Dagger effectively.
+Welcome to the Shipwright documentation. This directory contains comprehensive guides, references, and examples to help you understand and use Shipwright effectively.
 
 ## 📚 Documentation Index
 
@@ -143,10 +143,10 @@ If you find issues with the documentation:
 
 ## 🔗 External Resources
 
-- [GitHub Repository](https://github.com/getsyntegrity/syntegrity-dagger)
-- [Issue Tracker](https://github.com/getsyntegrity/syntegrity-dagger/issues)
-- [Discussions](https://github.com/getsyntegrity/syntegrity-dagger/discussions)
-- [Releases](https://github.com/getsyntegrity/syntegrity-dagger/releases)
+- [GitHub Repository](https://github.com/pablogore/shipwright)
+- [Issue Tracker](https://github.com/pablogore/shipwright/issues)
+- [Discussions](https://github.com/pablogore/shipwright/discussions)
+- [Releases](https://github.com/pablogore/shipwright/releases)
 
 ## 📞 Getting Help
 
@@ -160,4 +160,4 @@ If you can't find what you're looking for:
 
 ---
 
-**Happy building with Syntegrity Dagger!** 🚀
+**Happy building with Shipwright!** 🚀

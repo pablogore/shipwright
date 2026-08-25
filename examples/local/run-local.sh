@@ -26,20 +26,20 @@ NC='\033[0m' # No Color
 PIPELINE="${1:-go-service}"
 STEP="${2:-}"  # Optional: specific step (setup, build, test, lint, security)
 COVERAGE="${3:-90}"
-CONFIG_FILE="${4:-.syntegrity-dagger.yml}"
+CONFIG_FILE="${4:-.shipwright.yml}"
 
-echo -e "${BLUE}🏠 Syntegrity Dagger - Local Pipeline Runner${NC}"
+echo -e "${BLUE}🏠 Shipwright - Local Pipeline Runner${NC}"
 echo "=========================================="
 echo ""
 
-# Check if syntegrity-dagger is installed
-if ! command -v syntegrity-dagger &> /dev/null; then
-    echo -e "${RED}❌ syntegrity-dagger not found${NC}"
+# Check if shipwright is installed
+if ! command -v shipwright &> /dev/null; then
+    echo -e "${RED}❌ shipwright not found${NC}"
     echo ""
     echo "Install it with:"
-    echo "  curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger"
-    echo "  chmod +x syntegrity-dagger"
-    echo "  sudo mv syntegrity-dagger /usr/local/bin/"
+    echo "  curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o shipwright"
+    echo "  chmod +x shipwright"
+    echo "  sudo mv shipwright /usr/local/bin/"
     echo ""
     exit 1
 fi
@@ -56,7 +56,7 @@ fi
 
 # Show version
 echo -e "${BLUE}📋 Version:${NC}"
-syntegrity-dagger --version
+shipwright --version
 echo -e "${CYAN}Go version: $(go version)${NC}"
 echo ""
 
@@ -103,7 +103,7 @@ EOF
 fi
 
 # Build command
-CMD="syntegrity-dagger --pipeline=$PIPELINE --config=$CONFIG_FILE --coverage=$COVERAGE --local --verbose"
+CMD="shipwright --pipeline=$PIPELINE --config=$CONFIG_FILE --coverage=$COVERAGE --local --verbose"
 
 if [ -n "$STEP" ]; then
     echo -e "${BLUE}🎯 Running step: ${CYAN}$STEP${NC}"

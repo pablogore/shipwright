@@ -1,4 +1,4 @@
-# Estrategia de Branching - Syntegrity Dagger
+# Estrategia de Branching - Shipwright
 
 ## 🎯 Objetivo
 Prevenir conflictos de merge mediante una estrategia clara de branching y coordinación entre desarrolladores.

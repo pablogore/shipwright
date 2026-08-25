@@ -1,4 +1,4 @@
-# Production Configuration Template for Syntegrity Dagger
+# Production Configuration Template for Shipwright
 # This template provides secure defaults and best practices for production deployments
 
 pipeline:
@@ -105,6 +105,6 @@ git:
 # - Retry counts should be reasonable (0-5 recommended)
 # - For production, always use HTTPS for registry and Git URLs
 # - Ensure Dagger engine is running before executing pipelines
-# - Run health checks with: syntegrity-dagger --health
+# - Run health checks with: shipwright --health
 
 

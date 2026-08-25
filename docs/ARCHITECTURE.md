@@ -1,10 +1,10 @@
-# Syntegrity Dagger Architecture
+# Shipwright Architecture
 
-This document provides a comprehensive overview of the Syntegrity Dagger architecture, including system design, component interactions, and deployment patterns.
+This document provides a comprehensive overview of the Shipwright architecture, including system design, component interactions, and deployment patterns.
 
 ## System Overview
 
-Syntegrity Dagger is a unified CI/CD pipeline library that provides standardized, reusable pipelines for Go projects. It's built on top of the Dagger SDK and follows a modular, extensible architecture.
+Shipwright is a unified CI/CD pipeline library that provides standardized, reusable pipelines for Go projects. It's built on top of the Dagger SDK and follows a modular, extensible architecture.
 
 ## C4 Model Diagrams
 
@@ -12,12 +12,12 @@ Syntegrity Dagger is a unified CI/CD pipeline library that provides standardized
 
 ```mermaid
 C4Context
-    title System Context Diagram - Syntegrity Dagger
+    title System Context Diagram - Shipwright
 
     Person(developer, "Developer", "Go developer using CI/CD pipelines")
     Person(devops, "DevOps Engineer", "Manages CI/CD infrastructure")
     
-    System(syntegrity, "Syntegrity Dagger", "Unified CI/CD pipeline library for Go projects")
+    System(shipwright, "Shipwright", "Unified CI/CD pipeline library for Go projects")
     
     System_Ext(github, "GitHub", "Source code repository and CI/CD platform")
     System_Ext(gitlab, "GitLab", "Source code repository and CI/CD platform")
@@ -25,25 +25,25 @@ C4Context
     System_Ext(docker, "Docker Registry", "Container image registry")
     System_Ext(dagger, "Dagger SDK", "Container-native CI/CD engine")
     
-    Rel(developer, syntegrity, "Uses", "CLI/API")
-    Rel(devops, syntegrity, "Configures", "YAML/Environment")
+    Rel(developer, shipwright, "Uses", "CLI/API")
+    Rel(devops, shipwright, "Configures", "YAML/Environment")
     
-    Rel(syntegrity, github, "Integrates with", "GitHub Actions")
-    Rel(syntegrity, gitlab, "Integrates with", "GitLab CI")
-    Rel(syntegrity, jenkins, "Integrates with", "Jenkins Pipeline")
-    Rel(syntegrity, docker, "Pushes images", "HTTP/HTTPS")
-    Rel(syntegrity, dagger, "Built on", "SDK")
+    Rel(shipwright, github, "Integrates with", "GitHub Actions")
+    Rel(shipwright, gitlab, "Integrates with", "GitLab CI")
+    Rel(shipwright, jenkins, "Integrates with", "Jenkins Pipeline")
+    Rel(shipwright, docker, "Pushes images", "HTTP/HTTPS")
+    Rel(shipwright, dagger, "Built on", "SDK")
 ```
 
 ### Level 2: Container Diagram
 
 ```mermaid
 C4Container
-    title Container Diagram - Syntegrity Dagger
+    title Container Diagram - Shipwright
 
     Person(developer, "Developer", "Go developer")
     
-    Container_Boundary(syntegrity, "Syntegrity Dagger") {
+    Container_Boundary(shipwright, "Shipwright") {
         Container(cli, "CLI Interface", "Go", "Command-line interface and application entry point")
         Container(app, "Application Core", "Go", "Application lifecycle and dependency injection")
         Container(pipelines, "Pipeline Engine", "Go", "Pipeline execution and management")

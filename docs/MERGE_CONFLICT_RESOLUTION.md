@@ -1,4 +1,4 @@
-# Guía de Resolución de Conflictos de Merge - Syntegrity Dagger
+# Guía de Resolución de Conflictos de Merge - Shipwright
 
 ## 🎯 Objetivo
 Proporcionar un proceso claro y sistemático para resolver conflictos de merge de manera eficiente y prevenir futuros conflictos.
@@ -41,11 +41,11 @@ require (
 <<<<<<< HEAD
 env:
   GO_VERSION: '1.25.1'
-  BINARY_NAME: 'syntegrity-dagger'
+  BINARY_NAME: 'shipwright'
 =======
 env:
   GO_VERSION: '1.25.2'
-  BINARY_NAME: 'syntegrity-dagger'
+  BINARY_NAME: 'shipwright'
 >>>>>>> origin/develop
 ```
 

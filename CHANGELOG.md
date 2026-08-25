@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Syntegrity Dagger will be documented in this file.
+All notable changes to Shipwright will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -62,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.1] - 2024-01-10
 
 ### Added
-- Initial release of Syntegrity Dagger
+- Initial release of Shipwright
 - Core pipeline architecture with dependency injection
 - Go-Kit pipeline implementation
 - Docker-Go pipeline implementation
@@ -208,8 +208,8 @@ When contributing to the project:
 
 ## Links
 
-- [GitHub Releases](https://github.com/getsyntegrity/syntegrity-dagger/releases)
-- [Documentation](https://github.com/getsyntegrity/syntegrity-dagger/tree/main/docs)
+- [GitHub Releases](https://github.com/pablogore/shipwright/releases)
+- [Documentation](https://github.com/pablogore/shipwright/tree/main/docs)
 - [Contributing Guide](CONTRIBUTING.md)
 - [API Reference](docs/API.md)
 

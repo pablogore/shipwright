@@ -1,6 +1,6 @@
 # 🔗 Guía de Integración con GitHub Actions
 
-Esta guía te ayudará a integrar Syntegrity Dagger en tus servicios para ejecutar pipelines CI/CD desde GitHub Actions.
+Esta guía te ayudará a integrar Shipwright en tus servicios para ejecutar pipelines CI/CD desde GitHub Actions.
 
 ## 📋 Tabla de Contenidos
 
@@ -17,7 +17,7 @@ Esta guía te ayudará a integrar Syntegrity Dagger en tus servicios para ejecut
 
 ### Opción 1: Usar la Action Reutilizable (Recomendado)
 
-La forma más fácil de usar Syntegrity Dagger es mediante la action reutilizable:
+La forma más fácil de usar Shipwright es mediante la action reutilizable:
 
 ```yaml
 # .github/workflows/ci.yml
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: build
@@ -41,14 +41,14 @@ jobs:
 Si prefieres más control, puedes descargar el binario manualmente:
 
 ```yaml
-- name: Download Syntegrity Dagger
+- name: Download Shipwright
   run: |
-    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-    chmod +x syntegrity-dagger
+    curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+    chmod +x shipwright
 
 - name: Run Pipeline
   run: |
-    ./syntegrity-dagger --pipeline go-kit --stage build
+    ./shipwright --pipeline go-kit --stage build
 ```
 
 ---
@@ -58,7 +58,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 ### Ejecutar Pipeline Completo
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     pipeline: go-kit
     # Dejar 'stage' vacío ejecuta el pipeline completo
@@ -67,7 +67,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 ### Ejecutar Stage Específico
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     pipeline: go-kit
     stage: build  # Ejecuta solo el stage 'build'
@@ -76,7 +76,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 ### Especificar Versión
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     version: v1.0.0  # Versión específica
     pipeline: go-kit
@@ -87,7 +87,7 @@ Si prefieres más control, puedes descargar el binario manualmente:
 
 ## 🎯 Ejecución por Stages
 
-Una de las ventajas principales de Syntegrity Dagger es poder ejecutar stages individuales en jobs separados de GitHub Actions.
+Una de las ventajas principales de Shipwright es poder ejecutar stages individuales en jobs separados de GitHub Actions.
 
 ### Ejemplo: Pipeline con Stages Separados
 
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: setup
@@ -111,7 +111,7 @@ jobs:
     needs: setup
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: build
@@ -121,7 +121,7 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: test
@@ -161,7 +161,7 @@ Los stages disponibles dependen del tipo de pipeline:
 ### Variables de Entorno
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     pipeline: go-kit
     stage: push
@@ -177,12 +177,12 @@ Los stages disponibles dependen del tipo de pipeline:
 
 **Recomendación para CI/CD**: Ejecuta cada step individualmente en jobs separados (ver ejemplo arriba) en lugar de usar el pipeline completo con steps definidos en YAML.
 
-El archivo `.syntegrity-dagger.yml` es útil principalmente para:
+El archivo `.shipwright.yml` es útil principalmente para:
 - **Ejecución local** (desarrollo en tu máquina)
 - **Configuración de valores por defecto** (coverage, go_version, etc.)
 - **NO para definir el orden de steps en CI/CD** (usa jobs separados en GitHub Actions)
 
-Ejemplo de `.syntegrity-dagger.yml`:
+Ejemplo de `.shipwright.yml`:
 
 ```yaml
 pipeline:
@@ -214,16 +214,16 @@ git:
 Luego úsalo en la action:
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     pipeline: go-kit
-    config: .syntegrity-dagger.yml
+    config: .shipwright.yml
 ```
 
 ### Opciones Adicionales
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     pipeline: go-kit
     stage: build
@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           env: dev
@@ -277,7 +277,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: build
@@ -299,7 +299,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: test
@@ -310,7 +310,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: push
@@ -326,7 +326,7 @@ jobs:
 **Solución**: Verifica que la versión especificada existe:
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     version: v1.0.0  # Asegúrate de que esta versión existe
     pipeline: go-kit
@@ -351,9 +351,9 @@ jobs:
 **Solución**: Verifica la ruta del archivo de configuración:
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
-    config: .syntegrity-dagger.yml  # Ruta relativa a la raíz del repo
+    config: .shipwright.yml  # Ruta relativa a la raíz del repo
 ```
 
 ### Problema: Secrets no disponibles
@@ -375,7 +375,7 @@ env:
 **Solución**: El cache se guarda por versión, OS y arquitectura. Si cambias alguno de estos, el cache no se usará:
 
 ```yaml
-- uses: ./.github/actions/syntegrity-dagger
+- uses: ./.github/actions/shipwright
   with:
     version: v1.0.0  # Cache específico para esta versión
     skip-cache: false  # Asegúrate de que no esté deshabilitado
@@ -391,7 +391,7 @@ No uses siempre `latest`, especifica una versión:
 
 ```yaml
 env:
-  SYNTEGRITY_DAGGER_VERSION: "v1.0.0"  # Versión específica
+  SHIPWRIGHT_VERSION: "v1.0.0"  # Versión específica
 ```
 
 ### 2. Usar Caché
@@ -414,7 +414,7 @@ jobs:
   build:
     timeout-minutes: 30
     steps:
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
           pipeline: go-kit
           stage: build
@@ -444,6 +444,6 @@ strategy:
 Si tienes problemas o preguntas:
 
 1. Revisa la [documentación completa](../README.md)
-2. Abre un [issue en GitHub](https://github.com/getsyntegrity/syntegrity-dagger/issues)
+2. Abre un [issue en GitHub](https://github.com/pablogore/shipwright/issues)
 3. Consulta los [ejemplos](../examples/)
 

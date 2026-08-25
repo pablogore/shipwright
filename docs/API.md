@@ -1,6 +1,6 @@
 # API Reference
 
-This document provides comprehensive API documentation for Syntegrity Dagger, including programmatic interfaces, data structures, and usage examples.
+This document provides comprehensive API documentation for Shipwright, including programmatic interfaces, data structures, and usage examples.
 
 ## Core Interfaces
 
@@ -197,8 +197,8 @@ import (
     "context"
     "log"
     
-    "github.com/getsyntegrity/syntegrity-dagger/internal/app"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/config"
+    "github.com/pablogore/shipwright/internal/app"
+    "github.com/pablogore/shipwright/internal/config"
 )
 
 func main() {
@@ -393,7 +393,7 @@ for _, name := range steps {
 config := config.NewConfigurationWrapper()
 
 // Load from file
-err := config.LoadFromFile(".syntegrity-dagger.yml")
+err := config.LoadFromFile(".shipwright.yml")
 if err != nil {
     log.Fatalf("Failed to load config file: %v", err)
 }
@@ -423,7 +423,7 @@ if err != nil {
 
 ```go
 // Load YAML configuration
-yamlConfig, err := config.LoadYAMLConfig(".syntegrity-dagger.yml")
+yamlConfig, err := config.LoadYAMLConfig(".shipwright.yml")
 if err != nil {
     log.Fatalf("Failed to load YAML config: %v", err)
 }
