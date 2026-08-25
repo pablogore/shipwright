@@ -17,7 +17,7 @@ type StepConfig struct {
 	Retries int    `yaml:"retries,omitempty"`
 }
 
-// YAMLConfig represents the structure of the .syntegrity-dagger.yml file
+// YAMLConfig represents the structure of the .shipwright.yml file
 type YAMLConfig struct {
 	Pipeline struct {
 		Name        string       `yaml:"name"`
@@ -206,12 +206,12 @@ func (p *YAMLParser) ValidateConfig(yamlConfig *YAMLConfig) error {
 func (p *YAMLParser) FindConfigFile() (string, error) {
 	// List of possible config file names and locations
 	configFiles := []string{
-		".syntegrity-dagger.yml",
-		".syntegrity-dagger.yaml",
-		"syntegrity-dagger.yml",
-		"syntegrity-dagger.yaml",
-		".github/syntegrity-dagger.yml",
-		".github/syntegrity-dagger.yaml",
+		".shipwright.yml",
+		".shipwright.yaml",
+		"shipwright.yml",
+		"shipwright.yaml",
+		".github/shipwright.yml",
+		".github/shipwright.yaml",
 	}
 
 	// Check current directory first

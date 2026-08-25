@@ -76,7 +76,7 @@ func (c *CLI) Run(args []string) error {
 		} else {
 			// File doesn't exist - this is OK, we'll use defaults
 			// Only warn if the user explicitly specified --config
-			if flags.configFile != ".syntegrity-dagger.yml" {
+			if flags.configFile != ".shipwright.yml" {
 				logger.L().WarnContext(ctx, "Configuration file not found, using defaults",
 					"config_file", flags.configFile)
 			}
@@ -167,7 +167,7 @@ func (c *CLI) parseFlags(args []string) (*Flags, error) {
 	flagSet.StringVar(&flags.gitAuth, "git-auth", defaultGitAuth, "Git authentication method: ssh or https")
 	flagSet.BoolVar(&flags.listSteps, "list-steps", false, "List available steps for a pipeline")
 	flagSet.BoolVar(&flags.listPipelines, "list-pipelines", false, "List available pipelines")
-	flagSet.StringVar(&flags.configFile, "config", ".syntegrity-dagger.yml", "Configuration file path")
+	flagSet.StringVar(&flags.configFile, "config", ".shipwright.yml", "Configuration file path")
 	flagSet.BoolVar(&flags.version, "version", false, "Show version information")
 	flagSet.BoolVar(&flags.local, "local", false, "Run pipeline locally without Docker")
 	flagSet.BoolVar(&flags.health, "health", false, "Run health checks for Dagger, registry, and Git")
