@@ -154,7 +154,7 @@ func (p *NomadDeployPlugin) deployToNomad(
 
 	// If we have job content, write it to a file
 	if nomadJob != "" {
-		container = container.WithExec([]string{"sh", "-c", fmt.Sprintf("echo '%s' > /tmp/job.hcl", nomadJob)})
+		container = container.WithNewFile("/tmp/job.hcl", nomadJob)
 	}
 
 	// Run Nomad job run
