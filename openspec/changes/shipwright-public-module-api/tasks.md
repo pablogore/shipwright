@@ -106,12 +106,12 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 7 — Provider registry + resolution (`workflow-execution`)
 
-- [ ] 7.1 RED: resolution hit/miss per capability (5 Register\*/Resolve\* pairs).
-- [ ] 7.2 RED: unsupported provider version rejected.
-- [ ] 7.3 SECURITY RED: unregistered `module:` reference fails closed at stage 6, naming the module path — proves the "compile-time-only, no `plugin.Open`" boundary (D-I).
-- [ ] 7.4 SECURITY RED: static assertion — no manifest-reachable code path calls `plugin.Open`.
-- [ ] 7.5 RED: `with` value kind mismatch against provider `WithSchema` rejected (stage 7).
-- [ ] 7.6 GREEN: typed `Registry`, `Ref{Name,Module,Version}`, `WithSchema`; register slice-3 capabilities.
+- [x] 7.1 RED: resolution hit/miss per capability (5 Register\*/Resolve\* pairs).
+- [x] 7.2 RED: unsupported provider version rejected.
+- [x] 7.3 SECURITY RED: unregistered `module:` reference fails closed at stage 6, naming the module path — proves the "compile-time-only, no `plugin.Open`" boundary (D-I).
+- [x] 7.4 SECURITY RED: static assertion — no manifest-reachable code path calls `plugin.Open`.
+- [x] 7.5 RED: `with` value kind mismatch against provider `WithSchema` rejected (stage 7).
+- [x] 7.6 GREEN: typed `Registry`, `Ref{Name,Module,Version}`, `WithSchema`; register slice-3 capabilities.
 
 ## Phase 8 — Execution engine (`workflow-execution`)
 
