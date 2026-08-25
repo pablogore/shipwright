@@ -29,15 +29,17 @@ Layer 3 lives in `internal/` deliberately (see D-H). Its public contract is the 
 
 **Signature rule (risk control):** capability interface methods use ONLY Dagger core types (`Directory`, `File`, `Container`, `Secret`) and scalars. Module-defined Objects never appear in an *interface method* signature — that corner of Dagger's type system is unverified.
 
+**Spike finding (WU2, task 2.1) — confirmed by a real `dagger call` against v0.21.8, verdict GO:** interface-typed Object field state DOES survive serialization, but Dagger's Go SDK codegen cannot compile a client proxy for an interface method that returns a lazy-chainable Dagger core type (`Directory`/`File`/`Container`) together with an explicit `error` — verified reproducible and isolated to that combination (a sibling method returning `(string, error)` compiled cleanly). `Builder.Build`, `Tester.Test`, and `Runner.Run` therefore drop `error` below, matching Dagger's own lazy-chainable idiom (errors surface at the terminal/scalar call, e.g. `Plan.Execute` or a caller's `Sync()`). This is a Layer-2-only, codegen-forced deviation from this section's original example code, not from the D-A decision itself. `Artifactor.Publish`/`Deployer.Deploy` are unaffected (scalar `(string, error)` return) and keep `error`. Layer 1 (`pkg/shipwright`, plain Go, no codegen involved) keeps `error` on all five methods — the two layers are intentionally asymmetric here, not out of sync.
+
 ```go
 // .dagger/capabilities.go — the public Dagger surface
 type Builder interface {
 	DaggerObject
-	Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error)
+	Build(ctx context.Context, source *dagger.Directory) *dagger.Directory
 }
 type Tester interface {
 	DaggerObject
-	Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error)
+	Test(ctx context.Context, source *dagger.Directory) *dagger.File
 }
 type Artifactor interface {
 	DaggerObject
@@ -49,7 +51,7 @@ type Deployer interface {
 }
 type Runner interface {
 	DaggerObject
-	Run(ctx context.Context, build *dagger.Directory) (*dagger.Container, error)
+	Run(ctx context.Context, build *dagger.Directory) *dagger.Container
 }
 
 type Shipwright struct{}
@@ -495,8 +497,8 @@ Code-only. No state, data, or release migration; the workflow layer is greenfiel
 
 ## Open Questions
 
-- [ ] Does Dagger v0.21.8 serialize interface-typed fields in Object chaining state? Proven or refuted in slice 2; refutation triggers the D-A fallback and leaves Layer 3 untouched.
-- [ ] Does `dagger init` accept `engineVersion v0.21.8` verbatim? If not, bump both pins together in slice 2 with the parity test green.
+- [x] Does Dagger v0.21.8 serialize interface-typed fields in Object chaining state? **Resolved (WU2, task 2.1): GO.** Proven via a real chained `dagger` query producing an actual artifact from a dynamically-invoked interface implementation. A codegen-forced signature adjustment was needed (see D-A above); the underlying serialization question is answered, D-A fallback not triggered.
+- [x] Does `dagger init` accept `engineVersion v0.21.8` verbatim? **Resolved (WU2, task 2.3): yes**, accepted verbatim with an already-matching installed CLI. No pin bump was needed.
 - [ ] What is the right manifest read cap? Proposed 1 MiB, to be confirmed against the alias-amplification fixture in slice 4 — the number is a test constant, not a contract element.
 
 ---
