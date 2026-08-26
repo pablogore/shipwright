@@ -1,10 +1,12 @@
 // Package workspaceguard guards design.md D1's go.work isolation decision:
-// the root module's workspace membership decides which packages
-// `go build ./...` and `go test -race ./...` traverse, so this package
-// makes that membership subject to an explicit, automated allowlist rather
-// than a comment. It parses go.work exactly once, the same way
-// internal/daggerpin parses go.mod/dagger.json, and never requires a
-// running Dagger engine.
+// go.work declares which modules participate in the workspace and how
+// dependency resolution works, but it does NOT make `go build ./...` or
+// `go test -race ./...` from root traverse nested modules — each module
+// must be tested/built explicitly (e.g., `cd providers/go && go test ./...`).
+// This package enforces which modules may appear in the workspace via an
+// explicit, automated allowlist rather than a comment. It parses go.work
+// exactly once, the same way internal/daggerpin parses go.mod/dagger.json,
+// and never requires a running Dagger engine.
 package workspaceguard
 
 import (
