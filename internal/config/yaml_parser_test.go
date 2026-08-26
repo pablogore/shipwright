@@ -476,3 +476,39 @@ func TestYAMLConfig_Structure(t *testing.T) {
 	assert.Equal(t, []string{"linux/amd64"}, config.Release.Platforms)
 	assert.Equal(t, "info", config.Logging.Level)
 }
+
+// TestYAMLParser_PluginsRoundTrip verifies the fix for #162: plugin config
+// written in .shipwright.yml must survive the full YAML → ParseFile →
+// ApplyToConfiguration → Get path and arrive at the plugin.
+func TestYAMLParser_PluginsRoundTrip(t *testing.T) {
+	yamlContent := `pipeline:
+  name: test-pipeline
+  steps:
+    - setup
+    - build
+plugins:
+  nomad-deploy:
+    nomad_addr: https://nomad.example.com:4646
+    region: global
+`
+	tmpFile := t.TempDir() + "/shipwright.yml"
+	require.NoError(t, os.WriteFile(tmpFile, []byte(yamlContent), 0o644))
+
+	parser := NewYAMLParser()
+	yamlConfig, err := parser.ParseFile(tmpFile)
+	require.NoError(t, err)
+
+	cfg, err := NewConfigurationWrapper()
+	require.NoError(t, err)
+
+	require.NoError(t, parser.ApplyToConfiguration(yamlConfig, cfg))
+
+	// The full YAML → Get path must return the plugin config map.
+	got := cfg.Get("plugins.nomad-deploy")
+	require.NotNil(t, got, "plugins.nomad-deploy must not be nil after YAML round-trip")
+
+	gotMap, ok := got.(map[string]any)
+	require.True(t, ok, "expected map[string]any, got %T", got)
+	assert.Equal(t, "https://nomad.example.com:4646", gotMap["nomad_addr"])
+	assert.Equal(t, "global", gotMap["region"])
+}

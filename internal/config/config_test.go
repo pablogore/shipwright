@@ -420,6 +420,7 @@ func TestConfigurationWrapper_Get(t *testing.T) {
 		{KeyReleaseBuildTargets, []string{"linux/amd64", "darwin/amd64", "windows/amd64"}},
 		{KeyReleaseArchiveFormats, []string{"tar.gz", "zip"}},
 		{"nonexistent_key", nil},
+		{"plugins.nomad-deploy", nil},
 	}
 
 	for _, tt := range tests {
@@ -428,6 +429,38 @@ func TestConfigurationWrapper_Get(t *testing.T) {
 			assert.Equal(t, tt.expect, result)
 		})
 	}
+
+	// Test "plugins" key returns nil (typed nil is still nil)
+	result := cfg.Get("plugins")
+	assert.Nil(t, result)
+}
+
+func TestConfigurationWrapper_PluginsRoundTrip(t *testing.T) {
+	cfg, err := NewConfigurationWrapper()
+	require.NoError(t, err)
+
+	// Set plugin config
+	pluginConfig := map[string]any{
+		"nomad_addr": "https://nomad.example.com:4646",
+		"region":     "global",
+	}
+	cfg.Set("plugins.nomad-deploy", pluginConfig)
+
+	// Get should return the full plugin map for "plugins.nomad-deploy"
+	result := cfg.Get("plugins.nomad-deploy")
+	assert.Equal(t, pluginConfig, result)
+
+	// Get("plugins") should return the entire plugins map
+	pluginsMap := cfg.Get("plugins")
+	assert.NotNil(t, pluginsMap)
+	if pluginsMapTyped, ok := pluginsMap.(map[string]map[string]any); ok {
+		assert.Equal(t, pluginConfig, pluginsMapTyped["nomad-deploy"])
+	} else {
+		t.Fatal("expected plugins to be map[string]map[string]any")
+	}
+
+	// Get with nonexistent plugin should return nil
+	assert.Nil(t, cfg.Get("plugins.nonexistent"))
 }
 
 func TestConfigurationWrapper_Set(t *testing.T) {
