@@ -1,6 +1,13 @@
 # GoReleaser configuration for shipwright
 # https://goreleaser.com/
 
+# providers/go/vX.Y.Z tags (design.md D6) must never be considered as the
+# root module's "previous tag" -- they belong to a disjoint release line
+# published by .github/workflows/release-provider-go.yml, not GoReleaser.
+git:
+  ignore_tags:
+    - 'providers/*'
+
 before:
   hooks:
     - go mod download

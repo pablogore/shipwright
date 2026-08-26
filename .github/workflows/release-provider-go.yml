@@ -1,0 +1,111 @@
+name: 'Release providers/go'
+
+# This workflow reacts to a human-pushed providers/go/vX.Y.Z tag
+# (design.md D6). It never creates, moves, or deletes a tag -- publishing a
+# providers/go release is always:
+#   git tag providers/go/vX.Y.Z <sha> && git push origin providers/go/vX.Y.Z
+# performed by a person, never by CI. Its `providers/go/v*` glob is disjoint
+# from root release.yml's `v*` glob by construction (Actions tag globs do
+# not cross `/`), and root's ci.yml does not trigger on tags at all, so this
+# workflow is the sole reactor for this namespace.
+on:
+  push:
+    tags:
+      - 'providers/go/v*'
+
+# No `packages`, `id-token`, SHIPWRIGHT_TOKEN, or ~/.netrc (unlike
+# release.yml) -- this workflow's single write is `gh release create`.
+permissions:
+  contents: 'write'
+
+env:
+  GO_VERSION: '1.26.1'
+
+jobs:
+  release:
+    runs-on: 'ubuntu-latest'
+    steps:
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v7'
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v7'
+      with:
+        go-version: '${{ env.GO_VERSION }}'
+
+    - name: 'Validate tag shape'
+      id: 'shape'
+      run: |
+        TAG="${{ github.ref_name }}"
+        # internal/releaseguard/tags_test.go extracts this exact assignment
+        # -- keep it byte-for-byte in sync with design.md D6. Major is
+        # restricted to 0|1 on purpose: major >= 2 needs module path
+        # .../providers/go/v2 and tag providers/go/v2/v2.0.0 (Go's /vN
+        # module-path major-suffix rule) -- a decision, not a tag typo.
+        SHAPE_REGEX='^providers/go/v(0|1)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
+        if ! [[ "$TAG" =~ $SHAPE_REGEX ]]; then
+          echo "::error::Tag '$TAG' does not match providers/go's release shape ($SHAPE_REGEX)."
+          echo "::error::A major version >= 2 needs module path .../providers/go/v2 and tag providers/go/v2/v2.0.0 -- this is a decision, not a tag typo."
+          exit 1
+        fi
+        VERSION="${TAG#providers/go/}"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Tag shape valid: $TAG"
+
+    - name: 'Validate module identity'
+      run: |
+        WANT='module github.com/pablogore/shipwright/providers/go'
+        MODULE_LINE=$(head -n1 providers/go/go.mod)
+        if [ "$MODULE_LINE" != "$WANT" ]; then
+          echo "::error::providers/go/go.mod's module line is '$MODULE_LINE', want '$WANT'."
+          exit 1
+        fi
+        echo "Module identity confirmed: $MODULE_LINE"
+
+    - name: 'Build and test providers/go in isolation'
+      run: |
+        cd providers/go
+        GOWORK=off go build ./...
+        GOWORK=off go test -race -short ./...
+
+    - name: 'Generate path-scoped changelog'
+      run: |
+        CURRENT_TAG="${{ github.ref_name }}"
+        PREV_TAG=$(git tag --list 'providers/go/v*' --sort=-v:refname | grep -vF "$CURRENT_TAG" | head -n1 || echo "")
+        if [ -n "$PREV_TAG" ]; then
+          echo "Changelog range: $PREV_TAG..$CURRENT_TAG"
+          git log --pretty='- %s (%h)' "$PREV_TAG..$CURRENT_TAG" -- providers/go/ > changelog-provider-go.md
+        else
+          echo "No previous providers/go tag -- changelog covers all commits touching providers/go/"
+          git log --pretty='- %s (%h)' "$CURRENT_TAG" -- providers/go/ > changelog-provider-go.md
+        fi
+        if [ ! -s changelog-provider-go.md ]; then
+          echo "- No changes recorded under providers/go/ for this release" > changelog-provider-go.md
+        fi
+        cat changelog-provider-go.md
+
+    - name: 'Create GitHub release'
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      run: |
+        gh release create "${{ github.ref_name }}" \
+          --title "providers/go ${{ steps.shape.outputs.version }}" \
+          --notes-file changelog-provider-go.md \
+          --latest=false
+
+    - name: 'Confirm module proxy visibility'
+      run: |
+        URL="https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/${{ steps.shape.outputs.version }}.info"
+        for attempt in 1 2 3 4 5; do
+          if curl -sf "$URL" >/dev/null; then
+            echo "Module proxy has indexed ${{ github.ref_name }}: $URL"
+            exit 0
+          fi
+          echo "Proxy not ready yet (attempt $attempt/5), retrying in 15s..."
+          sleep 15
+        done
+        echo "::error::Module proxy never indexed ${{ github.ref_name }} at $URL"
+        exit 1

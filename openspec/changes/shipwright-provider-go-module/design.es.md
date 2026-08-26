@@ -5,14 +5,16 @@
 
 ## Enfoque técnico
 
-Dos PR encadenados con una etiqueta git manual entre ambos, porque la etiqueta no
-puede existir antes que el código y el `require`+`go.sum` no pueden existir antes
-que la etiqueta.
+Tres PR encadenados con una etiqueta git manual entre el segundo y el tercero,
+porque la etiqueta no puede existir antes que el código, la automatización de
+release debe existir antes que la etiqueta (D6), y el `require`+`go.sum` no
+pueden existir antes que la etiqueta.
 
 | Tramo | Contenido | Mecanismo de resolución |
 |---|---|---|
 | **1** | Crear el módulo `providers/go`, `git mv` de 13 archivos, cambiar todos los importadores, añadir `go.work`, añadir 3 tests guardianes, borrar `internal/capabilities/` | `replace ... => ./providers/go` temporal en el `go.mod` raíz (autorizado explícitamente por D4) |
-| **etiqueta** | `git tag providers/go/v0.1.0 <sha del merge del tramo 1> && git push origin providers/go/v0.1.0` | — (tarea manual, no es un PR) |
+| **1b** | Automatización de release: `.github/workflows/release-provider-go.yml`, `--match 'v[0-9]*'` en las tres llamadas `git describe` del `release.yml` raíz, `git.ignore_tags` en `.goreleaser.yml`, `internal/releaseguard/tags_test.go` | — (no cambia la resolución de módulos; debe entrar **antes** de que exista la primera etiqueta de proveedor — D6) |
+| **etiqueta** | `git tag providers/go/v0.1.0 <sha del merge del tramo 1> && git push origin providers/go/v0.1.0` | — (push manual, no es un PR; el workflow del tramo 1b reacciona — D6) |
 | **2** | Eliminar el `replace`, conservar `require .../providers/go v0.1.0`, regenerar el `go.sum` raíz, añadir el test guardián de "sin `replace`", verificar `go install` con caché limpia | Etiqueta publicada con prefijo de ruta (estado final de D4) |
 
 El tramo 1 queda en verde **tanto** en modo workspace como con `GOWORK=off` (el
@@ -163,9 +165,12 @@ Eje 5 de COMPATIBILITY.md sobre las versiones de proveedor ("no cubiertas por
 ninguna garantía de Shipwright"), y `v0.x`/`v1.x` evita la regla del sufijo mayor
 `/vN` sobre un elemento de ruta que ya es una palabra clave de Go.
 
-**El etiquetado es manual, único y una tarea — no automatización.** `.goreleaser`
-construye solo el binario raíz; un proceso recurrente de release de proveedores
-está explícitamente fuera de alcance en la propuesta. Etiquetar el commit de merge
+**La *creación* de la etiqueta sigue siendo manual: un `git push` humano, nunca un
+job.** `.goreleaser` construye solo el binario raíz y no se reutiliza aquí. Lo que
+ocurre *después* del push (validación de forma, build aislado, changelog, GitHub
+Release) se automatiza en el tramo 1b — ver **D6**, que resuelve el punto que la
+propuesta dejó abierto deliberadamente ("manual vs. goreleaser/CI para el
+etiquetado automatizado"). Etiquetar el commit de merge
 del tramo 1 en `develop` es deliberado: Go resuelve etiquetas sin importar la rama,
 y la línea de versión del proveedor es independiente de la de release de la raíz
 (Eje 5). Consecuencia: el contenido de `providers/go/` debe ser **final en el tramo
@@ -196,6 +201,107 @@ Ambas rechazadas.
 Escanear también los archivos de test es intencional: un test que alcance
 `internal/**` significaría que el módulo solo es implementable desde fuera en su
 mitad de producción.
+
+### Decisión: la automatización de release del proveedor es un workflow que reacciona a la etiqueta, **no** GoReleaser (D6 — nueva)
+
+D6 no tiene contraparte en la propuesta: la propuesta difirió exactamente esto al
+diseño ("manual vs. goreleaser/CI para el etiquetado automatizado"; "si CI/
+goreleaser automatiza las FUTURAS etiquetas de proveedor"). **Elección** — un
+`.github/workflows/release-provider-go.yml` dedicado que *reacciona* a una
+etiqueta `providers/go/v*` publicada por una persona. Sin GoReleaser; el job nunca
+crea ni mueve una referencia.
+
+| Opción | Costo | Veredicto |
+|---|---|---|
+| Segunda configuración de GoReleaser | `monorepo:` (`tag_prefix`/`dir`) es la única forma en que GoReleaser entiende una etiqueta con prefijo de ruta, y es una función **Pro**; la versión OSS deriva la versión quitando la `v` de la etiqueta y no puede parsear `providers/go/v0.1.0`. Hay que desactivar todos los subsistemas centrales (builds, archives, checksums, taps, docker, firma) porque `providers/go` **no tiene paquete `main`**. Valor residual: solo changelog y cuerpo del release. | **Rechazada** |
+| Solo `gh release create --generate-notes` | Gratuito, pero las notas son de todo el repositorio (cada commit desde el release anterior), no acotadas a `providers/go/`, y nada valida la etiqueta. | Rechazada como respuesta completa; se conserva como respaldo del cuerpo |
+| Validación reactiva a la etiqueta + changelog acotado por ruta | Un archivo de workflow, sin licencia, sin binarios; valida las cuatro cosas que realmente rompen el release de una librería. | **Elegida** |
+
+**Fundamento** — el valor de GoReleaser es la *distribución de binarios*;
+`providers/go` distribuye **código fuente a través del proxy de módulos de Go**,
+así que toda su maquinaria de build/empaquetado/publicación es inaplicable por
+construcción. Lo que realmente puede romper este release es la etiqueta: forma
+incorrecta, mayor incorrecto (la regla `/vN` de la ruta de módulo), un módulo que
+no compila de forma aislada, o un proxy que nunca la descargó. Ninguna de esas es
+una función de GoReleaser; las cuatro son pasos `run:`.
+
+El workflow, en orden:
+
+1. `on: push: tags: ['providers/go/v*']` — disjunto del `v*` de la raíz por
+   construcción (los globs de Actions no cruzan `/`, y la etiqueta de proveedor no
+   empieza por `v`). `ci.yml` no se dispara con etiquetas, así que este workflow es
+   el único reactor.
+2. **Forma**: `^providers/go/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$`.
+   Rechazar mayor ≥ 2 con un mensaje que nombre la regla del sufijo mayor en la
+   ruta de módulo (un `v2` requiere ruta `.../providers/go/v2` y etiqueta
+   `providers/go/v2/v2.0.0` — es una decisión, no un error de tipeo).
+3. **Identidad**: el árbol etiquetado tiene `providers/go/go.mod` cuya línea
+   `module` es exactamente `github.com/pablogore/shipwright/providers/go`.
+4. **Aislamiento**: `cd providers/go && GOWORK=off go build ./... && GOWORK=off go test -race -short ./...`
+   sobre la etiqueta — la única garantía que un `git tag` manual no puede dar, y la
+   misma propiedad de aislamiento que D5 verifica a nivel de imports.
+5. **Changelog**: `git log --pretty='- %s (%h)' <etiqueta providers/go previa>..<etiqueta> -- providers/go/`
+   — **acotado por ruta**, para que el ruido exclusivo de la raíz nunca aparezca en
+   un release de proveedor. Sin predecesora ⇒ todos los commits que tocan
+   `providers/go/`.
+6. **Release**: `gh release create "$TAG" --title "providers/go $VERSION" --notes-file … --latest=false`.
+   `--latest=false` mantiene la insignia "Latest" del repositorio en el release de
+   binarios de la raíz, del que depende el fragmento de instalación
+   `releases/latest` de `.goreleaser.yml`.
+7. **Compuerta del proxy**: `curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/$VERSION.info`
+   — convierte la confirmación antes manual del paso 3 en una verificación que
+   puede fallar.
+
+**Radio de impacto sobre la línea de release de la raíz: la razón por la que esto
+no puede esperar a v0.2.0.** `.github/workflows/release.yml` deriva la versión de
+la raíz con un `git describe --tags --abbrev=0` sin filtrar en **tres** lugares
+(línea 162 auto-bump, 220 bump por dispatch, 245 rango del changelog). Al no estar
+filtrado, en cuanto `providers/go/v0.1.0` sea alcanzable desde `main` pasa a ser
+`LATEST_TAG`; el `sed 's/v//'` existente elimina entonces la `v` de
+*`pro`**`v`**`iders`*, produciendo `proiders/go/v0.1.0`, y `awk -F.` emite la
+etiqueta `vproiders/go/v0.2.0`. La ruta automática (merge develop→main →
+`workflow_dispatch`) crearía y publicaría esa referencia sin que ninguna persona
+escriba una etiqueta. **Corrección obligatoria, antes de que exista la primera
+etiqueta de proveedor**: `--match 'v[0-9]*'` en las tres llamadas. El
+`.goreleaser.yml` raíz recibe además `git: ignore_tags: ['providers/*']` para su
+propia búsqueda de etiqueta previa.
+
+**Guardián** (patrón del repositorio; solo test, como el de D5):
+`internal/releaseguard/tags_test.go` parsea ambos YAML de workflow y verifica que
+(a) ningún `git describe --tags` de `release.yml` carezca de `--match`; (b) los
+globs de etiqueta de `release.yml` no coincidan con `providers/go/v0.1.0`; (c) los
+globs de `release-provider-go.yml` no coincidan con `v1.2.3`; (d) el literal de la
+expresión regular de forma extraído del workflow acepte `providers/go/v0.1.0` y
+rechace `providers/go/v2.0.0`, `providers/go/v01.0.0` y `v0.1.0`. La disyunción de
+espacios de nombres pasa a ser una aserción, no una convención.
+
+**Dónde entra: tramo 1b, antes de la etiqueta — no a partir de v0.2.0.** Tres
+razones: (1) el defecto de `git describe` lo arma la *primera* etiqueta de
+proveedor, así que su corrección debe precederla; (2) un workflow de release que
+nunca se ejecutó es un script, no automatización — `v0.1.0` es la prueba de humo
+más barata posible (v0.x, cero consumidores, y un mal resultado cuesta `v0.1.1`,
+que D4 ya acepta como la puerta de un solo sentido); (3) como tramo propio deja
+intacto el diff del tramo 1 y añade un PR pequeño, limitado a `.github`, y
+reversible por separado, en vez de inflar uno existente.
+
+**Consistencia con la línea de release de la raíz, y dónde difieren
+deliberadamente:**
+
+| | módulo raíz | `providers/go` |
+|---|---|---|
+| Etiqueta | `vX.Y.Z` | `providers/go/vX.Y.Z` |
+| Disparador | push de etiqueta **o** automático al mergear develop→main, versión *derivada* | solo push de etiqueta, versión nunca derivada |
+| Herramienta | GoReleaser (`.goreleaser.yml`) | `gh release create` |
+| Artefacto | binarios multiplataforma + checksums | ninguno — el proxy es el artefacto |
+| "Latest" en GitHub | sí | `--latest=false` |
+
+La diferencia es deliberada: la raíz auto-incrementa porque publica un binario
+instalable con cadencia, mientras que la versión de un proveedor es una afirmación
+sobre un contrato de API que el Eje 5 de COMPATIBILITY.md ya declara fuera de toda
+garantía de Shipwright. Derivarla de heurísticas sobre mensajes de commit sería
+peor que inútil. Lo que ambas líneas **sí** deben compartir es la disyunción de
+espacios de nombres, y eso ahora es el guardián anterior en vez de una regla
+tácita.
 
 ## Flujo de datos
 
@@ -240,6 +346,10 @@ workspace de un solo repositorio); `go work sync` es el comando de mantenimiento
 | `go.mod` (raíz) | Modificar | Tramo 1: `require` + `replace` temporal. Tramo 2: `replace` eliminado |
 | `go.sum` (raíz) | Modificar | Solo tramo 2: hashes de `providers/go@v0.1.0` |
 | `COMPATIBILITY.md` | Modificar | Línea 46: `internal/capabilities/**` → `providers/go/**` |
+| `.github/workflows/release-provider-go.yml` | Crear (tramo 1b) | D6: validación reactiva a la etiqueta + GitHub Release para `providers/go/v*` |
+| `.github/workflows/release.yml` | Modificar (tramo 1b) | D6: `--match 'v[0-9]*'` en las tres llamadas `git describe --tags --abbrev=0` (líneas 162, 220, 245) |
+| `.goreleaser.yml` | Modificar (tramo 1b) | D6: `git: ignore_tags: ['providers/*']` para la búsqueda de etiqueta previa de la raíz |
+| `internal/releaseguard/tags_test.go` | Crear (tramo 1b) | Guardián D6; paquete solo de test, como el de D5 |
 | `pkg/shipwright/**` | **Sin cambios** | Restricción dura; se verifica con `git diff --stat -- pkg/shipwright/` |
 
 ## Interfaces y contratos
@@ -275,6 +385,7 @@ ubicación antes de mover su archivo fuente.
 | Unitario | Golden de nombres tras el movimiento | `naming_test.go` con `pkgs["golang"]` | Cambiar la clave antes que la cláusula de paquete → RED |
 | Unitario | Nombres de proveedor sin cambios | `register_test.go` / `container_capabilities_test.go` existentes deben seguir en verde | Regresión, no nuevo |
 | Unitario (raíz) | El `go.mod` raíz versionado no tiene `replace` | Tramo 2: `modfile.Parse` + `len(f.Replace) == 0` | Escrito en el tramo 2 con el `replace` todavía presente → RED |
+| Unitario (raíz) | D6: disyunción de espacios de nombres de etiquetas, `git describe` filtrado, regex de forma de etiqueta | Tramo 1b: parsear ambos YAML de workflow; extraer el literal de la regex de forma y probarlo por tabla (`providers/go/v0.1.0` ✓; `providers/go/v2.0.0`, `providers/go/v01.0.0`, `v0.1.0` ✗) | Escrito antes de que exista `release-provider-go.yml` → falla cerrado por archivo ausente y luego RED por el `git describe` sin filtrar |
 | Integración (con guarda `-short`) | `GoBuilder`/`GoUnitTester` con motor real | Movidos sin cambios; `./...` **no** cruza a `providers/go` en modo workspace (verificado empíricamente — ver la Pregunta abierta corregida más abajo), así que `make test`/CI ahora ejecutan `(cd providers/go && go test ./...)` de forma explícita para seguir cubriéndolo | Regresión |
 | E2E (manual) | `examples/workflow/diamond.yaml` | Ejecutar antes y después; comparar proveedores resueltos | Regresión |
 | E2E (manual) | `go install github.com/pablogore/shipwright@<tag>` con `GOMODCACHE` limpio | Aceptación del tramo 2 | Aceptación |
@@ -294,11 +405,22 @@ de la raíz, calibrados sobre el conjunto de paquetes previo a la extracción.
 
 ## Matriz de amenazas
 
-`N/A` — no cambia enrutamiento, comandos de shell, subprocesos, clasificación de
-archivos ejecutables ni integración de procesos. La única superficie adyacente es
-la automatización de VCS, y este diseño **la evita deliberadamente**: el etiquetado
-sigue siendo un paso manual y revisado en lugar de un push automatizado,
-precisamente para no introducir una nueva ruta de VCS automatizada con credenciales.
+`N/A` para enrutamiento, comandos de shell, subprocesos, clasificación de archivos
+ejecutables e integración de procesos: ninguno de esos límites cambia.
+
+**Automatización de VCS/PR: `Aplicable` desde D6** (antes de esta enmienda era
+`N/A`). Acotada así:
+
+| Aspecto | Límite | Comportamiento esperado |
+|---|---|---|
+| Creación de referencias | El workflow **reacciona** a una referencia; nunca crea, mueve ni borra una. La creación de la etiqueta sigue siendo un `git push` humano (D4). | Una etiqueta siempre la escribe una persona |
+| Alcance del token | Solo `permissions: contents: write` a nivel de job — sin `packages`, sin `id-token` (a diferencia de `release.yml`), sin `SHIPWRIGHT_TOKEN`, sin `~/.netrc` | Su única escritura es `gh release create` |
+| Código ejecutado del árbol etiquetado | `go build` / `go test` del módulo que se publica, nada más | Sin hooks de release, sin scripts arbitrarios |
+| Etiqueta mal formada o con mayor incorrecto | Falla en la validación de forma, antes de cualquier escritura de red | Sin Release, sin descarga del proxy, fallo explícito |
+| Colisión de espacio de nombres con el `v*` raíz | Los globs son disjuntos por construcción y se verifican | La línea de release de la raíz no puede ser disparada ni corrompida en su versión por una etiqueta de proveedor |
+
+Tests RED de las filas aplicables: las aserciones (a)–(d) de
+`internal/releaseguard/tags_test.go` en D6.
 
 ## Migración y despliegue
 
@@ -309,16 +431,28 @@ precisamente para no introducir una nueva ruta de VCS automatizada con credencia
    (las dos invocaciones que `./...` no fusiona — ver la Pregunta abierta
    corregida más abajo), además de `GOWORK=off go build ./...`. Verificar que
    `git diff --stat -- pkg/shipwright/` esté vacío. Merge a `develop`.
-2. **Etiqueta**: `git tag providers/go/v0.1.0 <sha del merge>` +
-   `git push origin providers/go/v0.1.0`. Confirmar que el proxy la ve
-   (`GOPROXY=direct go list -m github.com/pablogore/shipwright/providers/go@v0.1.0`).
-3. **Tramo 2**: test guardián de "sin `replace`" en RED → borrar el `replace` →
+2. **Tramo 1b** (D6, sin código Go de producción):
+   `internal/releaseguard/tags_test.go` en RED → `release-provider-go.yml` →
+   `--match 'v[0-9]*'` en las tres llamadas `git describe` de `release.yml` →
+   `git.ignore_tags` en `.goreleaser.yml`. Merge a `develop`. **Debe preceder al
+   paso 3**: el defecto del `git describe` sin filtrar lo arma la primera etiqueta
+   de proveedor, no este PR.
+3. **Etiqueta**: `git tag providers/go/v0.1.0 <sha del merge>` +
+   `git push origin providers/go/v0.1.0` (humano). El workflow del tramo 1b valida
+   entonces forma/identidad/aislamiento, publica el Release con `--latest=false` y
+   condiciona el resultado a la visibilidad en el proxy
+   (`curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/v0.1.0.info`),
+   reemplazando la confirmación manual previa con `go list -m`.
+4. **Tramo 2**: test guardián de "sin `replace`" en RED → borrar el `replace` →
    `GOWORK=off go mod tidy` en la raíz → aceptación de `go install` con
    `GOMODCACHE` limpio.
 
-Frontera de reversión: el tramo 1 es atómico (`git revert -m 1`). El tramo 2 se
-revierte de forma independiente al estado con `replace`. La etiqueta publicada es
-el único artefacto irreversible: se sustituye con `v0.1.1`, nunca se borra.
+Frontera de reversión: el tramo 1 es atómico (`git revert -m 1`). El tramo 1b se
+revierte de forma independiente y solo toca `.github/`, `.goreleaser.yml` y un
+archivo de test — pero revertirlo **no** despublica un Release (`gh release delete`
+es un acto aparte) ni elimina la etiqueta. El tramo 2 se revierte de forma
+independiente al estado con `replace`. La etiqueta publicada es el único artefacto
+irreversible: se sustituye con `v0.1.1`, nunca se borra.
 
 ## Preguntas abiertas
 
@@ -364,6 +498,16 @@ el único artefacto irreversible: se sustituye con `v0.1.1`, nunca se borra.
 - [ ] **Ruido de `go work sync` / `go.work.sum`** en el hook de pre-commit
       (`go-mod-tidy`). Confirmar que el hook no entre en conflicto con el modo
       workspace; si lo hace, acotarlo con `GOWORK=off`.
+- [ ] **Dos hechos de D6 a confirmar en la fase de aplicación; ninguno cambia la
+      dirección de D6.** (a) Que el bloque `monorepo:` (`tag_prefix`/`dir`) de
+      GoReleaser sea exclusivo de Pro — D6 rechaza GoReleaser solo con el argumento
+      de que no hay paquete `main`, así que esto solo afecta a cómo se redacta el
+      rechazo. (b) La clave exacta de `.goreleaser.yml` para excluir etiquetas de la
+      búsqueda de etiqueta previa (`git.ignore_tags`) frente a la versión de
+      GoReleaser que resuelve el workflow de release (`version: latest`); la
+      corrección con peso real es `--match 'v[0-9]*'` en `release.yml`, que no
+      depende de ella. Ambos puntos se razonaron a partir de los archivos
+      versionados, no de documentación en red.
 
 ---
 
@@ -371,5 +515,7 @@ el único artefacto irreversible: se sustituye con `v0.1.1`, nunca se borra.
 orquestador exigió que el diseño convirtiera cinco decisiones diferidas de la
 propuesta en algo ejecutable (contenidos exactos de archivo, el orden de etiquetado
 del ciclo de módulos, la implementación de los guardianes), y el orden de D4 no
-puede registrarse de forma creíble sin su razonamiento. El contenido está
-comprimido en tablas; sin relleno narrativo.
+puede registrarse de forma creíble sin su razonamiento. Una enmienda posterior
+añadió D6, que la propuesta difirió explícitamente al diseño y que terminó
+exponiendo un defecto activo de derivación de versión en el workflow de release de
+la raíz. El contenido está comprimido en tablas; sin relleno narrativo.
