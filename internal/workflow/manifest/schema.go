@@ -86,6 +86,7 @@ type Step struct {
 	Input      string              `yaml:"input,omitempty"`
 	With       map[string]any      `yaml:"with,omitempty"`
 	When       map[string][]string `yaml:"when,omitempty"`
+	Attempts   *int                `yaml:"attempts,omitempty"`
 }
 
 // UsesSpec names the step's implementation: either an in-repo Provider or

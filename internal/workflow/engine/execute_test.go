@@ -619,6 +619,116 @@ func TestExecute_UndeclaredVariableAndSecretRejected(t *testing.T) {
 	}
 }
 
+// intPtr is a test helper that returns a pointer to the given int value.
+func attemptsPtr(v int) *int { return &v }
+
+// tasks.md 8.4 (per-step override): a step's manifest-level attempts field
+// overrides the workflow-level Options.Retries — the step uses its own
+// budget, not the engine default.
+func TestExecute_PerStepAttempts_OverridesWorkflowDefault(t *testing.T) {
+	t.Parallel()
+
+	var calls int32
+	reg := providers.NewRegistry()
+	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
+		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+			n := atomic.AddInt32(&calls, 1)
+			if n < 3 {
+				return nil, errors.New("transient failure")
+			}
+			return source, nil
+		}}
+	})
+
+	// Workflow-level Retries is 0 (1 attempt), but the step declares attempts: 3
+	steps := []manifest.Step{{ID: "build", Capability: "build", Uses: manifest.UsesSpec{Provider: "go", Version: "1"}, Attempts: attemptsPtr(3)}}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	cfg := engine.Config{Steps: steps, Graph: g, Registry: reg, Options: engine.Options{}}
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil (should succeed on 3rd attempt using per-step attempts)", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 3 {
+		t.Fatalf("Build() was called %d times, want exactly 3 (per-step attempts=3)", got)
+	}
+	if len(res.Outcomes) != 1 || res.Outcomes[0].Attempts != 3 || res.Outcomes[0].Status != engine.StatusSucceeded {
+		t.Fatalf("Outcomes = %+v, want one StatusSucceeded outcome with Attempts=3", res.Outcomes)
+	}
+}
+
+// A step with attempts: 0 must produce exactly one attempt, even when the
+// workflow-level retry is high — the manifest author explicitly opted
+// this step out of retries.
+func TestExecute_PerStepAttempts_ZeroOverridesWorkflowDefault(t *testing.T) {
+	t.Parallel()
+
+	var calls int32
+	reg := providers.NewRegistry()
+	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
+		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+			atomic.AddInt32(&calls, 1)
+			return nil, errors.New("permanent failure")
+		}}
+	})
+
+	// Workflow-level Retries is 5, but the step declares attempts: 0
+	steps := []manifest.Step{{ID: "build", Capability: "build", Uses: manifest.UsesSpec{Provider: "go", Version: "1"}, Attempts: attemptsPtr(0)}}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	cfg := engine.Config{Steps: steps, Graph: g, Registry: reg, Options: engine.Options{Retries: 5}}
+
+	_, err = engine.Execute(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Execute() error = nil, want a failure")
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("Build() was called %d times, want exactly 1 (per-step attempts=0 overrides workflow retry=5)", got)
+	}
+}
+
+// A step with attempts: nil (omitted) must fall back to the workflow-level
+// Options.Retries, preserving backward compatibility.
+func TestExecute_PerStepAttempts_NilFallsBackToWorkflowDefault(t *testing.T) {
+	t.Parallel()
+
+	var calls int32
+	reg := providers.NewRegistry()
+	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
+		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+			n := atomic.AddInt32(&calls, 1)
+			if n < 3 {
+				return nil, errors.New("transient failure")
+			}
+			return source, nil
+		}}
+	})
+
+	// Step has no Attempts field (nil); workflow-level is 3
+	steps := []manifest.Step{{ID: "build", Capability: "build", Uses: manifest.UsesSpec{Provider: "go", Version: "1"}}}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	cfg := engine.Config{Steps: steps, Graph: g, Registry: reg, Options: engine.Options{Retries: 3}}
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil (should succeed on 3rd attempt using workflow-level retry)", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 3 {
+		t.Fatalf("Build() was called %d times, want exactly 3 (workflow-level retry=3)", got)
+	}
+	if len(res.Outcomes) != 1 || res.Outcomes[0].Attempts != 3 || res.Outcomes[0].Status != engine.StatusSucceeded {
+		t.Fatalf("Outcomes = %+v, want one StatusSucceeded outcome with Attempts=3", res.Outcomes)
+	}
+}
+
 // OptionsFromSpec is where spec.execution.concurrency.maxParallel is
 // "validated and recorded" (tasks.md 8.5) and spec.execution.timeout is
 // parsed into a time.Duration.
