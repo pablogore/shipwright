@@ -267,13 +267,21 @@ before its source file is moved.
 | Unit | Bundle-name golden after move | `naming_test.go` with `pkgs["golang"]` | Edit key before package clause changes → RED |
 | Unit | Provider names unchanged | Existing `register_test.go` / `container_capabilities_test.go` — must stay green through the swap | Regression, not new |
 | Unit (root) | Committed root `go.mod` has no `replace` | Slice 2: `modfile.Parse` + assert `len(f.Replace) == 0` | Written in slice 2 while the `replace` is still present → RED |
-| Integration (`-short`-guarded) | Real-engine `GoBuilder`/`GoUnitTester` | Moved unchanged; now runs under root `./...` in workspace mode | Regression |
+| Integration (`-short`-guarded) | Real-engine `GoBuilder`/`GoUnitTester` | Moved unchanged; `./...` does **not** cross into `providers/go` in workspace mode (verified empirically — see the corrected Open Question below), so `make test`/CI now run an explicit `(cd providers/go && go test ./...)` to keep this covered | Regression |
 | E2E (manual) | `examples/workflow/diamond.yaml` | Run before and after; compare resolved providers | Regression |
 | E2E (manual) | `go install github.com/pablogore/shipwright@<tag>` from a clean `GOMODCACHE` | Slice 2 acceptance | Acceptance |
 
-Coverage: `providers/go` inherits its own tests, so per-module coverage should be
-unchanged. The root `make coverage` target's `go list ./...` will now include
-`providers/go` in workspace mode — confirm the number does not regress below 90.
+Coverage: `providers/go` inherits its own tests, run via the explicit
+`go test` invocation above — not merged into root's `coverage.out`. This is a
+correction, not the original plan: `go list ./...` was verified to return
+exactly the 22 pre-extraction root packages in workspace mode, never
+`providers/go` (see the corrected Open Question below), so the root
+`make coverage` target's `go list ./...`-based package lists never included
+`providers/go` and still don't. That is now a deliberate scope decision
+(documented at the `Makefile` coverage section) rather than an oversight to
+fix: `providers/go` is an independently published module (D2/D4) whose
+coverage is not part of root's 90%/70% thresholds, which were calibrated
+against the pre-extraction package set.
 
 ## Threat Matrix
 
@@ -287,7 +295,9 @@ credential-bearing VCS path is introduced.
 
 1. **Slice 1** (branch off `develop`): guards RED → module + `git mv` → three
    importer swaps → `go.work` → temp `replace` → delete `internal/capabilities/`
-   → `COMPATIBILITY.md` line 46. Green under both `go test -race ./...` and
+   → `COMPATIBILITY.md` line 46. Green under `go test -race ./...` **and**
+   `(cd providers/go && go test -race ./...)` (the two invocations `./...`
+   does not merge — see the corrected Open Question below) plus
    `GOWORK=off go build ./...`. Verify `git diff --stat -- pkg/shipwright/` is
    empty. Merge to `develop`.
 2. **Tag interlude**: `git tag providers/go/v0.1.0 <merge sha>` +
@@ -303,14 +313,34 @@ irreversible artifact — superseded by `v0.1.1`, never deleted.
 
 ## Open Questions
 
-- [ ] **CI `go mod download` / `go mod verify` under workspace mode.** These run
-      in the `setup` stage and are single-module operations whose workspace-mode
-      behavior varies by Go version. **Designed answer**: prefix both with
-      `GOWORK=off` so they stay byte-identical to their pre-change semantics;
-      the `build`/`test`/`security` stages stay in workspace mode so `./...`
-      spans `providers/go` with no new step (proposal's "CI unchanged" claim
-      holds for those three). Verify empirically in slice 1; if the unprefixed
-      commands already work, drop the prefix and leave `ci.yml` untouched.
+- [x] **CI `go mod download` / `go mod verify` under workspace mode, and
+      whether `./...` spans `providers/go` in the `build`/`test`/`security`
+      stages.** **Verified empirically in slice 1 — the originally designed
+      answer was wrong on the second half.** `go list ./...` from repo root
+      returns exactly the 22 pre-extraction packages, identically in
+      `GOWORK=off` mode and in workspace mode; Go's `./...` wildcard **never**
+      crosses a nested-module boundary declared via `go.work`'s `use` — only
+      the `all` pattern or a fully-qualified import path does. `all` is not a
+      safe drop-in substitute either, confirmed per-command: `go vet all`
+      exits 1 (it also vets unrelated third-party dependency `_test.go`
+      files with pre-existing vet issues, e.g. `google/go-cmp`,
+      `prometheus/client_golang`); `go fmt all` explicitly refuses
+      `providers/go` ("not formatting packages in dependency modules");
+      `go list all` / `go test all` pull in the full ~400-package transitive
+      dependency graph, not just the two workspace modules; `govulncheck`
+      does not span `go.work` at all (root and `providers/go` scans produce
+      disjoint findings). So the proposal's "CI unchanged" claim does **not**
+      hold: before this fix, `providers/go` was silently excluded from every
+      repo-wide `build`/`test`/`vet`/`fmt`/`govulncheck` invocation in both
+      `Makefile` and `ci.yml`. **Fix applied**: one explicit
+      `(cd providers/go && go <cmd> ./...)` (or module-scoped `govulncheck`)
+      invocation added alongside each existing root one — not by widening
+      `./...` to `all`, which the testing above showed is unsafe. Coverage
+      (`go list ./... | grep -v ...`) is the one exception left unchanged by
+      design, not oversight — see the Coverage note above.
+      `go mod download`/`go mod verify` in the `setup` stage remain prefixed
+      with `GOWORK=off` as originally designed; that half of the answer
+      holds.
 - [ ] **Repository visibility.** `git remote` confirms `github.com/pablogore/shipwright`,
       so the module path matches the repo and D4's premise holds. Not verified:
       whether the repo is public. If it is private, `go install …@latest` never

@@ -275,14 +275,22 @@ ubicación antes de mover su archivo fuente.
 | Unitario | Golden de nombres tras el movimiento | `naming_test.go` con `pkgs["golang"]` | Cambiar la clave antes que la cláusula de paquete → RED |
 | Unitario | Nombres de proveedor sin cambios | `register_test.go` / `container_capabilities_test.go` existentes deben seguir en verde | Regresión, no nuevo |
 | Unitario (raíz) | El `go.mod` raíz versionado no tiene `replace` | Tramo 2: `modfile.Parse` + `len(f.Replace) == 0` | Escrito en el tramo 2 con el `replace` todavía presente → RED |
-| Integración (con guarda `-short`) | `GoBuilder`/`GoUnitTester` con motor real | Movidos sin cambios; ahora corren bajo `./...` de la raíz en modo workspace | Regresión |
+| Integración (con guarda `-short`) | `GoBuilder`/`GoUnitTester` con motor real | Movidos sin cambios; `./...` **no** cruza a `providers/go` en modo workspace (verificado empíricamente — ver la Pregunta abierta corregida más abajo), así que `make test`/CI ahora ejecutan `(cd providers/go && go test ./...)` de forma explícita para seguir cubriéndolo | Regresión |
 | E2E (manual) | `examples/workflow/diamond.yaml` | Ejecutar antes y después; comparar proveedores resueltos | Regresión |
 | E2E (manual) | `go install github.com/pablogore/shipwright@<tag>` con `GOMODCACHE` limpio | Aceptación del tramo 2 | Aceptación |
 
-Cobertura: `providers/go` conserva sus propios tests, así que la cobertura por
-módulo no debería cambiar. El `go list ./...` del objetivo `make coverage` de la
-raíz incluirá ahora `providers/go` en modo workspace: confirmar que el número no
-baje del 90.
+Cobertura: `providers/go` conserva sus propios tests, ejecutados mediante la
+invocación explícita de `go test` de arriba, no fusionados con el
+`coverage.out` de la raíz. Esto es una corrección, no el plan original: se
+verificó que `go list ./...` devuelve exactamente los 22 paquetes previos a
+la extracción en modo workspace, nunca `providers/go` (ver la Pregunta
+abierta corregida más abajo), así que las listas de paquetes basadas en
+`go list ./...` del objetivo `make coverage` de la raíz nunca incluyeron
+`providers/go` y siguen sin incluirlo. Eso es ahora una decisión de alcance
+deliberada (documentada en la sección de cobertura del `Makefile`), no un
+descuido a corregir: `providers/go` es un módulo publicado de forma
+independiente (D2/D4) cuya cobertura no forma parte de los umbrales del 90%/70%
+de la raíz, calibrados sobre el conjunto de paquetes previo a la extracción.
 
 ## Matriz de amenazas
 
@@ -296,8 +304,10 @@ precisamente para no introducir una nueva ruta de VCS automatizada con credencia
 
 1. **Tramo 1** (rama desde `develop`): guardianes en RED → módulo + `git mv` →
    los tres cambios de importador → `go.work` → `replace` temporal → borrar
-   `internal/capabilities/` → línea 46 de `COMPATIBILITY.md`. Verde tanto con
-   `go test -race ./...` como con `GOWORK=off go build ./...`. Verificar que
+   `internal/capabilities/` → línea 46 de `COMPATIBILITY.md`. Verde con
+   `go test -race ./...` **y** `(cd providers/go && go test -race ./...)`
+   (las dos invocaciones que `./...` no fusiona — ver la Pregunta abierta
+   corregida más abajo), además de `GOWORK=off go build ./...`. Verificar que
    `git diff --stat -- pkg/shipwright/` esté vacío. Merge a `develop`.
 2. **Etiqueta**: `git tag providers/go/v0.1.0 <sha del merge>` +
    `git push origin providers/go/v0.1.0`. Confirmar que el proxy la ve
@@ -312,15 +322,37 @@ el único artefacto irreversible: se sustituye con `v0.1.1`, nunca se borra.
 
 ## Preguntas abiertas
 
-- [ ] **`go mod download` / `go mod verify` de CI en modo workspace.** Se ejecutan
-      en la etapa `setup` y son operaciones de módulo único cuyo comportamiento en
-      modo workspace varía según la versión de Go. **Respuesta de diseño**:
-      prefijar ambos con `GOWORK=off` para que conserven su semántica previa
-      exacta; las etapas `build`/`test`/`security` permanecen en modo workspace
-      para que `./...` abarque `providers/go` sin ningún paso nuevo (la afirmación
-      "CI sin cambios" de la propuesta se sostiene para esas tres). Verificar
-      empíricamente en el tramo 1; si los comandos sin prefijo ya funcionan,
-      quitar el prefijo y dejar `ci.yml` intacto.
+- [x] **`go mod download` / `go mod verify` de CI en modo workspace, y si `./...`
+      abarca `providers/go` en las etapas `build`/`test`/`security`.**
+      **Verificado empíricamente en el tramo 1 — la respuesta de diseño
+      original era incorrecta en la segunda mitad.** `go list ./...` desde la
+      raíz del repo devuelve exactamente los 22 paquetes previos a la
+      extracción, de forma idéntica en modo `GOWORK=off` y en modo workspace;
+      el comodín `./...` de Go **nunca** cruza el límite de un módulo anidado
+      declarado vía `use` en `go.work` — solo lo hace el patrón `all` o una
+      ruta de importación completamente calificada. `all` tampoco es un
+      sustituto seguro, confirmado comando por comando: `go vet all` termina
+      con código 1 (también aplica vet a archivos `_test.go` de dependencias
+      de terceros no relacionados, con problemas de vet preexistentes, p. ej.
+      `google/go-cmp`, `prometheus/client_golang`); `go fmt all` rechaza
+      explícitamente los paquetes de `providers/go` ("not formatting packages
+      in dependency modules"); `go list all` / `go test all` arrastran todo el
+      grafo transitivo de dependencias (~400 paquetes), no solo los dos
+      módulos del workspace; `govulncheck` no abarca `go.work` en absoluto (los
+      escaneos de la raíz y de `providers/go` producen hallazgos disjuntos).
+      Así que la afirmación "CI sin cambios" de la propuesta **no** se
+      sostiene: antes de esta corrección, `providers/go` quedaba
+      silenciosamente excluido de toda invocación `build`/`test`/`vet`/`fmt`/
+      `govulncheck` de alcance-repositorio, tanto en `Makefile` como en
+      `ci.yml`. **Corrección aplicada**: se añadió una invocación explícita
+      `(cd providers/go && go <cmd> ./...)` (o `govulncheck` con alcance de
+      módulo) junto a cada invocación de la raíz ya existente — no ampliando
+      `./...` a `all`, que las pruebas de arriba muestran que es inseguro. La
+      cobertura (`go list ./... | grep -v ...`) es la única excepción que se
+      deja sin cambios por diseño, no por descuido — ver la nota de Cobertura
+      más arriba. `go mod download`/`go mod verify` en la etapa `setup` siguen
+      prefijados con `GOWORK=off` como se diseñó originalmente; esa mitad de
+      la respuesta se mantiene.
 - [ ] **Visibilidad del repositorio.** `git remote` confirma
       `github.com/pablogore/shipwright`, así que la ruta de módulo coincide con el
       repositorio y la premisa de D4 se sostiene. No verificado: si el repositorio
