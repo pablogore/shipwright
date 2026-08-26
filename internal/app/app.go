@@ -119,7 +119,7 @@ func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
 	}
 
 	// Load and initialize plugins before executing pipeline
-	if err := a.loadAndInitializePlugins(ctx, pipelineName, initialPipeline); err != nil {
+	if err := a.loadAndInitializePlugins(ctx, pipelineName); err != nil {
 		logger.L().WarnContext(ctx, "Failed to load plugins, continuing without plugins", "error", err)
 		// Don't fail the pipeline if plugins fail to load
 	}
@@ -203,7 +203,7 @@ func (a *App) GetPipelineInfo(pipelineName string) (map[string]any, error) {
 }
 
 // loadAndInitializePlugins loads and initializes plugins for the pipeline.
-func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string, pipeline interfaces.Pipeline) error {
+func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string) error {
 	// Get plugin registry
 	registry, err := a.container.Get("pluginRegistry")
 	if err != nil {
@@ -235,6 +235,11 @@ func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string,
 	cfg := a.container.GetConfiguration()
 	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
 
+	// Build the Layer 1 capability bundle exposed to plugins (replaces the
+	// retired interfaces.Pipeline handoff — see Container.BuildCapabilities
+	// and plugins.PluginContext.GetCapabilities()).
+	pluginCapabilities := BuildCapabilities(daggerClient, pipelineConfig)
+
 	// Get logger (using go-kit-logger directly)
 	// Create plugin context
 	pluginCtx := plugins.NewPluginContext(
@@ -242,7 +247,7 @@ func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string,
 		cfg,
 		hookManager.(interfaces.HookManager),
 		stepRegistry.(interfaces.StepRegistry),
-		pipeline,
+		pluginCapabilities,
 		pipelineConfig,
 		nil, // Logger is accessed via logger.L() directly
 	)

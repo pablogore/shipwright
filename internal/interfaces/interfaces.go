@@ -171,11 +171,16 @@ type StepResult struct {
 	Error     error          `json:"error,omitempty"`
 	Output    string         `json:"output,omitempty"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
-	Artifacts []Artifact     `json:"artifacts,omitempty"`
+	Artifacts []StepArtifact `json:"artifacts,omitempty"`
 }
 
-// Artifact represents a file or artifact produced by a step.
-type Artifact struct {
+// StepArtifact represents a file or artifact produced by a legacy pipeline
+// step (internal/app's dynamic-step execution model). Renamed from
+// "Artifact" (WU10, tasks.md 10.2) to avoid a name collision with the new
+// Layer 1 Artifactor capability vocabulary (pkg/shipwright, internal/capabilities,
+// internal/workflow/providers) — this type is unrelated to that capability
+// contract, it is the legacy step-execution model's artifact record.
+type StepArtifact struct {
 	Name        string `json:"name"`
 	Path        string `json:"path"`
 	Type        string `json:"type"`

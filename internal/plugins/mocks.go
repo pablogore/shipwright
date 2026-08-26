@@ -57,13 +57,13 @@ func NewMockPlugin() *MockPlugin {
 
 // MockPluginContext implements PluginContext interface for testing.
 type MockPluginContext struct {
-	GetConfigurationFunc  func() interfaces.Configuration
-	GetDaggerClientFunc   func() (*dagger.Client, error)
-	GetHookManagerFunc    func() interfaces.HookManager
-	GetLoggerFunc         func() interfaces.Logger
-	GetPipelineConfigFunc func() pipelines.Config
-	GetPipelineFunc       func() interfaces.Pipeline
-	GetStepRegistryFunc   func() interfaces.StepRegistry
+	GetConfigurationFunc func() interfaces.Configuration
+	GetDaggerClientFunc  func() (*dagger.Client, error)
+	GetHookManagerFunc   func() interfaces.HookManager
+	GetLoggerFunc        func() interfaces.Logger
+	GetConfigFunc        func() pipelines.Config
+	GetCapabilitiesFunc  func() Capabilities
+	GetStepRegistryFunc  func() interfaces.StepRegistry
 }
 
 // GetConfiguration implements PluginContext interface.
@@ -98,18 +98,18 @@ func (m *MockPluginContext) GetLogger() interfaces.Logger {
 	return nil
 }
 
-// GetPipeline implements PluginContext interface.
-func (m *MockPluginContext) GetPipeline() interfaces.Pipeline {
-	if m.GetPipelineFunc != nil {
-		return m.GetPipelineFunc()
+// GetCapabilities implements PluginContext interface.
+func (m *MockPluginContext) GetCapabilities() Capabilities {
+	if m.GetCapabilitiesFunc != nil {
+		return m.GetCapabilitiesFunc()
 	}
-	return nil
+	return Capabilities{}
 }
 
-// GetPipelineConfig implements PluginContext interface.
-func (m *MockPluginContext) GetPipelineConfig() pipelines.Config {
-	if m.GetPipelineConfigFunc != nil {
-		return m.GetPipelineConfigFunc()
+// GetConfig implements PluginContext interface.
+func (m *MockPluginContext) GetConfig() pipelines.Config {
+	if m.GetConfigFunc != nil {
+		return m.GetConfigFunc()
 	}
 	return pipelines.Config{}
 }

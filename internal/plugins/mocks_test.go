@@ -11,6 +11,7 @@ import (
 
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
 func TestMockPlugin(t *testing.T) {
@@ -65,8 +66,8 @@ func TestMockPluginContext(t *testing.T) {
 		client, clientErr := ctx.GetDaggerClient()
 		hookManager := ctx.GetHookManager()
 		logger := ctx.GetLogger()
-		pipeline := ctx.GetPipeline()
-		pipelineConfig := ctx.GetPipelineConfig()
+		caps := ctx.GetCapabilities()
+		pipelineConfig := ctx.GetConfig()
 		stepRegistry := ctx.GetStepRegistry()
 
 		// Assert
@@ -75,7 +76,7 @@ func TestMockPluginContext(t *testing.T) {
 		assert.NoError(t, clientErr)
 		assert.Nil(t, hookManager)
 		assert.Nil(t, logger)
-		assert.Nil(t, pipeline)
+		assert.Equal(t, Capabilities{}, caps)
 		assert.Equal(t, pipelines.Config{}, pipelineConfig)
 		assert.Nil(t, stepRegistry)
 	})
@@ -86,7 +87,7 @@ func TestMockPluginContext(t *testing.T) {
 		mockCfg := NewMockConfiguration()
 		mockHookManager := NewMockHookManager()
 		mockStepRegistry := NewMockStepRegistry()
-		mockPipeline := NewMockPipeline()
+		mockCaps := Capabilities{Testers: []shipwright.Tester{}}
 		mockLogger := NewMockLogger()
 		daggerClient := &dagger.Client{}
 
@@ -94,9 +95,9 @@ func TestMockPluginContext(t *testing.T) {
 		ctx.GetDaggerClientFunc = func() (*dagger.Client, error) { return daggerClient, nil }
 		ctx.GetHookManagerFunc = func() interfaces.HookManager { return mockHookManager }
 		ctx.GetStepRegistryFunc = func() interfaces.StepRegistry { return mockStepRegistry }
-		ctx.GetPipelineFunc = func() interfaces.Pipeline { return mockPipeline }
+		ctx.GetCapabilitiesFunc = func() Capabilities { return mockCaps }
 		ctx.GetLoggerFunc = func() interfaces.Logger { return mockLogger }
-		ctx.GetPipelineConfigFunc = func() pipelines.Config {
+		ctx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{Env: "test"}
 		}
 
@@ -105,8 +106,8 @@ func TestMockPluginContext(t *testing.T) {
 		client, clientErr := ctx.GetDaggerClient()
 		hookManager := ctx.GetHookManager()
 		logger := ctx.GetLogger()
-		pipeline := ctx.GetPipeline()
-		pipelineConfig := ctx.GetPipelineConfig()
+		caps := ctx.GetCapabilities()
+		pipelineConfig := ctx.GetConfig()
 		stepRegistry := ctx.GetStepRegistry()
 
 		// Assert
@@ -115,7 +116,7 @@ func TestMockPluginContext(t *testing.T) {
 		assert.NoError(t, clientErr)
 		assert.Equal(t, mockHookManager, hookManager)
 		assert.Equal(t, mockLogger, logger)
-		assert.Equal(t, mockPipeline, pipeline)
+		assert.Equal(t, mockCaps, caps)
 		assert.Equal(t, "test", pipelineConfig.Env)
 		assert.Equal(t, mockStepRegistry, stepRegistry)
 	})
