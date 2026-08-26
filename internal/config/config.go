@@ -419,8 +419,8 @@ func (cw *ConfigurationWrapper) Get(key string) any {
 		return cw.Config.Release.ArchiveFormats
 	case key == "plugins":
 		return cw.Config.Plugins
-	case len(key) > 8 && key[:8] == "plugins.":
-		pluginName := key[8:]
+	case strings.HasPrefix(key, "plugins."):
+		pluginName := strings.TrimPrefix(key, "plugins.")
 		if cw.Config.Plugins == nil {
 			return nil
 		}
@@ -472,8 +472,8 @@ func (cw *ConfigurationWrapper) Set(key string, value any) {
 		}
 	default:
 		// Handle plugins.<name> keys
-		if len(key) > 8 && key[:8] == "plugins." {
-			pluginName := key[8:]
+		if strings.HasPrefix(key, "plugins.") {
+			pluginName := strings.TrimPrefix(key, "plugins.")
 			if cw.Config.Plugins == nil {
 				cw.Config.Plugins = make(map[string]map[string]any)
 			}
