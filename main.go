@@ -14,7 +14,18 @@ import (
 	"github.com/pablogore/shipwright/internal/config"
 	"github.com/pablogore/shipwright/internal/executors"
 	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/workflow/engine"
+	"github.com/pablogore/shipwright/internal/workflow/graph"
+	"github.com/pablogore/shipwright/internal/workflow/manifest"
+	"github.com/pablogore/shipwright/internal/workflow/providers"
 )
+
+// defaultWorkflowManifestPath is --workflow's registered default (design.md
+// D-N: "Default .shipwright/workflow.yaml"). Registering it as the flag's
+// literal default, rather than "", keeps the flag's own --help text
+// accurate to the design; MODE SELECTION never reads this default value
+// directly — see Flags.workflowSet's doc comment for why.
+const defaultWorkflowManifestPath = ".shipwright/workflow.yaml"
 
 // CLI identity constants — presented in the --help usage line, --version
 // output, and structured startup log messages.
@@ -102,6 +113,18 @@ func (c *CLI) Run(args []string) error {
 	// Get the application instance
 	c.app = app.NewApp(app.GetContainer())
 
+	// The manifest-driven entrypoint (design.md D-N) takes over dispatch
+	// entirely once the user explicitly requests it via --workflow — it
+	// never falls through to the legacy --pipeline dispatch below, and a
+	// missing/unreadable manifest fails closed with no implicit legacy
+	// fallback (tasks.md 9.1). Everything from here down to the end of
+	// Run is the pre-existing legacy --pipeline path, untouched (tasks.md
+	// 9.5): both paths coexist so no merged state of this change ever
+	// leaves the CLI able to run nothing (design.md D-N sequencing note).
+	if flags.workflowSet {
+		return c.runWorkflowCLI(ctx, flags)
+	}
+
 	// Handle special commands
 	if flags.listPipelines {
 		return c.listAvailablePipelines(ctx)
@@ -139,6 +162,20 @@ type Flags struct {
 	verbose       bool
 	version       bool
 	configFile    string
+
+	// workflow is --workflow's path value (always populated — either the
+	// user's explicit value or defaultWorkflowManifestPath). workflowSet
+	// is true ONLY when the user explicitly passed --workflow on the
+	// command line (detected via flag.FlagSet.Visit in parseFlags, never
+	// from workflow's value alone). This is the mode switch between the
+	// legacy --pipeline path and the new manifest-driven path: a bare
+	// invocation (no --workflow) MUST behave EXACTLY as it did before this
+	// flag existed (design.md D-N, tasks.md 9.5 — --pipeline and every
+	// other legacy flag stay fully functional and untouched in this work
+	// unit), which a value-based check ("workflow != \"\"") could not
+	// guarantee once workflow has a non-empty registered default.
+	workflow    string
+	workflowSet bool
 }
 
 // parseFlags parses command line arguments.
@@ -171,10 +208,25 @@ func (c *CLI) parseFlags(args []string) (*Flags, error) {
 	flagSet.BoolVar(&flags.version, "version", false, "Show version information")
 	flagSet.BoolVar(&flags.local, "local", false, "Run pipeline locally without Docker")
 	flagSet.BoolVar(&flags.health, "health", false, "Run health checks for Dagger, registry, and Git")
+	flagSet.StringVar(&flags.workflow, "workflow", defaultWorkflowManifestPath,
+		"Path to a declarative workflow manifest — the new manifest-driven entrypoint (design.md D-N). "+
+			"Providing this flag switches the CLI to workflow mode; --step/--list-steps then target the "+
+			"manifest instead of the legacy --pipeline preset")
 
 	if err := flagSet.Parse(args); err != nil {
 		return nil, fmt.Errorf("failed to parse flags: %w", err)
 	}
+
+	// flagSet.Visit iterates ONLY the flags actually set on the command
+	// line — this is the one reliable way to distinguish "the user typed
+	// --workflow" from "--workflow's registered default happens to be
+	// non-empty" (see Flags.workflowSet's doc comment).
+	flagSet.Visit(func(f *flag.Flag) {
+		if f.Name == "workflow" {
+			flags.workflowSet = true
+		}
+	})
+
 	return flags, nil
 }
 
@@ -599,6 +651,284 @@ func (c *CLI) executeStepLocally(ctx context.Context, flags *Flags) error {
 
 	logger.L().InfoContext(ctx, "Pipeline step completed", "step", flags.step)
 	return nil
+}
+
+// workflowStepInfo is one manifest step's --list-steps report line
+// (design.md D-N: "--list-steps retargeted to list manifest step ids with
+// capability and resolved provider").
+type workflowStepInfo struct {
+	StepID          string
+	Capability      string
+	ProviderName    string
+	ProviderModule  string
+	ProviderVersion string
+}
+
+// runWorkflowCLI is the manifest-driven entrypoint's dispatcher (design.md
+// D-N). It parses+builds the manifest's graph first, unconditionally — a
+// missing/invalid manifest fails closed here, before --list-steps or
+// --step are even inspected (tasks.md 9.1), and this function never calls
+// into any legacy --pipeline code path (tasks.md 9.5).
+func (c *CLI) runWorkflowCLI(ctx context.Context, flags *Flags) error {
+	m, g, err := loadWorkflowManifest(flags.workflow)
+	if err != nil {
+		return err
+	}
+
+	if flags.listSteps {
+		return c.listWorkflowSteps(ctx, m)
+	}
+
+	runGraph, err := selectWorkflowGraph(g, flags.step)
+	if err != nil {
+		return err
+	}
+
+	return c.executeWorkflow(ctx, m, runGraph, flags)
+}
+
+// loadWorkflowManifest runs stages 1-3 (manifest.ParseFile) and stage 5
+// (graph.Build) of the fixed seven-stage validation pipeline (design.md
+// D-H) against path. manifest.ParseFile's own error already names the
+// exact path it failed to open/parse (internal/workflow/manifest/parse.go:
+// "manifest: open %s: %w") — this function adds no fallback of its own and
+// performs no implicit legacy --pipeline behavior on failure (design.md
+// D-N, tasks.md 9.1).
+func loadWorkflowManifest(path string) (*manifest.Manifest, *graph.Graph, error) {
+	m, err := manifest.ParseFile(path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("workflow: %w", err)
+	}
+
+	g, err := graph.Build(m.Spec.Steps)
+	if err != nil {
+		return nil, nil, fmt.Errorf("workflow: %w", err)
+	}
+
+	return m, g, nil
+}
+
+// selectWorkflowGraph returns g unchanged for a full workflow run
+// (stepID == ""), or stepID's needs-transitive closure via engine.Closure
+// when --step names a manifest step (design.md D-N: "--step <id>
+// retargeted to a manifest step id ... executes the needs-transitive
+// closure of <id> in topological order and stops"). This is the ONLY
+// place main.go computes reachability — the actual algorithm lives in
+// internal/workflow/engine/subgraph.go (WU8), per that package's own doc
+// comment naming this wiring as Phase 9's job.
+func selectWorkflowGraph(g *graph.Graph, stepID string) (*graph.Graph, error) {
+	if stepID == "" {
+		return g, nil
+	}
+
+	closure, err := engine.Closure(g, stepID)
+	if err != nil {
+		return nil, fmt.Errorf("workflow: %w", err)
+	}
+	return closure, nil
+}
+
+// listWorkflowSteps reports every manifest step's id, declared capability,
+// and resolved provider name/version (design.md D-N). Providers are
+// resolved against a nil Dagger client and an empty providers.Values map:
+// resolution at listing time only needs to prove a step's uses.provider/
+// uses.module is registered and version-supported (internal/workflow/
+// providers.checkWithSchema only rejects a with-field kind mismatch for
+// fields actually present in the Values it is given — an empty map can
+// never trigger one), never to actually run anything.
+func (c *CLI) listWorkflowSteps(ctx context.Context, m *manifest.Manifest) error {
+	reg := providers.NewRegistry()
+	providers.RegisterDefaults(reg, nil)
+
+	infos, err := resolveStepInfos(m.Spec.Steps, reg)
+	if err != nil {
+		return err
+	}
+
+	logger.L().InfoContext(ctx, "Available workflow steps",
+		"manifest", m.Metadata.Name,
+		"steps_count", len(infos))
+
+	for i, info := range infos {
+		logger.L().InfoContext(ctx, "Step information",
+			"index", i+1,
+			"step", info.StepID,
+			"capability", info.Capability,
+			"provider", info.ProviderName,
+			"provider_module", info.ProviderModule,
+			"provider_version", info.ProviderVersion)
+	}
+
+	return nil
+}
+
+// resolveStepInfos resolves every step's declared uses.provider/uses.module
+// against reg — see listWorkflowSteps' doc comment for why an empty
+// providers.Values map is always safe here.
+func resolveStepInfos(steps []manifest.Step, reg *providers.Registry) ([]workflowStepInfo, error) {
+	infos := make([]workflowStepInfo, 0, len(steps))
+	for _, s := range steps {
+		ref := providers.Ref{Name: s.Uses.Provider, Module: s.Uses.Module, Version: s.Uses.Version}
+		if err := resolveCapabilityRef(reg, s.Capability, ref); err != nil {
+			return nil, fmt.Errorf("workflow: step %q: %w", s.ID, err)
+		}
+		infos = append(infos, workflowStepInfo{
+			StepID:          s.ID,
+			Capability:      s.Capability,
+			ProviderName:    ref.Name,
+			ProviderModule:  ref.Module,
+			ProviderVersion: ref.Version,
+		})
+	}
+	return infos, nil
+}
+
+// resolveCapabilityRef dispatches ref to the Resolve* method matching
+// capability — manifest.ValidateStructure (stage 3, already run by
+// manifest.ParseFile) rejects any capability outside the five known
+// values, so the default case here is defensive only, never reachable
+// through the normal parse -> list pipeline.
+func resolveCapabilityRef(reg *providers.Registry, capability string, ref providers.Ref) error {
+	empty := providers.Values{}
+
+	switch capability {
+	case "build":
+		_, err := reg.ResolveBuilder(ref, empty)
+		return err
+	case "test":
+		_, err := reg.ResolveTester(ref, empty)
+		return err
+	case "artifact":
+		_, err := reg.ResolveArtifactor(ref, empty)
+		return err
+	case "deploy":
+		_, err := reg.ResolveDeployer(ref, empty)
+		return err
+	case "run":
+		_, err := reg.ResolveRunner(ref, empty)
+		return err
+	default:
+		return fmt.Errorf("unknown capability %q", capability)
+	}
+}
+
+// executeWorkflow runs g's steps end-to-end (design.md D-N/D-K): a real
+// Dagger client (via the app container — the same lazily-connected
+// "daggerClient" component the legacy --pipeline path already uses),
+// providers.RegisterDefaults' real in-repo capability implementations
+// (WU3/WU7), the manifest's declared secrets/source/variables, and
+// engine.Execute (WU8) for the wave-scheduled run itself. This is the
+// wiring task.md 9.4 asks for — it does not reimplement any engine logic,
+// it only assembles engine.Config and calls engine.Execute.
+func (c *CLI) executeWorkflow(ctx context.Context, m *manifest.Manifest, g *graph.Graph, flags *Flags) error {
+	client, err := c.workflowDaggerClient()
+	if err != nil {
+		return err
+	}
+
+	reg := providers.NewRegistry()
+	providers.RegisterDefaults(reg, client)
+
+	opts, err := engine.OptionsFromSpec(m.Spec.Execution)
+	if err != nil {
+		return fmt.Errorf("workflow: %w", err)
+	}
+
+	secrets, err := resolveWorkflowSecrets(client, m.Spec.Secrets)
+	if err != nil {
+		return fmt.Errorf("workflow: %w", err)
+	}
+
+	source, err := resolveWorkflowSource(client, m.Spec.Source)
+	if err != nil {
+		return fmt.Errorf("workflow: %w", err)
+	}
+
+	cfg := engine.Config{
+		Steps:      m.Spec.Steps,
+		Graph:      g,
+		Registry:   reg,
+		Source:     source,
+		Variables:  m.Spec.Variables,
+		Secrets:    secrets,
+		Predicates: map[string]string{"branch": flags.branch},
+		Options:    opts,
+	}
+
+	logger.L().InfoContext(ctx, "Executing workflow",
+		"manifest", m.Metadata.Name,
+		"steps", len(g.Nodes))
+
+	res, err := engine.Execute(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("workflow: %w", err)
+	}
+	if res.Failed() {
+		return fmt.Errorf("workflow: steps failed: %v", res.Failures)
+	}
+
+	logger.L().InfoContext(ctx, "Workflow completed successfully", "manifest", m.Metadata.Name)
+	return nil
+}
+
+// workflowDaggerClient acquires the app container's lazily-connected
+// "daggerClient" component — the identical component/connection mechanism
+// the legacy --pipeline path already relies on (see
+// executePipelineWithExecutor above); real execution genuinely needs a
+// live Dagger engine, unlike loadWorkflowManifest/listWorkflowSteps above,
+// which never touch it.
+func (c *CLI) workflowDaggerClient() (*dagger.Client, error) {
+	container := c.app.GetContainer()
+	client, err := container.Get("daggerClient")
+	if err != nil {
+		return nil, fmt.Errorf("workflow: failed to acquire Dagger client: %w", err)
+	}
+	daggerClient, ok := client.(*dagger.Client)
+	if !ok || daggerClient == nil {
+		return nil, fmt.Errorf("workflow: Dagger client unavailable")
+	}
+	return daggerClient, nil
+}
+
+// resolveWorkflowSecrets binds every spec.secrets entry to a *dagger.Secret
+// via client.SetSecret, reading each one's plaintext value from its
+// declared FromEnv environment variable (internal/pipelines/shared/
+// docker.go's existing client.SetSecret pattern, reused here per
+// manifest/schema.go's SecretSpec doc comment). The plaintext value never
+// leaves this function as anything other than the argument to SetSecret —
+// engine.Config.Secrets only ever holds the resulting *dagger.Secret
+// handles (design.md D-L).
+func resolveWorkflowSecrets(client *dagger.Client, secrets map[string]manifest.SecretSpec) (map[string]*dagger.Secret, error) {
+	if len(secrets) == 0 {
+		return nil, nil
+	}
+
+	out := make(map[string]*dagger.Secret, len(secrets))
+	for name, spec := range secrets {
+		out[name] = client.SetSecret(name, os.Getenv(spec.FromEnv))
+	}
+	return out, nil
+}
+
+// resolveWorkflowSource binds spec.source to the Directory engine.Config.
+// Source needs. Only a local spec.source.path is supported by this work
+// unit's CLI wiring — a git-based spec.source.repo/ref source is a
+// confirmed, deliberately out-of-scope gap for this work unit (flagged for
+// sdd-verify, mirroring prior work units' "report what is provable, do not
+// guess" / explicit-gap-flagging discipline): implementing a git clone
+// path here would reach beyond "wire main.go to the already-built engine
+// package" into new source-acquisition logic no earlier work unit built or
+// tested.
+func resolveWorkflowSource(client *dagger.Client, spec manifest.SourceSpec) (*dagger.Directory, error) {
+	if spec.Repo != "" {
+		return nil, fmt.Errorf("workflow: spec.source.repo (git-based source) is not supported by this CLI entrypoint yet — use spec.source.path")
+	}
+
+	path := spec.Path
+	if path == "" {
+		path = "."
+	}
+	return client.Host().Directory(path), nil
 }
 
 // Version and build information - set at build time
