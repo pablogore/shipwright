@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pablogore/shipwright/internal/workflow/manifest"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
@@ -380,6 +382,126 @@ func TestResolveCapabilityRef_UnknownCapabilityFailsClosed(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not-a-real-capability")
+}
+
+// --- resolveWorkflowSource tests (source-repo-ref-support) ---
+
+// TestResolveWorkflowSource_HTTPSClone proves the HTTPS protocol detection
+// path: a repo URL that doesn't start with "git@" selects HTTPS, and
+// shared.CloneRepo is reached (failing on an invalid repo, which proves
+// the delegation path is exercised). The error must mention the default
+// "main" branch since ref is empty.
+func TestResolveWorkflowSource_HTTPSClone(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip Dagger integration in short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
+	require.NoError(t, err)
+	defer client.Close()
+
+	spec := manifest.SourceSpec{
+		Repo: "https://github.com/org/nonexistent-repo.git",
+		Ref:  "",
+	}
+
+	_, err = resolveWorkflowSource(ctx, client, spec)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "main",
+		"error must reference the default branch 'main' when ref is empty")
+}
+
+// TestResolveWorkflowSource_SSHClone proves the SSH protocol detection
+// path: a repo URL starting with "git@" selects SSH. The clone fails
+// (no SSH key available in test env), which proves the SSH branch was taken.
+func TestResolveWorkflowSource_SSHClone(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip Dagger integration in short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
+	require.NoError(t, err)
+	defer client.Close()
+
+	spec := manifest.SourceSpec{
+		Repo: "git@github.com:org/nonexistent-repo.git",
+	}
+
+	_, err = resolveWorkflowSource(ctx, client, spec)
+	require.Error(t, err)
+	// The error comes from the SSH cloner — proves SSH path was taken.
+	assert.Error(t, err)
+}
+
+// TestResolveWorkflowSource_ExplicitRefPreserved proves that when spec.Ref
+// is set to a non-default value, it is forwarded to CloneRepo unchanged.
+func TestResolveWorkflowSource_ExplicitRefPreserved(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip Dagger integration in short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
+	require.NoError(t, err)
+	defer client.Close()
+
+	spec := manifest.SourceSpec{
+		Repo: "https://github.com/org/nonexistent-repo.git",
+		Ref:  "develop",
+	}
+
+	_, err = resolveWorkflowSource(ctx, client, spec)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "develop",
+		"error must reference the explicit branch 'develop'")
+}
+
+// TestResolveWorkflowSource_EmptyRefDefaultsToMain proves that an empty
+// spec.Ref is replaced with "main" before calling CloneRepo.
+func TestResolveWorkflowSource_EmptyRefDefaultsToMain(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip Dagger integration in short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
+	require.NoError(t, err)
+	defer client.Close()
+
+	spec := manifest.SourceSpec{
+		Repo: "https://github.com/org/nonexistent-repo.git",
+		Ref:  "",
+	}
+
+	_, err = resolveWorkflowSource(ctx, client, spec)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "main",
+		"error must reference the default branch 'main' when ref is empty")
+}
+
+// TestResolveWorkflowSource_PathFallback proves the existing path-based
+// code path is unchanged: when spec.Repo is empty, the function returns
+// client.Host().Directory(path) with no clone attempt.
+func TestResolveWorkflowSource_PathFallback(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip Dagger integration in short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
+	require.NoError(t, err)
+	defer client.Close()
+
+	spec := manifest.SourceSpec{
+		Repo: "",
+		Path: ".",
+	}
+
+	dir, err := resolveWorkflowSource(ctx, client, spec)
+	require.NoError(t, err)
+	assert.NotNil(t, dir, "path fallback must return a non-nil Directory")
 }
 
 // TestCLI_parseFlags_PresetFlagsRemoved is task 11.2's RED test (design.md

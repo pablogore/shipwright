@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"dagger.io/dagger"
 	"github.com/pablogore/kit-logger/pkg/logger"
@@ -13,6 +14,7 @@ import (
 	"github.com/pablogore/shipwright/internal/app"
 	"github.com/pablogore/shipwright/internal/config"
 	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/pipelines/shared"
 	"github.com/pablogore/shipwright/internal/workflow/engine"
 	"github.com/pablogore/shipwright/internal/workflow/graph"
 	"github.com/pablogore/shipwright/internal/workflow/manifest"
@@ -481,7 +483,7 @@ func (c *CLI) runWorkflowEngine(
 		return fmt.Errorf("workflow: %w", err)
 	}
 
-	source, err := resolveWorkflowSource(client, m.Spec.Source)
+	source, err := resolveWorkflowSource(ctx, client, m.Spec.Source)
 	if err != nil {
 		return fmt.Errorf("workflow: %w", err)
 	}
@@ -551,18 +553,30 @@ func resolveWorkflowSecrets(client *dagger.Client, secrets map[string]manifest.S
 	return out, nil
 }
 
-// resolveWorkflowSource binds spec.source to the Directory engine.Config.
-// Source needs. Only a local spec.source.path is supported by this work
-// unit's CLI wiring — a git-based spec.source.repo/ref source is a
-// confirmed, deliberately out-of-scope gap for this work unit (flagged for
-// sdd-verify, mirroring prior work units' "report what is provable, do not
-// guess" / explicit-gap-flagging discipline): implementing a git clone
-// path here would reach beyond "wire main.go to the already-built engine
-// package" into new source-acquisition logic no earlier work unit built or
-// tested.
-func resolveWorkflowSource(client *dagger.Client, spec manifest.SourceSpec) (*dagger.Directory, error) {
+// resolveWorkflowSource resolves the workflow's input source directory.
+//
+// When spec.Repo is non-empty, the clone protocol is detected from the URL
+// prefix (git@ → SSH, anything else → HTTPS) and delegated to
+// shared.CloneRepo. When spec.Repo is empty, the existing path-based local
+// directory resolution is used unchanged.
+func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec manifest.SourceSpec) (*dagger.Directory, error) {
 	if spec.Repo != "" {
-		return nil, fmt.Errorf("workflow: spec.source.repo (git-based source) is not supported by this CLI entrypoint yet — use spec.source.path")
+		protocol := "https"
+		if strings.HasPrefix(spec.Repo, "git@") {
+			protocol = "ssh"
+		}
+
+		ref := spec.Ref
+		if ref == "" {
+			ref = "main"
+		}
+
+		opts := shared.GitCloneOpts{
+			Repo:   spec.Repo,
+			Branch: ref,
+			Name:   "workflow-source",
+		}
+		return shared.CloneRepo(ctx, client, opts, protocol)
 	}
 
 	path := spec.Path
