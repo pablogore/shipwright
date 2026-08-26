@@ -113,4 +113,3 @@ func TestMetricsWrapper_Get_TracksMetrics(t *testing.T) {
 	assert.Equal(t, int64(1), wrapper.GetMetrics().GetHits())
 	assert.Equal(t, int64(1), wrapper.GetMetrics().GetTotalRequests())
 }
-

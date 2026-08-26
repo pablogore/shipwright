@@ -24,7 +24,7 @@ type YAMLConfig struct {
 		Environment string       `yaml:"environment"`
 		Coverage    float64      `yaml:"coverage"`
 		GoVersion   string       `yaml:"goVersion"`
-		Steps       interface{}  `yaml:"steps"` // Can be []string or []StepConfig
+		Steps       interface{}  `yaml:"steps"`                 // Can be []string or []StepConfig
 		StepConfigs []StepConfig `yaml:"stepConfigs,omitempty"` // Detailed step configurations
 	} `yaml:"pipeline"`
 
