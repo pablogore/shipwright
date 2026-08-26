@@ -53,6 +53,8 @@ type YAMLConfig struct {
 	Git struct {
 		Protocol string `yaml:"protocol"`
 	} `yaml:"git"`
+
+	Plugins map[string]map[string]any `yaml:"plugins"`
 }
 
 // YAMLParser handles parsing of YAML configuration files
@@ -129,6 +131,13 @@ func (p *YAMLParser) ApplyToConfiguration(yamlConfig *YAMLConfig, config interfa
 	// Apply git settings
 	if yamlConfig.Git.Protocol != "" {
 		config.Set("git.protocol", yamlConfig.Git.Protocol)
+	}
+
+	// Apply plugin settings
+	if yamlConfig.Plugins != nil {
+		for pluginName, pluginConfig := range yamlConfig.Plugins {
+			config.Set("plugins."+pluginName, pluginConfig)
+		}
 	}
 
 	return nil

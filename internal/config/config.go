@@ -48,14 +48,15 @@ const (
 
 // Config provides a simplified configuration interface with sane defaults.
 type Config struct {
-	Environment string         `koanf:"environment"`
-	Pipeline    PipelineConfig `koanf:"pipeline"`
-	Registry    RegistryConfig `koanf:"registry"`
-	Git         GitConfig      `koanf:"git"`
-	Security    SecurityConfig `koanf:"security"`
-	Logging     LoggingConfig  `koanf:"logging"`
-	Release     ReleaseConfig  `koanf:"release"`
-	Dagger      DaggerConfig   `koanf:"dagger"`
+	Environment string                     `koanf:"environment"`
+	Pipeline    PipelineConfig             `koanf:"pipeline"`
+	Registry    RegistryConfig             `koanf:"registry"`
+	Git         GitConfig                  `koanf:"git"`
+	Security    SecurityConfig             `koanf:"security"`
+	Logging     LoggingConfig              `koanf:"logging"`
+	Release     ReleaseConfig              `koanf:"release"`
+	Dagger      DaggerConfig               `koanf:"dagger"`
+	Plugins     map[string]map[string]any  `koanf:"plugins"`
 }
 
 // PipelineConfig defines pipeline configuration.
@@ -409,13 +410,21 @@ func (cw *ConfigurationWrapper) GetFloat(key string) float64 {
 
 // Get gets an interface value.
 func (cw *ConfigurationWrapper) Get(key string) any {
-	switch key {
-	case KeySecurityExcludePatterns:
+	switch {
+	case key == KeySecurityExcludePatterns:
 		return cw.Config.Security.ExcludePatterns
-	case KeyReleaseBuildTargets:
+	case key == KeyReleaseBuildTargets:
 		return cw.Config.Release.BuildTargets
-	case KeyReleaseArchiveFormats:
+	case key == KeyReleaseArchiveFormats:
 		return cw.Config.Release.ArchiveFormats
+	case key == "plugins":
+		return cw.Config.Plugins
+	case len(key) > 8 && key[:8] == "plugins.":
+		pluginName := key[8:]
+		if cw.Config.Plugins == nil {
+			return nil
+		}
+		return cw.Config.Plugins[pluginName]
 	default:
 		return nil
 	}
@@ -461,7 +470,17 @@ func (cw *ConfigurationWrapper) Set(key string, value any) {
 		if strValue, ok := value.(string); ok {
 			cw.Config.Logging.Level = strValue
 		}
-		// Add more cases as needed
+	default:
+		// Handle plugins.<name> keys
+		if len(key) > 8 && key[:8] == "plugins." {
+			pluginName := key[8:]
+			if cw.Config.Plugins == nil {
+				cw.Config.Plugins = make(map[string]map[string]any)
+			}
+			if configMap, ok := value.(map[string]any); ok {
+				cw.Config.Plugins[pluginName] = configMap
+			}
+		}
 	}
 }
 
