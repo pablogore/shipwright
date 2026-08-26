@@ -1,4 +1,4 @@
-package capabilities_test
+package golang_test
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/pablogore/shipwright/internal/capabilities"
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/go"
 )
 
 // TestGoBuilder_Build_RealEngine exercises GoBuilder.Build end to end
@@ -45,7 +45,7 @@ func main() {}
 	}
 
 	src := client.Host().Directory(tmpDir)
-	builder := &capabilities.GoBuilder{
+	builder := &golang.GoBuilder{
 		Client: client,
 		Config: shipwright.BuildConfig{GoVersion: "1.26.1", BinaryName: "capabilitiestest"},
 	}
@@ -92,7 +92,7 @@ func TestGoBuilder_Build_NilSource_RealClient(t *testing.T) {
 	}
 	defer client.Close()
 
-	builder := &capabilities.GoBuilder{Client: client}
+	builder := &golang.GoBuilder{Client: client}
 
 	_, err = builder.Build(ctx, nil)
 	if err == nil {
@@ -156,7 +156,7 @@ func TestAdd(t *testing.T) {
 	}
 
 	src := client.Host().Directory(tmpDir)
-	tester := &capabilities.GoUnitTester{
+	tester := &golang.GoUnitTester{
 		Client: client,
 		Config: shipwright.TestConfig{Coverage: 1},
 	}

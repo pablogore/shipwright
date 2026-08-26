@@ -1,15 +1,15 @@
-package capabilities_test
+package golang_test
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/pablogore/shipwright/internal/capabilities"
+	"github.com/pablogore/shipwright/providers/go"
 )
 
 func TestGoVulnScanner_Test_NilClient(t *testing.T) {
-	scanner := &capabilities.GoVulnScanner{}
+	scanner := &golang.GoVulnScanner{}
 
 	out, err := scanner.Test(context.Background(), nil)
 

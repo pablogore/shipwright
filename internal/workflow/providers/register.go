@@ -5,33 +5,35 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/pablogore/shipwright/internal/capabilities"
+	golang "github.com/pablogore/shipwright/providers/go"
+
 	"github.com/pablogore/shipwright/internal/workflow/interp"
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
 // RegisterDefaults registers Shipwright's five in-repo capability
-// implementations (internal/capabilities, WU3) into r under the provider
-// names design.md's own example manifest uses ("go", "go-test",
-// "golangci-lint", "govulncheck", "container"), all pinned to version
-// "1". This is the ONLY place in the tree that wires a manifest-facing
-// provider name to a concrete Go type — the Registry itself has no
-// knowledge of any provider's identity, and no provider registered here
-// (or anywhere else, see security_test.go) is loaded from a path,
-// fetched, or dynamically opened via plugin.Open (design.md D-I).
+// implementations (providers/go, extracted from the former
+// internal/capabilities, WU3) into r under the provider names design.md's
+// own example manifest uses ("go", "go-test", "golangci-lint",
+// "govulncheck", "container"), all pinned to version "1". This is the ONLY
+// place in the tree that wires a manifest-facing provider name to a
+// concrete Go type — the Registry itself has no knowledge of any
+// provider's identity, and no provider registered here (or anywhere else,
+// see security_test.go) is loaded from a path, fetched, or dynamically
+// opened via plugin.Open (design.md D-I).
 //
 // client is threaded through to every capability's Client field; it MAY
 // be nil in a test that only exercises resolution (never actually calling
 // a capability's method against a real Dagger engine) — every WU3
 // capability's own method already guards against a nil Client
-// (internal/capabilities/gobuilder.go etc.) and returns an error rather
-// than panicking, so registration itself never needs a live client.
+// (providers/go/gobuilder.go etc.) and returns an error rather than
+// panicking, so registration itself never needs a live client.
 func RegisterDefaults(r *Registry, client *dagger.Client) {
 	r.RegisterBuilder(Ref{Name: "go", Version: "1"}, WithSchema{
 		"goVersion":  interp.KindString,
 		"binaryName": interp.KindString,
 	}, func(v Values) shipwright.Builder {
-		return &capabilities.GoBuilder{
+		return &golang.GoBuilder{
 			Client: client,
 			Config: shipwright.BuildConfig{
 				GoVersion:  stringField(v, "goVersion"),
@@ -43,18 +45,18 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	r.RegisterTester(Ref{Name: "go-test", Version: "1"}, WithSchema{
 		"coverage": interp.KindInt,
 	}, func(v Values) shipwright.Tester {
-		return &capabilities.GoUnitTester{
+		return &golang.GoUnitTester{
 			Client: client,
 			Config: shipwright.TestConfig{Coverage: floatField(v, "coverage")},
 		}
 	})
 
 	r.RegisterTester(Ref{Name: "golangci-lint", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
-		return &capabilities.GoLinter{Client: client}
+		return &golang.GoLinter{Client: client}
 	})
 
 	r.RegisterTester(Ref{Name: "govulncheck", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
-		return &capabilities.GoVulnScanner{Client: client}
+		return &golang.GoVulnScanner{Client: client}
 	})
 
 	r.RegisterArtifactor(Ref{Name: "container", Version: "1"}, WithSchema{
@@ -62,7 +64,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"creds":        interp.KindSecret,
 		"registryUser": interp.KindString,
 	}, func(v Values) shipwright.Artifactor {
-		return &capabilities.ContainerPublisher{
+		return &golang.ContainerPublisher{
 			Client: client,
 			Config: shipwright.ArtifactConfig{RegistryUser: stringField(v, "registryUser")},
 		}

@@ -121,3 +121,33 @@ func TestGoModDaggerVersion_LocalPathReplaceFailsClosed(t *testing.T) {
 		t.Fatalf("GoModDaggerVersion() error = %q, want it to name the local replace path %q", err.Error(), wantSubstring)
 	}
 }
+
+// TestProvidersGoDaggerVersionMatchesRoot guards design.md's decision to add
+// zero new production code for cross-module Dagger pin parity: it reuses
+// GoModDaggerVersion, unchanged, against providers/go/go.mod. go.work alone
+// is insufficient -- in workspace mode Go silently picks one version via
+// MVS, so drift would build cleanly and only diverge for external
+// consumers who resolve providers/go outside the workspace. This is the
+// expected RED state before tasks.md 2.1 creates providers/go/go.mod.
+func TestProvidersGoDaggerVersionMatchesRoot(t *testing.T) {
+	root := repoRoot(t)
+
+	rootVersion, err := GoModDaggerVersion(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatalf("GoModDaggerVersion(root go.mod) error = %v, want nil", err)
+	}
+
+	providersGoVersion, err := GoModDaggerVersion(filepath.Join(root, "providers", "go", "go.mod"))
+	if err != nil {
+		t.Fatalf("GoModDaggerVersion(providers/go/go.mod) error = %v, want nil", err)
+	}
+
+	if rootVersion != providersGoVersion {
+		t.Fatalf(
+			"providers/go/go.mod dagger.io/dagger = %q, root go.mod dagger.io/dagger = %q -- "+
+				"the two must stay pinned identically to avoid two client versions in one build "+
+				"(proposal.md's Dagger compatibility note)",
+			providersGoVersion, rootVersion,
+		)
+	}
+}

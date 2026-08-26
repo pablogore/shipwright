@@ -1,15 +1,15 @@
-package capabilities_test
+package golang_test
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/pablogore/shipwright/internal/capabilities"
+	"github.com/pablogore/shipwright/providers/go"
 )
 
 func TestGoLinter_Test_NilClient(t *testing.T) {
-	linter := &capabilities.GoLinter{}
+	linter := &golang.GoLinter{}
 
 	out, err := linter.Test(context.Background(), nil)
 

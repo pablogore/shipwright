@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pablogore/shipwright/internal/capabilities"
+	golang "github.com/pablogore/shipwright/providers/go"
+
 	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
@@ -27,8 +28,9 @@ func TestBuildCapabilities_NilClientReturnsEmpty(t *testing.T) {
 }
 
 // TestBuildCapabilities_WiresRealImplementations proves BuildCapabilities
-// wires the standalone internal/capabilities implementations (Phase 3),
-// carrying the legacy pipelines.Config values through to their per-
+// wires the standalone providers/go implementations (originally Phase 3,
+// extracted from internal/capabilities), carrying the legacy
+// pipelines.Config values through to their per-
 // capability shipwright config structs (design.md D-D), when a non-nil
 // Dagger client is available.
 func TestBuildCapabilities_WiresRealImplementations(t *testing.T) {
@@ -57,31 +59,31 @@ func TestBuildCapabilities_WiresRealImplementations(t *testing.T) {
 	caps := BuildCapabilities(client, cfg)
 
 	require.NotNil(t, caps.Builder)
-	builder, ok := caps.Builder.(*capabilities.GoBuilder)
-	require.True(t, ok, "Builder must be *capabilities.GoBuilder")
+	builder, ok := caps.Builder.(*golang.GoBuilder)
+	require.True(t, ok, "Builder must be *golang.GoBuilder")
 	assert.Equal(t, client, builder.Client)
 	assert.Equal(t, "1.26.1", builder.Config.GoVersion)
 	assert.Equal(t, "17", builder.Config.JavaVersion)
 
 	require.Len(t, caps.Testers, 3, "GoUnitTester, GoLinter, GoVulnScanner")
-	unitTester, ok := caps.Testers[0].(*capabilities.GoUnitTester)
-	require.True(t, ok, "first Tester must be *capabilities.GoUnitTester")
+	unitTester, ok := caps.Testers[0].(*golang.GoUnitTester)
+	require.True(t, ok, "first Tester must be *golang.GoUnitTester")
 	assert.Equal(t, client, unitTester.Client)
 	assert.InDelta(t, 80.0, unitTester.Config.Coverage, 0.0001)
 	assert.Equal(t, "1.26.1", unitTester.GoVersion)
 
-	linter, ok := caps.Testers[1].(*capabilities.GoLinter)
-	require.True(t, ok, "second Tester must be *capabilities.GoLinter")
+	linter, ok := caps.Testers[1].(*golang.GoLinter)
+	require.True(t, ok, "second Tester must be *golang.GoLinter")
 	assert.Equal(t, client, linter.Client)
 
-	vulnScanner, ok := caps.Testers[2].(*capabilities.GoVulnScanner)
-	require.True(t, ok, "third Tester must be *capabilities.GoVulnScanner")
+	vulnScanner, ok := caps.Testers[2].(*golang.GoVulnScanner)
+	require.True(t, ok, "third Tester must be *golang.GoVulnScanner")
 	assert.Equal(t, client, vulnScanner.Client)
 	assert.Equal(t, "1.26.1", vulnScanner.GoVersion)
 
 	require.NotNil(t, caps.Artifactor)
-	publisher, ok := caps.Artifactor.(*capabilities.ContainerPublisher)
-	require.True(t, ok, "Artifactor must be *capabilities.ContainerPublisher")
+	publisher, ok := caps.Artifactor.(*golang.ContainerPublisher)
+	require.True(t, ok, "Artifactor must be *golang.ContainerPublisher")
 	assert.Equal(t, client, publisher.Client)
 	assert.Equal(t, "registry.example.com/org/svc", publisher.Config.Registry)
 	assert.Equal(t, "registry.example.com", publisher.Config.RegistryURL)

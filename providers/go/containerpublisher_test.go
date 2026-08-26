@@ -1,15 +1,15 @@
-package capabilities_test
+package golang_test
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/pablogore/shipwright/internal/capabilities"
+	"github.com/pablogore/shipwright/providers/go"
 )
 
 func TestContainerPublisher_Publish_NilClient(t *testing.T) {
-	publisher := &capabilities.ContainerPublisher{}
+	publisher := &golang.ContainerPublisher{}
 
 	ref, err := publisher.Publish(context.Background(), nil, "ghcr.io/acme/api:v1", nil)
 

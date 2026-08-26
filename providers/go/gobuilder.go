@@ -1,17 +1,31 @@
-// Package capabilities provides standalone, independently composable
-// implementations of Shipwright's Layer 1 capability interfaces
-// (pkg/shipwright). Every type in this flat package implements exactly one
-// capability and carries no shared "stack" identity — design.md D-F
-// explicitly rejects both a preset registry keyed by a stack name and a
-// nested goservice/ subdirectory, because the path itself would be a
-// bundling identity. See naming_test.go for the enforcing golden test.
+// Package golang provides Shipwright's Go-toolchain capability
+// implementations as their own standalone Go module
+// (github.com/pablogore/shipwright/providers/go), implementing Shipwright's
+// Layer 1 capability interfaces (pkg/shipwright) and nothing else. Every
+// type in this flat package implements exactly one capability and carries
+// no shared "stack" identity — design.md D-F explicitly rejects both a
+// preset registry keyed by a stack name and a nested goservice/
+// subdirectory, because the path itself would be a bundling identity. See
+// naming_test.go for the enforcing golden test.
+//
+// The package name deliberately differs from the last path element of
+// github.com/pablogore/shipwright/providers/go, because "go" is a Go
+// keyword and `package go` is a syntax error; importers reference it by its
+// declared name, golang, or alias it explicitly for clarity:
+//
+//	import golang "github.com/pablogore/shipwright/providers/go"
+//
+// This package imports nothing from internal/**, enforced by
+// internalimport_test.go (design.md D5) — the public contract
+// (pkg/shipwright) is sufficient on its own to implement every capability
+// here, from outside the core module.
 //
 // This package is purely additive. internal/pipelines/go-service/** is
 // left in place, untouched, and still fully functional; nothing here
 // migrates or removes any existing consumer of go-service — that
 // migration is a later, separate work unit (design.md's Migration
 // Sequence, slices 10-11).
-package capabilities
+package golang
 
 import (
 	"context"
