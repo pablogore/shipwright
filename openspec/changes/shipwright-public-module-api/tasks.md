@@ -135,12 +135,12 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 10 — DI + plugin re-type onto Layer 1 (`composition-model`) [LARGEST]
 
-- [ ] 10.1 RED: `PluginContext.GetCapabilities()`/`GetConfig()` replace `GetPipeline()`/`GetPipelineConfig()`.
-- [ ] 10.2 RED: `Container`/`StepRegistry`/`HookManager` compile against Layer 1; `Artifact`→`StepArtifact` (collision).
-- [ ] 10.3 GREEN: re-type `internal/app/{container,pipeline_executor,step_registry,hook_manager}.go`, `internal/interfaces/interfaces.go`, `internal/plugins/{interfaces,context}.go`, `internal/executors/{selector,docker_executor}.go`.
-- [ ] 10.4 GREEN: keep a thin deprecated `pipelines.Pipeline` shim so `--pipeline` still runs during this slice.
-- [ ] 10.5 GREEN: regenerate `mocks/**`, `internal/{app,plugins,executors}/mocks.go`.
-- [ ] 10.6 SEQUENCING: must merge before Phase 11 — deleting the shim before this re-type leaves the tree uncompilable.
+- [x] 10.1 RED: `PluginContext.GetCapabilities()`/`GetConfig()` replace `GetPipeline()`/`GetPipelineConfig()`.
+- [x] 10.2 RED: `Container`/`StepRegistry`/`HookManager` compile against Layer 1; `Artifact`→`StepArtifact` (collision).
+- [x] 10.3 GREEN: re-type `internal/app/{container,pipeline_executor,step_registry,hook_manager}.go`, `internal/interfaces/interfaces.go`, `internal/plugins/{interfaces,context}.go`, `internal/executors/{selector,docker_executor}.go`.
+- [x] 10.4 GREEN: keep a thin deprecated `pipelines.Pipeline` shim so `--pipeline` still runs during this slice.
+- [x] 10.5 GREEN: regenerate `mocks/**`, `internal/{app,plugins,executors}/mocks.go`.
+- [x] 10.6 SEQUENCING: must merge before Phase 11 — deleting the shim before this re-type leaves the tree uncompilable.
 
 ## Phase 11 — Preset + shim deletion (`composition-model`) [rollback-paired with 9]
 

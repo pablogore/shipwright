@@ -13,6 +13,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/kit-logger/pkg/logger"
+	"github.com/pablogore/shipwright/internal/capabilities"
 	"github.com/pablogore/shipwright/internal/config"
 	"github.com/pablogore/shipwright/internal/executors"
 	"github.com/pablogore/shipwright/internal/interfaces"
@@ -20,6 +21,7 @@ import (
 	goservice "github.com/pablogore/shipwright/internal/pipelines/go-service"
 	infra "github.com/pablogore/shipwright/internal/pipelines/infra"
 	"github.com/pablogore/shipwright/internal/plugins"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
 const (
@@ -817,6 +819,77 @@ func ConvertConfigToPipelinesConfig(cfg interfaces.Configuration) pipelines.Conf
 		GoVersion:     cfg.GetString("pipeline.go_version"),
 		JavaVersion:   cfg.GetString("pipeline.java_version"),
 		SSHPrivateKey: cfg.GetString("git.ssh_key"),
+	}
+}
+
+// BuildCapabilities constructs the Layer 1 capability bundle
+// (pkg/shipwright: Builder/Tester/Artifactor/Deployer/Runner) backed by the
+// standalone internal/capabilities implementations (Phase 3's go-service
+// decomposition), wired from the same pipelines.Config the DI container
+// already produces for the legacy --pipeline path. This is what
+// PluginContext.GetCapabilities() (replacing the retired GetPipeline(),
+// WU10 tasks.md 10.1/10.2) exposes to plugins.
+//
+// Deployer and Runner are always left nil: no concrete implementation
+// exists yet for either (pkg/shipwright.DeployConfig/RunConfig are empty
+// at this change, per design.md D-D) — Capabilities' fields are
+// independently optional by design, so a partial bundle is correct, not a
+// gap. When client is nil (no Dagger connection, e.g. most non-container
+// CLI paths), an empty Capabilities{} is returned rather than constructing
+// implementations against a nil client.
+func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capabilities {
+	if client == nil {
+		return plugins.Capabilities{}
+	}
+
+	builder := &capabilities.GoBuilder{
+		Client: client,
+		Config: shipwright.BuildConfig{
+			GoVersion:   cfg.GoVersion,
+			JavaVersion: cfg.JavaVersion,
+		},
+	}
+
+	testers := []shipwright.Tester{
+		&capabilities.GoUnitTester{
+			Client:    client,
+			Config:    shipwright.TestConfig{Coverage: cfg.Coverage},
+			GoVersion: cfg.GoVersion,
+		},
+		&capabilities.GoLinter{Client: client},
+		&capabilities.GoVulnScanner{Client: client, GoVersion: cfg.GoVersion},
+	}
+
+	artifactConfig := shipwright.ArtifactConfig{
+		Registry:     cfg.Registry,
+		RegistryURL:  cfg.RegistryURL,
+		RegistryUser: cfg.RegistryUser,
+		ImageName:    cfg.ImageName,
+		ImageTag:     cfg.ImageTag,
+		BuildTag:     cfg.BuildTag,
+		CommitSHA:    cfg.CommitSHA,
+		BranchName:   cfg.BranchName,
+		Version:      cfg.Version,
+	}
+	if cfg.RegistryPass != "" {
+		artifactConfig.RegistryPass = client.SetSecret("registry-pass", cfg.RegistryPass)
+	}
+	if cfg.RegistryToken != "" {
+		artifactConfig.RegistryToken = client.SetSecret("registry-token", cfg.RegistryToken)
+	}
+	if cfg.Token != "" {
+		artifactConfig.Token = client.SetSecret("generic-token", cfg.Token)
+	}
+
+	artifactor := &capabilities.ContainerPublisher{
+		Client: client,
+		Config: artifactConfig,
+	}
+
+	return plugins.Capabilities{
+		Builder:    builder,
+		Testers:    testers,
+		Artifactor: artifactor,
 	}
 }
 

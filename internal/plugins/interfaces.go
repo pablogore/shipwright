@@ -7,7 +7,32 @@ import (
 
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
+
+// Capabilities bundles the Layer 1 capability interfaces (pkg/shipwright:
+// Builder, Tester, Artifactor, Deployer, Runner) that are wired for the
+// current run, exposed to plugins via PluginContext.GetCapabilities().
+//
+// This replaces the retired PluginContext.GetPipeline() (WU10, tasks.md
+// 10.1/10.2, design.md's composition-model migration) — the composition
+// contract's extension point is now the five capability interfaces
+// directly, never a bundled "Pipeline" type. Capabilities itself carries
+// no bundle identity or name (design.md D-F): it is a plain data carrier
+// exposing whichever capabilities are wired for this run, not a named
+// capability-set preset. Any field MAY be nil — a run need not wire every
+// capability, and Deployer/Runner have no concrete implementation yet
+// (pkg/shipwright.DeployConfig/RunConfig are empty at this change).
+// Testers is a slice because multiple independent Tester implementations
+// MAY compose over the same input (design.md D-F's orthogonality win —
+// unit test, lint, vulnerability scan are three separate Testers).
+type Capabilities struct {
+	Builder    shipwright.Builder
+	Testers    []shipwright.Tester
+	Artifactor shipwright.Artifactor
+	Deployer   shipwright.Deployer
+	Runner     shipwright.Runner
+}
 
 // Plugin defines the interface that all plugins must implement.
 // Plugins can extend pipeline functionality by:
@@ -44,11 +69,13 @@ type PluginContext interface {
 	// GetStepRegistry returns the step registry for adding custom steps.
 	GetStepRegistry() interfaces.StepRegistry
 
-	// GetPipeline returns the current pipeline instance.
-	GetPipeline() interfaces.Pipeline
+	// GetCapabilities returns the Layer 1 capability bundle wired for the
+	// current run (replaces the retired GetPipeline()).
+	GetCapabilities() Capabilities
 
-	// GetPipelineConfig returns the pipeline-specific configuration.
-	GetPipelineConfig() pipelines.Config
+	// GetConfig returns the pipeline-specific configuration (replaces the
+	// retired GetPipelineConfig()).
+	GetConfig() pipelines.Config
 
 	// GetLogger returns the logger instance.
 	GetLogger() interfaces.Logger

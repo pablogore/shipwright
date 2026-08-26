@@ -43,7 +43,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx.GetDaggerClientFunc = func() (*dagger.Client, error) {
 			return nil, errors.New("dagger client not available")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{}
 		}
 		hook := plugin.createDeployHook(pluginCtx)
@@ -70,7 +70,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx.GetDaggerClientFunc = func() (*dagger.Client, error) {
 			return nil, errors.New("dagger client not available")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{}
 		}
 		hook := plugin.createDeployHook(pluginCtx)
@@ -98,7 +98,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx := NewMockPluginContext()
 		// Don't set GetDaggerClientFunc - the hook should fail before reaching that point
 		// because it checks for nomad_job/nomad_job_file first (line 102 in nomad_deploy.go)
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{}
 		}
 		hook := plugin.createDeployHook(pluginCtx)
@@ -126,7 +126,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx.GetDaggerClientFunc = func() (*dagger.Client, error) {
 			return nil, errors.New("dagger client not available")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{}
 		}
 		hook := plugin.createDeployHook(pluginCtx)
@@ -154,7 +154,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx.GetDaggerClientFunc = func() (*dagger.Client, error) {
 			return nil, errors.New("dagger client not available")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{
 				RegistryURL: "registry.example.com",
 				ImageName:   "test-service",
@@ -188,7 +188,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx.GetDaggerClientFunc = func() (*dagger.Client, error) {
 			return nil, errors.New("dagger client not available")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{
 				RegistryURL: "registry.example.com",
 				ImageName:   "test-service",
@@ -221,7 +221,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx.GetDaggerClientFunc = func() (*dagger.Client, error) {
 			return nil, errors.New("dagger client not available")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{}
 		}
 		hook := plugin.createDeployHook(pluginCtx)
@@ -250,7 +250,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 		pluginCtx.GetDaggerClientFunc = func() (*dagger.Client, error) {
 			return nil, errors.New("dagger client not available")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{}
 		}
 		hook := plugin.createDeployHook(pluginCtx)
@@ -283,7 +283,7 @@ func TestNomadDeployPlugin_createDeployHook(t *testing.T) {
 			// Return error to test the error path without triggering Dagger client operations
 			return nil, errors.New("dagger client not available for testing")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{
 				RegistryURL: "registry.example.com",
 				ImageName:   "test-service",

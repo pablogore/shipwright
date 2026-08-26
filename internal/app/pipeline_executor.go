@@ -372,11 +372,11 @@ func convertStepResults(internal map[string]StepResult) map[string]interfaces.St
 	return result
 }
 
-// convertArtifacts converts internal Artifact to interface Artifact.
-func convertArtifacts(internal []Artifact) []interfaces.Artifact {
-	result := make([]interfaces.Artifact, len(internal))
+// convertArtifacts converts internal Artifact to interfaces.StepArtifact.
+func convertArtifacts(internal []Artifact) []interfaces.StepArtifact {
+	result := make([]interfaces.StepArtifact, len(internal))
 	for i, artifact := range internal {
-		result[i] = interfaces.Artifact{
+		result[i] = interfaces.StepArtifact{
 			Name:        artifact.Name,
 			Path:        artifact.Path,
 			Type:        artifact.Type,

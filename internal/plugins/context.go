@@ -15,7 +15,7 @@ type pluginContext struct {
 	daggerClient   *dagger.Client
 	hookManager    interfaces.HookManager
 	logger         interfaces.Logger
-	pipeline       interfaces.Pipeline
+	capabilities   Capabilities
 	pipelineConfig pipelines.Config
 	stepRegistry   interfaces.StepRegistry
 }
@@ -26,7 +26,7 @@ func NewPluginContext(
 	configuration interfaces.Configuration,
 	hookManager interfaces.HookManager,
 	stepRegistry interfaces.StepRegistry,
-	pipeline interfaces.Pipeline,
+	capabilities Capabilities,
 	pipelineConfig pipelines.Config,
 	logger interfaces.Logger,
 ) PluginContext {
@@ -35,7 +35,7 @@ func NewPluginContext(
 		daggerClient:   daggerClient,
 		hookManager:    hookManager,
 		logger:         logger,
-		pipeline:       pipeline,
+		capabilities:   capabilities,
 		pipelineConfig: pipelineConfig,
 		stepRegistry:   stepRegistry,
 	}
@@ -64,13 +64,14 @@ func (pc *pluginContext) GetStepRegistry() interfaces.StepRegistry {
 	return pc.stepRegistry
 }
 
-// GetPipeline returns the current pipeline instance.
-func (pc *pluginContext) GetPipeline() interfaces.Pipeline {
-	return pc.pipeline
+// GetCapabilities returns the Layer 1 capability bundle wired for the
+// current run.
+func (pc *pluginContext) GetCapabilities() Capabilities {
+	return pc.capabilities
 }
 
-// GetPipelineConfig returns the pipeline-specific configuration.
-func (pc *pluginContext) GetPipelineConfig() pipelines.Config {
+// GetConfig returns the pipeline-specific configuration.
+func (pc *pluginContext) GetConfig() pipelines.Config {
 	return pc.pipelineConfig
 }
 

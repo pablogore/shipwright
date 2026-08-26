@@ -117,7 +117,7 @@ func (p *NomadDeployPlugin) createDeployHook(pluginCtx PluginContext) interfaces
 		}
 
 		// Get pipeline config to get image reference
-		pipelineConfig := pluginCtx.GetPipelineConfig()
+		pipelineConfig := pluginCtx.GetConfig()
 		imageRef := p.buildImageRefFromConfig(pipelineConfig)
 
 		// Deploy to Nomad
@@ -270,7 +270,7 @@ func (h *nomadDeployStepHandler) Execute(ctx context.Context, stepName string, c
 	}
 
 	// Get pipeline config
-	pipelineConfig := h.pluginCtx.GetPipelineConfig()
+	pipelineConfig := h.pluginCtx.GetConfig()
 
 	// Build image reference
 	plugin := &NomadDeployPlugin{config: h.config}

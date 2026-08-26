@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
 func TestNewPluginContext(t *testing.T) {
@@ -16,26 +17,26 @@ func TestNewPluginContext(t *testing.T) {
 		cfg := NewMockConfiguration()
 		hookManager := NewMockHookManager()
 		stepRegistry := NewMockStepRegistry()
-		pipeline := NewMockPipeline()
+		caps := Capabilities{}
 		pipelineConfig := pipelines.Config{}
 
 		// Act
-		ctx := NewPluginContext(nil, cfg, hookManager, stepRegistry, pipeline, pipelineConfig, nil)
+		ctx := NewPluginContext(nil, cfg, hookManager, stepRegistry, caps, pipelineConfig, nil)
 
 		// Assert
 		require.NotNil(t, ctx)
 		assert.Equal(t, cfg, ctx.GetConfiguration())
 		assert.Equal(t, hookManager, ctx.GetHookManager())
 		assert.Equal(t, stepRegistry, ctx.GetStepRegistry())
-		assert.Equal(t, pipeline, ctx.GetPipeline())
-		assert.Equal(t, pipelineConfig, ctx.GetPipelineConfig())
+		assert.Equal(t, caps, ctx.GetCapabilities())
+		assert.Equal(t, pipelineConfig, ctx.GetConfig())
 	})
 }
 
 func TestPluginContext_GetDaggerClient(t *testing.T) {
 	t.Run("ReturnsErrorWhenClientIsNil", func(t *testing.T) {
 		// Arrange
-		ctx := NewPluginContext(nil, nil, nil, nil, nil, pipelines.Config{}, nil)
+		ctx := NewPluginContext(nil, nil, nil, nil, Capabilities{}, pipelines.Config{}, nil)
 
 		// Act
 		client, err := ctx.GetDaggerClient()
@@ -51,7 +52,7 @@ func TestPluginContext_GetDaggerClient(t *testing.T) {
 		// Create a non-nil Dagger client pointer (even though it's not functional)
 		// This covers the return path at line 49 when client is not nil
 		daggerClient := &dagger.Client{}
-		ctx := NewPluginContext(daggerClient, nil, nil, nil, nil, pipelines.Config{}, nil)
+		ctx := NewPluginContext(daggerClient, nil, nil, nil, Capabilities{}, pipelines.Config{}, nil)
 
 		// Act
 		client, err := ctx.GetDaggerClient()
@@ -68,7 +69,7 @@ func TestPluginContext_GetConfiguration(t *testing.T) {
 	t.Run("ReturnsConfiguration", func(t *testing.T) {
 		// Arrange
 		cfg := NewMockConfiguration()
-		ctx := NewPluginContext(nil, cfg, nil, nil, nil, pipelines.Config{}, nil)
+		ctx := NewPluginContext(nil, cfg, nil, nil, Capabilities{}, pipelines.Config{}, nil)
 
 		// Act
 		result := ctx.GetConfiguration()
@@ -82,7 +83,7 @@ func TestPluginContext_GetHookManager(t *testing.T) {
 	t.Run("ReturnsHookManager", func(t *testing.T) {
 		// Arrange
 		hookManager := NewMockHookManager()
-		ctx := NewPluginContext(nil, nil, hookManager, nil, nil, pipelines.Config{}, nil)
+		ctx := NewPluginContext(nil, nil, hookManager, nil, Capabilities{}, pipelines.Config{}, nil)
 
 		// Act
 		result := ctx.GetHookManager()
@@ -96,7 +97,7 @@ func TestPluginContext_GetStepRegistry(t *testing.T) {
 	t.Run("ReturnsStepRegistry", func(t *testing.T) {
 		// Arrange
 		stepRegistry := NewMockStepRegistry()
-		ctx := NewPluginContext(nil, nil, nil, stepRegistry, nil, pipelines.Config{}, nil)
+		ctx := NewPluginContext(nil, nil, nil, stepRegistry, Capabilities{}, pipelines.Config{}, nil)
 
 		// Act
 		result := ctx.GetStepRegistry()
@@ -106,30 +107,30 @@ func TestPluginContext_GetStepRegistry(t *testing.T) {
 	})
 }
 
-func TestPluginContext_GetPipeline(t *testing.T) {
-	t.Run("ReturnsPipeline", func(t *testing.T) {
+func TestPluginContext_GetCapabilities(t *testing.T) {
+	t.Run("ReturnsCapabilities", func(t *testing.T) {
 		// Arrange
-		pipeline := NewMockPipeline()
-		ctx := NewPluginContext(nil, nil, nil, nil, pipeline, pipelines.Config{}, nil)
+		caps := Capabilities{Testers: []shipwright.Tester{}}
+		ctx := NewPluginContext(nil, nil, nil, nil, caps, pipelines.Config{}, nil)
 
 		// Act
-		result := ctx.GetPipeline()
+		result := ctx.GetCapabilities()
 
 		// Assert
-		assert.Equal(t, pipeline, result)
+		assert.Equal(t, caps, result)
 	})
 }
 
-func TestPluginContext_GetPipelineConfig(t *testing.T) {
-	t.Run("ReturnsPipelineConfig", func(t *testing.T) {
+func TestPluginContext_GetConfig(t *testing.T) {
+	t.Run("ReturnsConfig", func(t *testing.T) {
 		// Arrange
 		expectedConfig := pipelines.Config{
 			Env: "test",
 		}
-		ctx := NewPluginContext(nil, nil, nil, nil, nil, expectedConfig, nil)
+		ctx := NewPluginContext(nil, nil, nil, nil, Capabilities{}, expectedConfig, nil)
 
 		// Act
-		result := ctx.GetPipelineConfig()
+		result := ctx.GetConfig()
 
 		// Assert
 		assert.Equal(t, expectedConfig, result)
@@ -140,7 +141,7 @@ func TestPluginContext_GetLogger(t *testing.T) {
 	t.Run("ReturnsLogger", func(t *testing.T) {
 		// Arrange
 		logger := NewMockLogger()
-		ctx := NewPluginContext(nil, nil, nil, nil, nil, pipelines.Config{}, logger)
+		ctx := NewPluginContext(nil, nil, nil, nil, Capabilities{}, pipelines.Config{}, logger)
 
 		// Act
 		result := ctx.GetLogger()

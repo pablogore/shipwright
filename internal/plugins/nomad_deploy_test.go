@@ -329,7 +329,7 @@ func TestNomadDeployStepHandler_Execute(t *testing.T) {
 			// Return error to test the error path without triggering Dagger client operations
 			return nil, errors.New("dagger client not available for testing")
 		}
-		pluginCtx.GetPipelineConfigFunc = func() pipelines.Config {
+		pluginCtx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{
 				RegistryURL: "registry.example.com",
 				ImageName:   "test-service",
