@@ -2,14 +2,16 @@
 
 ## Technical Approach
 
-Two chained PR slices with a manual git-tag interlude between them, because the
-tag cannot exist before the code and the `require`+`go.sum` cannot exist before
+Three chained PR slices with a manual git-tag interlude between the second and
+the third, because the tag cannot exist before the code, the release automation
+must exist before the tag (D6), and the `require`+`go.sum` cannot exist before
 the tag.
 
 | Slice | Content | Resolution mechanism |
 |---|---|---|
 | **1** | Create `providers/go` module, `git mv` 13 files, swap all importers, add `go.work`, add 3 guard tests, delete `internal/capabilities/` | Temporary `replace ... => ./providers/go` in root `go.mod` (explicitly sanctioned by proposal D4) |
-| **tag** | `git tag providers/go/v0.1.0 <slice-1 merge sha> && git push origin providers/go/v0.1.0` | — (manual task, not a PR) |
+| **1b** | Release automation: `.github/workflows/release-provider-go.yml`, `--match 'v[0-9]*'` on root `release.yml`'s three `git describe` calls, `git.ignore_tags` in `.goreleaser.yml`, `internal/releaseguard/tags_test.go` | — (no module resolution change; must land **before** the first provider tag exists — D6) |
+| **tag** | `git tag providers/go/v0.1.0 <slice-1 merge sha> && git push origin providers/go/v0.1.0` | — (manual push, not a PR; slice 1b's workflow reacts — D6) |
 | **2** | Delete the `replace`, keep `require .../providers/go v0.1.0`, regenerate root `go.sum`, add the no-`replace` guard test, verify `go install` from a clean cache | Published, path-prefixed tag (D4 final state) |
 
 Slice 1 is green in **both** workspace and `GOWORK=off` mode (the `replace`
@@ -158,9 +160,11 @@ Axis 5 already says about provider versions ("not covered by any Shipwright
 guarantee"), and `v0.x`/`v1.x` avoids the `/vN` major-suffix path rule on a path
 element that is already a Go keyword.
 
-**Tagging is manual, one-time, and a task — not automation.** `.goreleaser`
-builds the root binary only; a recurring provider release process is explicitly
-out of scope in the proposal. Tagging slice 1's `develop` merge commit is
+**Tag *creation* stays manual — a human `git push`, never a job.** `.goreleaser`
+builds the root binary only and is not reused here. What happens *after* the push
+(shape validation, isolation build, changelog, GitHub Release) is automated in
+slice 1b — see **D6**, which settles the item the proposal deliberately left open
+("manual-vs-goreleaser/CI automated tagging"). Tagging slice 1's `develop` merge commit is
 deliberate: Go resolves tags regardless of branch, and the provider's version
 line is independent of the root's release line (Axis 5). Consequence:
 `providers/go/`'s content must be **final in slice 1** — a later correction costs
@@ -188,6 +192,99 @@ asserts dependencies rather than imports. Both rejected.
 
 Scanning test files too is intentional: a test reaching into `internal/**` would
 mean the module is only implementable-from-outside for its production half.
+
+### Decision: provider release automation is a tag-reacting workflow, **not** GoReleaser (D6 — new)
+
+D6 has no proposal counterpart: the proposal deferred exactly this to design
+("manual-vs-goreleaser/CI automated tagging"; "whether CI/goreleaser automates
+FUTURE provider tags"). **Choice** — a dedicated
+`.github/workflows/release-provider-go.yml` that *reacts* to a human-pushed
+`providers/go/v*` tag. No GoReleaser; the job never creates or moves a ref.
+
+| Option | Cost | Verdict |
+|---|---|---|
+| Second GoReleaser config | `monorepo:` (`tag_prefix`/`dir`) is the only way GoReleaser understands a path-prefixed tag, and it is a **Pro** feature; OSS GoReleaser derives the version by stripping `v` from the tag and cannot parse `providers/go/v0.1.0`. Every core subsystem (builds, archives, checksums, taps, docker, signing) must be switched off — `providers/go` has **no `main` package**. Residual value: changelog + release body only. | **Rejected** |
+| `gh release create --generate-notes` alone | Free, but notes are repo-wide (every commit since the previous release), not scoped to `providers/go/`, and nothing validates the tag. | Rejected as the whole answer; kept as body fallback |
+| Tag-reacting validation + path-scoped changelog | One workflow file, no license, no binaries; validates the four things that actually break a library release. | **Chosen** |
+
+**Rationale** — GoReleaser's value is *binary distribution*; `providers/go`
+distributes **source through the Go module proxy**, so its entire build/package/
+publish machinery is inapplicable by construction. What can actually break this
+release is the tag: wrong shape, wrong major (the `/vN` module-path rule), a
+module that does not compile in isolation, or a proxy that never fetched it.
+None of those are GoReleaser features; all four are `run:` steps.
+
+Workflow, in order:
+
+1. `on: push: tags: ['providers/go/v*']` — disjoint from root's `v*` by
+   construction (Actions globs do not cross `/`, and the provider tag does not
+   begin with `v`). `ci.yml` does not trigger on tags at all, so this workflow is
+   the only reactor.
+2. **Shape**: `^providers/go/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$`.
+   Reject major ≥ 2 with a message naming the module-path major-suffix rule (a
+   `v2` needs module path `.../providers/go/v2` and tag `providers/go/v2/v2.0.0`
+   — a decision, not a tag typo).
+3. **Identity**: the tagged tree has `providers/go/go.mod` whose `module` line is
+   exactly `github.com/pablogore/shipwright/providers/go`.
+4. **Isolation**: `cd providers/go && GOWORK=off go build ./... && GOWORK=off go test -race -short ./...`
+   at the tag — the one gate a manual `git tag` cannot give, and the same
+   isolation property D5 asserts at the import level.
+5. **Changelog**: `git log --pretty='- %s (%h)' <prev providers/go tag>..<tag> -- providers/go/`
+   — **path-scoped**, so root-only churn never appears in a provider release.
+   No predecessor ⇒ all commits touching `providers/go/`.
+6. **Release**: `gh release create "$TAG" --title "providers/go $VERSION" --notes-file … --latest=false`.
+   `--latest=false` keeps the repo's "Latest" badge on the root binary release,
+   which the `releases/latest` install snippet in `.goreleaser.yml` depends on.
+7. **Proxy gate**: `curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/$VERSION.info`
+   — turns the previously manual step-3 confirmation into a failing check.
+
+**Blast radius on the root release line — the reason this cannot wait for
+v0.2.0.** `.github/workflows/release.yml` derives the root version with a bare
+`git describe --tags --abbrev=0` in **three** places (lines 162 auto-bump, 220
+dispatch-bump, 245 changelog range). It is unfiltered, so once
+`providers/go/v0.1.0` is reachable from `main` it becomes `LATEST_TAG`; the
+existing `sed 's/v//'` then strips the `v` of *`pro`**`v`**`iders`*, yielding
+`proiders/go/v0.1.0`, and `awk -F.` emits the tag `vproiders/go/v0.2.0`. The
+automatic path (develop→main merge → `workflow_dispatch`) would create and push
+that ref with no human typing a tag. **Mandatory fix, before the first provider
+tag exists**: `--match 'v[0-9]*'` on all three calls. Root `.goreleaser.yml`
+additionally gets `git: ignore_tags: ['providers/*']` for its own previous-tag
+lookup.
+
+**Guard** (repo pattern; test-only, like D5's): `internal/releaseguard/tags_test.go`
+parses both workflow YAMLs and asserts (a) no `git describe --tags` in
+`release.yml` lacks `--match`; (b) `release.yml`'s tag globs do not match
+`providers/go/v0.1.0`; (c) `release-provider-go.yml`'s globs do not match
+`v1.2.3`; (d) the shape regex literal extracted from the workflow accepts
+`providers/go/v0.1.0` and rejects `providers/go/v2.0.0`,
+`providers/go/v01.0.0`, and `v0.1.0`. Namespace disjointness becomes an
+assertion, not a convention.
+
+**Where it lands: slice 1b, before the tag — not from v0.2.0 onward.** Three
+reasons: (1) the `git describe` defect is armed by the *first* provider tag, so
+its fix must precede that tag; (2) a release workflow that has never executed is
+a script, not automation — `v0.1.0` is the cheapest possible smoke test (v0.x,
+zero consumers, and a bad outcome costs `v0.1.1`, which D4 already accepts as
+the one-way door); (3) as its own slice it leaves slice 1's diff untouched and
+adds a small, `.github`-only, independently revertible PR instead of inflating
+one.
+
+**Consistency with the root release line, and where the two deliberately differ:**
+
+| | root module | `providers/go` |
+|---|---|---|
+| Tag | `vX.Y.Z` | `providers/go/vX.Y.Z` |
+| Trigger | tag push **or** auto on develop→main merge, version *derived* | tag push only, version never derived |
+| Tooling | GoReleaser (`.goreleaser.yml`) | `gh release create` |
+| Artifact | cross-platform binaries + checksums | none — the proxy is the artifact |
+| GitHub "Latest" | yes | `--latest=false` |
+
+The difference is deliberate: root auto-bumps because it ships an installable
+binary on a cadence, whereas a provider version is a statement about an API
+contract that COMPATIBILITY.md Axis 5 already declares outside any Shipwright
+guarantee. Deriving it from commit-message heuristics would be worse than
+useless. What the two lines **must** share is namespace disjointness, and that is
+now the guard above rather than an unwritten rule.
 
 ## Data Flow
 
@@ -232,6 +329,10 @@ if one is generated (Go's own recommendation for a single-repo workspace);
 | `go.mod` (root) | Modify | Slice 1: `require` + temp `replace`. Slice 2: `replace` deleted |
 | `go.sum` (root) | Modify | Slice 2 only: `providers/go@v0.1.0` hashes |
 | `COMPATIBILITY.md` | Modify | Line 46's `internal/capabilities/**` → `providers/go/**` |
+| `.github/workflows/release-provider-go.yml` | Create (slice 1b) | D6: tag-reacting validation + GitHub Release for `providers/go/v*` |
+| `.github/workflows/release.yml` | Modify (slice 1b) | D6: `--match 'v[0-9]*'` on the three `git describe --tags --abbrev=0` calls (lines 162, 220, 245) |
+| `.goreleaser.yml` | Modify (slice 1b) | D6: `git: ignore_tags: ['providers/*']` for root's own previous-tag lookup |
+| `internal/releaseguard/tags_test.go` | Create (slice 1b) | D6 guard; test-only package, like D5's |
 | `pkg/shipwright/**` | **Unchanged** | Hard constraint; verified by `git diff --stat -- pkg/shipwright/` |
 
 ## Interfaces / Contracts
@@ -267,6 +368,7 @@ before its source file is moved.
 | Unit | Bundle-name golden after move | `naming_test.go` with `pkgs["golang"]` | Edit key before package clause changes → RED |
 | Unit | Provider names unchanged | Existing `register_test.go` / `container_capabilities_test.go` — must stay green through the swap | Regression, not new |
 | Unit (root) | Committed root `go.mod` has no `replace` | Slice 2: `modfile.Parse` + assert `len(f.Replace) == 0` | Written in slice 2 while the `replace` is still present → RED |
+| Unit (root) | D6: tag-namespace disjointness, filtered `git describe`, tag-shape regex | Slice 1b: parse both workflow YAMLs; extract the shape regex literal and table-test it (`providers/go/v0.1.0` ✓; `providers/go/v2.0.0`, `providers/go/v01.0.0`, `v0.1.0` ✗) | Written before `release-provider-go.yml` exists → fails closed on the missing file, then RED on the unfiltered `git describe` |
 | Integration (`-short`-guarded) | Real-engine `GoBuilder`/`GoUnitTester` | Moved unchanged; `./...` does **not** cross into `providers/go` in workspace mode (verified empirically — see the corrected Open Question below), so `make test`/CI now run an explicit `(cd providers/go && go test ./...)` to keep this covered | Regression |
 | E2E (manual) | `examples/workflow/diamond.yaml` | Run before and after; compare resolved providers | Regression |
 | E2E (manual) | `go install github.com/pablogore/shipwright@<tag>` from a clean `GOMODCACHE` | Slice 2 acceptance | Acceptance |
@@ -285,11 +387,22 @@ against the pre-extraction package set.
 
 ## Threat Matrix
 
-`N/A` — no routing, shell command, subprocess, executable-file classification, or
-process-integration boundary changes. The one adjacent surface is VCS
-automation, and this design **deliberately avoids it**: tagging stays a manual,
-reviewed step rather than a scripted push, precisely so no new automated
-credential-bearing VCS path is introduced.
+`N/A` for routing, shell command, subprocess, executable-file classification, and
+process integration — none of those boundaries change.
+
+**VCS/PR automation: `Applicable` since D6** (it was `N/A` before this
+amendment). Bounded as follows:
+
+| Aspect | Bound | Expected behaviour |
+|---|---|---|
+| Ref creation | The workflow **reacts** to a ref; it never creates, moves, or deletes one. Tag creation stays a human `git push` (D4). | A tag is only ever authored by a person |
+| Token scope | Job-level `permissions: contents: write` only — no `packages`, no `id-token` (unlike `release.yml`), no `SHIPWRIGHT_TOKEN`, no `~/.netrc` | Its single write is `gh release create` |
+| Code executed from the tagged tree | `go build` / `go test` of the module being released, nothing else | No release hooks, no arbitrary scripts |
+| Malformed / wrong-major tag | Fails at shape validation, before any network write | No Release, no proxy warm, loud failure |
+| Namespace collision with root `v*` | Globs are disjoint by construction and asserted | Root release line cannot be triggered or version-corrupted by a provider tag |
+
+RED tests for the applicable rows: `internal/releaseguard/tags_test.go`
+assertions (a)–(d) in D6.
 
 ## Migration / Rollout
 
@@ -300,16 +413,27 @@ credential-bearing VCS path is introduced.
    does not merge — see the corrected Open Question below) plus
    `GOWORK=off go build ./...`. Verify `git diff --stat -- pkg/shipwright/` is
    empty. Merge to `develop`.
-2. **Tag interlude**: `git tag providers/go/v0.1.0 <merge sha>` +
-   `git push origin providers/go/v0.1.0`. Confirm the proxy sees it
-   (`GOPROXY=direct go list -m github.com/pablogore/shipwright/providers/go@v0.1.0`).
-3. **Slice 2**: no-`replace` guard test RED → delete `replace` →
+2. **Slice 1b** (D6, no Go production code): `internal/releaseguard/tags_test.go`
+   RED → `release-provider-go.yml` → `--match 'v[0-9]*'` on `release.yml`'s three
+   `git describe` calls → `git.ignore_tags` in `.goreleaser.yml`. Merge to
+   `develop`. **Must precede step 3**: the unfiltered `git describe` defect is
+   armed by the first provider tag, not by this PR.
+3. **Tag interlude**: `git tag providers/go/v0.1.0 <merge sha>` +
+   `git push origin providers/go/v0.1.0` (human). Slice 1b's workflow then
+   validates shape/identity/isolation, publishes the Release with
+   `--latest=false`, and gates on proxy visibility
+   (`curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/v0.1.0.info`),
+   replacing the previously manual `go list -m` confirmation.
+4. **Slice 2**: no-`replace` guard test RED → delete `replace` →
    `GOWORK=off go mod tidy` at root → `go install` acceptance from a clean
    `GOMODCACHE`.
 
-Rollback boundary: slice 1 is atomic (`git revert -m 1`). Slice 2 reverts
-independently back to the `replace` state. The published tag is the only
-irreversible artifact — superseded by `v0.1.1`, never deleted.
+Rollback boundary: slice 1 is atomic (`git revert -m 1`). Slice 1b reverts
+independently and touches only `.github/`, `.goreleaser.yml`, and one test file
+— but reverting it does **not** un-publish a Release (`gh release delete` is a
+separate act) and does not remove the tag. Slice 2 reverts independently back to
+the `replace` state. The published tag is the only irreversible artifact —
+superseded by `v0.1.1`, never deleted.
 
 ## Open Questions
 
@@ -351,11 +475,22 @@ irreversible artifact — superseded by `v0.1.1`, never deleted.
 - [ ] **`go work sync` / `go.work.sum` churn** in the pre-commit hook
       (`go-mod-tidy`). Confirm the hook does not fight workspace mode; if it
       does, scope it with `GOWORK=off`.
+- [ ] **Two D6 facts to confirm at apply time; neither changes D6's direction.**
+      (a) That GoReleaser's `monorepo:` (`tag_prefix`/`dir`) block is Pro-only —
+      D6 rejects GoReleaser on the no-`main`-package argument alone, so this
+      affects only how the rejection is worded. (b) The exact `.goreleaser.yml`
+      key for excluding tags from previous-tag lookup (`git.ignore_tags`) against
+      the GoReleaser version the release workflow resolves (`version: latest`);
+      the load-bearing fix is `--match 'v[0-9]*'` in `release.yml`, which does not
+      depend on it. Both were reasoned from the checked-in files, not from
+      network documentation.
 
 ---
 
 *Deviation note:* exceeds the skill's 800-word budget. Cause: the orchestrator
 required design to make five deferred proposal decisions concretely executable
 (exact file contents, the module-cycle tagging order, the guard implementations),
-and D4's ordering cannot be recorded credibly without its reasoning. Content is
-compressed into tables; no narrative padding.
+and D4's ordering cannot be recorded credibly without its reasoning. A later
+amendment added D6, which the proposal explicitly deferred to design and which
+turned out to expose a live version-derivation defect in the root release
+workflow. Content is compressed into tables; no narrative padding.
