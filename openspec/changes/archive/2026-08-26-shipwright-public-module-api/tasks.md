@@ -163,10 +163,10 @@ Added after a second independent review of PR #157 found that deleting `App.RunP
 
 ## Phase 12 — Cross-language proof + docs (`public-module-api`)
 
-- [ ] 12.1 GREEN: `examples/crosslang-ts/` — TypeScript `Builder` against generated bindings.
-- [ ] 12.2 RED/GREEN: type-check clean + one documented local `dagger call`.
-- [ ] 12.3 GREEN: `COMPATIBILITY.md` — guaranteed surface, five version axes, explicit provider-version exclusion.
-- [ ] 12.4 GREEN: minimum correction to `docs/API.md`/`docs/ARCHITECTURE.md` (stop presenting `Pipeline`); document flag removals.
+- [x] 12.1 GREEN: `examples/crosslang-ts/` — TypeScript `Builder` against generated bindings. `ExampleBuilder` (`@object()` class) implements `ShipwrightBuilder` (generated from `.dagger/capabilities.go`'s `Builder` interface); `id(): Promise<ID>` added via TypeScript declaration merging (type-only, zero runtime member — a real `id()` method broke the module runtime's own identity marshaling, see 12.2 evidence). Deliberately trivial: returns `source` unchanged.
+- [x] 12.2 RED/GREEN: type-check clean + one documented local `dagger call`. `npx tsc --noEmit -p tsconfig.json` exits 0. Real invocation against the live engine: `dagger shell -c 'shipwright | plan $(host | directory <src>) | with-build $(example-builder) | execute'` — succeeds end-to-end (all steps green, `execute` returns `""`, matching `Plan.Execute`'s documented semantics when only `WithBuild` is chained). Two confirmed, documented v0.21.8 TS-SDK runtime constraints (see apply-progress): (1) a locally `new`-constructed instance cannot be passed inline as an Interface-typed argument within the same function body — it must be exposed as its own Dagger Function and composed across two engine calls; (2) a real (non-type-only) `id()` method is consumed by the runtime's own object-identity/introspection machinery and a stub implementation breaks marshaling — declaration merging avoids this by adding the member to the type only.
+- [x] 12.3 GREEN: `COMPATIBILITY.md` — guaranteed surface (verified against `pkg/shipwright/testdata/api.golden`'s actual current content, not reconstructed from memory), five version axes per design.md D-E, explicit provider-version exclusion (`uses.version` orthogonal to `ContractVersion`).
+- [x] 12.4 GREEN: minimum correction to `docs/API.md`/`docs/ARCHITECTURE.md` — added a prominent status notice to both (the entire pre-migration `Pipeline`/preset content is retained as explicitly-marked historical reference, not rewritten — a full rewrite is an out-of-scope fast-follow per the proposal's non-goals); added a "CLI Entrypoint (current)" section to `docs/ARCHITECTURE.md` documenting `--workflow`/`--step`/`--list-steps` as current and `--pipeline`/`--list-pipelines`/`--only-build`/`--only-test`/`--skip-push` as removed.
 
 ## Deviation Note
 

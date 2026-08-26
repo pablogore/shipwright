@@ -1,8 +1,40 @@
 # Shipwright Architecture
 
+> **Status: pre-migration, retained for historical reference.** The
+> `shipwright-public-module-api` change (see
+> `openspec/changes/shipwright-public-module-api/`) removed the named
+> `Pipeline`/preset architecture this document describes (the `go-service`
+> and `infra` pipelines, the preset registry, and the `--pipeline`/
+> `--list-pipelines`/`--only-build`/`--only-test`/`--skip-push` CLI flags
+> shown or implied below) and replaced it with a versioned capability
+> contract (`pkg/shipwright/` + `.dagger/`) composed either programmatically
+> (`Plan`) or declaratively through a `shipwright.dev/v1` workflow manifest.
+> See the "CLI Entrypoint (current)" section below for the current flag set,
+> and `COMPATIBILITY.md` (repo root) for the current guaranteed surface. A
+> full rewrite of the diagrams and component descriptions below is tracked
+> as an explicit fast-follow, out of scope for that change; this notice and
+> the CLI section are the minimum correction so the rest of this document is
+> not read as canonical.
+
 This document provides a comprehensive overview of the Shipwright architecture, including system design, component interactions, and deployment patterns.
 
-## System Overview
+## CLI Entrypoint (current)
+
+`main.go`'s `--workflow <path>` flag (default `.shipwright/workflow.yaml`) is
+the sole CLI entrypoint. It parses a `shipwright.dev/v1` manifest, builds its
+DAG, resolves each step's provider, and executes it through
+`internal/workflow/engine`.
+
+| Flag | Status |
+|---|---|
+| `--workflow <path>` | Current — primary entrypoint |
+| `--step <id>` | Current — retargeted to a manifest step id; runs its `needs`-transitive closure |
+| `--list-steps` | Current — retargeted to list manifest step ids with capability and resolved provider |
+| `--pipeline`, `--list-pipelines` | **Removed** — named presets no longer exist |
+| `--only-build`, `--only-test`, `--skip-push` | **Removed** — `--step` replaces them |
+| `--config`, `--env`, `--executor`, `--verbose`, `--version`, `--health`, `--local`, git flags | Unchanged |
+
+## System Overview (historical — see notice above)
 
 Shipwright is a unified CI/CD pipeline library that provides standardized, reusable pipelines for Go projects. It's built on top of the Dagger SDK and follows a modular, extensible architecture.
 

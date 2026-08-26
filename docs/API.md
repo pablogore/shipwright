@@ -1,8 +1,23 @@
 # API Reference
 
+> **Status: pre-migration, retained for historical reference.** The
+> `shipwright-public-module-api` change (see
+> `openspec/changes/shipwright-public-module-api/`) removed the `Pipeline`
+> interface, the preset registry, and every type below it entirely from the
+> codebase — none of the Go code on this page exists anymore. The current,
+> guaranteed public surface is documented in `COMPATIBILITY.md` (repo root):
+> the five capability interfaces in `pkg/shipwright/` (Layer 1) and
+> `.dagger/capabilities.go` (Layer 2), plus the `shipwright.dev/v1` manifest
+> schema consumed via the `--workflow` CLI flag (see `docs/ARCHITECTURE.md`'s
+> "CLI Entrypoint" section for the current flag set). A full rewrite of this
+> document against the current API is tracked as an explicit fast-follow
+> (the originating proposal's non-goals list it as out of scope for that
+> change); this notice is the minimum correction so the content below is not
+> read as canonical.
+
 This document provides comprehensive API documentation for Shipwright, including programmatic interfaces, data structures, and usage examples.
 
-## Core Interfaces
+## Core Interfaces (historical — removed, see notice above)
 
 ### Pipeline Interface
 
