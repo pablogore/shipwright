@@ -570,19 +570,18 @@ func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec mani
 			return nil, fmt.Errorf("workflow: source.authSecretRef is not supported yet (got %q)", spec.AuthSecretRef)
 		}
 
-		protocol := "https"
-		if strings.HasPrefix(spec.Repo, "git@") {
-			protocol = "ssh"
+		if spec.Ref == "" {
+			return nil, fmt.Errorf("workflow: source.ref is required when source.repo is set")
 		}
 
-		ref := spec.Ref
-		if ref == "" {
-			ref = "main"
+		protocol := "https"
+		if strings.HasPrefix(spec.Repo, "git@") || strings.HasPrefix(spec.Repo, "ssh://") {
+			protocol = "ssh"
 		}
 
 		opts := shared.GitCloneOpts{
 			Repo:   spec.Repo,
-			Branch: ref,
+			Branch: spec.Ref,
 			Name:   "workflow-source",
 		}
 		return cloneFn(ctx, client, opts, protocol)

@@ -405,20 +405,21 @@ func mockCloneFunc(dir *dagger.Directory, err error, out *[]cloneCall) cloneRepo
 }
 
 // TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS proves that a repo
-// URL not starting with "git@" selects protocol "https".
+// URL not starting with "git@" or "ssh://" selects protocol "https".
 func TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS(t *testing.T) {
 	var calls []cloneCall
 	cloneFn := mockCloneFunc(nil, nil, &calls)
 
 	spec := manifest.SourceSpec{
 		Repo: "https://github.com/org/repo.git",
+		Ref:  "main",
 	}
 
 	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
 	require.NoError(t, err)
 	require.Len(t, calls, 1)
 	assert.Equal(t, "https", calls[0].protocol,
-		"non-git@ URL must select HTTPS protocol")
+		"non-SSH URL must select HTTPS protocol")
 }
 
 // TestResolveWorkflowSource_SSHProtocolSelectsSSH proves that a repo URL
@@ -429,6 +430,7 @@ func TestResolveWorkflowSource_SSHProtocolSelectsSSH(t *testing.T) {
 
 	spec := manifest.SourceSpec{
 		Repo: "git@github.com:org/repo.git",
+		Ref:  "main",
 	}
 
 	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
@@ -438,8 +440,26 @@ func TestResolveWorkflowSource_SSHProtocolSelectsSSH(t *testing.T) {
 		"git@ URL must select SSH protocol")
 }
 
+// TestResolveWorkflowSource_SSHSchemeSelectsSSH proves that a repo URL
+// using the ssh:// scheme selects protocol "ssh", not "https".
+func TestResolveWorkflowSource_SSHSchemeSelectsSSH(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "ssh://git@github.com/org/repo.git",
+		Ref:  "main",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "ssh", calls[0].protocol,
+		"ssh:// URL must select SSH protocol")
+}
+
 // TestResolveWorkflowSource_ExplicitRefPreserved proves that when spec.Ref
-// is set to a non-default value, it is forwarded as opts.Branch unchanged.
+// is set, it is forwarded as opts.Branch unchanged.
 func TestResolveWorkflowSource_ExplicitRefPreserved(t *testing.T) {
 	var calls []cloneCall
 	cloneFn := mockCloneFunc(nil, nil, &calls)
@@ -456,22 +476,18 @@ func TestResolveWorkflowSource_ExplicitRefPreserved(t *testing.T) {
 		"explicit ref must be forwarded as Branch")
 }
 
-// TestResolveWorkflowSource_EmptyRefDefaultsToMain proves that an empty
-// spec.Ref is replaced with "main" before calling cloneFn.
-func TestResolveWorkflowSource_EmptyRefDefaultsToMain(t *testing.T) {
-	var calls []cloneCall
-	cloneFn := mockCloneFunc(nil, nil, &calls)
-
+// TestResolveWorkflowSource_EmptyRefFailsClosed proves that an empty
+// spec.Ref is rejected with an explicit error when source.repo is set.
+// A remote workflow source requires an explicit pinned ref.
+func TestResolveWorkflowSource_EmptyRefFailsClosed(t *testing.T) {
 	spec := manifest.SourceSpec{
 		Repo: "https://github.com/org/repo.git",
 		Ref:  "",
 	}
 
-	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
-	require.NoError(t, err)
-	require.Len(t, calls, 1)
-	assert.Equal(t, "main", calls[0].opts.Branch,
-		"empty ref must default to main")
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source.ref is required")
 }
 
 // TestResolveWorkflowSource_RepoForwarded proves the repo URL is forwarded
@@ -499,6 +515,7 @@ func TestResolveWorkflowSource_RepoForwarded(t *testing.T) {
 func TestResolveWorkflowSource_AuthSecretRefFailsClosed(t *testing.T) {
 	spec := manifest.SourceSpec{
 		Repo:          "https://github.com/org/repo.git",
+		Ref:           "main",
 		AuthSecretRef: "github-prod",
 	}
 
