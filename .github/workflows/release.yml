@@ -158,8 +158,9 @@ jobs:
           # Continue with automatic release logic (only for workflow_dispatch from CI with develop merge)
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
-          # Get latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Get latest tag (--match excludes providers/go/v* so a provider
+          # release can never be picked up as the root's LATEST_TAG)
+          LATEST_TAG=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
 
           # Determine version bump based on source branch and commit messages
@@ -216,8 +217,9 @@ jobs:
 
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
-          # Get latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Get latest tag (--match excludes providers/go/v* so a provider
+          # release can never be picked up as the root's LATEST_TAG)
+          LATEST_TAG=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
 
           # For manual releases, default to patch version bump
@@ -241,8 +243,9 @@ jobs:
       run: |
         echo "📝 Generating changelog for release..."
 
-        # Get the latest tag (before this release)
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        # Get the latest tag (before this release; --match excludes
+        # providers/go/v* so a provider release can never be picked up here)
+        LATEST_TAG=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo "")
         echo "Latest tag: $LATEST_TAG"
 
         # Get the version that will be released

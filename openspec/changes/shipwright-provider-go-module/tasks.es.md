@@ -53,22 +53,22 @@ Riesgo de presupuesto de 400 lineas: Medio
 
 ## Fase 4: Slice 1b — Guarda de release RED (TDD)
 
-- [ ] 4.1 RED `internal/releaseguard/tags_test.go`: table-test que verifica (a) que ninguna llamada `git describe --tags` en `release.yml` carezca de `--match`, (b) que los globs de tag de `release.yml` no coincidan con `providers/go/v0.1.0`, (c) que los globs de `release-provider-go.yml` no coincidan con `v1.2.3`, (d) que el regex de forma extraido del workflow acepte `providers/go/v0.1.0` y rechace `providers/go/v2.0.0`, `providers/go/v01.0.0`, `v0.1.0` — falla de forma segura: (a) por las llamadas `git describe` sin filtrar en `release.yml`, (c)/(d) por la ausencia de `release-provider-go.yml`
+- [x] 4.1 RED `internal/releaseguard/tags_test.go`: table-test que verifica (a) que ninguna llamada `git describe --tags` en `release.yml` carezca de `--match`, (b) que los globs de tag de `release.yml` no coincidan con `providers/go/v0.1.0`, (c) que los globs de `release-provider-go.yml` no coincidan con `v1.2.3`, (d) que el regex de forma extraido del workflow acepte `providers/go/v0.1.0` y rechace `providers/go/v2.0.0`, `providers/go/v01.0.0`, `v0.1.0` — falla de forma segura: (a) por las llamadas `git describe` sin filtrar en `release.yml`, (c)/(d) por la ausencia de `release-provider-go.yml`
 
 ## Fase 5: Slice 1b — Automatizacion de release (GREEN)
 
-- [ ] 5.1 Agregar `--match 'v[0-9]*'` a las tres llamadas `git describe --tags --abbrev=0` en `.github/workflows/release.yml` (auto-bump ~L162, bump por dispatch ~L220, rango del changelog ~L245)
-- [ ] 5.2 Agregar `git: ignore_tags: ['providers/*']` a la busqueda de tag previo de `.goreleaser.yml`
-- [ ] 5.3 Crear `.github/workflows/release-provider-go.yml`: `on: push: tags: ['providers/go/v*']`, paso de validacion de forma (`^providers/go/v(0|1)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$`, mayor restringido a `0|1` para rechazar >= 2 en el mismo regex, nombrando la regla `/vN` de la ruta de modulo), y paso de identidad de modulo (la linea `module` de `providers/go/go.mod` == `github.com/pablogore/shipwright/providers/go`)
-- [ ] 5.4 Agregar paso de aislamiento a `release-provider-go.yml`: `cd providers/go && GOWORK=off go build ./... && GOWORK=off go test -race -short ./...` sobre el tag
-- [ ] 5.5 Agregar paso de changelog acotado por ruta (`git log --pretty='- %s (%h)' <tag providers/go previo>..<tag> -- providers/go/`) y paso de release (`gh release create "$TAG" --title "providers/go $VERSION" --notes-file … --latest=false`) a `release-provider-go.yml`
-- [ ] 5.6 Agregar paso de compuerta de visibilidad del proxy a `release-provider-go.yml`: `curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/$VERSION.info`
-- [ ] 5.7 GREEN: volver a ejecutar 4.1
+- [x] 5.1 Agregar `--match 'v[0-9]*'` a las tres llamadas `git describe --tags --abbrev=0` en `.github/workflows/release.yml` (auto-bump ~L162, bump por dispatch ~L220, rango del changelog ~L245)
+- [x] 5.2 Agregar `git: ignore_tags: ['providers/*']` a la busqueda de tag previo de `.goreleaser.yml`
+- [x] 5.3 Crear `.github/workflows/release-provider-go.yml`: `on: push: tags: ['providers/go/v*']`, paso de validacion de forma (`^providers/go/v(0|1)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$`, mayor restringido a `0|1` para rechazar >= 2 en el mismo regex, nombrando la regla `/vN` de la ruta de modulo), y paso de identidad de modulo (la linea `module` de `providers/go/go.mod` == `github.com/pablogore/shipwright/providers/go`)
+- [x] 5.4 Agregar paso de aislamiento a `release-provider-go.yml`: `cd providers/go && GOWORK=off go build ./... && GOWORK=off go test -race -short ./...` sobre el tag
+- [x] 5.5 Agregar paso de changelog acotado por ruta (`git log --pretty='- %s (%h)' <tag providers/go previo>..<tag> -- providers/go/`) y paso de release (`gh release create "$TAG" --title "providers/go $VERSION" --notes-file … --latest=false`) a `release-provider-go.yml`
+- [x] 5.6 Agregar paso de compuerta de visibilidad del proxy a `release-provider-go.yml`: `curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/$VERSION.info`
+- [x] 5.7 GREEN: volver a ejecutar 4.1
 
 ## Fase 6: Slice 1b — Verificacion y fusion
 
-- [ ] 6.1 `go test -race ./internal/releaseguard/...` en verde; `golangci-lint run` limpio sobre el paquete nuevo
-- [ ] 6.2 Validar el YAML de los workflows (`actionlint` o equivalente, si esta disponible) sobre `release-provider-go.yml` y el `release.yml` modificado
+- [x] 6.1 `go test -race ./internal/releaseguard/...` en verde; `golangci-lint run` limpio sobre el paquete nuevo
+- [x] 6.2 Validar el YAML de los workflows (`actionlint` o equivalente, si esta disponible) sobre `release-provider-go.yml` y el `release.yml` modificado
 - [ ] 6.3 Fusionar el slice 1b a `develop` — rama publicada y PR abierto segun la convencion del repo (cadena stacked-to-main, base `develop` despues del PR 1); la fusion real requiere accion humana/revisor, no realizada por este agente
 
 ## Fase 7: Interludio de tag (manual)

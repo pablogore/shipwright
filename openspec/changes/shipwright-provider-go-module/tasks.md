@@ -53,22 +53,22 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Slice 1b — Release guard RED (TDD)
 
-- [ ] 4.1 RED `internal/releaseguard/tags_test.go`: table-test (a) no `git describe --tags` call in `release.yml` lacks `--match`, (b) `release.yml`'s tag globs don't match `providers/go/v0.1.0`, (c) `release-provider-go.yml`'s globs don't match `v1.2.3`, (d) the shape regex extracted from the workflow accepts `providers/go/v0.1.0` and rejects `providers/go/v2.0.0`, `providers/go/v01.0.0`, `v0.1.0` — fails closed: (a) on the unfiltered `git describe` calls in `release.yml`, (c)/(d) on the missing `release-provider-go.yml`
+- [x] 4.1 RED `internal/releaseguard/tags_test.go`: table-test (a) no `git describe --tags` call in `release.yml` lacks `--match`, (b) `release.yml`'s tag globs don't match `providers/go/v0.1.0`, (c) `release-provider-go.yml`'s globs don't match `v1.2.3`, (d) the shape regex extracted from the workflow accepts `providers/go/v0.1.0` and rejects `providers/go/v2.0.0`, `providers/go/v01.0.0`, `v0.1.0` — fails closed: (a) on the unfiltered `git describe` calls in `release.yml`, (c)/(d) on the missing `release-provider-go.yml`
 
 ## Phase 5: Slice 1b — Release automation (GREEN)
 
-- [ ] 5.1 Add `--match 'v[0-9]*'` to the three `git describe --tags --abbrev=0` calls in `.github/workflows/release.yml` (auto-bump ~L162, dispatch-bump ~L220, changelog range ~L245)
-- [ ] 5.2 Add `git: ignore_tags: ['providers/*']` to `.goreleaser.yml`'s previous-tag lookup
-- [ ] 5.3 Create `.github/workflows/release-provider-go.yml`: `on: push: tags: ['providers/go/v*']`, shape-validation step (`^providers/go/v(0|1)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$`, major restricted to `0|1` so it rejects >= 2 in the same regex, naming the `/vN` module-path rule), and module-identity step (`providers/go/go.mod`'s `module` line == `github.com/pablogore/shipwright/providers/go`)
-- [ ] 5.4 Add isolation step to `release-provider-go.yml`: `cd providers/go && GOWORK=off go build ./... && GOWORK=off go test -race -short ./...` at the tag
-- [ ] 5.5 Add path-scoped changelog step (`git log --pretty='- %s (%h)' <prev providers/go tag>..<tag> -- providers/go/`) and release step (`gh release create "$TAG" --title "providers/go $VERSION" --notes-file … --latest=false`) to `release-provider-go.yml`
-- [ ] 5.6 Add proxy-visibility gate step to `release-provider-go.yml`: `curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/$VERSION.info`
-- [ ] 5.7 GREEN: re-run 4.1
+- [x] 5.1 Add `--match 'v[0-9]*'` to the three `git describe --tags --abbrev=0` calls in `.github/workflows/release.yml` (auto-bump ~L162, dispatch-bump ~L220, changelog range ~L245)
+- [x] 5.2 Add `git: ignore_tags: ['providers/*']` to `.goreleaser.yml`'s previous-tag lookup
+- [x] 5.3 Create `.github/workflows/release-provider-go.yml`: `on: push: tags: ['providers/go/v*']`, shape-validation step (`^providers/go/v(0|1)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$`, major restricted to `0|1` so it rejects >= 2 in the same regex, naming the `/vN` module-path rule), and module-identity step (`providers/go/go.mod`'s `module` line == `github.com/pablogore/shipwright/providers/go`)
+- [x] 5.4 Add isolation step to `release-provider-go.yml`: `cd providers/go && GOWORK=off go build ./... && GOWORK=off go test -race -short ./...` at the tag
+- [x] 5.5 Add path-scoped changelog step (`git log --pretty='- %s (%h)' <prev providers/go tag>..<tag> -- providers/go/`) and release step (`gh release create "$TAG" --title "providers/go $VERSION" --notes-file … --latest=false`) to `release-provider-go.yml`
+- [x] 5.6 Add proxy-visibility gate step to `release-provider-go.yml`: `curl -sf https://proxy.golang.org/github.com/pablogore/shipwright/providers/go/@v/$VERSION.info`
+- [x] 5.7 GREEN: re-run 4.1
 
 ## Phase 6: Slice 1b — Verification & Merge
 
-- [ ] 6.1 `go test -race ./internal/releaseguard/...` green; `golangci-lint run` clean on the new package
-- [ ] 6.2 Validate workflow YAML (`actionlint` or equivalent, if available) on `release-provider-go.yml` and the modified `release.yml`
+- [x] 6.1 `go test -race ./internal/releaseguard/...` green; `golangci-lint run` clean on the new package
+- [x] 6.2 Validate workflow YAML (`actionlint` or equivalent, if available) on `release-provider-go.yml` and the modified `release.yml`
 - [ ] 6.3 Merge slice 1b to `develop` — branch pushed and PR opened per repo delivery convention (stacked-to-main chain, base `develop` after PR 1); actual merge requires human/reviewer action, not performed by this agent
 
 ## Phase 7: Tag interlude (manual)
