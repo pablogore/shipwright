@@ -148,12 +148,12 @@ security: ## Run security vulnerability check
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	@govulncheck ./... | tee vuln_report.txt
 	@cd providers/go && govulncheck ./... | tee -a ../../vuln_report.txt
-	@if grep -q "Vulnerabilities found" vuln_report.txt; then \
+	@if grep -q "No vulnerabilities found." vuln_report.txt; then \
+		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
+	else \
 		echo -e "$(RED)❌ Security vulnerabilities detected! Please update dependencies.$(NC)"; \
 		cat vuln_report.txt; \
 		exit 1; \
-	else \
-		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
 	fi
 	@rm -f vuln_report.txt
 
