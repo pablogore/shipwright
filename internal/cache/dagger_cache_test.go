@@ -103,4 +103,3 @@ func TestDaggerCacheManager_WarmUp(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Dagger client is required")
 }
-

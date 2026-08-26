@@ -108,5 +108,3 @@ func (p *YAMLParser) GetStepRetries(yamlConfig *YAMLConfig, stepName string) int
 	// Return default retries
 	return DefaultStepRetries
 }
-
-

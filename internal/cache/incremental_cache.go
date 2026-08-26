@@ -186,4 +186,3 @@ func (c *IncrementalCache) getCachePath(key string) string {
 	hashStr := hex.EncodeToString(hash[:])
 	return filepath.Join(c.baseDir, hashStr[:2], hashStr[2:4], hashStr)
 }
-

@@ -13,7 +13,8 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/kit-logger/pkg/logger"
-	"github.com/pablogore/shipwright/internal/capabilities"
+	golang "github.com/pablogore/shipwright/providers/go"
+
 	"github.com/pablogore/shipwright/internal/config"
 	"github.com/pablogore/shipwright/internal/executors"
 	"github.com/pablogore/shipwright/internal/interfaces"
@@ -620,8 +621,9 @@ func ConvertConfigToPipelinesConfig(cfg interfaces.Configuration) pipelines.Conf
 
 // BuildCapabilities constructs the Layer 1 capability bundle
 // (pkg/shipwright: Builder/Tester/Artifactor/Deployer/Runner) backed by the
-// standalone internal/capabilities implementations (Phase 3's go-service
-// decomposition), wired from the same pipelines.Config the DI container
+// standalone providers/go implementations (originally Phase 3's go-service
+// decomposition, extracted from internal/capabilities into its own module),
+// wired from the same pipelines.Config the DI container
 // already produces for the legacy --pipeline path. This is what
 // PluginContext.GetCapabilities() (replacing the retired GetPipeline(),
 // WU10 tasks.md 10.1/10.2) exposes to plugins.
@@ -638,7 +640,7 @@ func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capa
 		return plugins.Capabilities{}
 	}
 
-	builder := &capabilities.GoBuilder{
+	builder := &golang.GoBuilder{
 		Client: client,
 		Config: shipwright.BuildConfig{
 			GoVersion:   cfg.GoVersion,
@@ -647,13 +649,13 @@ func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capa
 	}
 
 	testers := []shipwright.Tester{
-		&capabilities.GoUnitTester{
+		&golang.GoUnitTester{
 			Client:    client,
 			Config:    shipwright.TestConfig{Coverage: cfg.Coverage},
 			GoVersion: cfg.GoVersion,
 		},
-		&capabilities.GoLinter{Client: client},
-		&capabilities.GoVulnScanner{Client: client, GoVersion: cfg.GoVersion},
+		&golang.GoLinter{Client: client},
+		&golang.GoVulnScanner{Client: client, GoVersion: cfg.GoVersion},
 	}
 
 	artifactConfig := shipwright.ArtifactConfig{
@@ -677,7 +679,7 @@ func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capa
 		artifactConfig.Token = client.SetSecret("generic-token", cfg.Token)
 	}
 
-	artifactor := &capabilities.ContainerPublisher{
+	artifactor := &golang.ContainerPublisher{
 		Client: client,
 		Config: artifactConfig,
 	}

@@ -43,8 +43,8 @@ Threat Matrix (all credential fields are `*dagger.Secret`, never a plain
 
 **Nothing outside this list carries a compatibility guarantee.** Internal,
 non-exported packages (`internal/**`), example code (`examples/**`), and any
-implementation detail of `internal/capabilities/**` may change at any time
-without a `ContractVersion` bump.
+implementation detail of `providers/go/**` may change at any time without a
+`ContractVersion` bump.
 
 ## Five Independent Version Axes
 

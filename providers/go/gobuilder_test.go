@@ -1,15 +1,15 @@
-package capabilities_test
+package golang_test
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/pablogore/shipwright/internal/capabilities"
+	"github.com/pablogore/shipwright/providers/go"
 )
 
 func TestGoBuilder_Build_NilClient(t *testing.T) {
-	builder := &capabilities.GoBuilder{}
+	builder := &golang.GoBuilder{}
 
 	out, err := builder.Build(context.Background(), nil)
 

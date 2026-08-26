@@ -194,4 +194,3 @@ func (w *MetricsWrapper) WarmUp(ctx context.Context, keys []string, generator fu
 func (w *MetricsWrapper) GetMetrics() *CacheMetrics {
 	return w.metrics
 }
-

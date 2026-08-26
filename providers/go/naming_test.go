@@ -1,4 +1,4 @@
-package capabilities_test
+package golang_test
 
 import (
 	"go/ast"
@@ -12,9 +12,10 @@ import (
 )
 
 // forbiddenBundleSubstrings enumerates naming patterns design.md D-F
-// explicitly rejects for internal/capabilities: an exported identifier
-// that names a stack bundle instead of a single, standalone capability
-// implementation (e.g. GoService, GoStack). Matching is case-insensitive.
+// explicitly rejects for providers/go (formerly internal/capabilities): an
+// exported identifier that names a stack bundle instead of a single,
+// standalone capability implementation (e.g. GoService, GoStack). Matching
+// is case-insensitive.
 var forbiddenBundleSubstrings = []string{
 	"goservice",
 	"gostack",
@@ -24,14 +25,16 @@ var forbiddenBundleSubstrings = []string{
 }
 
 // TestNoExportedIdentifierNamesAStackBundle is the naming golden test
-// required by tasks.md 3.1: no exported identifier in internal/capabilities
-// may name a stack bundle. Every implementation must describe what it does
-// (GoBuilder, ContainerPublisher, ...), never a bundled stack identity —
-// design.md D-F rejects both a preset registry keyed by a stack name and a
-// `goservice/` subdirectory, because the path itself would be a bundling
-// identity. This test guards the exported-identifier half of that rule.
+// required by tasks.md 3.1 (originally in internal/capabilities, moved
+// here unchanged by the providers/go extraction): no exported identifier
+// in this package may name a stack bundle. Every implementation must
+// describe what it does (GoBuilder, ContainerPublisher, ...), never a
+// bundled stack identity — design.md D-F rejects both a preset registry
+// keyed by a stack name and a `goservice/` subdirectory, because the path
+// itself would be a bundling identity. This test guards the
+// exported-identifier half of that rule.
 func TestNoExportedIdentifierNamesAStackBundle(t *testing.T) {
-	pkg := parseCapabilitiesPackage(t)
+	pkg := parseGolangPackage(t)
 
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
@@ -56,11 +59,11 @@ func assertNotBundleName(t *testing.T, name string) {
 	}
 }
 
-// parseCapabilitiesPackage parses the non-test production source of
-// internal/capabilities. Deliberately fails closed (t.Fatal) if the package
-// does not exist yet — that is the expected RED state before tasks.md
-// 3.2-3.4 add production files.
-func parseCapabilitiesPackage(t *testing.T) *ast.Package {
+// parseGolangPackage parses the non-test production source of providers/go
+// (package golang). Deliberately fails closed (t.Fatal) if the package does
+// not exist yet — that was the expected RED state before the extraction's
+// tasks.md 2.1-2.9 added production files here.
+func parseGolangPackage(t *testing.T) *ast.Package {
 	t.Helper()
 
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -75,12 +78,12 @@ func parseCapabilitiesPackage(t *testing.T) *ast.Package {
 		t.Fatalf("failed to parse package directory %s: %v", pkgDir, err)
 	}
 
-	pkg, ok := pkgs["capabilities"]
+	pkg, ok := pkgs["golang"]
 	if !ok {
 		t.Fatalf(
-			"package %q not found while parsing %s -- internal/capabilities must exist with at least one "+
+			"package %q not found while parsing %s -- providers/go must exist with at least one "+
 				"non-test production file",
-			"capabilities", pkgDir,
+			"golang", pkgDir,
 		)
 	}
 	return pkg
@@ -96,9 +99,8 @@ func nonTestGoFile(info os.FileInfo) bool {
 // exportedDeclNames extracts every exported top-level identifier
 // introduced by decl: type names, const/var names, and function/method
 // names. Struct field names are deliberately out of scope — design.md D-F
-// speaks to "the exported identifiers of internal/capabilities", meaning
-// top-level package declarations, not the fields of an already-standalone
-// type.
+// speaks to "the exported identifiers of providers/go", meaning top-level
+// package declarations, not the fields of an already-standalone type.
 func exportedDeclNames(decl ast.Decl) []string {
 	var names []string
 

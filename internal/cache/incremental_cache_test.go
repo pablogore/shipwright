@@ -104,4 +104,3 @@ func TestIncrementalCache_IsCacheValid_NoCache(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, valid)
 }
-

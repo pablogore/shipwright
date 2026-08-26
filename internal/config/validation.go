@@ -117,4 +117,3 @@ func ValidateEnvironment(env string) error {
 
 	return fmt.Errorf("invalid environment: %s (must be one of: %v)", env, validEnvironments)
 }
-

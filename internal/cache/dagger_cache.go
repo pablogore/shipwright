@@ -11,7 +11,7 @@ import (
 // DaggerCacheManager manages cache for Dagger container layers.
 // It uses Dagger's built-in cache volumes for efficient layer caching.
 type DaggerCacheManager struct {
-	client      *dagger.Client
+	client       *dagger.Client
 	cacheVolumes map[string]*dagger.CacheVolume
 }
 
@@ -124,4 +124,3 @@ func (d *DaggerCacheManager) WarmUp(ctx context.Context, keys []string, generato
 	}
 	return nil
 }
-

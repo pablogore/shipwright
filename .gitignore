@@ -100,9 +100,9 @@ fabric.properties
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# Go workspace file
-go.work
-go.work.sum
+# Go workspace file: intentionally NOT ignored in this repo (design.md D1) --
+# go.work and go.work.sum are committed so `./...` spans providers/go for
+# every contributor without an extra setup step.
 
 # env file
 .env
