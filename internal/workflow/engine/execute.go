@@ -411,11 +411,17 @@ func maxAttempts(retries int) int {
 	return retries
 }
 
-// executeStepWithRetry attempts s up to Options.Retries times (tasks.md
-// 8.4), returning the first successful result or the last attempt's error
-// once the budget is exhausted.
+// executeStepWithRetry attempts s up to its configured attempt budget
+// (tasks.md 8.4), returning the first successful result or the last
+// attempt's error once the budget is exhausted. A step-level Attempts
+// field overrides the workflow-level Options.Retries when set. A nil
+// value falls back to Options.Retries.
 func executeStepWithRetry(ctx context.Context, s manifest.Step, outputs map[string]result, cfg Config) (result, int, error) {
-	attempts := maxAttempts(cfg.Options.Retries)
+	retries := cfg.Options.Retries
+	if s.Attempts != nil {
+		retries = *s.Attempts
+	}
+	attempts := maxAttempts(retries)
 
 	var lastErr error
 	for attempt := 1; attempt <= attempts; attempt++ {
