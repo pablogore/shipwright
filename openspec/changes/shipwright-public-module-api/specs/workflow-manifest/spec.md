@@ -128,17 +128,18 @@ enforcement is `workflow-execution`'s responsibility.
 
 ### Requirement: Approval Gates Are Declared As Metadata Only
 
-`spec.environments.<name>.approvals` MUST be representable as declared,
-readable metadata (e.g. a list of required reviewers). The schema MUST NOT
-define any execution or blocking semantics for this field — it is data,
-readable by any caller or external system.
+`spec.environments.<name>.approvals` MUST be representable as a structured
+object with a `required` field holding a list of reviewer names (e.g.
+`approvals: {required: [platform-team]}`). The schema MUST NOT define any
+execution or blocking semantics for this field — it is data, readable by
+any caller or external system.
 
 #### Scenario: Declared approval metadata is queryable, not executable
 
 - GIVEN a manifest declaring `spec.environments.production.approvals:
-  [team-platform]`
+  {required: [platform-team]}`
 - WHEN the manifest is parsed
-- THEN the approvals list is available as plain data to any caller, and
+- THEN the `required` list is available as plain data to any caller, and
   the schema attaches no blocking behavior to it
 
 ### Requirement: Interpolation Tokens Use A Fixed Grammar, No Arbitrary Expressions

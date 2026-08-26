@@ -135,19 +135,20 @@ aplicación es responsabilidad de `workflow-execution`.
 
 ### Requisito: Los Portones de Aprobación se Declaran Solo Como Metadatos
 
-`spec.environments.<nombre>.approvals` DEBE ser representable como
-metadatos declarados y legibles (p. ej. una lista de revisores requeridos).
+`spec.environments.<nombre>.approvals` DEBE ser representable como un
+objeto estructurado con un campo `required` que contenga una lista de
+nombres de revisores (p. ej. `approvals: {required: [platform-team]}`).
 El esquema NO DEBE definir ninguna semántica de ejecución o bloqueo para
 este campo — son datos, legibles por cualquier llamador o sistema externo.
 
 #### Escenario: Los metadatos de aprobación declarados son consultables, no ejecutables
 
 - DADO un manifiesto que declara `spec.environments.production.approvals:
-  [team-platform]`
+  {required: [platform-team]}`
 - CUANDO se analiza el manifiesto
-- ENTONCES la lista de aprobaciones está disponible como datos simples
-  para cualquier llamador, y el esquema no le adjunta ningún
-  comportamiento de bloqueo
+- ENTONCES la lista `required` está disponible como datos simples para
+  cualquier llamador, y el esquema no le adjunta ningún comportamiento de
+  bloqueo
 
 ### Requisito: Los Tokens de Interpolación Usan una Gramática Fija, Sin Expresiones Arbitrarias
 
