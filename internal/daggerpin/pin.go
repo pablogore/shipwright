@@ -65,6 +65,9 @@ func GoModDaggerVersion(path string) (string, error) {
 
 	for _, rep := range f.Replace {
 		if rep.Old.Path == "dagger.io/dagger" {
+			if rep.New.Version == "" {
+				return "", fmt.Errorf("daggerpin: dagger.io/dagger is replaced by local path %q; engine-version parity cannot be established", rep.New.Path)
+			}
 			return rep.New.Version, nil
 		}
 	}

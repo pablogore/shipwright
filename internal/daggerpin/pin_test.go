@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -89,5 +90,34 @@ func TestGoModDaggerVersion_ReplaceDirectiveWins(t *testing.T) {
 	const want = "v0.22.0"
 	if got != want {
 		t.Fatalf("GoModDaggerVersion() = %q, want %q (the replace directive's version, not the require version v0.21.8)", got, want)
+	}
+}
+
+// TestGoModDaggerVersion_LocalPathReplaceFailsClosed guards against a local
+// filesystem replace directive (`replace dagger.io/dagger => ../dagger`)
+// silently producing an empty effective version. modfile's parsed New.Version
+// is "" for a local path replace (there is no version to compare), so
+// returning it as-is would make the pin-parity test report a confusing
+// "v0.21.8 != ”" mismatch instead of naming the actual, unrelated problem:
+// a local replace has no comparable version at all.
+func TestGoModDaggerVersion_LocalPathReplaceFailsClosed(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "go.mod")
+	content := "module example.com/localreplace\n\n" +
+		"go 1.26.1\n\n" +
+		"require dagger.io/dagger v0.21.8\n\n" +
+		"replace dagger.io/dagger => ../dagger\n"
+	if err := os.WriteFile(modPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v, want nil", modPath, err)
+	}
+
+	_, err := GoModDaggerVersion(modPath)
+	if err == nil {
+		t.Fatal("GoModDaggerVersion() error = nil, want a fail-closed error naming the local replace path")
+	}
+
+	const wantSubstring = "../dagger"
+	if !strings.Contains(err.Error(), wantSubstring) {
+		t.Fatalf("GoModDaggerVersion() error = %q, want it to name the local replace path %q", err.Error(), wantSubstring)
 	}
 }
