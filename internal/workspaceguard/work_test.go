@@ -1,16 +1,20 @@
 // Package workspaceguard guards design.md D1's go.work isolation decision:
-// the root module's workspace membership decides which packages
-// `go build ./...` and `go test -race ./...` traverse, so this package
-// makes that membership subject to an explicit, automated allowlist rather
-// than a comment. This is a plain root-module unit test -- it reads
-// go.work as text, mirroring internal/daggerpin's pin_test.go, and never
-// requires a running Dagger engine.
+// go.work declares which modules participate in the workspace and how
+// dependency resolution works, but it does NOT make `go build ./...` or
+// `go test -race ./...` from root traverse nested modules — each module
+// must be tested/built explicitly (e.g., `cd providers/go && go test ./...`).
+// This package enforces which modules may appear in the workspace via an
+// explicit, automated allowlist rather than a comment. This is a plain
+// root-module unit test — it reads go.work and CI/Makefile as text,
+// mirroring internal/daggerpin's pin_test.go, and never requires a
+// running Dagger engine.
 package workspaceguard
 
 import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -92,4 +96,40 @@ func TestUsePaths_UnparseableFileFailsClosed(t *testing.T) {
 	if err == nil {
 		t.Fatal("UsePaths() with an unparseable go.work must return an error, got nil")
 	}
+}
+
+// TestCIMakefileExplicitlyTestsProvidersGo verifies that the Makefile and CI
+// workflow explicitly test/build providers/go as a separate module. Since
+// `go test ./...` from root never traverses nested modules (see design.md
+// Open Questions), CI would silently skip providers/go tests without these
+// explicit invocations. This test makes it impossible to forget them.
+func TestCIMakefileExplicitlyTestsProvidersGo(t *testing.T) {
+	root := repoRoot(t)
+
+	t.Run("Makefile test target includes providers/go", func(t *testing.T) {
+		data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+		if err != nil {
+			t.Fatalf("ReadFile(Makefile) error = %v", err)
+		}
+		content := string(data)
+
+		// The test target must explicitly cd into providers/go and run tests
+		if !strings.Contains(content, "cd providers/go") {
+			t.Error("Makefile does not include 'cd providers/go' — " +
+				"go test ./... from root never traverses nested modules")
+		}
+	})
+
+	t.Run("CI test step includes providers/go", func(t *testing.T) {
+		data, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+		if err != nil {
+			t.Fatalf("ReadFile(ci.yml) error = %v", err)
+		}
+		content := string(data)
+
+		if !strings.Contains(content, "cd providers/go") {
+			t.Error("CI workflow does not include 'cd providers/go' — " +
+				"CI would silently skip providers/go tests")
+		}
+	})
 }
