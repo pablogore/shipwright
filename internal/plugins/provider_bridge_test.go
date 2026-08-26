@@ -3,7 +3,6 @@ package plugins
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"dagger.io/dagger"
@@ -309,38 +308,44 @@ func TestNomadDeployPlugin_Deploy_RejectsMissingJobAndJobFile(t *testing.T) {
 // TestNomadDeployPlugin_Deploy_ReturnsDeploymentReference asserts the
 // observable contract engine.Execute records as the step's output: a
 // non-empty deployment reference naming the environment and the artifact.
-func TestNomadDeployPlugin_Deploy_ReturnsDeploymentReference(t *testing.T) {
+// TestNomadDeployPlugin_Deploy_FailsClosedNotImplemented proves Deploy never
+// fabricates a deployment reference: neither stageNomadJob (builds a
+// container, never executes it) nor runNomadCommand (checks for the Nomad
+// CLI, never runs it) perform a real deployment, so a workflow step must see
+// a distinguishable error, not a "nomad://..." success string it would
+// otherwise report as a completed deployment.
+func TestNomadDeployPlugin_Deploy_FailsClosedNotImplemented(t *testing.T) {
 	p := &NomadDeployPlugin{nomadAddr: "http://localhost:4646", jobFile: "nomad.hcl"}
 
 	got, err := p.Deploy(context.Background(), "ghcr.io/acme/api:v1", "staging", nil)
 
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(got, "nomad://"), "got %q", got)
-	assert.Contains(t, got, "staging")
-	assert.Contains(t, got, "ghcr.io/acme/api:v1")
+	require.ErrorIs(t, err, ErrNomadDeploymentNotImplemented)
+	assert.Empty(t, got, "Deploy must never return a deployment reference for an unperformed deployment")
 }
 
 // TestNomadDeployPlugin_Deploy_DefaultsNomadAddr proves an unset address
 // falls back to the documented local default rather than producing an
-// empty NOMAD_ADDR.
+// empty NOMAD_ADDR, even though Deploy itself still fails closed.
 func TestNomadDeployPlugin_Deploy_DefaultsNomadAddr(t *testing.T) {
 	p := &NomadDeployPlugin{jobFile: "nomad.hcl"}
 
 	_, err := p.Deploy(context.Background(), "ghcr.io/acme/api:v1", "staging", nil)
 
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrNomadDeploymentNotImplemented)
 	assert.Equal(t, defaultNomadAddr, p.resolvedNomadAddr())
 }
 
 // TestNomadDeployPlugin_Deploy_JobOnlyIsAccepted covers the inline-job branch
-// (`job` set, `jobFile` empty), the alternative to a job file.
+// (`job` set, `jobFile` empty), the alternative to a job file: it must reach
+// the not-implemented fail-closed error, never the "job or job file must be
+// specified" validation error, proving job-only input is accepted by
+// validation even though execution itself is still unimplemented.
 func TestNomadDeployPlugin_Deploy_JobOnlyIsAccepted(t *testing.T) {
 	p := &NomadDeployPlugin{job: `job "api" {}`}
 
-	got, err := p.Deploy(context.Background(), "ghcr.io/acme/api:v1", "prod", nil)
+	_, err := p.Deploy(context.Background(), "ghcr.io/acme/api:v1", "prod", nil)
 
-	require.NoError(t, err)
-	assert.Contains(t, got, "prod")
+	require.ErrorIs(t, err, ErrNomadDeploymentNotImplemented)
 }
 
 // TestNomadDeployPlugin_StageNomadJob_NoDaggerClientIsNoop covers the
@@ -365,7 +370,10 @@ func TestNomadDeployPlugin_StageNomadJob_UnavailableClientIsNoop(t *testing.T) {
 }
 
 // TestNomadDeployPlugin_Deploy_WithUnavailableDaggerClient proves the whole
-// Deploy path stays usable when no Dagger engine is wired.
+// Deploy path stays reachable (validation and staging both tolerate a
+// missing engine) when no Dagger client is wired — it must still reach the
+// SAME not-implemented fail-closed error, not a different one caused by the
+// missing client, and it must never fabricate a deployment reference.
 func TestNomadDeployPlugin_Deploy_WithUnavailableDaggerClient(t *testing.T) {
 	p := &NomadDeployPlugin{
 		jobFile:      "nomad.hcl",
@@ -374,8 +382,8 @@ func TestNomadDeployPlugin_Deploy_WithUnavailableDaggerClient(t *testing.T) {
 
 	got, err := p.Deploy(context.Background(), "ghcr.io/acme/api:v1", "staging", nil)
 
-	require.NoError(t, err)
-	assert.Contains(t, got, "ghcr.io/acme/api:v1")
+	require.ErrorIs(t, err, ErrNomadDeploymentNotImplemented)
+	assert.Empty(t, got)
 }
 
 func TestRegistry_LoadBuiltinPlugins_ReportsLoadFailure(t *testing.T) {

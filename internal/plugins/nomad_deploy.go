@@ -42,6 +42,16 @@ const (
 // string or a plain WithEnvVariable (the security skill's secrets rule).
 const nomadTokenSecretName = "NOMAD_TOKEN"
 
+// ErrNomadDeploymentNotImplemented is returned by Deploy after validation and
+// staging succeed. stageNomadJob builds a Nomad CLI container but never
+// executes it, and runNomadCommand only checks for a local Nomad binary and
+// logs — neither performs a real `nomad job run` or calls the Nomad API. A
+// shipwright.Deployer's returned string is recorded by engine.Execute as the
+// step's successful output, so fabricating a "nomad://..." reference here
+// would let a workflow report a deployment that never happened. Deploy fails
+// closed with this sentinel instead, until real execution is implemented.
+var ErrNomadDeploymentNotImplemented = errors.New("nomad-deploy: real Nomad execution is not implemented yet — no deployment occurred")
+
 // NomadDeployPlugin adds Nomad deployment capability to Shipwright workflows.
 //
 // It is BOTH the Plugin (lifecycle: Name/Version/Initialize/Cleanup) and the
@@ -206,10 +216,7 @@ func (p *NomadDeployPlugin) Deploy(
 		return "", fmt.Errorf("nomad-deploy: %w", err)
 	}
 
-	ref := fmt.Sprintf("nomad://%s/%s", environment, artifactRef)
-	logger.L().InfoContext(ctx, "Nomad deployment completed", "deployment", ref)
-
-	return ref, nil
+	return "", fmt.Errorf("%w (artifact=%s environment=%s)", ErrNomadDeploymentNotImplemented, artifactRef, environment)
 }
 
 // Cleanup cleans up the plugin.
