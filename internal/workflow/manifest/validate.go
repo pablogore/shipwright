@@ -66,6 +66,11 @@ func ValidateIdentity(m *Manifest) error {
 // cycle/reference validation), which this package deliberately does not
 // implement.
 func ValidateStructure(m *Manifest) error {
+	if m.Spec.Execution.Concurrency.MaxParallel < 0 {
+		return fmt.Errorf("manifest: spec.execution.concurrency.maxParallel must be >= 0, got %d",
+			m.Spec.Execution.Concurrency.MaxParallel)
+	}
+
 	seen := make(map[string]bool, len(m.Spec.Steps))
 
 	for i, step := range m.Spec.Steps {

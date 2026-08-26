@@ -104,6 +104,41 @@ func TestParse_EmptyUsesVersionFailsValidation(t *testing.T) {
 	}
 }
 
+func TestParse_MaxParallelZeroValidates(t *testing.T) {
+	src := identityHeader + `
+  execution:
+    concurrency:
+      maxParallel: 0
+  steps:
+    - id: build
+      capability: build
+      uses: {provider: go, version: "1"}
+`
+	_, err := manifest.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatalf("Parse() with maxParallel: 0 must succeed (cannot distinguish from omitted), got %v", err)
+	}
+}
+
+func TestParse_MaxParallelNegativeFailsValidation(t *testing.T) {
+	src := identityHeader + `
+  execution:
+    concurrency:
+      maxParallel: -1
+  steps:
+    - id: build
+      capability: build
+      uses: {provider: go, version: "1"}
+`
+	_, err := manifest.Parse(strings.NewReader(src))
+	if err == nil {
+		t.Fatal("Parse() with maxParallel: -1 must return an error, got nil")
+	}
+	if !strings.Contains(err.Error(), "maxParallel") {
+		t.Fatalf("Parse() error = %v, want a maxParallel validation error", err)
+	}
+}
+
 func TestParse_StepWithCapabilityAndUsesValidates(t *testing.T) {
 	src := identityHeader + `
   steps:
