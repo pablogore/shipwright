@@ -47,10 +47,6 @@ type Spec struct {
 // Repo+Ref pinned pair with an optional AuthSecretRef. Which combination a
 // given provider actually requires is a later-stage (references/graph)
 // concern, not a structural one — this package parses the shape only.
-//
-// Ref is a branch or tag name (NOT a commit SHA). The cloner delegates to
-// git clone --branch, which only accepts ref names resolvable to a
-// branch or tag. Commit SHAs are explicitly rejected by ValidateSourceRef.
 type SourceSpec struct {
 	Path          string `yaml:"path,omitempty"`
 	Repo          string `yaml:"repo,omitempty"`

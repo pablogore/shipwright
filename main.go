@@ -566,6 +566,10 @@ type cloneRepoFunc func(ctx context.Context, client *dagger.Client, opts shared.
 // directory resolution is used unchanged.
 func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec manifest.SourceSpec, cloneFn cloneRepoFunc) (*dagger.Directory, error) {
 	if spec.Repo != "" {
+		if spec.AuthSecretRef != "" {
+			return nil, fmt.Errorf("workflow: source.authSecretRef is not supported yet (got %q)", spec.AuthSecretRef)
+		}
+
 		protocol := "https"
 		if strings.HasPrefix(spec.Repo, "git@") {
 			protocol = "ssh"

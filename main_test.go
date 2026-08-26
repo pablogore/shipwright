@@ -492,6 +492,21 @@ func TestResolveWorkflowSource_RepoForwarded(t *testing.T) {
 		"repo URL must be forwarded unchanged")
 }
 
+// TestResolveWorkflowSource_AuthSecretRefFailsClosed proves that a
+// non-empty authSecretRef is rejected with an explicit error, not silently
+// ignored. The cloner currently uses global credentials; letting
+// authSecretRef through would be misleading.
+func TestResolveWorkflowSource_AuthSecretRefFailsClosed(t *testing.T) {
+	spec := manifest.SourceSpec{
+		Repo:          "https://github.com/org/repo.git",
+		AuthSecretRef: "github-prod",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "authSecretRef is not supported yet")
+}
+
 // TestResolveWorkflowSource_PathFallback proves the existing path-based
 // code path is unchanged: when spec.Repo is empty, the function returns
 // client.Host().Directory(path) with no clone attempt.
