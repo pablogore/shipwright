@@ -68,11 +68,11 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 3 — Capability implementations (`composition-model`)
 
-- [ ] 3.1 RED: naming golden — no exported identifier in `internal/capabilities` names a stack bundle.
-- [ ] 3.2 GREEN: `GoBuilder` (from Build/buildBinary/buildDocker).
-- [ ] 3.3 GREEN: `GoUnitTester`, `GoLinter`, `GoVulnScanner` (three independent Testers — orthogonality win).
-- [ ] 3.4 GREEN: `ContainerPublisher` (from Package/Tag/Push).
-- [ ] 3.5 RED/GREEN: `var _ Builder = (*GoBuilder)(nil)` etc. per implementation; original `go-service` left in place.
+- [x] 3.1 RED: naming golden — no exported identifier in `internal/capabilities` names a stack bundle.
+- [x] 3.2 GREEN: `GoBuilder` (from Build/buildBinary/buildDocker).
+- [x] 3.3 GREEN: `GoUnitTester`, `GoLinter`, `GoVulnScanner` (three independent Testers — orthogonality win).
+- [x] 3.4 GREEN: `ContainerPublisher` (from Package/Tag/Push).
+- [x] 3.5 RED/GREEN: `var _ Builder = (*GoBuilder)(nil)` etc. per implementation; original `go-service` left in place.
 
 ## Phase 4 — Manifest schema + parser (`workflow-manifest`)
 
