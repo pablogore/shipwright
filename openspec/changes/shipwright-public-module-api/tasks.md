@@ -115,15 +115,15 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 8 — Execution engine (`workflow-execution`)
 
-- [ ] 8.1 RED: wave order deterministic, manifest-declaration order within a wave.
-- [ ] 8.2 RED: fail-fast stops later waves, names the failing step id; skips not-yet-started dependents.
-- [ ] 8.3 RED: per-step `context.WithTimeout` fires.
-- [ ] 8.4 RED: bounded per-step retry.
-- [ ] 8.5 SCOPE NOTE (own task, do not over-build): `maxParallel` validated/recorded but NOT used to widen execution — serial is a correct schedule for any `maxParallel >= 1`; `maxParallel <= 0` fails at stage 3. Concurrent widening within a wave is explicitly deferred.
-- [ ] 8.6 RED (absence-of-behavior, flag for sdd-verify): approval metadata under `spec.environments.<name>.approvals` does NOT block/queue/gate — engine executes per normal DAG ordering with no recorded approval. Supersedes the original proposal's blocking criterion (D-M).
-- [ ] 8.7 RED: `when` accepts only a structured predicate map (`when: {branch: [main]}`), evaluated by exact match — per design.md D-L, canonical over the `workflow-execution` spec's own scenario text, which illustrates a string-expression form; flag this spec/design drift to `sdd-verify`.
-- [ ] 8.8 GREEN: wave scheduler over `graph.Graph` + `providers.Registry`, invoking Layer 1 interfaces directly — never through `Plan`.
-- [ ] 8.9 GREEN: `examples/workflow/*.yaml` including the diamond fan-in case.
+- [x] 8.1 RED: wave order deterministic, manifest-declaration order within a wave.
+- [x] 8.2 RED: fail-fast stops later waves, names the failing step id; skips not-yet-started dependents.
+- [x] 8.3 RED: per-step `context.WithTimeout` fires.
+- [x] 8.4 RED: bounded per-step retry.
+- [x] 8.5 SCOPE NOTE (own task, do not over-build): `maxParallel` validated/recorded but NOT used to widen execution — serial is a correct schedule for any `maxParallel >= 1`; `maxParallel <= 0` fails at stage 3. Concurrent widening within a wave is explicitly deferred. GAP FOUND: `maxParallel <= 0` is confirmed NOT enforced anywhere in `internal/workflow/manifest` stage 3 as of this WU (grep-verified, no reference to MaxParallel outside schema.go's field decl and parse_test.go's decode assertion) — flagged for `sdd-verify`, not fixed here per this task's own instruction not to reach back into WU4's package.
+- [x] 8.6 RED (absence-of-behavior, flag for sdd-verify): approval metadata under `spec.environments.<name>.approvals` does NOT block/queue/gate — engine executes per normal DAG ordering with no recorded approval. Supersedes the original proposal's blocking criterion (D-M).
+- [x] 8.7 RED: `when` accepts only a structured predicate map (`when: {branch: [main]}`), evaluated by exact match — per design.md D-L. Verified `specs/workflow-execution/spec.md` already shows the structured form; no spec/design drift found (already reconciled in a prior WU).
+- [x] 8.8 GREEN: wave scheduler over `graph.Graph` + `providers.Registry`, invoking Layer 1 interfaces directly — never through `Plan`.
+- [x] 8.9 GREEN: `examples/workflow/*.yaml` including the diamond fan-in case.
 
 ## Phase 9 — CLI manifest entrypoint (`workflow-execution`)
 
