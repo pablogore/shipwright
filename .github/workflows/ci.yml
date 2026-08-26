@@ -8,9 +8,9 @@ name: 'CI/CD Pipeline'
 # Note: PR merges trigger push events, so we handle both to avoid duplicates
 on:
   push:
-    branches: [ 'main', 'develop' ]
+    branches: [ 'main', 'develop', 'feature/shipwright-public-module-api-*' ]
   pull_request:
-    branches: [ 'main', 'develop' ]
+    branches: [ 'main', 'develop', 'feature/shipwright-public-module-api-*' ]
     types: ['opened', 'synchronize', 'reopened', 'ready_for_review']
   delete:
   workflow_dispatch:

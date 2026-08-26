@@ -31,15 +31,17 @@ La capa 3 vive en `internal/` de forma deliberada (ver D-H). Su contrato públic
 
 **Regla de firmas (control de riesgo):** los métodos de las interfaces de capacidad usan ÚNICAMENTE tipos núcleo de Dagger (`Directory`, `File`, `Container`, `Secret`) y escalares. Ningún Object definido por el módulo aparece en la firma de un *método de interfaz*: ese rincón del sistema de tipos de Dagger no está verificado.
 
+**Hallazgo del spike (WU2, tarea 2.1) — confirmado con un `dagger call` real contra v0.21.8, veredicto GO:** el estado tipado por interfaz de un campo de Object SÍ sobrevive la serialización, pero el codegen del Go SDK de Dagger no puede compilar un proxy de cliente para un método de interfaz que devuelve un tipo núcleo de Dagger encadenable de forma perezosa (`Directory`/`File`/`Container`) junto con un `error` explícito — verificado como reproducible y aislado a esa combinación (un método hermano que devuelve `(string, error)` compiló sin problemas). Por eso `Builder.Build`, `Tester.Test` y `Runner.Run` abajo descartan `error`, siguiendo el propio idiom de encadenamiento perezoso de Dagger (los errores aparecen en la llamada terminal/escalar, p. ej. `Plan.Execute` o el `Sync()` de quien llama). Es una desviación forzada por el codegen, exclusiva de la capa 2, respecto al código de ejemplo original de esta sección — no de la decisión D-A en sí. `Artifactor.Publish`/`Deployer.Deploy` no se ven afectados (devuelven `(string, error)` escalar) y conservan `error`. La capa 1 (`pkg/shipwright`, Go plano, sin codegen de por medio) conserva `error` en los cinco métodos — las dos capas son deliberadamente asimétricas acá, no están desincronizadas.
+
 ```go
 // .dagger/capabilities.go — la superficie pública de Dagger
 type Builder interface {
 	DaggerObject
-	Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error)
+	Build(ctx context.Context, source *dagger.Directory) *dagger.Directory
 }
 type Tester interface {
 	DaggerObject
-	Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error)
+	Test(ctx context.Context, source *dagger.Directory) *dagger.File
 }
 type Artifactor interface {
 	DaggerObject
@@ -51,7 +53,7 @@ type Deployer interface {
 }
 type Runner interface {
 	DaggerObject
-	Run(ctx context.Context, build *dagger.Directory) (*dagger.Container, error)
+	Run(ctx context.Context, build *dagger.Directory) *dagger.Container
 }
 
 type Shipwright struct{}
@@ -497,8 +499,8 @@ Solo código. Sin migración de estado, datos ni release; la capa de workflow es
 
 ## Preguntas abiertas
 
-- [ ] ¿Dagger v0.21.8 serializa campos tipados por interfaz en el estado de encadenamiento de un Object? Se demuestra o refuta en la porción 2; una refutación dispara la contingencia de D-A y deja intacta la capa 3.
-- [ ] ¿`dagger init` acepta `engineVersion v0.21.8` textualmente? Si no, se suben ambos pines juntos en la porción 2 con el test de paridad verde.
+- [x] ¿Dagger v0.21.8 serializa campos tipados por interfaz en el estado de encadenamiento de un Object? **Resuelto (WU2, tarea 2.1): GO.** Demostrado con una query encadenada real de `dagger` que produjo un artefacto concreto desde una implementación de interfaz invocada dinámicamente. Hizo falta un ajuste de firma forzado por el codegen (ver D-A arriba); la pregunta de serialización de fondo queda respondida, la contingencia de D-A no se dispara.
+- [x] ¿`dagger init` acepta `engineVersion v0.21.8` textualmente? **Resuelto (WU2, tarea 2.3): sí**, aceptado textualmente con un CLI instalado que ya coincidía. No hizo falta subir ningún pin.
 - [ ] ¿Cuál es el tope correcto de lectura del manifiesto? Se propone 1 MiB, a confirmar contra el fixture de amplificación por alias en la porción 4; el número es una constante de test, no un elemento del contrato.
 
 ---
