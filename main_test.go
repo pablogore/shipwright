@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pablogore/shipwright/internal/pipelines/shared"
+	"github.com/pablogore/shipwright/internal/workflow/manifest"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
@@ -380,6 +383,168 @@ func TestResolveCapabilityRef_UnknownCapabilityFailsClosed(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not-a-real-capability")
+}
+
+// --- resolveWorkflowSource tests (source-repo-ref-support) ---
+
+// cloneCall captures the arguments passed to a mock cloneFn.
+type cloneCall struct {
+	opts     shared.GitCloneOpts
+	protocol string
+}
+
+// mockCloneFunc returns a cloneRepoFunc that records every call and
+// returns dir, err. No Dagger client or network access is needed.
+func mockCloneFunc(dir *dagger.Directory, err error, out *[]cloneCall) cloneRepoFunc {
+	return func(_ context.Context, _ *dagger.Client, opts shared.GitCloneOpts, protocol string) (*dagger.Directory, error) {
+		if out != nil {
+			*out = append(*out, cloneCall{opts: opts, protocol: protocol})
+		}
+		return dir, err
+	}
+}
+
+// TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS proves that a repo
+// URL not starting with "git@" or "ssh://" selects protocol "https".
+func TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "https://github.com/org/repo.git",
+		Ref:  "main",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "https", calls[0].protocol,
+		"non-SSH URL must select HTTPS protocol")
+}
+
+// TestResolveWorkflowSource_SSHProtocolSelectsSSH proves that a repo URL
+// starting with "git@" selects protocol "ssh".
+func TestResolveWorkflowSource_SSHProtocolSelectsSSH(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "git@github.com:org/repo.git",
+		Ref:  "main",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "ssh", calls[0].protocol,
+		"git@ URL must select SSH protocol")
+}
+
+// TestResolveWorkflowSource_SSHSchemeSelectsSSH proves that a repo URL
+// using the ssh:// scheme selects protocol "ssh", not "https".
+func TestResolveWorkflowSource_SSHSchemeSelectsSSH(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "ssh://git@github.com/org/repo.git",
+		Ref:  "main",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "ssh", calls[0].protocol,
+		"ssh:// URL must select SSH protocol")
+}
+
+// TestResolveWorkflowSource_ExplicitRefPreserved proves that when spec.Ref
+// is set, it is forwarded as opts.Branch unchanged.
+func TestResolveWorkflowSource_ExplicitRefPreserved(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "https://github.com/org/repo.git",
+		Ref:  "develop",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "develop", calls[0].opts.Branch,
+		"explicit ref must be forwarded as Branch")
+}
+
+// TestResolveWorkflowSource_EmptyRefFailsClosed proves that an empty
+// spec.Ref is rejected with an explicit error when source.repo is set.
+// A remote workflow source requires an explicit pinned ref.
+func TestResolveWorkflowSource_EmptyRefFailsClosed(t *testing.T) {
+	spec := manifest.SourceSpec{
+		Repo: "https://github.com/org/repo.git",
+		Ref:  "",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source.ref is required")
+}
+
+// TestResolveWorkflowSource_RepoForwarded proves the repo URL is forwarded
+// as opts.Repo unchanged.
+func TestResolveWorkflowSource_RepoForwarded(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "git@github.com:org/repo.git",
+		Ref:  "v1.0.0",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "git@github.com:org/repo.git", calls[0].opts.Repo,
+		"repo URL must be forwarded unchanged")
+}
+
+// TestResolveWorkflowSource_AuthSecretRefFailsClosed proves that a
+// non-empty authSecretRef is rejected with an explicit error, not silently
+// ignored. The cloner currently uses global credentials; letting
+// authSecretRef through would be misleading.
+func TestResolveWorkflowSource_AuthSecretRefFailsClosed(t *testing.T) {
+	spec := manifest.SourceSpec{
+		Repo:          "https://github.com/org/repo.git",
+		Ref:           "main",
+		AuthSecretRef: "github-prod",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "authSecretRef is not supported yet")
+}
+
+// TestResolveWorkflowSource_PathFallback proves the existing path-based
+// code path is unchanged: when spec.Repo is empty, the function returns
+// client.Host().Directory(path) with no clone attempt.
+func TestResolveWorkflowSource_PathFallback(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip Dagger integration in short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
+	require.NoError(t, err)
+	defer client.Close()
+
+	spec := manifest.SourceSpec{
+		Repo: "",
+		Path: ".",
+	}
+
+	dir, err := resolveWorkflowSource(ctx, client, spec, nil)
+	require.NoError(t, err)
+	assert.NotNil(t, dir, "path fallback must return a non-nil Directory")
 }
 
 // TestCLI_parseFlags_PresetFlagsRemoved is task 11.2's RED test (design.md
