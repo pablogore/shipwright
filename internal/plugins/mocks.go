@@ -8,6 +8,7 @@ import (
 
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/workflow/providers"
 )
 
 // MockPlugin implements Plugin interface for testing.
@@ -57,13 +58,14 @@ func NewMockPlugin() *MockPlugin {
 
 // MockPluginContext implements PluginContext interface for testing.
 type MockPluginContext struct {
-	GetConfigurationFunc func() interfaces.Configuration
-	GetDaggerClientFunc  func() (*dagger.Client, error)
-	GetHookManagerFunc   func() interfaces.HookManager
-	GetLoggerFunc        func() interfaces.Logger
-	GetConfigFunc        func() pipelines.Config
-	GetCapabilitiesFunc  func() Capabilities
-	GetStepRegistryFunc  func() interfaces.StepRegistry
+	GetConfigurationFunc    func() interfaces.Configuration
+	GetDaggerClientFunc     func() (*dagger.Client, error)
+	GetHookManagerFunc      func() interfaces.HookManager
+	GetLoggerFunc           func() interfaces.Logger
+	GetConfigFunc           func() pipelines.Config
+	GetCapabilitiesFunc     func() Capabilities
+	GetProviderRegistryFunc func() *providers.Registry
+	GetStepRegistryFunc     func() interfaces.StepRegistry
 }
 
 // GetConfiguration implements PluginContext interface.
@@ -106,6 +108,14 @@ func (m *MockPluginContext) GetCapabilities() Capabilities {
 	return Capabilities{}
 }
 
+// GetProviderRegistry implements PluginContext interface.
+func (m *MockPluginContext) GetProviderRegistry() *providers.Registry {
+	if m.GetProviderRegistryFunc != nil {
+		return m.GetProviderRegistryFunc()
+	}
+	return nil
+}
+
 // GetConfig implements PluginContext interface.
 func (m *MockPluginContext) GetConfig() pipelines.Config {
 	if m.GetConfigFunc != nil {
@@ -129,10 +139,19 @@ func NewMockPluginContext() *MockPluginContext {
 
 // MockPluginLoader implements PluginLoader interface for testing.
 type MockPluginLoader struct {
+	ListBuiltinsFunc    func() []string
 	LoadBuiltinFunc     func(ctx context.Context, name string) (Plugin, error)
 	LoadFromConfigFunc  func(ctx context.Context, config map[string]interface{}) (Plugin, error)
 	LoadFromFileFunc    func(ctx context.Context, filePath string) (Plugin, error)
 	RegisterBuiltinFunc func(name string, factory func() Plugin)
+}
+
+// ListBuiltins implements PluginLoader interface.
+func (m *MockPluginLoader) ListBuiltins() []string {
+	if m.ListBuiltinsFunc != nil {
+		return m.ListBuiltinsFunc()
+	}
+	return nil
 }
 
 // LoadBuiltin implements PluginLoader interface.

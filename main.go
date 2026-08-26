@@ -315,6 +315,20 @@ func (c *CLI) listWorkflowSteps(ctx context.Context, m *manifest.Manifest) error
 	reg := providers.NewRegistry()
 	providers.RegisterDefaults(reg, nil)
 
+	// Plugins are wired here too, with a nil Dagger client, so --list-steps
+	// resolves against the SAME provider set an actual run does. Without
+	// this, a manifest step naming a plugin-contributed provider would be
+	// reported as unregistered by --list-steps while executing correctly —
+	// a listing that lies about the run.
+	return runWithPluginLifecycle(ctx, c.app, reg, nil, func() error {
+		return reportWorkflowSteps(ctx, m, reg)
+	})
+}
+
+// reportWorkflowSteps resolves and logs every step's provider. Split out of
+// listWorkflowSteps so the plugin lifecycle wraps exactly the resolution and
+// reporting work.
+func reportWorkflowSteps(ctx context.Context, m *manifest.Manifest, reg *providers.Registry) error {
 	infos, err := resolveStepInfos(m.Spec.Steps, reg)
 	if err != nil {
 		return err
@@ -404,6 +418,59 @@ func (c *CLI) executeWorkflow(ctx context.Context, m *manifest.Manifest, g *grap
 	reg := providers.NewRegistry()
 	providers.RegisterDefaults(reg, client)
 
+	return runWithPluginLifecycle(ctx, c.app, reg, client, func() error {
+		return c.runWorkflowEngine(ctx, m, g, flags, reg, client)
+	})
+}
+
+// pluginLifecycle is the plugin load/cleanup surface the workflow entrypoint
+// depends on, satisfied by *app.App. Declaring it here (consumer-side) keeps
+// runWithPluginLifecycle's deferred-cleanup contract unit-testable without a
+// DI container or a live Dagger engine.
+type pluginLifecycle interface {
+	LoadAndInitializePlugins(ctx context.Context, reg *providers.Registry, client *dagger.Client) error
+	CleanupPlugins(ctx context.Context) error
+}
+
+// runWithPluginLifecycle wires the configured plugins into reg, runs run, and
+// always cleans the plugins up afterwards.
+//
+// Cleanup is deferred BEFORE the load error is checked on purpose: plugin
+// loading initializes plugins one at a time, so a failure on the third plugin
+// leaves the first two initialized and needing cleanup. Cleanup failure is
+// logged, never propagated — it must not mask the workflow's real outcome.
+func runWithPluginLifecycle(
+	ctx context.Context,
+	lc pluginLifecycle,
+	reg *providers.Registry,
+	client *dagger.Client,
+	run func() error,
+) error {
+	defer func() {
+		if err := lc.CleanupPlugins(ctx); err != nil {
+			logger.L().WarnContext(ctx, "Plugin cleanup failed", "error", err)
+		}
+	}()
+
+	if err := lc.LoadAndInitializePlugins(ctx, reg, client); err != nil {
+		return fmt.Errorf("workflow: %w", err)
+	}
+
+	return run()
+}
+
+// runWorkflowEngine assembles engine.Config and calls engine.Execute. It runs
+// inside runWithPluginLifecycle, so reg already carries both the in-repo
+// providers (RegisterDefaults) and every provider the loaded plugins
+// contributed.
+func (c *CLI) runWorkflowEngine(
+	ctx context.Context,
+	m *manifest.Manifest,
+	g *graph.Graph,
+	flags *Flags,
+	reg *providers.Registry,
+	client *dagger.Client,
+) error {
 	opts, err := engine.OptionsFromSpec(m.Spec.Execution)
 	if err != nil {
 		return fmt.Errorf("workflow: %w", err)
@@ -447,11 +514,10 @@ func (c *CLI) executeWorkflow(ctx context.Context, m *manifest.Manifest, g *grap
 }
 
 // workflowDaggerClient acquires the app container's lazily-connected
-// "daggerClient" component — the identical component/connection mechanism
-// the legacy --pipeline path already relies on (see
-// executePipelineWithExecutor above); real execution genuinely needs a
-// live Dagger engine, unlike loadWorkflowManifest/listWorkflowSteps above,
-// which never touch it.
+// "daggerClient" component. Real execution genuinely needs a live Dagger
+// engine, unlike loadWorkflowManifest/listWorkflowSteps above, which never
+// touch it — listWorkflowSteps deliberately wires plugins with a nil client
+// for exactly that reason.
 func (c *CLI) workflowDaggerClient() (*dagger.Client, error) {
 	container := c.app.GetContainer()
 	client, err := container.Get("daggerClient")

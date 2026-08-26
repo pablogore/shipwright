@@ -7,37 +7,46 @@ import (
 
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/workflow/providers"
 )
 
 // pluginContext implements PluginContext interface.
 type pluginContext struct {
-	configuration  interfaces.Configuration
-	daggerClient   *dagger.Client
-	hookManager    interfaces.HookManager
-	logger         interfaces.Logger
-	capabilities   Capabilities
-	pipelineConfig pipelines.Config
-	stepRegistry   interfaces.StepRegistry
+	configuration    interfaces.Configuration
+	daggerClient     *dagger.Client
+	hookManager      interfaces.HookManager
+	logger           interfaces.Logger
+	capabilities     Capabilities
+	providerRegistry *providers.Registry
+	pipelineConfig   pipelines.Config
+	stepRegistry     interfaces.StepRegistry
 }
 
 // NewPluginContext creates a new plugin context.
+//
+// providerRegistry is the workflow run's own *providers.Registry — the
+// extension point plugins register capability implementations into (see
+// PluginContext.GetProviderRegistry). Pass nil when no workflow registry is
+// wired; plugins treat that as "no provider extension point available".
 func NewPluginContext(
 	daggerClient *dagger.Client,
 	configuration interfaces.Configuration,
 	hookManager interfaces.HookManager,
 	stepRegistry interfaces.StepRegistry,
 	capabilities Capabilities,
+	providerRegistry *providers.Registry,
 	pipelineConfig pipelines.Config,
 	logger interfaces.Logger,
 ) PluginContext {
 	return &pluginContext{
-		configuration:  configuration,
-		daggerClient:   daggerClient,
-		hookManager:    hookManager,
-		logger:         logger,
-		capabilities:   capabilities,
-		pipelineConfig: pipelineConfig,
-		stepRegistry:   stepRegistry,
+		configuration:    configuration,
+		daggerClient:     daggerClient,
+		hookManager:      hookManager,
+		logger:           logger,
+		capabilities:     capabilities,
+		providerRegistry: providerRegistry,
+		pipelineConfig:   pipelineConfig,
+		stepRegistry:     stepRegistry,
 	}
 }
 
@@ -68,6 +77,12 @@ func (pc *pluginContext) GetStepRegistry() interfaces.StepRegistry {
 // current run.
 func (pc *pluginContext) GetCapabilities() Capabilities {
 	return pc.capabilities
+}
+
+// GetProviderRegistry returns the workflow run's provider registry, or nil
+// when none was wired.
+func (pc *pluginContext) GetProviderRegistry() *providers.Registry {
+	return pc.providerRegistry
 }
 
 // GetConfig returns the pipeline-specific configuration.

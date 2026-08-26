@@ -10,6 +10,7 @@ import (
 	"github.com/pablogore/kit-logger/pkg/logger"
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/plugins"
+	"github.com/pablogore/shipwright/internal/workflow/providers"
 )
 
 var (
@@ -108,21 +109,32 @@ func (a *App) GetContainer() *Container {
 	return a.container
 }
 
-// loadAndInitializePlugins loads and initializes plugins for the pipeline.
+// LoadAndInitializePlugins loads every compile-time-registered builtin plugin
+// and initializes it against providerRegistry — the SAME *providers.Registry
+// the caller's workflow run resolves each manifest step against. A plugin
+// contributes a Layer 1 capability implementation by registering into that
+// registry during Initialize (plugins.PluginContext.GetProviderRegistry).
 //
-// Unreachable from any CLI path as of this work unit: it was previously
-// called only from the now-deleted App.RunPipeline (tasks.md 11's preset
-// deletion). Left in place, along with cleanupPlugins below, because both
-// are the Layer-1-based plugin/capability wiring WU10 built
-// (Container.BuildCapabilities, plugins.Capabilities,
-// PluginContext.GetCapabilities/GetConfig) — not preset-specific surface —
-// and this work unit's scope is limited to removing the preset registry and
-// its CLI flags. Flagged for sdd-verify: this method (and cleanupPlugins)
-// currently has no production caller and is a candidate for either
-// reintegration with the --workflow entrypoint or removal in a later work
-// unit.
-func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string) error {
-	// Get plugin registry
+// daggerClient is passed explicitly rather than resolved from the container
+// because the container's "daggerClient" component connects lazily: the
+// --list-steps path must be able to wire plugins WITHOUT starting a Dagger
+// engine, and passes nil. A nil client yields an empty capability bundle
+// (BuildCapabilities' documented behavior), which is correct — resolution
+// does not need a live client.
+//
+// SECURITY (design.md D-I): this uses PluginRegistry.LoadBuiltinPlugins, not
+// LoadPluginsFromConfig. Only compile-time builtin factories are loaded, so
+// plugin.Open is unreachable from the CLI's plugin wiring and every provider
+// reaching the registry is still build-time-compiled code.
+func (a *App) LoadAndInitializePlugins(
+	ctx context.Context,
+	providerRegistry *providers.Registry,
+	daggerClient *dagger.Client,
+) error {
+	if providerRegistry == nil {
+		return fmt.Errorf("provider registry cannot be nil")
+	}
+
 	registry, err := a.container.Get("pluginRegistry")
 	if err != nil {
 		return fmt.Errorf("failed to get plugin registry: %w", err)
@@ -130,26 +142,16 @@ func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string)
 
 	pluginRegistry := registry.(plugins.PluginRegistry)
 
-	// Get Dagger client (may be nil)
-	var daggerClient *dagger.Client
-	client, err := a.container.Get("daggerClient")
-	if err == nil && client != nil {
-		daggerClient = client.(*dagger.Client)
-	}
-
-	// Get hook manager
 	hookManager, err := a.container.Get("hookManager")
 	if err != nil {
 		return fmt.Errorf("failed to get hook manager: %w", err)
 	}
 
-	// Get step registry
 	stepRegistry, err := a.container.Get("stepRegistry")
 	if err != nil {
 		return fmt.Errorf("failed to get step registry: %w", err)
 	}
 
-	// Get pipeline config
 	cfg := a.container.GetConfiguration()
 	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
 
@@ -158,21 +160,19 @@ func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string)
 	// and plugins.PluginContext.GetCapabilities()).
 	pluginCapabilities := BuildCapabilities(daggerClient, pipelineConfig)
 
-	// Get logger (using go-kit-logger directly)
-	// Create plugin context
 	pluginCtx := plugins.NewPluginContext(
 		daggerClient,
 		cfg,
 		hookManager.(interfaces.HookManager),
 		stepRegistry.(interfaces.StepRegistry),
 		pluginCapabilities,
+		providerRegistry,
 		pipelineConfig,
 		nil, // Logger is accessed via logger.L() directly
 	)
 
-	// Load plugins from configuration
-	if err := pluginRegistry.LoadPluginsFromConfig(ctx, pluginCtx); err != nil {
-		return fmt.Errorf("failed to load plugins from config: %w", err)
+	if err := pluginRegistry.LoadBuiltinPlugins(ctx, pluginCtx); err != nil {
+		return fmt.Errorf("failed to load builtin plugins: %w", err)
 	}
 
 	logger.L().InfoContext(ctx, "Plugins loaded and initialized", "count", len(pluginRegistry.ListPlugins()))
@@ -180,9 +180,9 @@ func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string)
 	return nil
 }
 
-// cleanupPlugins cleans up all loaded plugins.
-func (a *App) cleanupPlugins(ctx context.Context) error {
-	// Get plugin registry
+// CleanupPlugins cleans up all loaded plugins. Callers invoke it through
+// defer so it also runs on a failed workflow, not only on the success path.
+func (a *App) CleanupPlugins(ctx context.Context) error {
 	registry, err := a.container.Get("pluginRegistry")
 	if err != nil {
 		return fmt.Errorf("failed to get plugin registry: %w", err)
@@ -190,7 +190,6 @@ func (a *App) cleanupPlugins(ctx context.Context) error {
 
 	pluginRegistry := registry.(plugins.PluginRegistry)
 
-	// Cleanup all plugins
 	if err := pluginRegistry.CleanupAll(ctx); err != nil {
 		return fmt.Errorf("failed to cleanup plugins: %w", err)
 	}
