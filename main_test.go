@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pablogore/shipwright/internal/pipelines/shared"
 	"github.com/pablogore/shipwright/internal/workflow/manifest"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
 	"github.com/pablogore/shipwright/pkg/shipwright"
@@ -386,99 +387,109 @@ func TestResolveCapabilityRef_UnknownCapabilityFailsClosed(t *testing.T) {
 
 // --- resolveWorkflowSource tests (source-repo-ref-support) ---
 
-// TestResolveWorkflowSource_HTTPSClone proves the HTTPS protocol detection
-// path: a repo URL that doesn't start with "git@" selects HTTPS, and
-// shared.CloneRepo is reached (failing on an invalid repo, which proves
-// the delegation path is exercised). The error must mention the default
-// "main" branch since ref is empty.
-func TestResolveWorkflowSource_HTTPSClone(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skip Dagger integration in short mode")
-	}
-
-	ctx := context.Background()
-	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
-	require.NoError(t, err)
-	defer client.Close()
-
-	spec := manifest.SourceSpec{
-		Repo: "https://github.com/org/nonexistent-repo.git",
-		Ref:  "",
-	}
-
-	_, err = resolveWorkflowSource(ctx, client, spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "main",
-		"error must reference the default branch 'main' when ref is empty")
+// cloneCall captures the arguments passed to a mock cloneFn.
+type cloneCall struct {
+	opts     shared.GitCloneOpts
+	protocol string
 }
 
-// TestResolveWorkflowSource_SSHClone proves the SSH protocol detection
-// path: a repo URL starting with "git@" selects SSH. The clone fails
-// (no SSH key available in test env), which proves the SSH branch was taken.
-func TestResolveWorkflowSource_SSHClone(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skip Dagger integration in short mode")
+// mockCloneFunc returns a cloneRepoFunc that records every call and
+// returns dir, err. No Dagger client or network access is needed.
+func mockCloneFunc(dir *dagger.Directory, err error, out *[]cloneCall) cloneRepoFunc {
+	return func(_ context.Context, _ *dagger.Client, opts shared.GitCloneOpts, protocol string) (*dagger.Directory, error) {
+		if out != nil {
+			*out = append(*out, cloneCall{opts: opts, protocol: protocol})
+		}
+		return dir, err
 	}
+}
 
-	ctx := context.Background()
-	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
-	require.NoError(t, err)
-	defer client.Close()
+// TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS proves that a repo
+// URL not starting with "git@" selects protocol "https".
+func TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
 
 	spec := manifest.SourceSpec{
-		Repo: "git@github.com:org/nonexistent-repo.git",
+		Repo: "https://github.com/org/repo.git",
 	}
 
-	_, err = resolveWorkflowSource(ctx, client, spec)
-	require.Error(t, err)
-	// The error comes from the SSH cloner — proves SSH path was taken.
-	assert.Error(t, err)
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "https", calls[0].protocol,
+		"non-git@ URL must select HTTPS protocol")
+}
+
+// TestResolveWorkflowSource_SSHProtocolSelectsSSH proves that a repo URL
+// starting with "git@" selects protocol "ssh".
+func TestResolveWorkflowSource_SSHProtocolSelectsSSH(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "git@github.com:org/repo.git",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "ssh", calls[0].protocol,
+		"git@ URL must select SSH protocol")
 }
 
 // TestResolveWorkflowSource_ExplicitRefPreserved proves that when spec.Ref
-// is set to a non-default value, it is forwarded to CloneRepo unchanged.
+// is set to a non-default value, it is forwarded as opts.Branch unchanged.
 func TestResolveWorkflowSource_ExplicitRefPreserved(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skip Dagger integration in short mode")
-	}
-
-	ctx := context.Background()
-	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
-	require.NoError(t, err)
-	defer client.Close()
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
 
 	spec := manifest.SourceSpec{
-		Repo: "https://github.com/org/nonexistent-repo.git",
+		Repo: "https://github.com/org/repo.git",
 		Ref:  "develop",
 	}
 
-	_, err = resolveWorkflowSource(ctx, client, spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "develop",
-		"error must reference the explicit branch 'develop'")
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "develop", calls[0].opts.Branch,
+		"explicit ref must be forwarded as Branch")
 }
 
 // TestResolveWorkflowSource_EmptyRefDefaultsToMain proves that an empty
-// spec.Ref is replaced with "main" before calling CloneRepo.
+// spec.Ref is replaced with "main" before calling cloneFn.
 func TestResolveWorkflowSource_EmptyRefDefaultsToMain(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skip Dagger integration in short mode")
-	}
-
-	ctx := context.Background()
-	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
-	require.NoError(t, err)
-	defer client.Close()
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
 
 	spec := manifest.SourceSpec{
-		Repo: "https://github.com/org/nonexistent-repo.git",
+		Repo: "https://github.com/org/repo.git",
 		Ref:  "",
 	}
 
-	_, err = resolveWorkflowSource(ctx, client, spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "main",
-		"error must reference the default branch 'main' when ref is empty")
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "main", calls[0].opts.Branch,
+		"empty ref must default to main")
+}
+
+// TestResolveWorkflowSource_RepoForwarded proves the repo URL is forwarded
+// as opts.Repo unchanged.
+func TestResolveWorkflowSource_RepoForwarded(t *testing.T) {
+	var calls []cloneCall
+	cloneFn := mockCloneFunc(nil, nil, &calls)
+
+	spec := manifest.SourceSpec{
+		Repo: "git@github.com:org/repo.git",
+		Ref:  "v1.0.0",
+	}
+
+	_, err := resolveWorkflowSource(context.Background(), nil, spec, cloneFn)
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "git@github.com:org/repo.git", calls[0].opts.Repo,
+		"repo URL must be forwarded unchanged")
 }
 
 // TestResolveWorkflowSource_PathFallback proves the existing path-based
@@ -499,7 +510,7 @@ func TestResolveWorkflowSource_PathFallback(t *testing.T) {
 		Path: ".",
 	}
 
-	dir, err := resolveWorkflowSource(ctx, client, spec)
+	dir, err := resolveWorkflowSource(ctx, client, spec, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, dir, "path fallback must return a non-nil Directory")
 }

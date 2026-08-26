@@ -1,6 +1,9 @@
 package manifest
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
 
 // allowedAPIVersions is the schema's apiVersion allowlist (stage 2,
 // design.md D-H). Design.md D-E: the manifest schema version evolves
@@ -66,6 +69,10 @@ func ValidateIdentity(m *Manifest) error {
 // cycle/reference validation), which this package deliberately does not
 // implement.
 func ValidateStructure(m *Manifest) error {
+	if err := ValidateSourceRef(m.Spec.Source.Ref); err != nil {
+		return err
+	}
+
 	seen := make(map[string]bool, len(m.Spec.Steps))
 
 	for i, step := range m.Spec.Steps {
@@ -101,5 +108,39 @@ func validateStep(index int, step Step, seen map[string]bool) error {
 		return fmt.Errorf("manifest: step %q has an empty uses.version", step.ID)
 	}
 
+	return nil
+}
+
+// refPattern matches valid Git branch and tag names per git-check-ref-format
+// rules (simplified). Commit SHAs (40-char hex strings) are explicitly
+// excluded to enforce the branch-or-tag-only contract.
+//
+// The pattern allows: letters, digits, dots, hyphens, underscores, slashes,
+// and the special refs like HEAD — but rejects anything that looks like a
+// raw SHA. This is intentionally conservative: a ref that passes this
+// validation is guaranteed to be a valid branch/tag name for git clone --branch.
+var refPattern = regexp.MustCompile(`^[a-zA-Z0-9._/\-@{~]+$`)
+
+// shaPattern detects 7+ hex characters that look like a commit SHA prefix.
+var shaPattern = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
+
+// ValidateSourceRef validates that ref is a valid branch or tag name,
+// NOT a commit SHA. When source.repo is set, ref must be non-empty
+// (resolveWorkflowSource defaults to "main"). An empty ref is valid
+// for path-based sources (source.repo is empty).
+//
+// The git clone --branch flag only accepts branch or tag names. Passing a
+// commit SHA with --depth=1 produces undefined behavior depending on Git
+// version. This validation makes the restriction explicit at parse time.
+func ValidateSourceRef(ref string) error {
+	if ref == "" {
+		return nil
+	}
+	if shaPattern.MatchString(ref) {
+		return fmt.Errorf("manifest: source.ref %q looks like a commit SHA; only branch or tag names are supported", ref)
+	}
+	if !refPattern.MatchString(ref) {
+		return fmt.Errorf("manifest: source.ref %q contains invalid characters; only branch or tag names are allowed", ref)
+	}
 	return nil
 }

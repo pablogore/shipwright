@@ -483,7 +483,7 @@ func (c *CLI) runWorkflowEngine(
 		return fmt.Errorf("workflow: %w", err)
 	}
 
-	source, err := resolveWorkflowSource(ctx, client, m.Spec.Source)
+	source, err := resolveWorkflowSource(ctx, client, m.Spec.Source, shared.CloneRepo)
 	if err != nil {
 		return fmt.Errorf("workflow: %w", err)
 	}
@@ -553,13 +553,18 @@ func resolveWorkflowSecrets(client *dagger.Client, secrets map[string]manifest.S
 	return out, nil
 }
 
+// cloneRepoFunc is the signature shared.CloneRepo satisfies. Accepting
+// this as a parameter lets tests inject a mock without requiring a real
+// Dagger client or network access.
+type cloneRepoFunc func(ctx context.Context, client *dagger.Client, opts shared.GitCloneOpts, protocol string) (*dagger.Directory, error)
+
 // resolveWorkflowSource resolves the workflow's input source directory.
 //
 // When spec.Repo is non-empty, the clone protocol is detected from the URL
 // prefix (git@ → SSH, anything else → HTTPS) and delegated to
 // shared.CloneRepo. When spec.Repo is empty, the existing path-based local
 // directory resolution is used unchanged.
-func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec manifest.SourceSpec) (*dagger.Directory, error) {
+func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec manifest.SourceSpec, cloneFn cloneRepoFunc) (*dagger.Directory, error) {
 	if spec.Repo != "" {
 		protocol := "https"
 		if strings.HasPrefix(spec.Repo, "git@") {
@@ -576,7 +581,7 @@ func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec mani
 			Branch: ref,
 			Name:   "workflow-source",
 		}
-		return shared.CloneRepo(ctx, client, opts, protocol)
+		return cloneFn(ctx, client, opts, protocol)
 	}
 
 	path := spec.Path

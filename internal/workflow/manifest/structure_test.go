@@ -204,3 +204,73 @@ func TestParse_DeclaredApprovalMetadataIsQueryable(t *testing.T) {
 		t.Fatalf("Environments[production].Approvals.Required = %v, want [platform-team]", approvals)
 	}
 }
+
+// --- source.ref validation (P1: contract enforcement) ---
+
+func TestValidateSourceRef_BranchName(t *testing.T) {
+	if err := manifest.ValidateSourceRef("main"); err != nil {
+		t.Fatalf("ValidateSourceRef(%q) = %v, want nil", "main", err)
+	}
+}
+
+func TestValidateSourceRef_BranchWithSlash(t *testing.T) {
+	if err := manifest.ValidateSourceRef("feature/my-feature"); err != nil {
+		t.Fatalf("ValidateSourceRef(%q) = %v, want nil", "feature/my-feature", err)
+	}
+}
+
+func TestValidateSourceRef_TagName(t *testing.T) {
+	if err := manifest.ValidateSourceRef("v1.2.3"); err != nil {
+		t.Fatalf("ValidateSourceRef(%q) = %v, want nil", "v1.2.3", err)
+	}
+}
+
+func TestValidateSourceRef_EmptyRefIsValid(t *testing.T) {
+	if err := manifest.ValidateSourceRef(""); err != nil {
+		t.Fatalf("ValidateSourceRef(%q) = %v, want nil", "", err)
+	}
+}
+
+func TestValidateSourceRef_CommitSHATooLong(t *testing.T) {
+	sha := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+	if err := manifest.ValidateSourceRef(sha); err == nil {
+		t.Fatalf("ValidateSourceRef(%q) = nil, want error", sha)
+	}
+}
+
+func TestValidateSourceRef_CommitSHAShort(t *testing.T) {
+	sha := "a1b2c3d"
+	if err := manifest.ValidateSourceRef(sha); err == nil {
+		t.Fatalf("ValidateSourceRef(%q) = nil, want error", sha)
+	}
+}
+
+func TestValidateSourceRef_InvalidCharacters(t *testing.T) {
+	if err := manifest.ValidateSourceRef("branch with spaces"); err == nil {
+		t.Fatalf("ValidateSourceRef(%q) = nil, want error", "branch with spaces")
+	}
+}
+
+func TestParse_SourceRefWithSHARejectsAtValidation(t *testing.T) {
+	src := `
+apiVersion: shipwright.dev/v1
+kind: Workflow
+metadata:
+  name: example
+spec:
+  source:
+    repo: "https://github.com/org/repo.git"
+    ref: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+  steps:
+    - id: build
+      capability: build
+      uses: {provider: go, version: "1"}
+`
+	_, err := manifest.Parse(strings.NewReader(src))
+	if err == nil {
+		t.Fatal("Parse() with a commit SHA as ref must return an error, got nil")
+	}
+	if !strings.Contains(err.Error(), "looks like a commit SHA") {
+		t.Fatalf("Parse() error = %v, want commit SHA rejection error", err)
+	}
+}
