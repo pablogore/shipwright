@@ -108,101 +108,19 @@ func (a *App) GetContainer() *Container {
 	return a.container
 }
 
-// RunPipeline executes a pipeline with the given name.
-func (a *App) RunPipeline(ctx context.Context, pipelineName string) error {
-	logger.L().InfoContext(ctx, "Running pipeline", "name", pipelineName)
-
-	// Get pipeline once to determine available steps
-	initialPipeline, err := a.container.GetPipeline(pipelineName)
-	if err != nil {
-		return fmt.Errorf("failed to get pipeline %s: %w", pipelineName, err)
-	}
-
-	// Load and initialize plugins before executing pipeline
-	if err := a.loadAndInitializePlugins(ctx, pipelineName); err != nil {
-		logger.L().WarnContext(ctx, "Failed to load plugins, continuing without plugins", "error", err)
-		// Don't fail the pipeline if plugins fail to load
-	}
-
-	// Execute pipeline steps
-	steps := initialPipeline.GetAvailableSteps()
-
-	for _, step := range steps {
-		logger.L().InfoContext(ctx, "Executing pipeline step", "step", step)
-
-		// Get a fresh pipeline instance before each step to ensure
-		// we have a valid Dagger client (connection may be lost between steps)
-		pipeline, err := a.container.GetPipeline(pipelineName)
-		if err != nil {
-			return fmt.Errorf("failed to get pipeline %s for step %s: %w", pipelineName, step, err)
-		}
-
-		stepErr := pipeline.ExecuteStep(ctx, step)
-		if stepErr != nil {
-			return fmt.Errorf("pipeline step %s failed: %w", step, stepErr)
-		}
-
-		logger.L().InfoContext(ctx, "Pipeline step completed", "step", step)
-	}
-
-	logger.L().InfoContext(ctx, "Pipeline completed successfully", "name", pipelineName)
-
-	// Cleanup plugins after pipeline execution
-	if err := a.cleanupPlugins(ctx); err != nil {
-		logger.L().WarnContext(ctx, "Failed to cleanup plugins", "error", err)
-		// Don't fail the pipeline if plugin cleanup fails
-	}
-
-	return nil
-}
-
-// RunPipelineStep executes a single pipeline step.
-func (a *App) RunPipelineStep(ctx context.Context, pipelineName, step string) error {
-	logger.L().InfoContext(ctx, "Running pipeline step", "pipeline", pipelineName, "step", step)
-
-	pipeline, err := a.container.GetPipeline(pipelineName)
-	if err != nil {
-		return fmt.Errorf("failed to get pipeline %s: %w", pipelineName, err)
-	}
-
-	// Execute single step
-	stepErr := pipeline.ExecuteStep(ctx, step)
-	if stepErr != nil {
-		return fmt.Errorf("pipeline step %s failed: %w", step, stepErr)
-	}
-
-	logger.L().InfoContext(ctx, "Pipeline step completed successfully", "pipeline", pipelineName, "step", step)
-	return nil
-}
-
-// ListPipelines returns a list of available pipelines.
-func (a *App) ListPipelines() ([]string, error) {
-	registry, err := a.container.GetPipelineRegistry()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get pipeline registry: %w", err)
-	}
-
-	return registry.List(), nil
-}
-
-// GetPipelineInfo returns information about a specific pipeline.
-func (a *App) GetPipelineInfo(pipelineName string) (map[string]any, error) {
-	pipeline, err := a.container.GetPipeline(pipelineName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get pipeline %s: %w", pipelineName, err)
-	}
-
-	info := map[string]any{
-		"name": pipeline.Name(),
-		"steps": []string{
-			"setup", "build", "test", "tag", "package", "push", "lint", "security", "release",
-		},
-	}
-
-	return info, nil
-}
-
 // loadAndInitializePlugins loads and initializes plugins for the pipeline.
+//
+// Unreachable from any CLI path as of this work unit: it was previously
+// called only from the now-deleted App.RunPipeline (tasks.md 11's preset
+// deletion). Left in place, along with cleanupPlugins below, because both
+// are the Layer-1-based plugin/capability wiring WU10 built
+// (Container.BuildCapabilities, plugins.Capabilities,
+// PluginContext.GetCapabilities/GetConfig) — not preset-specific surface —
+// and this work unit's scope is limited to removing the preset registry and
+// its CLI flags. Flagged for sdd-verify: this method (and cleanupPlugins)
+// currently has no production caller and is a candidate for either
+// reintegration with the --workflow entrypoint or removal in a later work
+// unit.
 func (a *App) loadAndInitializePlugins(ctx context.Context, pipelineName string) error {
 	// Get plugin registry
 	registry, err := a.container.Get("pluginRegistry")

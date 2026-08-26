@@ -1,14 +1,12 @@
 package app
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
 
 	"dagger.io/dagger"
 	"github.com/pablogore/shipwright/internal/interfaces"
-	"github.com/pablogore/shipwright/internal/pipelines"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -211,86 +209,6 @@ func TestContainer_Validate_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "validation error")
 }
 
-func TestContainer_GetPipelineRegistry(t *testing.T) {
-
-	mockConfig := NewMockConfiguration()
-	ctx := t.Context()
-
-	container := NewContainer(ctx, mockConfig)
-
-	// Register pipeline registry
-	mockRegistry := NewMockPipelineRegistry()
-	container.Register("pipelineRegistry", func() (any, error) {
-		return mockRegistry, nil
-	})
-
-	// Test GetPipelineRegistry
-	registry, err := container.GetPipelineRegistry()
-	require.NoError(t, err)
-	assert.Equal(t, mockRegistry, registry)
-}
-
-func TestContainer_GetPipelineRegistry_Error(t *testing.T) {
-
-	mockConfig := NewMockConfiguration()
-	ctx := t.Context()
-
-	container := NewContainer(ctx, mockConfig)
-
-	// Test GetPipelineRegistry without registration
-	registry, err := container.GetPipelineRegistry()
-	require.Error(t, err)
-	assert.Nil(t, registry)
-	assert.Contains(t, err.Error(), "component not found")
-}
-
-func TestContainer_GetPipeline(t *testing.T) {
-
-	mockConfig := NewMockConfiguration()
-	mockRegistry := NewMockPipelineRegistry()
-	mockPipeline := NewMockPipeline()
-	ctx := t.Context()
-
-	container := NewContainer(ctx, mockConfig)
-
-	// Register dependencies
-	container.Register("pipelineRegistry", func() (any, error) {
-		return mockRegistry, nil
-	})
-	// Create a non-nil mock client to avoid nil pointer issues in verification
-	mockClient := &dagger.Client{}
-	container.Register("daggerClient", func() (any, error) {
-		return mockClient, nil
-	})
-
-	// Set up expectations
-	mockRegistry.GetFunc = func(name string, client *dagger.Client, cfg interfaces.Configuration) (interfaces.Pipeline, error) {
-		if name == "test-pipeline" {
-			return mockPipeline, nil
-		}
-		return nil, nil
-	}
-
-	// Test GetPipeline
-	pipeline, err := container.GetPipeline("test-pipeline")
-	require.NoError(t, err)
-	assert.Equal(t, mockPipeline, pipeline)
-}
-
-func TestContainer_GetPipeline_RegistryError(t *testing.T) {
-
-	mockConfig := NewMockConfiguration()
-	ctx := t.Context()
-
-	container := NewContainer(ctx, mockConfig)
-
-	// Test GetPipeline without registry
-	pipeline, err := container.GetPipeline("test-pipeline")
-	require.Error(t, err)
-	assert.Nil(t, pipeline)
-	assert.Contains(t, err.Error(), "component not found")
-}
-
 func TestContainer_GetDaggerClient(t *testing.T) {
 
 	mockConfig := NewMockConfiguration()
@@ -485,80 +403,6 @@ func TestContainer_GetLogger_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "deprecated")
 }
 
-func TestNewPipelineRegistry(t *testing.T) {
-	registry := NewPipelineRegistry()
-	assert.NotNil(t, registry)
-	assert.NotNil(t, registry.pipelines)
-}
-
-func TestPipelineRegistry_Register(t *testing.T) {
-	registry := NewPipelineRegistry()
-
-	// Test registering a pipeline
-	factory := func(_ *dagger.Client, _ interfaces.Configuration) interfaces.Pipeline {
-		return nil
-	}
-
-	registry.Register("test-pipeline", factory)
-
-	// Verify pipeline is registered
-	_, exists := registry.pipelines["test-pipeline"]
-	assert.True(t, exists)
-}
-
-func TestPipelineRegistry_Get(t *testing.T) {
-
-	mockConfig := NewMockConfiguration()
-	mockPipeline := NewMockPipeline()
-	registry := NewPipelineRegistry()
-
-	// Register a pipeline
-	factory := func(_ *dagger.Client, _ interfaces.Configuration) interfaces.Pipeline {
-		return mockPipeline
-	}
-
-	registry.Register("test-pipeline", factory)
-
-	// Test Get
-	var mockClient *dagger.Client
-	pipeline, err := registry.Get("test-pipeline", mockClient, mockConfig)
-	require.NoError(t, err)
-	assert.Equal(t, mockPipeline, pipeline)
-}
-
-func TestPipelineRegistry_Get_NotFound(t *testing.T) {
-
-	mockConfig := NewMockConfiguration()
-	registry := NewPipelineRegistry()
-
-	// Test Get with non-existent pipeline
-	var mockClient *dagger.Client
-	pipeline, err := registry.Get("non-existent", mockClient, mockConfig)
-	require.Error(t, err)
-	assert.Nil(t, pipeline)
-	assert.Contains(t, err.Error(), "pipeline not found")
-}
-
-func TestPipelineRegistry_List(t *testing.T) {
-	registry := NewPipelineRegistry()
-
-	// Register some pipelines
-	factory := func(_ *dagger.Client, _ interfaces.Configuration) interfaces.Pipeline {
-		return nil
-	}
-
-	registry.Register("pipeline1", factory)
-	registry.Register("pipeline2", factory)
-	registry.Register("pipeline3", factory)
-
-	// Test List
-	pipelines := registry.List()
-	assert.Len(t, pipelines, 3)
-	assert.Contains(t, pipelines, "pipeline1")
-	assert.Contains(t, pipelines, "pipeline2")
-	assert.Contains(t, pipelines, "pipeline3")
-}
-
 func TestNewVulnChecker(t *testing.T) {
 
 	mockConfig := NewMockConfiguration()
@@ -745,20 +589,6 @@ func TestContainer_registerDaggerComponents_WithTimeout(t *testing.T) {
 		// If it succeeds, that's also fine - it means Dagger is available
 		require.NoError(t, err)
 	}
-}
-
-func TestContainer_registerPipelineComponents(t *testing.T) {
-
-	mockConfig := NewMockConfiguration()
-	ctx := t.Context()
-
-	container := NewContainer(ctx, mockConfig)
-
-	container.registerPipelineComponents()
-
-	// Verify component is registered
-	_, exists := container.once["pipelineRegistry"]
-	assert.True(t, exists)
 }
 
 func TestContainer_registerSecurityComponents(t *testing.T) {
@@ -950,11 +780,6 @@ func TestContainer_registerHookComponents_Execution(t *testing.T) {
 	assert.True(t, ok, "hookManager should implement HookManager interface")
 }
 
-// Helper function to create a mock pipelines.Pipeline
-func createMockPipelinesPipeline() pipelines.Pipeline {
-	return NewMockPipelinesPipeline()
-}
-
 // Helper function to setup mock configuration expectations for convertConfig
 func setupMockConfigForConvertConfig(mockConfig *MockConfiguration) {
 	mockConfig.EnvironmentFunc = func() string { return "dev" }
@@ -973,109 +798,4 @@ func setupMockConfigForConvertConfig(mockConfig *MockConfiguration) {
 		}
 	}
 	mockConfig.GetFloatFunc = func(key string) float64 { return 90.0 }
-}
-
-// Test pipeline factory functions
-func TestNewGoServicePipeline(t *testing.T) {
-	mockConfig := NewMockConfiguration()
-
-	// Setup mock expectations for convertConfig
-	setupMockConfigForConvertConfig(mockConfig)
-
-	// Test with nil client - pipelines handle this gracefully
-	pipeline := NewGoServicePipeline(nil, mockConfig)
-
-	// Should return a PipelineAdapter, not nil
-	assert.NotNil(t, pipeline)
-	assert.IsType(t, &PipelineAdapter{}, pipeline)
-
-	// Test that the pipeline has a name
-	assert.NotEmpty(t, pipeline.Name())
-}
-
-func TestNewInfraPipeline(t *testing.T) {
-	mockConfig := NewMockConfiguration()
-
-	// Setup mock expectations for convertConfig
-	setupMockConfigForConvertConfig(mockConfig)
-
-	// Test with nil client - pipelines handle this gracefully
-	pipeline := NewInfraPipeline(nil, mockConfig)
-
-	// Should return a PipelineAdapter, not nil
-	assert.NotNil(t, pipeline)
-	assert.IsType(t, &PipelineAdapter{}, pipeline)
-
-	// Test that the pipeline has a name
-	assert.NotEmpty(t, pipeline.Name())
-}
-
-// Test PipelineAdapter functionality
-func TestPipelineAdapter_Name(t *testing.T) {
-	// Create a mock pipeline
-	mockPipeline := createMockPipelinesPipeline()
-	mockPipeline.(*MockPipelinesPipeline).NameFunc = func() string {
-		return "test-pipeline"
-	}
-
-	adapter := NewPipelineAdapter(mockPipeline)
-	assert.Equal(t, "test-pipeline", adapter.Name())
-}
-
-func TestPipelineAdapter_GetAvailableSteps(t *testing.T) {
-	mockPipeline := createMockPipelinesPipeline()
-	adapter := NewPipelineAdapter(mockPipeline)
-
-	steps := adapter.GetAvailableSteps()
-	expectedSteps := []string{"setup", "build", "test", "package", "tag", "push"}
-	assert.Equal(t, expectedSteps, steps)
-}
-
-func TestPipelineAdapter_ExecuteStep(t *testing.T) {
-	mockPipeline := createMockPipelinesPipeline()
-	mockPipeline.(*MockPipelinesPipeline).SetupFunc = func(ctx context.Context) error { return nil }
-	mockPipeline.(*MockPipelinesPipeline).BuildFunc = func(ctx context.Context) error { return nil }
-
-	adapter := NewPipelineAdapter(mockPipeline)
-
-	ctx := t.Context()
-
-	// Test setup step
-	err := adapter.ExecuteStep(ctx, "setup")
-	require.NoError(t, err)
-
-	// Test build step
-	err = adapter.ExecuteStep(ctx, "build")
-	require.NoError(t, err)
-
-	// Test unknown step
-	err = adapter.ExecuteStep(ctx, "unknown")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown step")
-}
-
-func TestPipelineAdapter_ValidateStep(t *testing.T) {
-	mockPipeline := createMockPipelinesPipeline()
-	adapter := NewPipelineAdapter(mockPipeline)
-
-	// Test valid step
-	err := adapter.ValidateStep("setup")
-	require.NoError(t, err)
-
-	// Test invalid step
-	err = adapter.ValidateStep("invalid")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid step")
-}
-
-func TestPipelineAdapter_GetStepConfig(t *testing.T) {
-	mockPipeline := createMockPipelinesPipeline()
-	adapter := NewPipelineAdapter(mockPipeline)
-
-	config := adapter.GetStepConfig("setup")
-	assert.Equal(t, "setup", config.Name)
-	assert.Equal(t, "Execute setup step", config.Description)
-	assert.True(t, config.Required)
-	assert.Equal(t, 5*time.Minute, config.Timeout)
-	assert.Equal(t, 0, config.Retries)
 }

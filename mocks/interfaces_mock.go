@@ -332,21 +332,6 @@ func (mr *MockContainerMockRecorder) Get(name any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockContainer)(nil).Get), name)
 }
 
-// GetDaggerClient mocks base method.
-func (m *MockContainer) GetDaggerClient() (*dagger.Client, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDaggerClient")
-	ret0, _ := ret[0].(*dagger.Client)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDaggerClient indicates an expected call of GetDaggerClient.
-func (mr *MockContainerMockRecorder) GetDaggerClient() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDaggerClient", reflect.TypeOf((*MockContainer)(nil).GetDaggerClient))
-}
-
 // GetLinter mocks base method.
 func (m *MockContainer) GetLinter() (interfaces.Linter, error) {
 	m.ctrl.T.Helper()
@@ -375,36 +360,6 @@ func (m *MockContainer) GetLogger() (interfaces.Logger, error) {
 func (mr *MockContainerMockRecorder) GetLogger() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogger", reflect.TypeOf((*MockContainer)(nil).GetLogger))
-}
-
-// GetPipeline mocks base method.
-func (m *MockContainer) GetPipeline(name string) (interfaces.Pipeline, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPipeline", name)
-	ret0, _ := ret[0].(interfaces.Pipeline)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPipeline indicates an expected call of GetPipeline.
-func (mr *MockContainerMockRecorder) GetPipeline(name any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPipeline", reflect.TypeOf((*MockContainer)(nil).GetPipeline), name)
-}
-
-// GetPipelineRegistry mocks base method.
-func (m *MockContainer) GetPipelineRegistry() (interfaces.PipelineRegistry, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPipelineRegistry")
-	ret0, _ := ret[0].(interfaces.PipelineRegistry)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPipelineRegistry indicates an expected call of GetPipelineRegistry.
-func (mr *MockContainerMockRecorder) GetPipelineRegistry() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPipelineRegistry", reflect.TypeOf((*MockContainer)(nil).GetPipelineRegistry))
 }
 
 // GetRegistryAuth mocks base method.
@@ -505,75 +460,6 @@ func (m *MockContainer) Validate() error {
 func (mr *MockContainerMockRecorder) Validate() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Validate", reflect.TypeOf((*MockContainer)(nil).Validate))
-}
-
-// MockPipelineProvider is a mock of PipelineProvider interface.
-type MockPipelineProvider struct {
-	ctrl     *gomock.Controller
-	recorder *MockPipelineProviderMockRecorder
-	isgomock struct{}
-}
-
-// MockPipelineProviderMockRecorder is the mock recorder for MockPipelineProvider.
-type MockPipelineProviderMockRecorder struct {
-	mock *MockPipelineProvider
-}
-
-// NewMockPipelineProvider creates a new mock instance.
-func NewMockPipelineProvider(ctrl *gomock.Controller) *MockPipelineProvider {
-	mock := &MockPipelineProvider{ctrl: ctrl}
-	mock.recorder = &MockPipelineProviderMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockPipelineProvider) EXPECT() *MockPipelineProviderMockRecorder {
-	return m.recorder
-}
-
-// GetDaggerClient mocks base method.
-func (m *MockPipelineProvider) GetDaggerClient() (*dagger.Client, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDaggerClient")
-	ret0, _ := ret[0].(*dagger.Client)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDaggerClient indicates an expected call of GetDaggerClient.
-func (mr *MockPipelineProviderMockRecorder) GetDaggerClient() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDaggerClient", reflect.TypeOf((*MockPipelineProvider)(nil).GetDaggerClient))
-}
-
-// GetPipeline mocks base method.
-func (m *MockPipelineProvider) GetPipeline(name string) (interfaces.Pipeline, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPipeline", name)
-	ret0, _ := ret[0].(interfaces.Pipeline)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPipeline indicates an expected call of GetPipeline.
-func (mr *MockPipelineProviderMockRecorder) GetPipeline(name any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPipeline", reflect.TypeOf((*MockPipelineProvider)(nil).GetPipeline), name)
-}
-
-// GetPipelineRegistry mocks base method.
-func (m *MockPipelineProvider) GetPipelineRegistry() (interfaces.PipelineRegistry, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPipelineRegistry")
-	ret0, _ := ret[0].(interfaces.PipelineRegistry)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPipelineRegistry indicates an expected call of GetPipelineRegistry.
-func (mr *MockPipelineProviderMockRecorder) GetPipelineRegistry() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPipelineRegistry", reflect.TypeOf((*MockPipelineProvider)(nil).GetPipelineRegistry))
 }
 
 // MockRegistryProvider is a mock of RegistryProvider interface.
@@ -724,128 +610,6 @@ func (mr *MockLoggingProviderMockRecorder) GetLogger() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogger", reflect.TypeOf((*MockLoggingProvider)(nil).GetLogger))
 }
 
-// MockPipeline is a mock of Pipeline interface.
-type MockPipeline struct {
-	ctrl     *gomock.Controller
-	recorder *MockPipelineMockRecorder
-	isgomock struct{}
-}
-
-// MockPipelineMockRecorder is the mock recorder for MockPipeline.
-type MockPipelineMockRecorder struct {
-	mock *MockPipeline
-}
-
-// NewMockPipeline creates a new mock instance.
-func NewMockPipeline(ctrl *gomock.Controller) *MockPipeline {
-	mock := &MockPipeline{ctrl: ctrl}
-	mock.recorder = &MockPipelineMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockPipeline) EXPECT() *MockPipelineMockRecorder {
-	return m.recorder
-}
-
-// AfterStep mocks base method.
-func (m *MockPipeline) AfterStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AfterStep", ctx, stepName)
-	ret0, _ := ret[0].(interfaces.HookFunc)
-	return ret0
-}
-
-// AfterStep indicates an expected call of AfterStep.
-func (mr *MockPipelineMockRecorder) AfterStep(ctx, stepName any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterStep", reflect.TypeOf((*MockPipeline)(nil).AfterStep), ctx, stepName)
-}
-
-// BeforeStep mocks base method.
-func (m *MockPipeline) BeforeStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BeforeStep", ctx, stepName)
-	ret0, _ := ret[0].(interfaces.HookFunc)
-	return ret0
-}
-
-// BeforeStep indicates an expected call of BeforeStep.
-func (mr *MockPipelineMockRecorder) BeforeStep(ctx, stepName any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeStep", reflect.TypeOf((*MockPipeline)(nil).BeforeStep), ctx, stepName)
-}
-
-// ExecuteStep mocks base method.
-func (m *MockPipeline) ExecuteStep(ctx context.Context, stepName string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExecuteStep", ctx, stepName)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ExecuteStep indicates an expected call of ExecuteStep.
-func (mr *MockPipelineMockRecorder) ExecuteStep(ctx, stepName any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteStep", reflect.TypeOf((*MockPipeline)(nil).ExecuteStep), ctx, stepName)
-}
-
-// GetAvailableSteps mocks base method.
-func (m *MockPipeline) GetAvailableSteps() []string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAvailableSteps")
-	ret0, _ := ret[0].([]string)
-	return ret0
-}
-
-// GetAvailableSteps indicates an expected call of GetAvailableSteps.
-func (mr *MockPipelineMockRecorder) GetAvailableSteps() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAvailableSteps", reflect.TypeOf((*MockPipeline)(nil).GetAvailableSteps))
-}
-
-// GetStepConfig mocks base method.
-func (m *MockPipeline) GetStepConfig(stepName string) interfaces.StepConfig {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStepConfig", stepName)
-	ret0, _ := ret[0].(interfaces.StepConfig)
-	return ret0
-}
-
-// GetStepConfig indicates an expected call of GetStepConfig.
-func (mr *MockPipelineMockRecorder) GetStepConfig(stepName any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStepConfig", reflect.TypeOf((*MockPipeline)(nil).GetStepConfig), stepName)
-}
-
-// Name mocks base method.
-func (m *MockPipeline) Name() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Name")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// Name indicates an expected call of Name.
-func (mr *MockPipelineMockRecorder) Name() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockPipeline)(nil).Name))
-}
-
-// ValidateStep mocks base method.
-func (m *MockPipeline) ValidateStep(stepName string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ValidateStep", stepName)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ValidateStep indicates an expected call of ValidateStep.
-func (mr *MockPipelineMockRecorder) ValidateStep(stepName any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateStep", reflect.TypeOf((*MockPipeline)(nil).ValidateStep), stepName)
-}
-
 // MockStepExecutor is a mock of StepExecutor interface.
 type MockStepExecutor struct {
 	ctrl     *gomock.Controller
@@ -912,71 +676,6 @@ func (m *MockStepExecutor) GetStepResult(stepName string) (interfaces.StepResult
 func (mr *MockStepExecutorMockRecorder) GetStepResult(stepName any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStepResult", reflect.TypeOf((*MockStepExecutor)(nil).GetStepResult), stepName)
-}
-
-// MockPipelineRegistry is a mock of PipelineRegistry interface.
-type MockPipelineRegistry struct {
-	ctrl     *gomock.Controller
-	recorder *MockPipelineRegistryMockRecorder
-	isgomock struct{}
-}
-
-// MockPipelineRegistryMockRecorder is the mock recorder for MockPipelineRegistry.
-type MockPipelineRegistryMockRecorder struct {
-	mock *MockPipelineRegistry
-}
-
-// NewMockPipelineRegistry creates a new mock instance.
-func NewMockPipelineRegistry(ctrl *gomock.Controller) *MockPipelineRegistry {
-	mock := &MockPipelineRegistry{ctrl: ctrl}
-	mock.recorder = &MockPipelineRegistryMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockPipelineRegistry) EXPECT() *MockPipelineRegistryMockRecorder {
-	return m.recorder
-}
-
-// Get mocks base method.
-func (m *MockPipelineRegistry) Get(name string, client *dagger.Client, cfg interfaces.Configuration) (interfaces.Pipeline, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", name, client, cfg)
-	ret0, _ := ret[0].(interfaces.Pipeline)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Get indicates an expected call of Get.
-func (mr *MockPipelineRegistryMockRecorder) Get(name, client, cfg any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockPipelineRegistry)(nil).Get), name, client, cfg)
-}
-
-// List mocks base method.
-func (m *MockPipelineRegistry) List() []string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List")
-	ret0, _ := ret[0].([]string)
-	return ret0
-}
-
-// List indicates an expected call of List.
-func (mr *MockPipelineRegistryMockRecorder) List() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockPipelineRegistry)(nil).List))
-}
-
-// Register mocks base method.
-func (m *MockPipelineRegistry) Register(name string, factory func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Register", name, factory)
-}
-
-// Register indicates an expected call of Register.
-func (mr *MockPipelineRegistryMockRecorder) Register(name, factory any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockPipelineRegistry)(nil).Register), name, factory)
 }
 
 // MockVulnChecker is a mock of VulnChecker interface.
