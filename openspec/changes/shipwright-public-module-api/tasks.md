@@ -144,11 +144,22 @@ yet — all net-new. Slice 10 (DI/plugin re-type) is the largest single unit
 
 ## Phase 11 — Preset + shim deletion (`composition-model`) [rollback-paired with 9]
 
-- [ ] 11.1 RED: no preset registry/factory map/CLI flag keyed by a stack name (e.g. `go-service`) exists anywhere.
-- [ ] 11.2 RED: `--pipeline`/`--list-pipelines`/`--only-build`/`--only-test`/`--skip-push` absent from `main.go`.
-- [ ] 11.3 GREEN: delete `internal/pipelines/{pipeline,registry,options}.go`, `common/interfaces.go` (confirmed dead), `go-service/**`.
-- [ ] 11.4 GREEN: remove preset flags + shim from `main.go`; regenerate `mocks/**`.
-- [ ] 11.5 VERIFY: `shipwright --workflow ...` proves a working path exists post-deletion — no merged state ever ran neither.
+- [x] 11.1 RED: no preset registry/factory map/CLI flag keyed by a stack name (e.g. `go-service`) exists anywhere. `internal/pipelines/no_preset_test.go` (`TestNoPresetRegistryOrStackNamedPipelineSurface`) asserts absence of `internal/pipelines/{pipeline.go,registry.go,common,go-service,infra}`; RED-confirmed against the pre-deletion tree, GREEN after 11.3.
+- [x] 11.2 RED: `--pipeline`/`--list-pipelines`/`--only-build`/`--only-test`/`--skip-push` absent from `main.go`. `main_test.go` (`TestCLI_parseFlags_PresetFlagsRemoved`) asserts `flag.Parse` rejects all five as unknown; RED-confirmed pre-deletion, GREEN after 11.4.
+- [x] 11.3 GREEN: deleted `internal/pipelines/{pipeline,registry}.go`, `common/interfaces.go`, `go-service/**`. **Deviation (see Deviation Note below): `options.go` was deliberately NOT deleted** — its `Config` struct is live, load-bearing plumbing shared by `internal/plugins`, `internal/executors`, and `internal/app/container.go`'s `BuildCapabilities`, none of which this work unit is authorized to re-type. **Judgment call (unanticipated reference):** also deleted `internal/pipelines/infra/**` — a second stack-named preset pipeline, unreachable once the preset registry is gone, and it depended on exactly the `pipelines.Pipeline`/`pipelines.HookFunc` types `pipeline.go`'s deletion removes. Also deleted `tests/go_pipeline_test.go` (ginkgo suite testing the deleted go-service package) and `mocks/pipeline_mock.go` (generated from the deleted `pipeline.go`).
+- [x] 11.4 GREEN: removed `--pipeline`/`--list-pipelines`/`--only-build`/`--only-test`/`--skip-push` and the `PipelineAdapter`/`PipelineRegistry` shim from `main.go`/`internal/app/container.go`; removed `interfaces.Pipeline`/`PipelineRegistry`/`PipelineProvider` from `internal/interfaces/interfaces.go`; removed the now-uncompilable `App.RunPipeline`/`RunPipelineStep`/`ListPipelines`/`GetPipelineInfo` from `internal/app/app.go`; regenerated `mocks/interfaces_mock.go` (zero drift on the other 3 generated files) and hand-updated `mocks/gen.go`, `internal/{app,plugins}/mocks.go`.
+- [x] 11.5 VERIFY: built `/tmp/shipwright-wu11` and ran `--workflow examples/workflow/diamond.yaml`: `--list-steps` exits 0 listing all 4 real steps; a full run reaches real `engine.Execute` against a live Dagger client (Docker detected) and fails only at the actual container-build step with a sandbox Dagger-engine-session error (same class of pre-existing sandbox limitation WU10 documented, not a regression). `--pipeline go-service --help` now fails closed with `flag provided but not defined: -pipeline`, confirming no merged state runs neither.
+
+### Phase 11 review remediation — plugin → `providers.Registry` bridge
+
+Added after a second independent review of PR #157 found that deleting `App.RunPipeline` left `App.loadAndInitializePlugins`/`cleanupPlugins` unreachable AND left the plugin extension mechanism itself structurally dead (`HookManager`/`StepRegistry` have no live production consumer; `engine.Execute` consults neither).
+
+- [x] 11.6 RED: `internal/plugins/provider_bridge_test.go` — a plugin must reach the run's `*providers.Registry` (`PluginContext.GetProviderRegistry`) and register a real `shipwright.Deployer` resolvable through WU7's `ResolveDeployer`; `NomadDeployPlugin` must satisfy `shipwright.Deployer`; `LoadBuiltinPlugins` must never call `LoadFromFile`/`LoadFromConfig`. RED-confirmed (undefined symbols) before implementation.
+- [x] 11.7 RED: `plugin_lifecycle_test.go` — `runWithPluginLifecycle` must run `CleanupPlugins` via `defer` so it fires on the run-failure path AND after a partial load failure, and a cleanup error must never mask the run's real outcome.
+- [x] 11.8 GREEN: new extension point — `PluginContext.GetProviderRegistry() *providers.Registry`, `PluginLoader.ListBuiltins()`, `PluginRegistry.LoadBuiltinPlugins()` (builtin-only, never config/`.so`); `NewPluginContext` gains a `providerRegistry` parameter.
+- [x] 11.9 GREEN: `NomadDeployPlugin` rewritten onto `shipwright.Deployer` (`Deploy(ctx, artifactRef, environment, creds)`), registering itself via `Registry.RegisterDeployer(Ref{Name: "nomad-deploy", Version: "1"}, WithSchema{...}, factory)`. Its `HookManager.RegisterHook`/`StepRegistry.RegisterStep` registrations and the `nomadDeployStepHandler`/`buildImageRefFromConfig` surface were REMOVED (repo-wide grep confirmed `PipelineExecutor` — the sole executor of hooks/registry steps — has no production caller after 11.4; only `examples/**` reaches it). Credentials cross into the container only as `*dagger.Secret` via `WithSecretVariable`.
+- [x] 11.10 GREEN: `App.LoadAndInitializePlugins(ctx, providerRegistry, daggerClient)` / `App.CleanupPlugins(ctx)` exported and wired into BOTH `executeWorkflow` (live client) and `listWorkflowSteps` (nil client, so listing resolves the same provider set a run does), through `runWithPluginLifecycle`'s deferred cleanup. Stale `executePipelineWithExecutor above` reference in `workflowDaggerClient`'s doc comment corrected.
+- [x] 11.11 VERIFY: ad-hoc manifest with `capability: deploy`, `uses.provider: nomad-deploy` → `--list-steps` exits 0 resolving the plugin-contributed provider; a full run logs `Nomad deploy provider registered` → `Deploying to Nomad` → `deployment=nomad://staging/ghcr.io/acme/api:v1` → `Workflow completed successfully`. A deliberately invalid variant (missing `artifactRef`) logs `Cleaning up Nomad deploy plugin` BEFORE the failure, proving the deferred cleanup. `examples/workflow/diamond.yaml` still fails only at the pre-existing sandbox Dagger-session error (confirmed identical on a stashed baseline build).
 
 ## Phase 12 — Cross-language proof + docs (`public-module-api`)
 
@@ -167,3 +178,47 @@ security tasks, 1 absence-of-behavior test, 1 spec/design drift flag, 2 hard
 sequencing constraints) that the launch instructions required not be buried
 in prose. Completeness prioritized over the word budget, consistent with
 this change's own design.md deviation note.
+
+### WU11 deviation note (recorded during apply, not at planning time)
+
+Two deviations from this task list's/design.md's literal text, both forced
+by a full-repo dead-code sweep before deletion (per this work unit's own
+launch instructions):
+
+1. **`internal/pipelines/options.go` was NOT deleted**, despite tasks.md
+   11.3 and design.md's File Changes table naming it. Its `Config` struct
+   is live, load-bearing plumbing consumed by `internal/plugins`,
+   `internal/executors`, and `internal/app/container.go`'s
+   `BuildCapabilities` (the Layer-1-based DI wiring WU10 built and this
+   work unit is explicitly barred from re-typing). Deleting it would have
+   required re-typing all three packages — well beyond "remove the preset
+   registry and its flags." `pipelines.Config` is not itself a preset
+   registry/factory map keyed by a stack name, so keeping it does not
+   violate task 11.1's invariant.
+2. **`internal/pipelines/infra/**` was deleted, though named nowhere in
+   tasks.md or design.md.** It is a second stack-named preset pipeline
+   (`SyntegrityInfraPipeline`), reachable only through the same
+   `PipelineRegistry`/`--pipeline infra` this work unit deletes, and it
+   depends on exactly the `pipelines.Pipeline`/`pipelines.HookFunc` types
+   `pipeline.go`'s deletion removes — leaving it in place would not
+   compile. `tests/go_pipeline_test.go` (a ginkgo suite exercising the
+   deleted `go-service` package) and `mocks/pipeline_mock.go` (generated
+   from the deleted `pipeline.go`) were deleted for the same reason.
+
+Scope also grew past tasks.md 11.3/11.4's literal file list because the
+entire legacy `--pipeline` CLI dispatch tree in `main.go`
+(`executePipeline`, `executeSingleStep`, `executePipelineWithExecutor`,
+`executeStepWithExecutor`, `executePipelineLocally`, `executeStepLocally`,
+`listAvailablePipelines`, the legacy `listAvailableSteps`,
+`isCIEnvironment`) and `App.RunPipeline`/`RunPipelineStep`/
+`ListPipelines`/`GetPipelineInfo` (`internal/app/app.go`) call
+`Container.GetPipeline`/`GetPipelineRegistry` directly or transitively;
+once those methods were removed with the `PipelineAdapter`/
+`PipelineRegistry` shim, this entire tree became uncompilable dead code
+and had to go too — `--workflow` is now main.go's only dispatch path
+(`Run()` always calls `runWorkflowCLI`), matching the launch instructions'
+own framing ("leaving `--workflow` as the sole CLI entrypoint"). Flagged
+for `sdd-verify`: `App.loadAndInitializePlugins`/`cleanupPlugins`
+(Layer-1 capability/plugin wiring) are left in place per the "do not
+touch" boundary but now have zero production callers — a candidate for
+reintegration with `--workflow` or removal in a later work unit.

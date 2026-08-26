@@ -84,7 +84,7 @@ func TestCLI_parseFlags_ErrorHandling(t *testing.T) {
 	}{
 		{
 			name:    "valid flags should not error",
-			args:    []string{"-pipeline", "go-service"},
+			args:    []string{"-workflow", diamondManifestPath},
 			wantErr: false,
 		},
 		{
@@ -143,43 +143,30 @@ func TestCLIIdentityConstants(t *testing.T) {
 
 const diamondManifestPath = "examples/workflow/diamond.yaml"
 
-// TestCLI_parseFlags_WorkflowModeDetection is the flag-parsing-level proof
-// that --workflow's mode switch is detected via flag.FlagSet.Visit (an
-// explicit --workflow on the command line), never inferred from
-// flags.workflow's value alone — see Flags.workflowSet's doc comment in
-// main.go. This is the resolution to the "--step/--list-steps
-// retargeted" ambiguity: legacy --pipeline invocations (no --workflow)
-// leave workflowSet false and every legacy flag untouched (tasks.md 9.5);
-// only an explicit --workflow engages the new manifest-driven meaning of
-// --step/--list-steps (tasks.md 9.2, 9.3).
-func TestCLI_parseFlags_WorkflowModeDetection(t *testing.T) {
+// TestCLI_parseFlags_WorkflowPath is the flag-parsing-level proof that
+// --workflow is the CLI's sole entrypoint after this work unit (design.md
+// D-N, tasks.md 11.1/11.2/11.4): there is no more mode switch between a
+// legacy --pipeline path and a manifest-driven path — flags.workflow always
+// holds the manifest path (its registered default, or an explicit
+// override), and --step always parses as a manifest step id.
+func TestCLI_parseFlags_WorkflowPath(t *testing.T) {
 	tests := []struct {
-		name            string
-		args            []string
-		wantWorkflowSet bool
-		wantWorkflow    string
-		wantStep        string
+		name         string
+		args         []string
+		wantWorkflow string
+		wantStep     string
 	}{
 		{
-			name:            "bare invocation stays in legacy pipeline mode",
-			args:            []string{},
-			wantWorkflowSet: false,
-			wantWorkflow:    defaultWorkflowManifestPath,
-			wantStep:        "",
+			name:         "bare invocation uses the default manifest path",
+			args:         []string{},
+			wantWorkflow: defaultWorkflowManifestPath,
+			wantStep:     "",
 		},
 		{
-			name:            "--pipeline go-service --step build stays legacy — no --workflow given",
-			args:            []string{"-pipeline", "go-service", "-step", "build"},
-			wantWorkflowSet: false,
-			wantWorkflow:    defaultWorkflowManifestPath,
-			wantStep:        "build",
-		},
-		{
-			name:            "explicit --workflow engages workflow mode",
-			args:            []string{"-workflow", diamondManifestPath, "-step", "unit"},
-			wantWorkflowSet: true,
-			wantWorkflow:    diamondManifestPath,
-			wantStep:        "unit",
+			name:         "explicit --workflow overrides the default path",
+			args:         []string{"-workflow", diamondManifestPath, "-step", "unit"},
+			wantWorkflow: diamondManifestPath,
+			wantStep:     "unit",
 		},
 	}
 
@@ -188,7 +175,6 @@ func TestCLI_parseFlags_WorkflowModeDetection(t *testing.T) {
 			cli := NewCLI()
 			flags, err := cli.parseFlags(tt.args)
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantWorkflowSet, flags.workflowSet)
 			assert.Equal(t, tt.wantWorkflow, flags.workflow)
 			assert.Equal(t, tt.wantStep, flags.step)
 		})
@@ -394,4 +380,26 @@ func TestResolveCapabilityRef_UnknownCapabilityFailsClosed(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not-a-real-capability")
+}
+
+// TestCLI_parseFlags_PresetFlagsRemoved is task 11.2's RED test (design.md
+// D-N, tasks.md 11.2): --pipeline, --list-pipelines, --only-build,
+// --only-test, and --skip-push must be absent from main.go's flag set after
+// this work unit — flag.FlagSet.Parse rejects each as an unknown flag. It
+// fails while any of the five is still registered, and passes once all are
+// removed (tasks.md 11.4).
+func TestCLI_parseFlags_PresetFlagsRemoved(t *testing.T) {
+	removedFlags := []string{
+		"-pipeline=go-service", "-list-pipelines", "-only-build", "-only-test", "-skip-push",
+	}
+
+	for _, flagArg := range removedFlags {
+		t.Run(flagArg, func(t *testing.T) {
+			cli := NewCLI()
+			flags, err := cli.parseFlags([]string{flagArg})
+
+			require.Error(t, err, "%s must no longer be a registered flag (design.md D-N)", flagArg)
+			assert.Nil(t, flags)
+		})
+	}
 }

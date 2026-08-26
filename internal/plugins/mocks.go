@@ -8,6 +8,7 @@ import (
 
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/workflow/providers"
 )
 
 // MockPlugin implements Plugin interface for testing.
@@ -57,13 +58,14 @@ func NewMockPlugin() *MockPlugin {
 
 // MockPluginContext implements PluginContext interface for testing.
 type MockPluginContext struct {
-	GetConfigurationFunc func() interfaces.Configuration
-	GetDaggerClientFunc  func() (*dagger.Client, error)
-	GetHookManagerFunc   func() interfaces.HookManager
-	GetLoggerFunc        func() interfaces.Logger
-	GetConfigFunc        func() pipelines.Config
-	GetCapabilitiesFunc  func() Capabilities
-	GetStepRegistryFunc  func() interfaces.StepRegistry
+	GetConfigurationFunc    func() interfaces.Configuration
+	GetDaggerClientFunc     func() (*dagger.Client, error)
+	GetHookManagerFunc      func() interfaces.HookManager
+	GetLoggerFunc           func() interfaces.Logger
+	GetConfigFunc           func() pipelines.Config
+	GetCapabilitiesFunc     func() Capabilities
+	GetProviderRegistryFunc func() *providers.Registry
+	GetStepRegistryFunc     func() interfaces.StepRegistry
 }
 
 // GetConfiguration implements PluginContext interface.
@@ -106,6 +108,14 @@ func (m *MockPluginContext) GetCapabilities() Capabilities {
 	return Capabilities{}
 }
 
+// GetProviderRegistry implements PluginContext interface.
+func (m *MockPluginContext) GetProviderRegistry() *providers.Registry {
+	if m.GetProviderRegistryFunc != nil {
+		return m.GetProviderRegistryFunc()
+	}
+	return nil
+}
+
 // GetConfig implements PluginContext interface.
 func (m *MockPluginContext) GetConfig() pipelines.Config {
 	if m.GetConfigFunc != nil {
@@ -129,10 +139,19 @@ func NewMockPluginContext() *MockPluginContext {
 
 // MockPluginLoader implements PluginLoader interface for testing.
 type MockPluginLoader struct {
+	ListBuiltinsFunc    func() []string
 	LoadBuiltinFunc     func(ctx context.Context, name string) (Plugin, error)
 	LoadFromConfigFunc  func(ctx context.Context, config map[string]interface{}) (Plugin, error)
 	LoadFromFileFunc    func(ctx context.Context, filePath string) (Plugin, error)
 	RegisterBuiltinFunc func(name string, factory func() Plugin)
+}
+
+// ListBuiltins implements PluginLoader interface.
+func (m *MockPluginLoader) ListBuiltins() []string {
+	if m.ListBuiltinsFunc != nil {
+		return m.ListBuiltinsFunc()
+	}
+	return nil
 }
 
 // LoadBuiltin implements PluginLoader interface.
@@ -456,78 +475,6 @@ func (m *MockConfiguration) Validate() error {
 // NewMockConfiguration creates a new mock configuration.
 func NewMockConfiguration() *MockConfiguration {
 	return &MockConfiguration{}
-}
-
-// MockPipeline implements interfaces.Pipeline interface for testing.
-type MockPipeline struct {
-	AfterStepFunc         func(ctx context.Context, stepName string) interfaces.HookFunc
-	BeforeStepFunc        func(ctx context.Context, stepName string) interfaces.HookFunc
-	ExecuteStepFunc       func(ctx context.Context, stepName string) error
-	GetAvailableStepsFunc func() []string
-	GetStepConfigFunc     func(stepName string) interfaces.StepConfig
-	NameFunc              func() string
-	ValidateStepFunc      func(stepName string) error
-}
-
-// AfterStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) AfterStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	if m.AfterStepFunc != nil {
-		return m.AfterStepFunc(ctx, stepName)
-	}
-	return nil
-}
-
-// BeforeStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) BeforeStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	if m.BeforeStepFunc != nil {
-		return m.BeforeStepFunc(ctx, stepName)
-	}
-	return nil
-}
-
-// ExecuteStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) ExecuteStep(ctx context.Context, stepName string) error {
-	if m.ExecuteStepFunc != nil {
-		return m.ExecuteStepFunc(ctx, stepName)
-	}
-	return nil
-}
-
-// GetAvailableSteps implements interfaces.Pipeline interface.
-func (m *MockPipeline) GetAvailableSteps() []string {
-	if m.GetAvailableStepsFunc != nil {
-		return m.GetAvailableStepsFunc()
-	}
-	return nil
-}
-
-// GetStepConfig implements interfaces.Pipeline interface.
-func (m *MockPipeline) GetStepConfig(stepName string) interfaces.StepConfig {
-	if m.GetStepConfigFunc != nil {
-		return m.GetStepConfigFunc(stepName)
-	}
-	return interfaces.StepConfig{}
-}
-
-// Name implements interfaces.Pipeline interface.
-func (m *MockPipeline) Name() string {
-	if m.NameFunc != nil {
-		return m.NameFunc()
-	}
-	return "mock-pipeline"
-}
-
-// ValidateStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) ValidateStep(stepName string) error {
-	if m.ValidateStepFunc != nil {
-		return m.ValidateStepFunc(stepName)
-	}
-	return nil
-}
-
-// NewMockPipeline creates a new mock pipeline.
-func NewMockPipeline() *MockPipeline {
-	return &MockPipeline{}
 }
 
 // MockLogger implements interfaces.Logger interface for testing.

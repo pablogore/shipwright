@@ -2,31 +2,102 @@ package plugins
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 
 	"dagger.io/dagger"
 
 	"github.com/pablogore/kit-logger/pkg/logger"
 
-	"github.com/pablogore/shipwright/internal/interfaces"
-	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/workflow/interp"
+	"github.com/pablogore/shipwright/internal/workflow/providers"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
-// NomadDeployPlugin is a plugin that adds Nomad deployment capability to pipelines.
-// This allows services to deploy to Nomad clusters without modifying the core Dagger library.
+// nomadProviderName/nomadProviderVersion are the providers.Ref identity this
+// plugin registers its shipwright.Deployer under. A manifest step reaches it
+// with:
+//
+//	capability: deploy
+//	uses:
+//	  provider: nomad-deploy
+//	  version: "1"
+const (
+	nomadProviderName    = "nomad-deploy"
+	nomadProviderVersion = "1"
+)
+
+// defaultNomadAddr/defaultNomadJobFile are the local-development fallbacks
+// used when neither the manifest's `with` block nor plugin configuration
+// supplies a value.
+const (
+	defaultNomadAddr    = "http://localhost:4646"
+	defaultNomadJobFile = "nomad.hcl"
+)
+
+// nomadTokenSecretName is the Dagger secret name the deploy credential is
+// bound to. The credential is only ever handed to the container as a
+// *dagger.Secret via WithSecretVariable — never interpolated into a command
+// string or a plain WithEnvVariable (the security skill's secrets rule).
+const nomadTokenSecretName = "NOMAD_TOKEN"
+
+// ErrNomadDeploymentNotImplemented is returned by Deploy after validation and
+// staging succeed. stageNomadJob builds a Nomad CLI container but never
+// executes it, and runNomadCommand only checks for a local Nomad binary and
+// logs — neither performs a real `nomad job run` or calls the Nomad API. A
+// shipwright.Deployer's returned string is recorded by engine.Execute as the
+// step's successful output, so fabricating a "nomad://..." reference here
+// would let a workflow report a deployment that never happened. Deploy fails
+// closed with this sentinel instead, until real execution is implemented.
+var ErrNomadDeploymentNotImplemented = errors.New("nomad-deploy: real Nomad execution is not implemented yet — no deployment occurred")
+
+// NomadDeployPlugin adds Nomad deployment capability to Shipwright workflows.
+//
+// It is BOTH the Plugin (lifecycle: Name/Version/Initialize/Cleanup) and the
+// shipwright.Deployer (Layer 1 capability) it contributes. Initialize
+// registers a Deployer factory into the run's *providers.Registry through
+// PluginContext.GetProviderRegistry(); the factory returns a per-step copy of
+// this plugin bound to that step's typed `with` values, which is what
+// internal/workflow/engine.dispatchDeploy actually calls.
+//
+// Why this replaced the previous hook/step registration: the earlier
+// implementation registered a "push"-after hook on interfaces.HookManager and
+// a "deploy-nomad" handler on interfaces.StepRegistry. Both were only ever
+// executed by the preset-driven step flow that this change's preset-deletion
+// work unit removed — engine.Execute consults neither. Those registrations
+// therefore made the plugin LOOK wired while guaranteeing its deploy logic
+// could never run. They are removed rather than kept as compatibility dead
+// weight.
 type NomadDeployPlugin struct {
 	config  map[string]interface{}
 	name    string
 	version string
+
+	// nomadAddr/job/jobFile are the resolved per-step settings. They are set
+	// only on the copies the registered provider factory produces; the
+	// long-lived plugin instance registered with PluginRegistry leaves them
+	// empty.
+	nomadAddr string
+	job       string
+	jobFile   string
+
+	// daggerClient is the run's Dagger client accessor, captured from the
+	// PluginContext at Initialize time. It is a func (not a *dagger.Client)
+	// because a run may wire no client at all — for example --list-steps,
+	// which resolves providers without connecting to a Dagger engine.
+	daggerClient func() (*dagger.Client, error)
 }
+
+// Compile-time proof that the plugin really satisfies the public Layer 1
+// deploy contract engine.dispatchDeploy resolves.
+var _ shipwright.Deployer = (*NomadDeployPlugin)(nil)
 
 // NewNomadDeployPlugin creates a new Nomad deploy plugin.
 func NewNomadDeployPlugin() Plugin {
 	return &NomadDeployPlugin{
 		config:  make(map[string]interface{}),
-		name:    "nomad-deploy",
+		name:    nomadProviderName,
 		version: "1.0.0",
 	}
 }
@@ -41,40 +112,111 @@ func (p *NomadDeployPlugin) Version() string {
 	return p.version
 }
 
-// Initialize initializes the plugin and registers hooks/steps.
+// Initialize reads plugin configuration and registers this plugin's
+// shipwright.Deployer into the run's provider registry.
+//
+// A nil registry (no workflow wired for this run) is not an error: the plugin
+// simply contributes nothing, matching PluginContext.GetProviderRegistry's
+// documented contract.
 func (p *NomadDeployPlugin) Initialize(ctx context.Context, pluginCtx PluginContext) error {
 	logger.L().InfoContext(ctx, "Initializing Nomad deploy plugin")
 
-	// Get configuration
-	cfg := pluginCtx.GetConfiguration()
-	if nomadConfig := cfg.Get("plugins.nomad-deploy"); nomadConfig != nil {
-		if configMap, ok := nomadConfig.(map[string]interface{}); ok {
-			p.config = configMap
+	if cfg := pluginCtx.GetConfiguration(); cfg != nil {
+		if nomadConfig := cfg.Get("plugins.nomad-deploy"); nomadConfig != nil {
+			if configMap, ok := nomadConfig.(map[string]interface{}); ok {
+				p.config = configMap
+			}
 		}
 	}
 
-	// Register hook to deploy to Nomad after push step
-	hookManager := pluginCtx.GetHookManager()
-	if err := hookManager.RegisterHook(
-		"push",
-		interfaces.HookTypeAfter,
-		p.createDeployHook(pluginCtx),
-	); err != nil {
-		return fmt.Errorf("failed to register deploy hook: %w", err)
+	p.daggerClient = pluginCtx.GetDaggerClient
+
+	reg := pluginCtx.GetProviderRegistry()
+	if reg == nil {
+		logger.L().WarnContext(ctx,
+			"Nomad deploy plugin initialized without a provider registry — no deploy provider contributed",
+			"plugin", p.name)
+		return nil
 	}
 
-	// Register custom "deploy-nomad" step
-	stepRegistry := pluginCtx.GetStepRegistry()
-	if err := stepRegistry.RegisterStep(
-		"deploy-nomad",
-		&nomadDeployStepHandler{config: p.config, pluginCtx: pluginCtx},
-	); err != nil {
-		return fmt.Errorf("failed to register deploy-nomad step: %w", err)
-	}
+	reg.RegisterDeployer(
+		providers.Ref{Name: nomadProviderName, Version: nomadProviderVersion},
+		p.withSchema(),
+		p.newDeployer,
+	)
 
-	logger.L().InfoContext(ctx, "Nomad deploy plugin initialized", "config", p.config)
+	logger.L().InfoContext(ctx, "Nomad deploy provider registered",
+		"provider", nomadProviderName,
+		"version", nomadProviderVersion)
 
 	return nil
+}
+
+// withSchema declares the `with` fields a deploy step may pass, so
+// providers.checkWithSchema rejects a kind mismatch at resolution time rather
+// than letting an unexpected value reach Deploy.
+//
+// artifactRef/environment/creds are the engine's own deploy field names
+// (internal/workflow/engine/execute.go's deployArtifactRefField and
+// siblings); nomadAddr/job/jobFile are this provider's own settings.
+func (p *NomadDeployPlugin) withSchema() providers.WithSchema {
+	return providers.WithSchema{
+		"artifactRef": interp.KindString,
+		"environment": interp.KindString,
+		"creds":       interp.KindSecret,
+		"nomadAddr":   interp.KindString,
+		"job":         interp.KindString,
+		"jobFile":     interp.KindString,
+	}
+}
+
+// newDeployer is the provider factory registered with the Registry. It binds
+// one step's typed values onto a copy of the plugin, falling back to plugin
+// configuration and then to the documented defaults.
+func (p *NomadDeployPlugin) newDeployer(v providers.Values) shipwright.Deployer {
+	return &NomadDeployPlugin{
+		config:       p.config,
+		name:         p.name,
+		version:      p.version,
+		nomadAddr:    valueOr(v, "nomadAddr", p.getConfigString("nomad_addr", "")),
+		job:          valueOr(v, "job", p.getConfigString("nomad_job", "")),
+		jobFile:      valueOr(v, "jobFile", p.getConfigString("nomad_job_file", defaultNomadJobFile)),
+		daggerClient: p.daggerClient,
+	}
+}
+
+// Deploy implements shipwright.Deployer: it deploys an already-published
+// artifact reference into a named environment and returns the deployment
+// reference the engine records as this step's output.
+func (p *NomadDeployPlugin) Deploy(
+	ctx context.Context,
+	artifactRef string,
+	environment string,
+	creds *dagger.Secret,
+) (string, error) {
+	if artifactRef == "" {
+		return "", errors.New("nomad-deploy: artifactRef must not be empty")
+	}
+	if p.job == "" && p.jobFile == "" {
+		return "", errors.New("nomad-deploy: a nomad job or job file must be specified")
+	}
+
+	addr := p.resolvedNomadAddr()
+
+	logger.L().InfoContext(ctx, "Deploying to Nomad",
+		"artifact", artifactRef,
+		"environment", environment,
+		"nomad_addr", addr)
+
+	if err := p.stageNomadJob(ctx, addr, environment, creds); err != nil {
+		return "", err
+	}
+
+	if err := p.runNomadCommand(ctx, addr, p.jobFile, artifactRef); err != nil {
+		return "", fmt.Errorf("nomad-deploy: %w", err)
+	}
+
+	return "", fmt.Errorf("%w (artifact=%s environment=%s)", ErrNomadDeploymentNotImplemented, artifactRef, environment)
 }
 
 // Cleanup cleans up the plugin.
@@ -83,157 +225,82 @@ func (p *NomadDeployPlugin) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-// createDeployHook creates a hook function that deploys to Nomad after push.
-func (p *NomadDeployPlugin) createDeployHook(pluginCtx PluginContext) interfaces.HookFunc {
-	return func(ctx context.Context) error {
-		// Check if auto-deploy is enabled
-		if autoDeploy, ok := p.config["auto_deploy"].(bool); ok && !autoDeploy {
-			logger.L().InfoContext(ctx, "Auto-deploy disabled, skipping Nomad deployment")
-			return nil
-		}
+// resolvedNomadAddr returns the configured Nomad address, or the documented
+// local-development default.
+func (p *NomadDeployPlugin) resolvedNomadAddr() string {
+	if p.nomadAddr != "" {
+		return p.nomadAddr
+	}
+	return defaultNomadAddr
+}
 
-		logger.L().InfoContext(ctx, "Deploying to Nomad after push")
-
-		// Get Nomad configuration
-		nomadAddr := p.getConfigString("nomad_addr", "http://localhost:4646")
-		nomadJob := p.getConfigString("nomad_job", "")
-		// Get nomad_job_file, but allow empty string if explicitly set
-		nomadJobFile := ""
-		if jobFile, ok := p.config["nomad_job_file"].(string); ok {
-			nomadJobFile = jobFile
-		} else {
-			// Use default only if not explicitly set
-			nomadJobFile = "nomad.hcl"
-		}
-
-		if nomadJob == "" && nomadJobFile == "" {
-			return fmt.Errorf("nomad job or job file must be specified")
-		}
-
-		// Get Dagger client to access the image
-		daggerClient, err := pluginCtx.GetDaggerClient()
-		if err != nil {
-			return fmt.Errorf("dagger client not available: %w", err)
-		}
-
-		// Get pipeline config to get image reference
-		pipelineConfig := pluginCtx.GetConfig()
-		imageRef := p.buildImageRefFromConfig(pipelineConfig)
-
-		// Deploy to Nomad
-		if err := p.deployToNomad(ctx, daggerClient, nomadAddr, nomadJob, nomadJobFile, imageRef); err != nil {
-			return fmt.Errorf("failed to deploy to Nomad: %w", err)
-		}
-
-		logger.L().InfoContext(ctx, "Successfully deployed to Nomad", "image", imageRef)
-
+// stageNomadJob prepares the Nomad CLI container carrying the job definition.
+// It is a no-op when the run wired no Dagger client (for example a resolution
+// only path such as --list-steps, or a unit test) — the local CLI fallback in
+// runNomadCommand still applies.
+//
+// The deploy credential crosses into the container exclusively as a
+// *dagger.Secret through WithSecretVariable, and the job body is written with
+// WithNewFile rather than interpolated into an `sh -c` string (the security
+// skill's secrets and command-construction rules).
+//
+// Scope, stated explicitly: the staged container is BUILT and deliberately
+// NOT executed, exactly as the previous hook-based deployToNomad did.
+// Actually running `nomad job run` inside it needs a reachable Nomad server
+// and is out of scope for this remediation, which restores the plugin's
+// reachability rather than adding new deployment behavior.
+func (p *NomadDeployPlugin) stageNomadJob(
+	ctx context.Context,
+	addr string,
+	environment string,
+	creds *dagger.Secret,
+) error {
+	if p.daggerClient == nil {
 		return nil
 	}
-}
 
-// deployToNomad deploys the image to Nomad.
-func (p *NomadDeployPlugin) deployToNomad(
-	ctx context.Context,
-	client *dagger.Client,
-	nomadAddr string,
-	nomadJob string,
-	nomadJobFile string,
-	imageRef string,
-) error {
-	// Create a container with Nomad CLI
+	client, err := p.daggerClient()
+	if err != nil || client == nil {
+		logger.L().WarnContext(ctx, "Dagger client unavailable, using local Nomad CLI path only")
+		return nil
+	}
+
 	container := client.Container().
 		From("hashicorp/nomad:latest").
-		WithEnvVariable("NOMAD_ADDR", nomadAddr)
+		WithEnvVariable("NOMAD_ADDR", addr)
 
-	// If we have a job file, mount it
-	if nomadJobFile != "" {
-		// In a real implementation, you would mount the job file
-		// For now, we'll use the job content directly
-		logger.L().InfoContext(ctx, "Using Nomad job file", "file", nomadJobFile)
+	if environment != "" {
+		container = container.WithEnvVariable("NOMAD_NAMESPACE", environment)
 	}
-
-	// If we have job content, write it to a file
-	if nomadJob != "" {
-		container = container.WithNewFile("/tmp/job.hcl", nomadJob)
+	if creds != nil {
+		container = container.WithSecretVariable(nomadTokenSecretName, creds)
 	}
-
-	// Run Nomad job run
-	// In a real implementation, you would:
-	// 1. Update the job file with the new image reference
-	// 2. Run `nomad job run /tmp/job.hcl`
-	// For this example, we'll use a simpler approach with environment variables
-
-	// For now, we'll use a local Nomad CLI if available
-	// In production, you might want to use the Nomad API directly
-	if err := p.runNomadCommand(ctx, nomadAddr, nomadJobFile, imageRef); err != nil {
-		return fmt.Errorf("nomad deployment failed: %w", err)
+	if p.job != "" {
+		container = container.WithNewFile("/tmp/job.hcl", p.job)
 	}
+	_ = container // built, not executed — see this function's doc comment.
 
 	return nil
 }
 
-// runNomadCommand runs a Nomad CLI command locally.
-func (p *NomadDeployPlugin) runNomadCommand(ctx context.Context, nomadAddr, jobFile, imageRef string) error {
-	// Check if Nomad CLI is available
+// runNomadCommand exercises the local Nomad CLI path when it is available. A
+// missing CLI is deliberately not a failure: it keeps a workflow authored
+// against Nomad runnable on a machine with no Nomad installed, the same
+// tolerance the previous hook-based implementation had. Like stageNomadJob,
+// issuing the real `nomad job run` invocation is out of scope here.
+func (p *NomadDeployPlugin) runNomadCommand(ctx context.Context, nomadAddr, jobFile, artifactRef string) error {
 	if _, err := exec.LookPath("nomad"); err != nil {
-		logger.L().WarnContext(ctx, "Nomad CLI not found, skipping deployment",
-			"hint", "Install Nomad CLI or use Nomad API directly")
-		return nil // Don't fail if Nomad CLI is not available
+		logger.L().WarnContext(ctx, "Nomad CLI not found, skipping local deployment",
+			"hint", "Install the Nomad CLI or target the Nomad API directly")
+		return nil
 	}
 
-	// Set Nomad address
-	env := os.Environ()
-	env = append(env, fmt.Sprintf("NOMAD_ADDR=%s", nomadAddr))
-
-	// Update job file with new image reference if needed
-	if jobFile != "" {
-		// In a real implementation, you would:
-		// 1. Read the job file
-		// 2. Replace the image reference
-		// 3. Write it back
-		// 4. Run `nomad job run <file>`
-		logger.L().InfoContext(ctx, "Would deploy Nomad job", "file", jobFile, "image", imageRef)
-	}
+	logger.L().InfoContext(ctx, "Would deploy Nomad job",
+		"nomad_addr", nomadAddr,
+		"file", jobFile,
+		"artifact", artifactRef)
 
 	return nil
-}
-
-// buildImageRefFromConfig builds the full image reference from pipeline config.
-func (p *NomadDeployPlugin) buildImageRefFromConfig(cfg pipelines.Config) string {
-	// Get registry URL
-	registry := cfg.RegistryURL
-	if registry == "" {
-		registry = cfg.Registry
-	}
-	if registry == "" {
-		registry = os.Getenv("REGISTRY_URL")
-	}
-	if registry == "" {
-		registry = "localhost:5000"
-	}
-
-	// Get image name
-	imageName := cfg.ImageName
-	if imageName == "" {
-		imageName = os.Getenv("IMAGE_NAME")
-	}
-	if imageName == "" {
-		imageName = "app"
-	}
-
-	// Get image tag
-	tag := cfg.ImageTag
-	if tag == "" {
-		tag = cfg.BuildTag
-	}
-	if tag == "" {
-		tag = os.Getenv("IMAGE_TAG")
-	}
-	if tag == "" {
-		tag = "latest"
-	}
-
-	return fmt.Sprintf("%s/%s:%s", registry, imageName, tag)
 }
 
 // getConfigString gets a string value from config with default.
@@ -244,67 +311,18 @@ func (p *NomadDeployPlugin) getConfigString(key, defaultValue string) string {
 	return defaultValue
 }
 
-// nomadDeployStepHandler handles the "deploy-nomad" step.
-type nomadDeployStepHandler struct {
-	config    map[string]interface{}
-	pluginCtx PluginContext
-}
-
-// CanHandle checks if this handler can handle the step.
-func (h *nomadDeployStepHandler) CanHandle(stepName string) bool {
-	return stepName == "deploy-nomad"
-}
-
-// Execute executes the deploy-nomad step.
-func (h *nomadDeployStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
-	if !h.CanHandle(stepName) {
-		return fmt.Errorf("handler cannot handle step: %s", stepName)
+// valueOr returns v[key]'s string form, or fallback when the field is absent
+// or not string-representable. A secret Value never yields a string here
+// (interp.Value has no string accessor for KindSecret), so a credential can
+// never silently become one of these plain settings.
+func valueOr(v providers.Values, key, fallback string) string {
+	val, ok := v[key]
+	if !ok {
+		return fallback
 	}
-
-	logger.L().InfoContext(ctx, "Executing deploy-nomad step")
-
-	// Get Dagger client
-	daggerClient, err := h.pluginCtx.GetDaggerClient()
-	if err != nil {
-		return fmt.Errorf("dagger client not available: %w", err)
+	s, ok := val.String()
+	if !ok || s == "" {
+		return fallback
 	}
-
-	// Get pipeline config
-	pipelineConfig := h.pluginCtx.GetConfig()
-
-	// Build image reference
-	plugin := &NomadDeployPlugin{config: h.config}
-	imageRef := plugin.buildImageRefFromConfig(pipelineConfig)
-
-	// Get Nomad configuration
-	nomadAddr := plugin.getConfigString("nomad_addr", "http://localhost:4646")
-	nomadJobFile := plugin.getConfigString("nomad_job_file", "nomad.hcl")
-
-	// Deploy to Nomad
-	if err := plugin.deployToNomad(ctx, daggerClient, nomadAddr, "", nomadJobFile, imageRef); err != nil {
-		return fmt.Errorf("failed to deploy to Nomad: %w", err)
-	}
-
-	logger.L().InfoContext(ctx, "Deploy-nomad step completed", "image", imageRef)
-
-	return nil
-}
-
-// GetStepInfo returns step configuration.
-func (h *nomadDeployStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
-	return interfaces.StepConfig{
-		Name:        stepName,
-		Description: "Deploy application to Nomad cluster",
-		Required:    false,
-		Timeout:     0,                // No timeout by default
-		DependsOn:   []string{"push"}, // Depends on push step
-	}
-}
-
-// Validate validates the step configuration.
-func (h *nomadDeployStepHandler) Validate(stepName string, config interfaces.StepConfig) error {
-	if stepName != "deploy-nomad" {
-		return fmt.Errorf("invalid step name: %s", stepName)
-	}
-	return nil
+	return s
 }

@@ -124,6 +124,52 @@ func (r *registry) LoadPluginsFromConfig(ctx context.Context, pluginCtx PluginCo
 	return nil
 }
 
+// LoadBuiltinPlugins registers and initializes every compile-time-registered
+// builtin plugin (see the PluginRegistry interface doc comment for the
+// design.md D-I security rationale). It deliberately does NOT read
+// configuration: PluginLoader.LoadFromConfig's `type: file` branch reaches
+// plugin.Open, so keeping this path builtin-only is what proves the
+// --workflow entrypoint can never load native code from a config-supplied
+// path.
+func (r *registry) LoadBuiltinPlugins(ctx context.Context, pluginCtx PluginContext) error {
+	if pluginCtx == nil {
+		return errors.New("plugin context cannot be nil")
+	}
+	if r.loader == nil {
+		return nil
+	}
+
+	var failures []error
+	for _, name := range r.loader.ListBuiltins() {
+		r.mutex.RLock()
+		_, exists := r.plugins[name]
+		r.mutex.RUnlock()
+		if exists {
+			continue
+		}
+
+		plugin, err := r.loader.LoadBuiltin(ctx, name)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("builtin plugin %s: %w", name, err))
+			continue
+		}
+		if plugin == nil {
+			failures = append(failures, fmt.Errorf("builtin plugin %s: factory returned nil", name))
+			continue
+		}
+
+		if err := r.registerAndInitialize(ctx, plugin, pluginCtx); err != nil {
+			failures = append(failures, fmt.Errorf("builtin plugin %s: %w", name, err))
+		}
+	}
+
+	if len(failures) > 0 {
+		return fmt.Errorf("failed to load some builtin plugins: %v", failures)
+	}
+
+	return nil
+}
+
 // registerAndInitialize registers and initializes a plugin.
 func (r *registry) registerAndInitialize(ctx context.Context, plugin Plugin, pluginCtx PluginContext) error {
 	if err := r.RegisterPlugin(plugin); err != nil {

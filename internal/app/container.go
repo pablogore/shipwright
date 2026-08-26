@@ -18,26 +18,14 @@ import (
 	"github.com/pablogore/shipwright/internal/executors"
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/pipelines"
-	goservice "github.com/pablogore/shipwright/internal/pipelines/go-service"
-	infra "github.com/pablogore/shipwright/internal/pipelines/infra"
 	"github.com/pablogore/shipwright/internal/plugins"
 	"github.com/pablogore/shipwright/pkg/shipwright"
-)
-
-const (
-	// MaxStepTimeout is the maximum allowed timeout for a step (2 hours)
-	MaxStepTimeout = 2 * time.Hour
-	// DefaultStepTimeout is the default timeout for steps (5 minutes)
-	DefaultStepTimeout = 5 * time.Minute
-	// DefaultStepRetries is the default number of retries for steps
-	DefaultStepRetries = 0
 )
 
 // Static errors for err113 compliance.
 var (
 	ErrComponentNotFound          = errors.New("component not found")
 	ErrFailedToCreateDaggerClient = errors.New("failed to create Dagger client")
-	ErrPipelineNotFound           = errors.New("pipeline not found")
 	ErrInvalidConfiguration       = errors.New("invalid configuration")
 )
 
@@ -120,7 +108,6 @@ func (c *Container) Validate() error {
 // registerComponents registers all application components.
 func (c *Container) registerComponents() {
 	c.registerDaggerComponents()
-	c.registerPipelineComponents()
 	c.registerSecurityComponents()
 	c.registerLoggingComponents()
 	c.registerExecutorComponents()
@@ -260,21 +247,6 @@ func (c *Container) verifyDockerAvailable(ctx context.Context) error {
 	return nil
 }
 
-// registerPipelineComponents registers pipeline-related components.
-func (c *Container) registerPipelineComponents() {
-	// Pipeline Registry
-	c.Register("pipelineRegistry", func() (any, error) {
-		registry := NewPipelineRegistry()
-
-		// Register default pipelines
-		registry.Register("go-service", NewGoServicePipeline)
-		registry.Register("infra", NewInfraPipeline)
-		// docker-go functionality has been merged into go-service
-
-		return registry, nil
-	})
-}
-
 // registerSecurityComponents registers security-related components.
 func (c *Container) registerSecurityComponents() {
 	// Vulnerability Checker
@@ -348,31 +320,7 @@ func (c *Container) registerExecutorComponents() {
 	})
 }
 
-// GetPipelineRegistry implements PipelineProvider interface.
-func (c *Container) GetPipelineRegistry() (interfaces.PipelineRegistry, error) {
-	registry, err := c.Get("pipelineRegistry")
-	if err != nil {
-		return nil, err
-	}
-	return registry.(interfaces.PipelineRegistry), nil
-}
-
-// GetPipeline implements PipelineProvider interface.
-func (c *Container) GetPipeline(name string) (interfaces.Pipeline, error) {
-	registry, err := c.GetPipelineRegistry()
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := c.GetDaggerClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return registry.Get(name, client, c.config)
-}
-
-// GetDaggerClient implements PipelineProvider interface.
+// GetDaggerClient returns the cached Dagger client.
 // Returns the cached Dagger client. Connection management is handled by Dagger internally.
 func (c *Container) GetDaggerClient() (*dagger.Client, error) {
 	client, err := c.Get("daggerClient")
@@ -424,41 +372,6 @@ func (c *Container) GetLogger() (interfaces.Logger, error) {
 // GetConfiguration returns the configuration instance.
 func (c *Container) GetConfiguration() interfaces.Configuration {
 	return c.config
-}
-
-// PipelineRegistry implements the pipeline registry.
-type PipelineRegistry struct {
-	pipelines map[string]func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline
-}
-
-// NewPipelineRegistry creates a new pipeline registry.
-func NewPipelineRegistry() *PipelineRegistry {
-	return &PipelineRegistry{
-		pipelines: make(map[string]func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline),
-	}
-}
-
-// Register adds a new pipeline to the registry.
-func (r *PipelineRegistry) Register(name string, factory func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline) {
-	r.pipelines[name] = factory
-}
-
-// Get retrieves a pipeline by its name.
-func (r *PipelineRegistry) Get(name string, client *dagger.Client, cfg interfaces.Configuration) (interfaces.Pipeline, error) {
-	factory, ok := r.pipelines[name]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrPipelineNotFound, name)
-	}
-	return factory(client, cfg), nil
-}
-
-// List returns the names of all registered pipelines.
-func (r *PipelineRegistry) List() []string {
-	names := make([]string, 0, len(r.pipelines))
-	for name := range r.pipelines {
-		names = append(names, name)
-	}
-	return names
 }
 
 // VulnChecker implements vulnerability checking.
@@ -633,123 +546,6 @@ func (c *Container) registerHookComponents() {
 	})
 }
 
-// PipelineAdapter adapts pipelines.Pipeline to interfaces.Pipeline
-type PipelineAdapter struct {
-	pipeline pipelines.Pipeline
-	config   interfaces.Configuration
-}
-
-// NewPipelineAdapter creates a new pipeline adapter
-func NewPipelineAdapter(pipeline pipelines.Pipeline) *PipelineAdapter {
-	return &PipelineAdapter{pipeline: pipeline}
-}
-
-// NewPipelineAdapterWithConfig creates a new pipeline adapter with configuration
-func NewPipelineAdapterWithConfig(pipeline pipelines.Pipeline, cfg interfaces.Configuration) *PipelineAdapter {
-	return &PipelineAdapter{
-		pipeline: pipeline,
-		config:   cfg,
-	}
-}
-
-// Name returns the name of the pipeline
-func (p *PipelineAdapter) Name() string {
-	return p.pipeline.Name()
-}
-
-// GetAvailableSteps returns the available steps for the pipeline
-func (p *PipelineAdapter) GetAvailableSteps() []string {
-	return []string{"setup", "build", "test", "package", "tag", "push"}
-}
-
-// ExecuteStep executes a specific step
-func (p *PipelineAdapter) ExecuteStep(ctx context.Context, stepName string) error {
-	switch stepName {
-	case "setup":
-		return p.pipeline.Setup(ctx)
-	case "build":
-		return p.pipeline.Build(ctx)
-	case "test":
-		return p.pipeline.Test(ctx)
-	case "package":
-		return p.pipeline.Package(ctx)
-	case "tag":
-		return p.pipeline.Tag(ctx)
-	case "push":
-		return p.pipeline.Push(ctx)
-	default:
-		return fmt.Errorf("unknown step: %s", stepName)
-	}
-}
-
-// BeforeStep returns a hook function to execute before a step
-func (p *PipelineAdapter) BeforeStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	hook := p.pipeline.BeforeStep(ctx, stepName)
-	if hook == nil {
-		return func(_ context.Context) error { return nil }
-	}
-	// Convert pipelines.HookFunc to interfaces.HookFunc
-	return interfaces.HookFunc(hook)
-}
-
-// AfterStep returns a hook function to execute after a step
-func (p *PipelineAdapter) AfterStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	hook := p.pipeline.AfterStep(ctx, stepName)
-	if hook == nil {
-		return func(_ context.Context) error { return nil }
-	}
-	// Convert pipelines.HookFunc to interfaces.HookFunc
-	return interfaces.HookFunc(hook)
-}
-
-// GetStepConfig returns configuration for a step.
-// It reads timeout and retries from configuration if available, otherwise uses defaults.
-func (p *PipelineAdapter) GetStepConfig(stepName string) interfaces.StepConfig {
-	timeout := DefaultStepTimeout
-	retries := DefaultStepRetries
-
-	// Try to read from configuration if available
-	if p.config != nil {
-		// Read timeout from config (format: "step.<stepName>.timeout")
-		timeoutKey := fmt.Sprintf("step.%s.timeout", stepName)
-		if timeoutStr := p.config.GetString(timeoutKey); timeoutStr != "" {
-			if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
-				// Validate timeout doesn't exceed maximum
-				if parsedTimeout <= MaxStepTimeout {
-					timeout = parsedTimeout
-				} else {
-					timeout = MaxStepTimeout
-				}
-			}
-		}
-
-		// Read retries from config (format: "step.<stepName>.retries")
-		retriesKey := fmt.Sprintf("step.%s.retries", stepName)
-		if retriesInt := p.config.GetInt(retriesKey); retriesInt > 0 {
-			retries = retriesInt
-		}
-	}
-
-	return interfaces.StepConfig{
-		Name:        stepName,
-		Description: fmt.Sprintf("Execute %s step", stepName),
-		Required:    true,
-		Timeout:     timeout,
-		Retries:     retries,
-	}
-}
-
-// ValidateStep validates a step name
-func (p *PipelineAdapter) ValidateStep(stepName string) error {
-	validSteps := p.GetAvailableSteps()
-	for _, step := range validSteps {
-		if step == stepName {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid step: %s", stepName)
-}
-
 // validateConvertedConfig validates URLs and versions in the configuration.
 // This is called after convertConfig to ensure all values are valid.
 func validateConvertedConfig(cfg interfaces.Configuration) error {
@@ -891,25 +687,4 @@ func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capa
 		Testers:    testers,
 		Artifactor: artifactor,
 	}
-}
-
-// Pipeline factory functions
-func NewGoServicePipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
-	// Validate configuration before conversion
-	if err := validateConvertedConfig(cfg); err != nil {
-		logger.L().WarnContext(context.Background(), "Configuration validation warning", "error", err)
-	}
-	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
-	pipeline := goservice.New(client, pipelineConfig)
-	return NewPipelineAdapterWithConfig(pipeline, cfg)
-}
-
-func NewInfraPipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
-	// Validate configuration before conversion
-	if err := validateConvertedConfig(cfg); err != nil {
-		logger.L().WarnContext(context.Background(), "Configuration validation warning", "error", err)
-	}
-	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
-	pipeline := infra.New(client, pipelineConfig)
-	return NewPipelineAdapterWithConfig(pipeline, cfg)
 }

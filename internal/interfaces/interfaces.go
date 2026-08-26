@@ -102,17 +102,9 @@ type Container interface {
 	Validate() error
 
 	// Pipeline-specific providers
-	PipelineProvider
 	RegistryProvider
 	SecurityProvider
 	LoggingProvider
-}
-
-// PipelineProvider defines the interface for pipeline access.
-type PipelineProvider interface {
-	GetPipelineRegistry() (PipelineRegistry, error)
-	GetPipeline(name string) (Pipeline, error)
-	GetDaggerClient() (*dagger.Client, error)
 }
 
 // RegistryProvider defines the interface for registry access.
@@ -130,17 +122,6 @@ type SecurityProvider interface {
 // LoggingProvider defines the interface for logging access.
 type LoggingProvider interface {
 	GetLogger() (Logger, error)
-}
-
-// Pipeline defines the core pipeline interface with dynamic step execution.
-type Pipeline interface {
-	Name() string
-	GetAvailableSteps() []string
-	ExecuteStep(ctx context.Context, stepName string) error
-	BeforeStep(ctx context.Context, stepName string) HookFunc
-	AfterStep(ctx context.Context, stepName string) HookFunc
-	GetStepConfig(stepName string) StepConfig
-	ValidateStep(stepName string) error
 }
 
 // StepConfig defines configuration for a pipeline step.
@@ -187,13 +168,6 @@ type StepArtifact struct {
 	Size        int64  `json:"size"`
 	Checksum    string `json:"checksum,omitempty"`
 	Description string `json:"description,omitempty"`
-}
-
-// PipelineRegistry defines the interface for pipeline registration and retrieval.
-type PipelineRegistry interface {
-	Register(name string, factory func(*dagger.Client, Configuration) Pipeline)
-	Get(name string, client *dagger.Client, cfg Configuration) (Pipeline, error)
-	List() []string
 }
 
 // VulnChecker defines the interface for vulnerability checking.

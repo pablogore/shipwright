@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"plugin"
+	"sort"
 
 	"github.com/pablogore/kit-logger/pkg/logger"
 )
@@ -26,6 +27,19 @@ func NewLoader() PluginLoader {
 // RegisterBuiltin registers a built-in plugin factory.
 func (l *loader) RegisterBuiltin(name string, factory func() Plugin) {
 	l.builtinPlugins[name] = factory
+}
+
+// ListBuiltins returns every compile-time-registered builtin plugin name.
+// Sorted so the load order LoadBuiltinPlugins produces is deterministic —
+// plugin initialization registers providers, and a non-deterministic order
+// would make a duplicate-registration bug intermittent instead of reliable.
+func (l *loader) ListBuiltins() []string {
+	names := make([]string, 0, len(l.builtinPlugins))
+	for name := range l.builtinPlugins {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // LoadFromFile loads a plugin from a Go plugin file (.so).
