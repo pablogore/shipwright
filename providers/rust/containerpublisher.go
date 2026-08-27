@@ -1,4 +1,4 @@
-package golang
+package rust
 
 import (
 	"context"
@@ -11,39 +11,27 @@ import (
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
-// defaultPublishBaseImage matches the legacy pipeline's minimal runtime
-// image for a compiled Go binary
-// (internal/pipelines/go-service/pipeline.go's Package method).
-const defaultPublishBaseImage = "alpine:latest"
+// defaultPublishBaseImage is the minimal runtime image a compiled Rust
+// binary is packaged into.
+//
+// debian:bookworm-slim, not alpine (providers/go's GoBuilder default): a
+// plain `cargo build --release` inside the official rust:<version> image
+// dynamically links against glibc, not musl. alpine ships musl libc, so a
+// glibc-linked binary published into it fails at container startup with a
+// dynamic-linker error ("No such file or directory" from the missing
+// ld-linux loader) rather than running. Cross-compiling to the
+// x86_64-unknown-linux-musl target to make alpine work is a real option,
+// but it is a build-time decision out of scope for this default publisher;
+// debian-slim is the glibc-compatible minimal-base analog that actually
+// runs the binary GoBuilder-equivalent RustBuilder produces by default.
+const defaultPublishBaseImage = "debian:bookworm-slim"
 
 // ContainerPublisher packages a build-output Directory into a minimal
-// container image and publishes it to a registry. Extracted from the
-// legacy go-service pipeline's Package / Tag / Push logic
-// (internal/pipelines/go-service/pipeline.go).
-//
-// Behavioral judgment calls:
-//   - The legacy Tag step generated a tag from TAG_NAME or `git
-//     rev-parse` and wrote it to a host-local .tag_name file — a host
-//     filesystem side effect that has no place in a capability contract
-//     whose only inputs/outputs are Dagger core types (design.md D-A).
-//     Under the new manifest model the caller supplies the fully-resolved
-//     image reference, tag included, via the ref parameter (e.g.
-//     ${{ variables.imageRef }}); tag generation becomes the caller's
-//     concern, not this capability's.
-//   - Artifactor.Publish's signature (pkg/shipwright, shipped in WU1) has
-//     no username parameter, only a ref and a *dagger.Secret. Config.
-//     RegistryUser (shipwright.ArtifactConfig, also shipped in WU1)
-//     supplies that missing piece, preserving the legacy split between a
-//     configured username and a secret credential.
-//   - shipwright.ArtifactConfig.BinaryName carries the binary filename
-//     across the Build -> Artifact boundary (a manifest-level `with`
-//     binding, register.go), computed by computeEntrypoint below. Left
-//     empty, this type assumes the build Directory contains a single
-//     binary named defaultBinaryName ("app") — the same default GoBuilder
-//     uses when its own BuildConfig.BinaryName is left empty. A caller
-//     that sets a non-default BuildConfig.BinaryName on GoBuilder MUST set
-//     the matching ArtifactConfig.BinaryName here, or Publish computes an
-//     entrypoint pointing at a file the build never produced.
+// container image and publishes it to a registry. Structural mirror of
+// providers/go's ContainerPublisher, whose logic is otherwise generic
+// (source-agnostic Dagger container packaging) and needed no Rust-specific
+// change beyond the base image above and the binary path convention shared
+// with RustBuilder.
 type ContainerPublisher struct {
 	// Client is the Dagger client used to construct the runtime image.
 	Client *dagger.Client
@@ -52,8 +40,8 @@ type ContainerPublisher struct {
 	Config shipwright.ArtifactConfig
 }
 
-// Compile-time conformance assertion (tasks.md 3.5): ContainerPublisher
-// must satisfy Layer 1's Artifactor interface.
+// Compile-time conformance assertion: ContainerPublisher must satisfy
+// Layer 1's Artifactor interface.
 var _ shipwright.Artifactor = (*ContainerPublisher)(nil)
 
 // Publish packages build into a minimal container image, authenticates
@@ -93,10 +81,10 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 	return publishedRef, nil
 }
 
-// computeEntrypoint returns the in-image path of the binary a Builder
-// produced, reusing resolveBinaryName (gobuilder.go) so a non-default
-// BuildConfig.BinaryName and the matching ArtifactConfig.BinaryName agree
-// on the same fallback ("app") when either is left empty. Pure helper,
+// computeEntrypoint returns the in-image path of the binary RustBuilder
+// produced, reusing resolveBinaryName (rustbuilder.go) so a non-default
+// Config.BinaryName and this package's own defaultBinaryName agree on the
+// same fallback ("app") when Config.BinaryName is left empty. Pure helper,
 // unit-testable without a Dagger client.
 func computeEntrypoint(binaryName string) string {
 	return "/app/" + resolveBinaryName(binaryName)

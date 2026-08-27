@@ -1,770 +1,296 @@
-# API Reference
+  # API Reference (Layer 1 — `pkg/shipwright`)
 
-> **Status: pre-migration, retained for historical reference.** The
-> `shipwright-public-module-api` change (see
-> `openspec/changes/shipwright-public-module-api/`) removed the `Pipeline`
-> interface, the preset registry, and every type below it entirely from the
-> codebase — none of the Go code on this page exists anymore. The current,
-> guaranteed public surface is documented in `COMPATIBILITY.md` (repo root):
-> the five capability interfaces in `pkg/shipwright/` (Layer 1) and
-> `.dagger/capabilities.go` (Layer 2), plus the `shipwright.dev/v1` manifest
-> schema consumed via the `--workflow` CLI flag (see `docs/ARCHITECTURE.md`'s
-> "CLI Entrypoint" section for the current flag set). A full rewrite of this
-> document against the current API is tracked as an explicit fast-follow
-> (the originating proposal's non-goals list it as out of scope for that
-> change); this notice is the minimum correction so the content below is not
-> read as canonical.
+This document is the reference for Shipwright's **Layer 1** contract: the
+plain Go capability interfaces and config structs in `pkg/shipwright`. If
+you import `github.com/pablogore/shipwright/pkg/shipwright` directly from
+Go code, this is your document.
 
-This document provides comprehensive API documentation for Shipwright, including programmatic interfaces, data structures, and usage examples.
+If you instead call the Dagger module (`dagger call ...` against
+`.dagger/`), see [`DAGGER_MODULE_API.md`](DAGGER_MODULE_API.md) — the
+**Layer 2** composition surface, which wraps these same capabilities for
+Dagger's type system.
 
-## Core Interfaces (historical — removed, see notice above)
+For what is version-guaranteed and how the five independent version axes
+work, see [`COMPATIBILITY.md`](../COMPATIBILITY.md) (repo root). This
+document does not restate that policy.
 
-### Pipeline Interface
+## Quick Path
 
-The `Pipeline` interface defines the contract for all pipeline implementations:
-
-```go
-type Pipeline interface {
-    // Name returns the name of the pipeline
-    Name() string
-    
-    // Setup performs initial setup required for the pipeline
-    Setup(ctx context.Context) error
-    
-    // Build compiles or builds the necessary components
-    Build(ctx context.Context) error
-    
-    // Test executes the test step of the pipeline
-    Test(ctx context.Context) error
-    
-    // Package creates a distributable package
-    Package(ctx context.Context) error
-    
-    // Tag applies a tag to the pipeline's output
-    Tag(ctx context.Context) error
-    
-    // Push uploads or deploys the pipeline's output
-    Push(ctx context.Context) error
-    
-    // BeforeStep returns a hook function to execute before a step
-    BeforeStep(ctx context.Context, step string) HookFunc
-    
-    // AfterStep returns a hook function to execute after a step
-    AfterStep(ctx context.Context, step string) HookFunc
-}
-```
-
-### Step Handler Interface
-
-The `StepHandler` interface defines the contract for individual pipeline steps:
-
-```go
-type StepHandler interface {
-    // Execute runs the step logic
-    Execute(ctx context.Context) error
-    
-    // GetStepInfo returns information about the step
-    GetStepInfo() StepInfo
-    
-    // Validate checks if the step can be executed
-    Validate(ctx context.Context) error
-}
-```
-
-### Configuration Interface
-
-The `Configuration` interface provides access to configuration values:
-
-```go
-type Configuration interface {
-    // GetString returns a string configuration value
-    GetString(key string) string
-    
-    // GetInt returns an integer configuration value
-    GetInt(key string) int
-    
-    // GetFloat64 returns a float64 configuration value
-    GetFloat64(key string) float64
-    
-    // GetBool returns a boolean configuration value
-    GetBool(key string) bool
-    
-    // GetDuration returns a duration configuration value
-    GetDuration(key string) time.Duration
-    
-    // GetStringSlice returns a string slice configuration value
-    GetStringSlice(key string) []string
-    
-    // Set sets a configuration value
-    Set(key string, value interface{}) error
-    
-    // Validate validates the configuration
-    Validate() error
-}
-```
-
-## Data Structures
-
-### Pipeline Configuration
-
-```go
-type Config struct {
-    // Pipeline settings
-    PipelineName    string        `yaml:"pipeline_name" json:"pipeline_name"`
-    Environment     string        `yaml:"environment" json:"environment"`
-    Coverage        float64       `yaml:"coverage" json:"coverage"`
-    SkipPush        bool          `yaml:"skip_push" json:"skip_push"`
-    OnlyBuild       bool          `yaml:"only_build" json:"only_build"`
-    OnlyTest        bool          `yaml:"only_test" json:"only_test"`
-    Verbose         bool          `yaml:"verbose" json:"verbose"`
-    Timeout         time.Duration `yaml:"timeout" json:"timeout"`
-    
-    // Git settings
-    GitURL          string        `yaml:"git_url" json:"git_url"`
-    GitRef          string        `yaml:"git_ref" json:"git_ref"`
-    GitProtocol     string        `yaml:"git_protocol" json:"git_protocol"`
-    GitUsername     string        `yaml:"git_username" json:"git_username"`
-    GitPassword     string        `yaml:"git_password" json:"git_password"`
-    SSHPrivateKey   string        `yaml:"ssh_private_key" json:"ssh_private_key"`
-    
-    // Registry settings
-    RegistryURL     string        `yaml:"registry_url" json:"registry_url"`
-    RegistryUsername string       `yaml:"registry_username" json:"registry_username"`
-    RegistryPassword string       `yaml:"registry_password" json:"registry_password"`
-    RegistryNamespace string      `yaml:"registry_namespace" json:"registry_namespace"`
-    RegistryInsecure bool         `yaml:"registry_insecure" json:"registry_insecure"`
-    
-    // Build settings
-    GoVersion       string        `yaml:"go_version" json:"go_version"`
-    CGOEnabled      bool          `yaml:"cgo_enabled" json:"cgo_enabled"`
-    BuildFlags      []string      `yaml:"build_flags" json:"build_flags"`
-    TestFlags       []string      `yaml:"test_flags" json:"test_flags"`
-    
-    // Security settings
-    SecurityEnabled bool          `yaml:"security_enabled" json:"security_enabled"`
-    SecurityLevel   string        `yaml:"security_level" json:"security_level"`
-    FailOnVulns     bool          `yaml:"fail_on_vulnerabilities" json:"fail_on_vulnerabilities"`
-    
-    // Step settings
-    Steps           []StepConfig  `yaml:"steps" json:"steps"`
-    
-    // Hook settings
-    Hooks           HookConfig    `yaml:"hooks" json:"hooks"`
-}
-```
-
-### Step Information
-
-```go
-type StepInfo struct {
-    Name         string        `yaml:"name" json:"name"`
-    Description  string        `yaml:"description" json:"description"`
-    Dependencies []string      `yaml:"dependencies" json:"dependencies"`
-    Timeout      time.Duration `yaml:"timeout" json:"timeout"`
-    Retries      int           `yaml:"retries" json:"retries"`
-    Parallel     bool          `yaml:"parallel" json:"parallel"`
-    Required     bool          `yaml:"required" json:"required"`
-}
-```
-
-### Step Configuration
-
-```go
-type StepConfig struct {
-    Name      string        `yaml:"name" json:"name"`
-    Enabled   bool          `yaml:"enabled" json:"enabled"`
-    Required  bool          `yaml:"required" json:"required"`
-    Timeout   time.Duration `yaml:"timeout" json:"timeout"`
-    Retries   int           `yaml:"retries" json:"retries"`
-    Parallel  bool          `yaml:"parallel" json:"parallel"`
-}
-```
-
-### Hook Configuration
-
-```go
-type HookConfig struct {
-    PrePipeline  []HookDefinition `yaml:"pre_pipeline" json:"pre_pipeline"`
-    PostPipeline []HookDefinition `yaml:"post_pipeline" json:"post_pipeline"`
-    PreStep      []HookDefinition `yaml:"pre_step" json:"pre_step"`
-    PostStep     []HookDefinition `yaml:"post_step" json:"post_step"`
-}
-
-type HookDefinition struct {
-    Name    string `yaml:"name" json:"name"`
-    Command string `yaml:"command" json:"command"`
-    Script  string `yaml:"script" json:"script"`
-    URL     string `yaml:"url" json:"url"`
-    Method  string `yaml:"method" json:"method"`
-    Headers map[string]string `yaml:"headers" json:"headers"`
-    Body    string `yaml:"body" json:"body"`
-}
-```
-
-## Application API
-
-### Application Initialization
+A Go embedder composes capabilities directly — no `Plan`, no chaining
+helpers, just calling interface methods against your own implementations:
 
 ```go
 package main
 
 import (
-    "context"
-    "log"
-    
-    "github.com/pablogore/shipwright/internal/app"
-    "github.com/pablogore/shipwright/internal/config"
+	"context"
+	"log"
+
+	"dagger.io/dagger"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
 func main() {
-    ctx := context.Background()
-    
-    // Load configuration
-    cfg, err := config.NewConfigurationWrapper()
-    if err != nil {
-        log.Fatalf("Failed to load configuration: %v", err)
-    }
-    
-    // Initialize application
-    err = app.Initialize(ctx, cfg)
-    if err != nil {
-        log.Fatalf("Failed to initialize application: %v", err)
-    }
-    defer app.Reset()
-    
-    // Get application instance
-    application := app.NewApp(app.GetContainer())
-    
-    // Use the application...
+	ctx := context.Background()
+
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		log.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	source := client.Host().Directory(".")
+
+	var builder shipwright.Builder = myBuilder{} // your Builder implementation
+
+	build, err := builder.Build(ctx, source)
+	if err != nil {
+		log.Fatalf("build failed: %v", err)
+	}
+
+	if _, err := build.Sync(ctx); err != nil {
+		log.Fatalf("build result failed: %v", err)
+	}
 }
 ```
 
-### Pipeline Execution
+Each capability interface (`Builder`, `Tester`, `Artifactor`, `Deployer`,
+`Runner`) takes and returns plain Dagger core types
+(`*dagger.Directory`, `*dagger.File`, `*dagger.Container`,
+`*dagger.Secret`) plus Go scalars, `context.Context`, and `error`. There is
+no shared base type and no required composition helper at this layer —
+capabilities compose because their inputs and outputs line up, not because
+of an interface contract between them.
+
+## Surface Inventory
+
+This table lists every entry in
+[`pkg/shipwright/testdata/api.golden`](../pkg/shipwright/testdata/api.golden)
+— the machine-enforced, textual-diff enumeration of the guaranteed Layer 1
+surface — in the golden's own sorted order. Every row below has exactly one
+corresponding doc section. If a future change updates `api.golden` (via a
+reviewed `-update` diff), this table must gain or lose a matching row in the
+same PR.
+
+Regenerate the golden after an intentional surface change:
+
+```bash
+go test ./pkg/shipwright/... -run TestGuaranteedSurface_MatchesGolden -update
+```
+
+| # | Golden Entry | Kind | Doc Section |
+|---|---|---|---|
+| 1 | `ContractVersion` | const | [ContractVersion](#contractversion) |
+| 2 | `ArtifactConfig` | struct | [ArtifactConfig](#artifactconfig) |
+| 3 | `Artifactor` | interface | [Artifactor](#artifactor) |
+| 4 | `BuildConfig` | struct | [BuildConfig](#buildconfig) |
+| 5 | `Builder` | interface | [Builder](#builder) |
+| 6 | `DeployConfig` | struct | [DeployConfig](#deployconfig) |
+| 7 | `Deployer` | interface | [Deployer](#deployer) |
+| 8 | `RunConfig` | struct | [RunConfig](#runconfig) |
+| 9 | `Runner` | interface | [Runner](#runner) |
+| 10 | `SourceConfig` | struct | [SourceConfig](#sourceconfig) |
+| 11 | `TestConfig` | struct | [TestConfig](#testconfig) |
+| 12 | `Tester` | interface | [Tester](#tester) |
+
+> **Maintenance note**: `api.golden` currently enumerates 12 entries (1
+> const, 5 interfaces, 6 structs). Any accepted `-update` diff to the golden
+> — an addition, removal, or rename — MUST land a matching row change in
+> this table in the same PR that changes the golden.
+
+## Capabilities
+
+Capabilities are independent — none depends on a sibling, and none shares a
+base interface. Signatures below are verbatim from
+[`pkg/shipwright/capabilities.go`](../pkg/shipwright/capabilities.go).
+
+### Builder
 
 ```go
-// Get pipeline registry
-container := app.GetContainer()
-registry, err := container.GetPipelineRegistry()
-if err != nil {
-    log.Fatalf("Failed to get pipeline registry: %v", err)
-}
-
-// Get specific pipeline
-pipeline, err := registry.Get("go-service", client, config)
-if err != nil {
-    log.Fatalf("Failed to get pipeline: %v", err)
-}
-
-// Execute pipeline steps
-ctx := context.Background()
-
-err = pipeline.Setup(ctx)
-if err != nil {
-    log.Fatalf("Setup failed: %v", err)
-}
-
-err = pipeline.Build(ctx)
-if err != nil {
-    log.Fatalf("Build failed: %v", err)
-}
-
-err = pipeline.Test(ctx)
-if err != nil {
-    log.Fatalf("Test failed: %v", err)
-}
-
-err = pipeline.Package(ctx)
-if err != nil {
-    log.Fatalf("Package failed: %v", err)
-}
-
-err = pipeline.Push(ctx)
-if err != nil {
-    log.Fatalf("Push failed: %v", err)
+type Builder interface {
+	Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error)
 }
 ```
 
-### Step Execution
+Builds a source `Directory` into a build-output `Directory`. Has no
+knowledge of `Test`, `Artifact`, `Deploy`, or `Run`.
+
+### Tester
 
 ```go
-// Get step registry
-stepRegistry, err := container.GetStepRegistry()
-if err != nil {
-    log.Fatalf("Failed to get step registry: %v", err)
+type Tester interface {
+	Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error)
 }
-
-// Get specific step
-step, err := stepRegistry.GetStep("build")
-if err != nil {
-    log.Fatalf("Failed to get step: %v", err)
-}
-
-// Execute step
-ctx := context.Background()
-err = step.Execute(ctx)
-if err != nil {
-    log.Fatalf("Step execution failed: %v", err)
-}
-
-// Get step information
-info := step.GetStepInfo()
-fmt.Printf("Step: %s\n", info.Name)
-fmt.Printf("Description: %s\n", info.Description)
-fmt.Printf("Dependencies: %v\n", info.Dependencies)
 ```
 
-### Hook Management
+Runs tests against a build-output `Directory` and returns a report `File`.
+Multiple independent `Tester` implementations may exist for the same input
+(unit, lint, vulnerability scan, ...); none is privileged.
+
+### Artifactor
 
 ```go
-// Get hook manager
-hookManager, err := container.GetHookManager()
-if err != nil {
-    log.Fatalf("Failed to get hook manager: %v", err)
-}
-
-// Register a custom hook
-err = hookManager.RegisterHook("pre-build", func(ctx context.Context) error {
-    fmt.Println("Executing pre-build hook")
-    return nil
-})
-if err != nil {
-    log.Fatalf("Failed to register hook: %v", err)
-}
-
-// Execute hooks
-ctx := context.Background()
-err = hookManager.ExecuteHooks(ctx, "pre-build")
-if err != nil {
-    log.Fatalf("Hook execution failed: %v", err)
+type Artifactor interface {
+	Publish(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error)
 }
 ```
 
-## Pipeline Registry API
+Publishes a build-output `Directory` as a versioned artifact and returns its
+resolved reference (for example an image reference).
 
-### Pipeline Registration
+### Deployer
 
 ```go
-// Create new registry
-registry := pipelines.NewRegistry()
-
-// Register custom pipeline
-registry.Register("my-pipeline", func(client *dagger.Client, cfg pipelines.Config) pipelines.Pipeline {
-    return &MyPipeline{
-        Client: client,
-        Config: cfg,
-    }
-})
-
-// Get pipeline
-pipeline, err := registry.Get("my-pipeline", client, config)
-if err != nil {
-    log.Fatalf("Failed to get pipeline: %v", err)
-}
-
-// List available pipelines
-pipelines := registry.List()
-for _, name := range pipelines {
-    fmt.Printf("Available pipeline: %s\n", name)
+type Deployer interface {
+	Deploy(ctx context.Context, artifactRef, environment string, creds *dagger.Secret) (string, error)
 }
 ```
 
-### Step Registry API
+Deploys a previously published artifact reference into a named environment
+and returns a deployment result reference. Note that `Deploy` takes
+`artifactRef`, `environment`, and `creds` as method parameters — not through
+`DeployConfig` (see [DeployConfig](#deployconfig) below).
+
+### Runner
 
 ```go
-// Create new step registry
-stepRegistry := app.NewStepRegistry()
-
-// Register custom step
-err := stepRegistry.RegisterStep("my-step", func(config interfaces.Configuration, client *dagger.Client, logger interfaces.Logger) interfaces.StepHandler {
-    return &MyStepHandler{
-        config: config,
-        client: client,
-        logger: logger,
-    }
-})
-if err != nil {
-    log.Fatalf("Failed to register step: %v", err)
-}
-
-// Get step
-step, err := stepRegistry.GetStep("my-step")
-if err != nil {
-    log.Fatalf("Failed to get step: %v", err)
-}
-
-// List available steps
-steps := stepRegistry.ListSteps()
-for _, name := range steps {
-    fmt.Printf("Available step: %s\n", name)
+type Runner interface {
+	Run(ctx context.Context, build *dagger.Directory) (*dagger.Container, error)
 }
 ```
 
-## Configuration API
+Runs a build-output `Directory` as a live `Container`, for example to
+execute it locally or expose it for interactive inspection.
 
-### Configuration Loading
+## ContractVersion
 
 ```go
-// Load configuration from multiple sources
-config := config.NewConfigurationWrapper()
-
-// Load from file
-err := config.LoadFromFile(".shipwright.yml")
-if err != nil {
-    log.Fatalf("Failed to load config file: %v", err)
-}
-
-// Load from environment variables
-config.LoadFromEnvironment()
-
-// Set configuration values programmatically
-err = config.Set("pipeline.name", "go-service")
-if err != nil {
-    log.Fatalf("Failed to set config: %v", err)
-}
-
-// Get configuration values
-pipelineName := config.GetString("pipeline.name")
-coverage := config.GetFloat64("pipeline.coverage")
-timeout := config.GetDuration("pipeline.timeout")
-
-// Validate configuration
-err = config.Validate()
-if err != nil {
-    log.Fatalf("Configuration validation failed: %v", err)
-}
+const ContractVersion = "1.0.0"
 ```
 
-### YAML Configuration Loading
+The current Layer 1 contract version. Bumping it is a deliberate,
+guarantee-relevant act — see `COMPATIBILITY.md`'s "Bumping the Contract
+Version" section for the full procedure, including the hand-kept literal
+mirror in `.dagger/capabilities.go` and the test that keeps the two in sync.
+
+## Configuration Structs
+
+Signatures below are verbatim from
+[`pkg/shipwright/config.go`](../pkg/shipwright/config.go).
+
+### SourceConfig
+
+Configures how a `Builder` obtains its source input (git checkout,
+credentials). It carries no `Build`/`Test`/`Artifact`/`Deploy`/`Run` field —
+orthogonality here is compiler-enforced, not documented.
 
 ```go
-// Load YAML configuration
-yamlConfig, err := config.LoadYAMLConfig(".shipwright.yml")
-if err != nil {
-    log.Fatalf("Failed to load YAML config: %v", err)
+type SourceConfig struct {
+	GitRepo       string
+	GitRef        string
+	GitProtocol   string
+	GitUserEmail  string
+	GitUserName   string
+	SSHPrivateKey *dagger.Secret
 }
-
-// Access YAML configuration
-pipelineConfig := yamlConfig.Pipeline
-gitConfig := yamlConfig.Git
-registryConfig := yamlConfig.Registry
-
-// Merge with defaults
-finalConfig := config.MergeWithDefaults(yamlConfig)
 ```
 
-## Dagger Integration API
+### BuildConfig
 
-### Dagger Client Management
+Configures a `Builder` implementation.
 
 ```go
-// Get Dagger client from container
-client, err := container.GetDaggerClient()
-if err != nil {
-    log.Fatalf("Failed to get Dagger client: %v", err)
+type BuildConfig struct {
+	GoVersion   string
+	JavaVersion string
+	BuildMode   string
+	BinaryName  string
 }
-
-// Use Dagger client for container operations
-ctx := context.Background()
-
-// Create container
-container := client.Container().
-    From("golang:1.26.1-alpine").
-    WithMountedDirectory("/src", client.Host().Directory(".")).
-    WithWorkdir("/src")
-
-// Execute commands
-result, err := container.WithExec([]string{"go", "build", "-o", "app", "./cmd/app"}).Stdout(ctx)
-if err != nil {
-    log.Fatalf("Build failed: %v", err)
-}
-
-fmt.Printf("Build output: %s\n", result)
 ```
 
-### Container Operations
+`BuildMode` selects how a concrete `Builder` produces its output (e.g.
+`"binary"`, `"docker"`, `"both"`) — it is left as a plain string here; each
+`Builder` implementation owns its own enum.
+
+### TestConfig
+
+Configures a `Tester` implementation.
 
 ```go
-// Build Docker image
-image := client.Container().
-    From("golang:1.26.1-alpine").
-    WithMountedDirectory("/src", client.Host().Directory(".")).
-    WithWorkdir("/src").
-    WithExec([]string{"go", "build", "-o", "app", "./cmd/app"}).
-    WithEntrypoint([]string{"./app"})
-
-// Tag image
-taggedImage := image.WithRegistryAuth("registry.example.com", "username", "password")
-
-// Push image
-digest, err := taggedImage.Publish(ctx, "registry.example.com/myapp:latest")
-if err != nil {
-    log.Fatalf("Failed to push image: %v", err)
+type TestConfig struct {
+	Coverage float64
 }
-
-fmt.Printf("Image pushed with digest: %s\n", digest)
 ```
 
-## Error Handling
+### ArtifactConfig
 
-### Custom Error Types
+Configures an `Artifactor` implementation.
 
 ```go
-// Define custom error types
-var (
-    ErrPipelineNotFound = errors.New("pipeline not found")
-    ErrStepNotFound     = errors.New("step not found")
-    ErrConfigurationInvalid = errors.New("configuration is invalid")
-    ErrDaggerClientFailed = errors.New("failed to create Dagger client")
-)
-
-// Wrap errors with context
-func (p *MyPipeline) Build(ctx context.Context) error {
-    if err := p.performBuild(ctx); err != nil {
-        return fmt.Errorf("build failed for pipeline %s: %w", p.Name(), err)
-    }
-    return nil
+type ArtifactConfig struct {
+	Registry      string
+	RegistryURL   string
+	RegistryUser  string
+	RegistryPass  *dagger.Secret
+	RegistryToken *dagger.Secret
+	ImageName     string
+	ImageTag      string
+	BuildTag      string
+	CommitSHA     string
+	BranchName    string
+	Version       string
+	Token         *dagger.Secret
 }
 ```
 
-### Error Handling Patterns
+### DeployConfig
 
 ```go
-// Handle errors with context
-func executePipeline(ctx context.Context, pipeline interfaces.Pipeline) error {
-    steps := []struct {
-        name string
-        fn   func(context.Context) error
-    }{
-        {"setup", pipeline.Setup},
-        {"build", pipeline.Build},
-        {"test", pipeline.Test},
-        {"package", pipeline.Package},
-        {"push", pipeline.Push},
-    }
-    
-    for _, step := range steps {
-        select {
-        case <-ctx.Done():
-            return fmt.Errorf("pipeline cancelled: %w", ctx.Err())
-        default:
-        }
-        
-        if err := step.fn(ctx); err != nil {
-            return fmt.Errorf("step %s failed: %w", step.name, err)
-        }
-    }
-    
-    return nil
-}
+type DeployConfig struct{}
 ```
 
-## Logging API
+**Currently empty.** No fields are declared. Concrete deploy adapters
+(Kubernetes, Nomad, SSH, ...) are deferred to a follow-up change. This is
+not an omission in this document — `api.golden` enumerates `DeployConfig`
+as an empty struct today, and this section states that fact rather than
+inventing fields. `Deployer.Deploy` already takes the parameters it needs
+(`artifactRef`, `environment`, `creds`) directly through its method
+signature, not through this struct.
 
-### Structured Logging
+### RunConfig
 
 ```go
-// Get logger from container
-logger, err := container.Get("logger")
-if err != nil {
-    log.Fatalf("Failed to get logger: %v", err)
-}
-log := logger.(*LoggerAdapter)
-
-// Use structured logging
-log.Info("Pipeline execution started",
-    "pipeline", "go-service",
-    "environment", "production",
-    "coverage", 90.0)
-
-log.Error("Step execution failed",
-    "step", "build",
-    "error", err,
-    "duration", time.Since(start))
-
-// Create child logger with additional context
-childLogger := log.WithFields(map[string]interface{}{
-    "pipeline": "go-service",
-    "step": "build",
-})
-
-childLogger.Debug("Executing build step")
+type RunConfig struct{}
 ```
 
-## Testing API
+**Currently empty.** No fields are declared. Concrete run adapters are
+deferred to a follow-up change, the same as `DeployConfig` above.
 
-### Mock Interfaces
+## Secrets Invariant
 
-```go
-// Create mock configuration
-mockConfig := &mocks.MockConfiguration{}
-mockConfig.On("GetString", "pipeline.name").Return("go-service")
-mockConfig.On("GetFloat64", "pipeline.coverage").Return(90.0)
-mockConfig.On("Validate").Return(nil)
+Every credential-bearing field or parameter in the Layer 1 contract crosses
+as `*dagger.Secret`, never a plaintext `string`:
 
-// Create mock Dagger client
-mockClient := &mocks.MockDaggerClient{}
+- `SourceConfig.SSHPrivateKey`
+- `ArtifactConfig.RegistryPass`
+- `ArtifactConfig.RegistryToken`
+- `ArtifactConfig.Token`
+- every `creds *dagger.Secret` method parameter (`Artifactor.Publish`,
+  `Deployer.Deploy`)
 
-// Create mock logger
-mockLogger := &mocks.MockLogger{}
+This is enforced by convention and code review, not by the Go type system
+alone rejecting a plain `string` at every call site — treat any new
+credential-shaped field that is typed as `string` as a defect.
 
-// Test pipeline creation
-pipeline := goservice.New(mockClient, mockConfig)
-assert.Equal(t, "go-service", pipeline.Name())
-```
+## Boundaries
 
-### Integration Testing
-
-```go
-func TestPipelineIntegration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test")
-    }
-    
-    // Set up test environment
-    ctx := context.Background()
-    
-    // Create real Dagger client
-    client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
-    require.NoError(t, err)
-    defer client.Close()
-    
-    // Create test configuration
-    config := pipelines.Config{
-        PipelineName: "go-service",
-        Environment: "test",
-        Coverage: 80.0,
-        GitURL: "https://github.com/test/repo.git",
-        GitRef: "main",
-        GitProtocol: "https",
-    }
-    
-    // Create pipeline
-    pipeline := goservice.New(client, config)
-    
-    // Test pipeline execution
-    err = pipeline.Setup(ctx)
-    require.NoError(t, err)
-    
-    err = pipeline.Build(ctx)
-    require.NoError(t, err)
-    
-    err = pipeline.Test(ctx)
-    require.NoError(t, err)
-}
-```
-
-## Performance Considerations
-
-### Resource Management
-
-```go
-// Use context for cancellation
-func (p *MyPipeline) Build(ctx context.Context) error {
-    // Set timeout for build operation
-    buildCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-    defer cancel()
-    
-    // Check for cancellation
-    select {
-    case <-buildCtx.Done():
-        return buildCtx.Err()
-    default:
-    }
-    
-    // Perform build...
-    return nil
-}
-```
-
-### Parallel Execution
-
-```go
-// Execute steps in parallel when possible
-func (p *MyPipeline) executeStepsParallel(ctx context.Context, steps []string) error {
-    var wg sync.WaitGroup
-    errChan := make(chan error, len(steps))
-    
-    for _, step := range steps {
-        wg.Add(1)
-        go func(stepName string) {
-            defer wg.Done()
-            
-            if err := p.executeStep(ctx, stepName); err != nil {
-                errChan <- fmt.Errorf("step %s failed: %w", stepName, err)
-            }
-        }(step)
-    }
-    
-    wg.Wait()
-    close(errChan)
-    
-    // Check for errors
-    for err := range errChan {
-        if err != nil {
-            return err
-        }
-    }
-    
-    return nil
-}
-```
-
-## Best Practices
-
-### Interface Design
-
-```go
-// Keep interfaces small and focused
-type StepHandler interface {
-    Execute(ctx context.Context) error
-    GetStepInfo() StepInfo
-    Validate(ctx context.Context) error
-}
-
-// Use composition over inheritance
-type MyStepHandler struct {
-    config interfaces.Configuration
-    client *dagger.Client
-    logger interfaces.Logger
-}
-```
-
-### Error Handling
-
-```go
-// Always wrap errors with context
-func (p *MyPipeline) Build(ctx context.Context) error {
-    if err := p.performBuild(ctx); err != nil {
-        return fmt.Errorf("build failed for pipeline %s: %w", p.Name(), err)
-    }
-    return nil
-}
-
-// Use sentinel errors for common cases
-var ErrPipelineNotFound = errors.New("pipeline not found")
-
-func (r *Registry) Get(name string, client *dagger.Client, cfg Config) (Pipeline, error) {
-    factory, ok := r.pipelines[name]
-    if !ok {
-        return nil, fmt.Errorf("%w: %s", ErrPipelineNotFound, name)
-    }
-    return factory(client, cfg), nil
-}
-```
-
-### Configuration Management
-
-```go
-// Validate configuration early
-func (p *MyPipeline) ValidateConfig() error {
-    if p.Config.PipelineName == "" {
-        return fmt.Errorf("pipeline name is required")
-    }
-    
-    if p.Config.Coverage < 0 || p.Config.Coverage > 100 {
-        return fmt.Errorf("coverage must be between 0 and 100, got %f", p.Config.Coverage)
-    }
-    
-    return nil
-}
-```
+- **Guarantee and versioning policy**: see
+  [`COMPATIBILITY.md`](../COMPATIBILITY.md) for what is covered, the five
+  independent version axes, and the contract-bump procedure. Not restated
+  here.
+- **Layer 2 (Dagger module) signatures**: `Builder.Build`, `Tester.Test`,
+  and `Runner.Run` look different on the Dagger-module side — they drop the
+  `error` return present here. This is a deliberate codegen constraint, not
+  an inconsistency; see
+  [`DAGGER_MODULE_API.md`](DAGGER_MODULE_API.md#the-dropped-error-return)
+  for the full explanation.

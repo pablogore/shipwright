@@ -1,22 +1,38 @@
-# Shipwright Architecture
+# Shipwright Architecture: The Seven-Stage Workflow Pipeline
 
-> **Status: pre-migration, retained for historical reference.** The
-> `shipwright-public-module-api` change (see
-> `openspec/changes/shipwright-public-module-api/`) removed the named
-> `Pipeline`/preset architecture this document describes (the `go-service`
-> and `infra` pipelines, the preset registry, and the `--pipeline`/
-> `--list-pipelines`/`--only-build`/`--only-test`/`--skip-push` CLI flags
-> shown or implied below) and replaced it with a versioned capability
-> contract (`pkg/shipwright/` + `.dagger/`) composed either programmatically
-> (`Plan`) or declaratively through a `shipwright.dev/v1` workflow manifest.
-> See the "CLI Entrypoint (current)" section below for the current flag set,
-> and `COMPATIBILITY.md` (repo root) for the current guaranteed surface. A
-> full rewrite of the diagrams and component descriptions below is tracked
-> as an explicit fast-follow, out of scope for that change; this notice and
-> the CLI section are the minimum correction so the rest of this document is
-> not read as canonical.
+Shipwright runs a declarative `shipwright.dev/v1` workflow manifest
+(`.shipwright/workflow.yaml` by default) through a fixed, seven-stage
+validation pipeline before a single capability ever touches a container.
+Each stage lives in its own package, rejects a distinct class of error, and
+hands a narrower, more-validated artifact to the next: raw bytes become a
+typed manifest, the manifest becomes a compiled dependency graph, and the
+graph becomes an executed workflow. This document walks that pipeline
+top-to-bottom the same way `main.go` drives it, so a new contributor can
+trace `.shipwright/workflow.yaml` all the way to a running step without
+reading any other doc first.
 
-This document provides a comprehensive overview of the Shipwright architecture, including system design, component interactions, and deployment patterns.
+## The Flow
+
+```mermaid
+flowchart TD
+    A["1. Parse\nmanifest/parse.go"] --> B["2. Identity\nmanifest/validate.go"]
+    B --> C["3. Structure\nmanifest/validate.go"]
+    C --> D["4. References\ninterp/scanner.go"]
+    D --> E["5. Graph\ngraph/build.go, graph/kahn.go"]
+    E --> F["6. Provider Resolution\nproviders/registry.go"]
+    F --> G["7. Value Binding\nengine/execute.go"]
+    E -.->|"optional: --step"| H["engine/subgraph.go\nClosure"]
+    H --> F
+```
+
+Stages 1-3 run inside `manifest.ParseFile` and return once, at
+`main.go:275`. Stage 5 runs inside `graph.Build` and returns once, at
+`main.go:280` — and stage 5 is also where stage 4's static reference
+checking actually executes (`graph.Build` calls `interp.Scan` internally;
+see Stage 5 below). Stages 6-7 do not run once: they run per step, once per
+wave, inside `engine.Execute` (`main.go:506`), because a provider cannot be
+resolved and a `with` value cannot be bound until the step that produces an
+upstream `steps.<id>.output` has actually finished running.
 
 ## CLI Entrypoint (current)
 
@@ -34,421 +50,166 @@ DAG, resolves each step's provider, and executes it through
 | `--only-build`, `--only-test`, `--skip-push` | **Removed** — `--step` replaces them |
 | `--config`, `--env`, `--executor`, `--verbose`, `--version`, `--health`, `--local`, git flags | Unchanged |
 
-## System Overview (historical — see notice above)
+## Stage 1: Parse
 
-Shipwright is a unified CI/CD pipeline library that provides standardized, reusable pipelines for Go projects. It's built on top of the Dagger SDK and follows a modular, extensible architecture.
+`manifest.ParseFile` (`internal/workflow/manifest/parse.go`) opens the
+manifest file and hands it to `Parse`, which reads at most
+`MaxManifestBytes + 1` bytes through `io.LimitReader` before ever invoking
+the YAML decoder. Only a byte slice already proven to be within
+`MaxManifestBytes` (1 MiB) reaches `yaml.NewDecoder`, and that decoder runs
+with `KnownFields(true)` — an unrecognized field in the document is a decode
+error, not a silently-ignored one.
 
-## C4 Model Diagrams
+**Fails when**: the file exceeds `manifest.MaxManifestBytes` (`readCapped`
+returns an error — the defense against alias-amplification / "billion
+laughs" documents), or the YAML fails to decode into the typed `Manifest`
+struct, including any field `KnownFields(true)` does not recognize.
 
-### Level 1: System Context
+## Stage 2: Identity
 
-```mermaid
-C4Context
-    title System Context Diagram - Shipwright
+`ValidateIdentity` (`internal/workflow/manifest/validate.go`) checks the
+document's own version and type before inspecting anything about its
+steps: `apiVersion` must be present and in the allowlist (today, exactly
+`shipwright.dev/v1`), `kind` must equal `Workflow`, and `metadata.name`
+must be present.
 
-    Person(developer, "Developer", "Go developer using CI/CD pipelines")
-    Person(devops, "DevOps Engineer", "Manages CI/CD infrastructure")
-    
-    System(shipwright, "Shipwright", "Unified CI/CD pipeline library for Go projects")
-    
-    System_Ext(github, "GitHub", "Source code repository and CI/CD platform")
-    System_Ext(gitlab, "GitLab", "Source code repository and CI/CD platform")
-    System_Ext(jenkins, "Jenkins", "CI/CD automation server")
-    System_Ext(docker, "Docker Registry", "Container image registry")
-    System_Ext(dagger, "Dagger SDK", "Container-native CI/CD engine")
-    
-    Rel(developer, shipwright, "Uses", "CLI/API")
-    Rel(devops, shipwright, "Configures", "YAML/Environment")
-    
-    Rel(shipwright, github, "Integrates with", "GitHub Actions")
-    Rel(shipwright, gitlab, "Integrates with", "GitLab CI")
-    Rel(shipwright, jenkins, "Integrates with", "Jenkins Pipeline")
-    Rel(shipwright, docker, "Pushes images", "HTTP/HTTPS")
-    Rel(shipwright, dagger, "Built on", "SDK")
-```
+**Fails when**: `apiVersion` is missing or unsupported, `kind` is missing
+or not `Workflow`, or `metadata.name` is empty.
 
-### Level 2: Container Diagram
+## Stage 3: Structure
 
-```mermaid
-C4Container
-    title Container Diagram - Shipwright
+`ValidateStructure` (`internal/workflow/manifest/validate.go`) walks
+`spec.steps` and checks each step's shape in isolation — not yet its
+relationships to other steps, which is stage 5's job. A step's `id` must be
+non-empty and unique among all steps seen so far, `capability` must be one
+of the five known contract types (`build`, `test`, `artifact`, `deploy`,
+`run`), `uses` must name a `provider` or a `module`, and `uses.version`
+must be non-empty. `spec.execution.concurrency.maxParallel` is also
+checked here: it must be `>= 0`.
 
-    Person(developer, "Developer", "Go developer")
-    
-    Container_Boundary(shipwright, "Shipwright") {
-        Container(cli, "CLI Interface", "Go", "Command-line interface and application entry point")
-        Container(app, "Application Core", "Go", "Application lifecycle and dependency injection")
-        Container(pipelines, "Pipeline Engine", "Go", "Pipeline execution and management")
-        Container(steps, "Step Registry", "Go", "Individual pipeline step implementations")
-        Container(config, "Configuration", "Go", "Configuration management and validation")
-        Container(dagger_adapter, "Dagger Adapter", "Go", "Dagger SDK integration layer")
-    }
-    
-    System_Ext(dagger_sdk, "Dagger SDK", "Container-native CI/CD engine")
-    System_Ext(container_registry, "Container Registry", "Docker/OCI registry")
-    System_Ext(git_repo, "Git Repository", "Source code repository")
-    
-    Rel(developer, cli, "Executes", "Command line")
-    Rel(cli, app, "Initializes", "Application context")
-    Rel(app, pipelines, "Manages", "Pipeline execution")
-    Rel(pipelines, steps, "Executes", "Individual steps")
-    Rel(app, config, "Loads", "Configuration")
-    Rel(pipelines, dagger_adapter, "Uses", "Container operations")
-    Rel(dagger_adapter, dagger_sdk, "Integrates with", "SDK API")
-    Rel(dagger_adapter, container_registry, "Pushes/Pulls", "Container images")
-    Rel(dagger_adapter, git_repo, "Clones", "Source code")
-```
+**Fails when**: an empty or duplicate step id, an unsupported `capability`
+value, a step with neither `uses.provider` nor `uses.module`, an empty
+`uses.version`, or a negative `maxParallel`.
 
-### Level 3: Component Diagram
+## Stage 4: References
 
-```mermaid
-C4Component
-    title Component Diagram - Application Core
+Every string field a step can populate with a placeholder —
+`input`, a `with` entry, and so on — can contain
+`${{ variables.<name> }}`, `${{ secrets.<name> }}`, or
+`${{ steps.<id>.output }}`. `interp.Scan`
+(`internal/workflow/interp/scanner.go`) parses those placeholders against
+a small, closed, hand-written grammar — never a general template engine,
+never `os.Expand`, and never an expression evaluator — so a placeholder
+either matches one of exactly three shapes or it is a parse error. This
+stage is static: it only recognizes references, it does not resolve them
+to a value yet. `Scan` is not called from `main.go` directly; it is called
+from inside stage 5's `graph.Build` (see below) and again, at execution
+time, from stage 7.
 
-    Container_Boundary(app, "Application Core") {
-        Component(container, "Dependency Container", "Go", "Dependency injection and lifecycle management")
-        Component(pipeline_registry, "Pipeline Registry", "Go", "Pipeline registration and discovery")
-        Component(step_registry, "Step Registry", "Go", "Step registration and execution")
-        Component(hook_manager, "Hook Manager", "Go", "Pre/post step hook management")
-        Component(pipeline_executor, "Pipeline Executor", "Go", "Pipeline orchestration and execution")
-        Component(local_executor, "Local Executor", "Go", "Local execution without containers")
-    }
-    
-    Container_Boundary(pipelines, "Pipeline Implementations") {
-        Component(go_service_pipeline, "Go-Service Pipeline", "Go", "Go service/microservice pipeline implementation")
-        Component(infra_pipeline, "Infrastructure Pipeline", "Go", "Infrastructure deployment pipeline")
-    }
-    
-    Container_Boundary(steps, "Step Implementations") {
-        Component(setup_step, "Setup Step", "Go", "Environment and dependency setup")
-        Component(build_step, "Build Step", "Go", "Application compilation and building")
-        Component(test_step, "Test Step", "Go", "Unit and integration testing")
-        Component(lint_step, "Lint Step", "Go", "Code quality and style checking")
-        Component(security_step, "Security Step", "Go", "Vulnerability scanning")
-        Component(package_step, "Package Step", "Go", "Application packaging")
-        Component(push_step, "Push Step", "Go", "Container registry publishing")
-    }
-    
-    Rel(container, pipeline_registry, "Manages", "Pipeline instances")
-    Rel(container, step_registry, "Manages", "Step instances")
-    Rel(container, hook_manager, "Manages", "Hook instances")
-    Rel(pipeline_executor, pipeline_registry, "Retrieves", "Pipeline implementations")
-    Rel(pipeline_executor, step_registry, "Executes", "Individual steps")
-    Rel(pipeline_executor, hook_manager, "Triggers", "Pre/post hooks")
-    Rel(local_executor, step_registry, "Executes", "Steps locally")
-    
-    Rel(pipeline_registry, go_service_pipeline, "Contains", "Pipeline implementation")
-    Rel(pipeline_registry, infra_pipeline, "Contains", "Pipeline implementation")
-    
-    Rel(step_registry, setup_step, "Contains", "Step implementation")
-    Rel(step_registry, build_step, "Contains", "Step implementation")
-    Rel(step_registry, test_step, "Contains", "Step implementation")
-    Rel(step_registry, lint_step, "Contains", "Step implementation")
-    Rel(step_registry, security_step, "Contains", "Step implementation")
-    Rel(step_registry, package_step, "Contains", "Step implementation")
-    Rel(step_registry, push_step, "Contains", "Step implementation")
-```
+**Fails when**: an unclosed or nested `${{ }}` delimiter, a stray closing
+delimiter with no matching opener, or a placeholder body that does not
+match `variables.<name>`, `secrets.<name>`, or `steps.<id>.output`.
 
-## Architecture Principles
+## Stage 5: Graph
 
-### 1. Modular Design
-The system is built with clear separation of concerns:
-- **Application Layer**: CLI interface and application lifecycle
-- **Pipeline Layer**: Pipeline implementations and orchestration
-- **Step Layer**: Individual pipeline step implementations
-- **Infrastructure Layer**: Dagger integration and container management
+`graph.Build` (`internal/workflow/graph/build.go`, called from
+`main.go:280`) is where stage 4's scanner is actually put to work, and
+where the workflow's dependency graph is compiled and validated end to
+end. In order: it builds the node set and rejects a duplicate step id or a
+`needs[]` entry naming an unknown step; it calls `interp.Scan` on every
+step's `input` and `with` fields and rejects a `steps.<id>.output`
+reference to a step not also present in that step's own `needs[]` (an
+undeclared data dependency); it rejects the one kind mismatch decidable
+without a resolved provider (a `secrets.*` reference used where a
+Directory-typed `input` is expected); and finally it runs Kahn's algorithm
+(`internal/workflow/graph/kahn.go`) to detect cycles and produce the
+topologically-ordered `Waves` the engine executes.
 
-### 2. Dependency Injection
-Uses a container-based dependency injection pattern for:
-- Component lifecycle management
-- Lazy initialization
-- Testability and mocking
-- Configuration management
+When `--step <id>` is passed, `main.go` calls `engine.Closure`
+(`internal/workflow/engine/subgraph.go`) against this already-built graph
+to compute `<id>`'s needs-transitive closure — a subgraph, not a
+re-validation. `Closure` never re-runs cycle detection (a subset of an
+acyclic graph's edges cannot introduce a cycle), and its own
+`UnknownStepError` fires only when `--step` names an id absent from the
+compiled graph.
 
-### 3. Plugin Architecture
-Extensible design allows for:
-- Custom pipeline implementations
-- Custom step implementations
-- Hook system for pre/post processing
-- Configuration extensions
+**Fails when**: `graph.DuplicateStepIDError`, `graph.UnknownNeedsError`,
+`graph.UndeclaredDataReferenceError`, `graph.KindMismatchError`, or
+`graph.CycleError` (Kahn drains every zero-in-degree node and steps
+remain — those steps are in, or downstream of, a cycle).
 
-### 4. Configuration Management
-Multi-layered configuration system:
-- Default configuration
-- YAML configuration files
-- Environment variable overrides
-- Command-line flag overrides
+## Stage 6: Provider Resolution
 
-## Core Components
+Once the graph is compiled, `main.go` builds a `providers.Registry`
+(`internal/workflow/providers/registry.go`) via `providers.NewRegistry`
+and `providers.RegisterDefaults`. Each step's `uses.provider` (or
+`uses.module`) and `uses.version` resolve against this registry through a
+capability-specific `Resolve*` method (`ResolveBuilder`, `ResolveTester`,
+`ResolveArtifactor`, `ResolveDeployer`, `ResolveRunner`). Resolution is
+closed by design: a provider resolves only to an already-compiled,
+self-registered implementation — there is no fetch, download, cache, or
+dynamic `.so` load anywhere in this package, which is what keeps a
+manifest from ever running arbitrary native code in-process. A resolved
+provider also declares a `WithSchema` (its accepted `with` field names and
+expected kinds), checked against the step's interpolated values at
+resolution time.
 
-### Application Core (`internal/app/`)
+**Fails when**: `providers.UnregisteredProviderError` (no provider
+registered for that `Name`/`Module`), `providers.UnsupportedVersionError`
+(the provider exists, but not at the requested version), or
+`providers.WithSchemaMismatchError` (a `with` field's resolved kind does
+not match the provider's declared schema for that field).
 
-#### Container (`container.go`)
-- Manages dependency injection
-- Handles component lifecycle
-- Provides singleton pattern for global components
-- Supports lazy initialization
+## Stage 7: Value Binding
 
-#### Pipeline Executor (`pipeline_executor.go`)
-- Orchestrates pipeline execution
-- Manages step dependencies
-- Handles error propagation
-- Supports parallel execution
+`engine.Execute` (`internal/workflow/engine/execute.go:325`, called from
+`main.go:506`) is the first place in the pipeline where the compiled
+graph, the resolved registry, and interpolated values are all in scope
+together — because a `steps.<id>.output` reference cannot be resolved
+until the step that produces it has actually run. `Execute` walks
+`Graph.Waves` in order; within a wave, steps run sequentially in
+manifest-declaration order, never concurrently. For each step,
+`resolveInput` and `resolveWith` scan and render its `input`/`with`
+fields, calling `interp.Render` (`internal/workflow/interp/render.go:25`)
+to turn each reference into a typed `interp.Value` — and `Render` itself
+refuses to concatenate a secret with literal text or another reference,
+so a secret can only ever be a field's entire value. The bound values are
+then dispatched to the resolved capability method.
 
-#### Step Registry (`step_registry.go`)
-- Registers and manages pipeline steps
-- Provides step discovery
-- Handles step execution
-- Supports step dependencies
+Two engine-level controls apply per step here: **fail-fast**
+(`Options.FailFast`) stops scheduling further waves as soon as one step
+fails, and **retry** (`Options.Retries`, overridable per step via the
+manifest's `attempts` field) re-attempts a failing step up to its
+configured budget before recording it as failed.
 
-#### Hook Manager (`hook_manager.go`)
-- Manages pre/post step hooks
-- Supports conditional hook execution
-- Handles hook error propagation
-- Provides hook lifecycle management
+**Fails when**: `engine.StepFailedError` (every configured attempt for a
+step failed — wraps that step's last error and names the first failing
+step id), `engine.OutputKindMismatchError` (a `steps.<id>.output`
+reference resolves to a value whose kind cannot satisfy the field it is
+used in — for example, a `with` field expecting a string receiving a
+step that produced a directory), `engine.StepTimeoutError` (a step
+exceeded its configured `Options.Timeout`), or one of
+`engine.UndeclaredVariableError` / `engine.UndeclaredSecretError` /
+`engine.MissingStepOutputError` (a reference to a name or step id that
+was never declared, or whose output is not yet available).
 
-### Pipeline Implementations (`internal/pipelines/`)
+## Stage-to-Source Summary
 
-#### Go-Service Pipeline (`go-service/pipeline.go`)
-Standard pipeline for Go services and microservices (the former Go-Kit and Docker-Go pipelines were merged into this one):
-- Repository cloning with SSH/HTTPS support
-- Dependency management
-- Unit testing with coverage reporting
-- Binary and/or Docker image builds (configurable build mode)
-- Multi-stage Docker builds and cross-platform compilation
-- Container registry publishing
-- Health checks and validation
+| Stage | Package | Entry point |
+|---|---|---|
+| 1. Parse | `internal/workflow/manifest` | `parse.go` — `ParseFile`, `Parse` |
+| 2. Identity | `internal/workflow/manifest` | `validate.go` — `ValidateIdentity` |
+| 3. Structure | `internal/workflow/manifest` | `validate.go` — `ValidateStructure` |
+| 4. References | `internal/workflow/interp` | `scanner.go` — `Scan` |
+| 5. Graph | `internal/workflow/graph` | `build.go` — `Build`; `kahn.go` — cycle detection |
+| 6. Provider Resolution | `internal/workflow/providers` | `registry.go` — `Resolve*` |
+| 7. Value Binding | `internal/workflow/engine` | `execute.go` — `Execute`, `Render` calls |
 
-#### Infrastructure Pipeline (`infra/pipeline.go`)
-Infrastructure automation:
-- Terraform validation
-- Infrastructure testing
-- Deployment automation
-- Environment management
+## Next
 
-### Step Implementations (`internal/app/step_handlers.go`)
-
-#### Setup Step
-- Environment preparation
-- Dependency installation
-- Configuration validation
-- Workspace setup
-
-#### Build Step
-- Application compilation
-- Asset bundling
-- Binary optimization
-- Cross-platform builds
-
-#### Test Step
-- Unit test execution
-- Integration testing
-- Coverage reporting
-- Test result aggregation
-
-#### Lint Step
-- Code quality checks
-- Style enforcement
-- Security scanning
-- Documentation validation
-
-#### Security Step
-- Vulnerability scanning
-- Dependency audit
-- Security policy enforcement
-- Compliance checking
-
-#### Package Step
-- Application packaging
-- Container image creation
-- Artifact generation
-- Metadata management
-
-#### Push Step
-- Container registry publishing
-- Artifact distribution
-- Release management
-- Deployment triggers
-
-## Data Flow
-
-### Pipeline Execution Flow
-
-```mermaid
-sequenceDiagram
-    participant CLI as CLI Interface
-    participant App as Application Core
-    participant PE as Pipeline Executor
-    participant PR as Pipeline Registry
-    participant SR as Step Registry
-    participant HM as Hook Manager
-    participant DA as Dagger Adapter
-    
-    CLI->>App: Initialize application
-    App->>App: Load configuration
-    App->>App: Initialize container
-    App->>PE: Create pipeline executor
-    
-    CLI->>PE: Execute pipeline
-    PE->>PR: Get pipeline implementation
-    PR-->>PE: Return pipeline instance
-    
-    PE->>HM: Execute pre-pipeline hooks
-    HM-->>PE: Hook execution complete
-    
-    loop For each step
-        PE->>HM: Execute pre-step hooks
-        HM-->>PE: Hook execution complete
-        
-        PE->>SR: Execute step
-        SR->>DA: Perform container operations
-        DA-->>SR: Operation complete
-        SR-->>PE: Step execution complete
-        
-        PE->>HM: Execute post-step hooks
-        HM-->>PE: Hook execution complete
-    end
-    
-    PE->>HM: Execute post-pipeline hooks
-    HM-->>PE: Hook execution complete
-    
-    PE-->>CLI: Pipeline execution complete
-```
-
-### Configuration Resolution Flow
-
-```mermaid
-flowchart TD
-    A[Start] --> B[Load Default Config]
-    B --> C{Config File Exists?}
-    C -->|Yes| D[Load YAML Config]
-    C -->|No| E[Use Defaults Only]
-    D --> F[Merge with Defaults]
-    E --> G[Apply Environment Variables]
-    F --> G
-    G --> H[Apply CLI Flags]
-    H --> I[Validate Configuration]
-    I --> J{Valid?}
-    J -->|No| K[Return Error]
-    J -->|Yes| L[Return Final Config]
-    K --> M[End]
-    L --> M[End]
-```
-
-## Deployment Patterns
-
-### Standalone Binary
-- Single executable with all dependencies
-- No external runtime requirements
-- Cross-platform compatibility
-- Easy distribution and installation
-
-### Container-Based Execution
-- Uses Dagger SDK for container operations
-- Isolated execution environments
-- Consistent build environments
-- Scalable execution
-
-### CI/CD Integration
-- GitHub Actions integration
-- GitLab CI integration
-- Jenkins pipeline support
-- Custom CI/CD platform support
-
-## Security Considerations
-
-### Container Security
-- Non-root container execution
-- Minimal base images
-- Security scanning integration
-- Vulnerability management
-
-### Configuration Security
-- Sensitive data encryption
-- Environment variable protection
-- Secure credential management
-- Audit logging
-
-### Network Security
-- TLS/SSL for all communications
-- Certificate validation
-- Network isolation
-- Firewall compliance
-
-## Performance Characteristics
-
-### Execution Performance
-- Parallel step execution
-- Container caching
-- Incremental builds
-- Resource optimization
-
-### Scalability
-- Horizontal scaling support
-- Resource pooling
-- Load balancing
-- Auto-scaling capabilities
-
-### Monitoring and Observability
-- Structured logging
-- Metrics collection
-- Distributed tracing
-- Health checks
-
-## Extension Points
-
-### Custom Pipelines
-Developers can create custom pipeline implementations by:
-1. Implementing the `Pipeline` interface
-2. Registering with the pipeline registry
-3. Configuring pipeline-specific options
-4. Adding custom steps and hooks
-
-### Custom Steps
-New pipeline steps can be added by:
-1. Implementing the `StepHandler` interface
-2. Registering with the step registry
-3. Defining step dependencies
-4. Adding configuration options
-
-### Custom Hooks
-Pre/post processing can be added by:
-1. Implementing hook functions
-2. Registering with the hook manager
-3. Defining hook conditions
-4. Managing hook lifecycle
-
-## Testing Strategy
-
-### Unit Testing
-- Component-level testing
-- Mock-based testing
-- Interface-based testing
-- Coverage reporting
-
-### Integration Testing
-- End-to-end pipeline testing
-- Container integration testing
-- Configuration testing
-- Error handling testing
-
-### Performance Testing
-- Load testing
-- Stress testing
-- Resource utilization testing
-- Scalability testing
-
-## Future Considerations
-
-### Planned Enhancements
-- Multi-language support
-- Kubernetes integration
-- Advanced security features
-- Pipeline visualization
-- Plugin marketplace
-
-### Architectural Evolution
-- Microservices architecture
-- Event-driven design
-- Cloud-native patterns
-- Service mesh integration
+This document covers only what the engine and graph enforce, and where —
+it deliberately excludes how a workflow author fixes a rejected manifest.
+For manifest-authoring guidance, remediation examples, and corrected-YAML
+patterns, see the workflow authoring guide (tracked separately). For the
+guaranteed CLI/API compatibility surface, see `COMPATIBILITY.md` at the
+repository root.

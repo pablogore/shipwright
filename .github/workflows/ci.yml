@@ -882,14 +882,21 @@ jobs:
 
         go build ./...
 
-        # providers/go is a separate module in go.work; `./...` never crosses
-        # that module boundary (only `all` or fully-qualified import paths
-        # do, and `all` would also pull in the whole dependency graph), so
-        # build it explicitly to actually cover it in CI.
+        # providers/go and providers/rust are separate modules in go.work;
+        # `./...` never crosses that module boundary (only `all` or
+        # fully-qualified import paths do, and `all` would also pull in the
+        # whole dependency graph), so build each explicitly to actually
+        # cover it in CI.
         if [ -d "providers/go" ]; then
           (cd providers/go && go build ./...)
         else
           echo "⏭️  providers/go not found — skipping sub-module build"
+        fi
+
+        if [ -d "providers/rust" ]; then
+          (cd providers/rust && go build ./...)
+        else
+          echo "⏭️  providers/rust not found — skipping sub-module build"
         fi
 
   # Stage 4: Tests (runs in parallel with build)
@@ -1051,16 +1058,24 @@ jobs:
           go test -race $TEST_PACKAGES
         fi
 
-        # providers/go is a separate module in go.work; `./...` and `go list
-        # ./...` above never traverse into it. Run its tests explicitly so
-        # CI actually exercises it. Deliberately excluded from coverage.out:
-        # it is an independently-published module (design.md D2/D4) whose
-        # coverage is not part of root's calibrated threshold.
+        # providers/go and providers/rust are separate modules in go.work;
+        # `./...` and `go list ./...` above never traverse into them. Run
+        # their tests explicitly so CI actually exercises them. Deliberately
+        # excluded from coverage.out: each is an independently-published
+        # module (design.md D2/D4) whose coverage is not part of root's
+        # calibrated threshold.
         if [ -d "providers/go" ]; then
           echo "📋 Running providers/go module tests"
           (cd providers/go && go test -race ./...)
         else
           echo "⏭️  providers/go not found — skipping sub-module tests"
+        fi
+
+        if [ -d "providers/rust" ]; then
+          echo "📋 Running providers/rust module tests"
+          (cd providers/rust && go test -race ./...)
+        else
+          echo "⏭️  providers/rust not found — skipping sub-module tests"
         fi
 
   # Stage 5: Security (only for main/develop/PRs)
@@ -1218,16 +1233,25 @@ jobs:
         # Run vulnerability check and capture output
         govulncheck ./... > vuln_report.txt 2>&1 || true
 
-        # providers/go is a separate module in go.work; govulncheck does not
-        # span go.work module boundaries (verified: findings from root and
-        # providers/go are disjoint), so scan it explicitly and append to
-        # the same report the checks below already parse.
+        # providers/go and providers/rust are separate modules in go.work;
+        # govulncheck does not span go.work module boundaries (verified:
+        # findings from root and providers/go are disjoint), so scan each
+        # explicitly and append to the same report the checks below already
+        # parse.
         if [ -d "providers/go" ]; then
           echo "" >> vuln_report.txt
           echo "===== providers/go module =====" >> vuln_report.txt
           (cd providers/go && govulncheck ./...) >> vuln_report.txt 2>&1 || true
         else
           echo "⏭️  providers/go not found — skipping sub-module vulnerability scan"
+        fi
+
+        if [ -d "providers/rust" ]; then
+          echo "" >> vuln_report.txt
+          echo "===== providers/rust module =====" >> vuln_report.txt
+          (cd providers/rust && govulncheck ./...) >> vuln_report.txt 2>&1 || true
+        else
+          echo "⏭️  providers/rust not found — skipping sub-module vulnerability scan"
         fi
 
         # Check if there are vulnerabilities in dependencies (not stdlib)

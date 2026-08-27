@@ -92,10 +92,12 @@ clean: ## Clean build artifacts
 test: ## Run all tests
 	@echo -e "$(BLUE)Running tests...$(NC)"
 	$(GOTEST) -v -race ./...
-	@# providers/go is a separate module in go.work; `./...` never crosses that
-	@# boundary (only the `all` pattern or fully-qualified paths do, and `all`
-	@# pulls in the whole dependency graph), so it needs its own invocation.
+	@# providers/go and providers/rust are separate modules in go.work; `./...`
+	@# never crosses that boundary (only the `all` pattern or fully-qualified
+	@# paths do, and `all` pulls in the whole dependency graph), so each needs
+	@# its own invocation.
 	cd providers/go && $(GOTEST) -v -race ./...
+	cd providers/rust && $(GOTEST) -v -race ./...
 	@echo -e "$(GREEN)✅ Tests completed$(NC)"
 
 dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT part of `test`/`check`/`quality`/`all` — see design.md D-B isolation)
@@ -120,34 +122,39 @@ tools-install: ## Install development tools (goreleaser)
 check: test ## Run all checks (test)
 
 # Format code
-# providers/go is a separate go.work module; `go fmt all` was tried and
-# explicitly refuses it ("not formatting packages in dependency modules"),
-# so it needs its own invocation, same as vet/test below.
+# providers/go and providers/rust are separate go.work modules; `go fmt all`
+# was tried and explicitly refuses it ("not formatting packages in
+# dependency modules"), so each needs its own invocation, same as vet/test
+# below.
 fmt: ## Format code with gofmt
 	@echo -e "$(BLUE)Formatting code...$(NC)"
 	$(GOCMD) fmt ./...
 	cd providers/go && $(GOCMD) fmt ./...
+	cd providers/rust && $(GOCMD) fmt ./...
 	@echo -e "$(GREEN)✅ Code formatting completed$(NC)"
 
 # Run go vet
 # `go vet all` was tried and fails (exit 1) because `all` also pulls in and
 # vets third-party dependency *_test.go files with pre-existing, unrelated
 # vet issues (e.g. google/go-cmp, prometheus/client_golang) — not a safe
-# drop-in. Iterate both modules explicitly instead.
+# drop-in. Iterate all modules explicitly instead.
 vet: ## Run go vet
 	@echo -e "$(BLUE)Running go vet...$(NC)"
 	$(GOCMD) vet ./...
 	cd providers/go && $(GOCMD) vet ./...
+	cd providers/rust && $(GOCMD) vet ./...
 	@echo -e "$(GREEN)✅ Go vet completed$(NC)"
 
 # Security check
 # govulncheck does not span go.work module boundaries (verified: findings
-# from root and providers/go are disjoint), so it must run once per module.
+# from root, providers/go, and providers/rust are disjoint), so it must run
+# once per module.
 security: ## Run security vulnerability check
 	@echo -e "$(BLUE)Running security vulnerability check...$(NC)"
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	@govulncheck ./... | tee vuln_report.txt
 	@cd providers/go && govulncheck ./... | tee -a ../../vuln_report.txt
+	@cd providers/rust && govulncheck ./... | tee -a ../../vuln_report.txt
 	@if grep -q "No vulnerabilities found." vuln_report.txt; then \
 		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
 	else \

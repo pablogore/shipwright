@@ -29,10 +29,10 @@ func repoRoot(t *testing.T) string {
 }
 
 // wantUse is the exact, allowlisted `use` set design.md D1 commits to: only
-// the root module and providers/go, nothing else -- an addition of any
-// third member (not only .dagger) must fail this test, not only a
-// .dagger-specific one.
-var wantUse = []string{".", "./providers/go"}
+// the root module, providers/go, and providers/rust, nothing else -- an
+// addition of any further member (not only .dagger) must fail this test,
+// not only a .dagger-specific one.
+var wantUse = []string{".", "./providers/go", "./providers/rust"}
 
 func TestGoWorkUseSetIsExactAllowlist(t *testing.T) {
 	root := repoRoot(t)
@@ -53,7 +53,7 @@ func TestGoWorkUseSetIsExactAllowlist(t *testing.T) {
 }
 
 func TestGoWorkRejectsDaggerUse(t *testing.T) {
-	if use, found := DaggerUse([]string{".", "./providers/go"}); found {
+	if use, found := DaggerUse([]string{".", "./providers/go", "./providers/rust"}); found {
 		t.Fatalf("DaggerUse(%q) = true, want false for the committed allowlist", use)
 	}
 
@@ -67,7 +67,7 @@ func TestGoWorkRejectsDaggerUse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			use, found := DaggerUse([]string{".", "./providers/go", tt.use})
+			use, found := DaggerUse([]string{".", "./providers/go", "./providers/rust", tt.use})
 			if !found {
 				t.Fatalf("DaggerUse() = false, want true for %q -- design.md D-B isolation must fail closed", tt.use)
 			}
@@ -148,6 +148,39 @@ func TestCIMakefileExplicitlyTestsProvidersGo(t *testing.T) {
 		if !strings.Contains(content, "cd providers/go") {
 			t.Error("CI workflow does not include 'cd providers/go' — " +
 				"CI would silently skip providers/go tests")
+		}
+	})
+}
+
+// TestCIMakefileExplicitlyTestsProvidersRust mirrors
+// TestCIMakefileExplicitlyTestsProvidersGo for the providers/rust module,
+// added alongside it in go.work's allowlist above.
+func TestCIMakefileExplicitlyTestsProvidersRust(t *testing.T) {
+	root := repoRoot(t)
+
+	t.Run("Makefile test target includes providers/rust", func(t *testing.T) {
+		data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+		if err != nil {
+			t.Fatalf("ReadFile(Makefile) error = %v", err)
+		}
+		content := string(data)
+
+		if !strings.Contains(content, "cd providers/rust") {
+			t.Error("Makefile does not include 'cd providers/rust' — " +
+				"go test ./... from root never traverses nested modules")
+		}
+	})
+
+	t.Run("CI test step includes providers/rust", func(t *testing.T) {
+		data, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+		if err != nil {
+			t.Fatalf("ReadFile(ci.yml) error = %v", err)
+		}
+		content := string(data)
+
+		if !strings.Contains(content, "cd providers/rust") {
+			t.Error("CI workflow does not include 'cd providers/rust' — " +
+				"CI would silently skip providers/rust tests")
 		}
 	})
 }

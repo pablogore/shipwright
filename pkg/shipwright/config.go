@@ -70,6 +70,14 @@ type ArtifactConfig struct {
 	RegistryToken *dagger.Secret
 	// ImageName is the published image name.
 	ImageName string
+	// BinaryName is the name of the compiled binary file inside the
+	// published image, used to compute the container entrypoint
+	// ("/app/"+BinaryName). Left empty, an Artifactor falls back to its own
+	// default binary name (mirroring BuildConfig.BinaryName's own
+	// empty-falls-back-to-default convention) — set it explicitly whenever
+	// the paired Builder was configured with a non-default BuildConfig.
+	// BinaryName, so the two agree on where the binary actually lives.
+	BinaryName string
 	// ImageTag is the published image tag (e.g. latest, sha, v1.2.3).
 	ImageTag string
 	// BuildTag is the build tag associated with the artifact.

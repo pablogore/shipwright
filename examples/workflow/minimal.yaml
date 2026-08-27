@@ -1,0 +1,31 @@
+# Minimal runnable example manifest for docs/WORKFLOW_GUIDE.md's Quick path
+# (design.md "Example strategy" E1, tasks.md doc-003 1.1): the smallest
+# manifest that actually builds a graph and runs — one build step feeding
+# one test step, no variables, no secrets, no when. This file is covered
+# by the examples drift guard (internal/workflow/manifest/examples_test.go),
+# so it cannot silently drift from the schema.
+apiVersion: shipwright.dev/v1
+kind: Workflow
+metadata:
+  name: minimal-go-service
+  description: >-
+    Smallest runnable workflow: build a Go binary, then run its unit tests.
+spec:
+  source:
+    path: .
+  steps:
+    - id: build
+      capability: build
+      uses:
+        provider: go
+        version: "1"
+      with:
+        goVersion: "1.26.1"
+
+    - id: unit
+      capability: test
+      uses:
+        provider: go-test
+        version: "1"
+      needs: [build]
+      input: ${{ steps.build.output }}

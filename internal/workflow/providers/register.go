@@ -6,6 +6,7 @@ import (
 	"dagger.io/dagger"
 
 	golang "github.com/pablogore/shipwright/providers/go"
+	"github.com/pablogore/shipwright/providers/rust"
 
 	"github.com/pablogore/shipwright/internal/workflow/interp"
 	"github.com/pablogore/shipwright/pkg/shipwright"
@@ -63,11 +64,86 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"ref":          interp.KindString,
 		"creds":        interp.KindSecret,
 		"registryUser": interp.KindString,
+		"binaryName":   interp.KindString,
 	}, func(v Values) shipwright.Artifactor {
 		return &golang.ContainerPublisher{
 			Client: client,
-			Config: shipwright.ArtifactConfig{RegistryUser: stringField(v, "registryUser")},
+			Config: shipwright.ArtifactConfig{
+				RegistryUser: stringField(v, "registryUser"),
+				BinaryName:   stringField(v, "binaryName"),
+			},
 		}
+	})
+
+	r.RegisterBuilder(Ref{Name: "rust", Version: "1"}, WithSchema{
+		"binaryName":  interp.KindString,
+		"buildMode":   interp.KindString,
+		"rustVersion": interp.KindString,
+	}, func(v Values) shipwright.Builder {
+		return &rust.RustBuilder{
+			Client: client,
+			Config: shipwright.BuildConfig{
+				BinaryName: stringField(v, "binaryName"),
+				BuildMode:  stringField(v, "buildMode"),
+			},
+			RustVersion: stringField(v, "rustVersion"),
+		}
+	})
+
+	r.RegisterTester(Ref{Name: "rust-test", Version: "1"}, WithSchema{
+		"coverage":    interp.KindInt,
+		"rustVersion": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &rust.RustUnitTester{
+			Client:      client,
+			Config:      shipwright.TestConfig{Coverage: floatField(v, "coverage")},
+			RustVersion: stringField(v, "rustVersion"),
+		}
+	})
+
+	// "clippy", not "rust-lint": mirrors golangci-lint's own convention of
+	// naming a Tester ref after the actual underlying tool rather than a
+	// generic "<language>-lint" placeholder.
+	r.RegisterTester(Ref{Name: "clippy", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
+		return &rust.RustLinter{Client: client}
+	})
+
+	// "cargo-audit", not "rust-vulncheck": mirrors govulncheck's own
+	// convention of naming a Tester ref after the actual underlying tool.
+	r.RegisterTester(Ref{Name: "cargo-audit", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
+		return &rust.RustVulnScanner{Client: client}
+	})
+
+	// rust.ContainerPublisher is registered under its own ref ("rust-
+	// container"), NOT reusing "container" -> golang.ContainerPublisher:
+	// unlike the rest of golang's capabilities, ContainerPublisher's logic
+	// is otherwise generic, but its defaultPublishBaseImage is not — Rust's
+	// default build output links dynamically against glibc (the official
+	// rust:<version> image's toolchain), which fails to start under
+	// golang.ContainerPublisher's alpine:latest (musl) base with a missing
+	// ld-linux loader error. rust.ContainerPublisher's own
+	// debian:bookworm-slim base exists specifically to run that binary
+	// (see providers/rust/containerpublisher.go's own doc comment), so
+	// reusing "container" here would silently ship broken images.
+	r.RegisterArtifactor(Ref{Name: "rust-container", Version: "1"}, WithSchema{
+		"ref":          interp.KindString,
+		"creds":        interp.KindSecret,
+		"registryUser": interp.KindString,
+		"binaryName":   interp.KindString,
+	}, func(v Values) shipwright.Artifactor {
+		return &rust.ContainerPublisher{
+			Client: client,
+			Config: shipwright.ArtifactConfig{
+				RegistryUser: stringField(v, "registryUser"),
+				BinaryName:   stringField(v, "binaryName"),
+			},
+		}
+	})
+
+	// ChangelogRunner (changelog.go) has no with-field configuration, same
+	// as golangci-lint/govulncheck above.
+	r.RegisterRunner(Ref{Name: "changelog", Version: "1"}, WithSchema{}, func(v Values) shipwright.Runner {
+		return &ChangelogRunner{Client: client}
 	})
 }
 

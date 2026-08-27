@@ -15,6 +15,8 @@ import (
 
 	"github.com/pablogore/shipwright/internal/workflow/interp"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
+	golang "github.com/pablogore/shipwright/providers/go"
+	"github.com/pablogore/shipwright/providers/rust"
 )
 
 // tasks.md 7.3, SECURITY RED: this is the test that proves the
@@ -105,6 +107,59 @@ func TestRegisterDefaults_RegistersAllFiveWU3Capabilities(t *testing.T) {
 	}
 }
 
+// providers/rust mirrors providers/go file-for-file (RustBuilder,
+// RustUnitTester, RustLinter, RustVulnScanner, ContainerPublisher). This is
+// the GREEN evidence that RegisterDefaults wires all five of them into a
+// Registry under their own manifest-facing names ("rust", "rust-test",
+// "clippy", "cargo-audit", "rust-container") and each resolves without
+// error, mirroring TestRegisterDefaults_RegistersAllFiveWU3Capabilities.
+func TestRegisterDefaults_RegistersRustProviders(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	builder, err := r.ResolveBuilder(providers.Ref{Name: "rust", Version: "1"}, providers.Values{
+		"binaryName": interp.NewString("myapp"),
+	})
+	if err != nil || builder == nil {
+		t.Fatalf("ResolveBuilder(rust) = (%v, %v), want (non-nil RustBuilder, nil)", builder, err)
+	}
+
+	unitTester, err := r.ResolveTester(providers.Ref{Name: "rust-test", Version: "1"}, providers.Values{})
+	if err != nil || unitTester == nil {
+		t.Fatalf("ResolveTester(rust-test) = (%v, %v), want (non-nil RustUnitTester, nil)", unitTester, err)
+	}
+
+	linter, err := r.ResolveTester(providers.Ref{Name: "clippy", Version: "1"}, providers.Values{})
+	if err != nil || linter == nil {
+		t.Fatalf("ResolveTester(clippy) = (%v, %v), want (non-nil RustLinter, nil)", linter, err)
+	}
+
+	vulnScanner, err := r.ResolveTester(providers.Ref{Name: "cargo-audit", Version: "1"}, providers.Values{})
+	if err != nil || vulnScanner == nil {
+		t.Fatalf("ResolveTester(cargo-audit) = (%v, %v), want (non-nil RustVulnScanner, nil)", vulnScanner, err)
+	}
+
+	publisher, err := r.ResolveArtifactor(providers.Ref{Name: "rust-container", Version: "1"}, providers.Values{
+		"ref":   interp.NewString("ghcr.io/acme/api-rust"),
+		"creds": interp.NewSecret(&dagger.Secret{}),
+	})
+	if err != nil || publisher == nil {
+		t.Fatalf("ResolveArtifactor(rust-container) = (%v, %v), want (non-nil rust.ContainerPublisher, nil)", publisher, err)
+	}
+
+	// "container" (golang.ContainerPublisher's ref) must remain unaffected
+	// by the rust registrations above, and rust's own container ref must
+	// not collide with it.
+	if _, err := r.ResolveArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.Values{
+		"ref":   interp.NewString("ghcr.io/acme/api"),
+		"creds": interp.NewSecret(&dagger.Secret{}),
+	}); err != nil {
+		t.Fatalf("ResolveArtifactor(container) after rust registration = %v, want nil", err)
+	}
+}
+
 // A same-named provider requested via uses.provider (Module=="") must
 // never resolve as though it had been requested via uses.module, and vice
 // versa (design.md D-I: "Module == "" means in-repo") — Ref is keyed by
@@ -118,5 +173,107 @@ func TestRegisterDefaults_InRepoProviderNotConfusedWithSameNamedModule(t *testin
 	_, err := r.ResolveBuilder(providers.Ref{Name: "go", Module: "go", Version: "1"}, providers.Values{})
 	if err == nil {
 		t.Fatal("ResolveBuilder(same Name via Module) error = nil, want unregistered — Module-qualified lookups must not fall back to the in-repo entry")
+	}
+}
+
+// TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough is the P1 GREEN
+// evidence: a manifest's `with: {rustVersion: ...}` on the "rust" builder
+// must actually reach RustBuilder.RustVersion, not just resolve without
+// error (checkWithSchema's own doc comment: an undeclared/unset with-field
+// is never an error there, so a resolve-without-error assertion alone
+// cannot catch a factory silently dropping the value — only a type
+// assertion on the resolved provider's own field does).
+func TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	builder, err := r.ResolveBuilder(providers.Ref{Name: "rust", Version: "1"}, providers.Values{
+		"rustVersion": interp.NewString("1.79.0"),
+	})
+	if err != nil || builder == nil {
+		t.Fatalf("ResolveBuilder(rust) = (%v, %v), want (non-nil RustBuilder, nil)", builder, err)
+	}
+
+	rustBuilder, ok := builder.(*rust.RustBuilder)
+	if !ok {
+		t.Fatalf("ResolveBuilder(rust) = %T, want *rust.RustBuilder", builder)
+	}
+	if rustBuilder.RustVersion != "1.79.0" {
+		t.Fatalf("RustBuilder.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustBuilder.RustVersion, "1.79.0")
+	}
+}
+
+// TestRegisterDefaults_ContainerPublishers_BinaryNameFlowsThrough is the
+// Blocker 2 GREEN evidence: a manifest's `with: {binaryName: ...}` on
+// "container" (golang) and "rust-container" (rust) must reach
+// ArtifactConfig.BinaryName, not just resolve without error, mirroring
+// TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough's own reasoning.
+func TestRegisterDefaults_ContainerPublishers_BinaryNameFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	goPublisher, err := r.ResolveArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.Values{
+		"ref":        interp.NewString("ghcr.io/acme/api"),
+		"creds":      interp.NewSecret(&dagger.Secret{}),
+		"binaryName": interp.NewString("my-service"),
+	})
+	if err != nil || goPublisher == nil {
+		t.Fatalf("ResolveArtifactor(container) = (%v, %v), want (non-nil ContainerPublisher, nil)", goPublisher, err)
+	}
+	goContainerPublisher, ok := goPublisher.(*golang.ContainerPublisher)
+	if !ok {
+		t.Fatalf("ResolveArtifactor(container) = %T, want *golang.ContainerPublisher", goPublisher)
+	}
+	if goContainerPublisher.Config.BinaryName != "my-service" {
+		t.Fatalf("golang.ContainerPublisher.Config.BinaryName = %q, want %q — the manifest's binaryName with-field never reached the provider", goContainerPublisher.Config.BinaryName, "my-service")
+	}
+
+	rustPublisher, err := r.ResolveArtifactor(providers.Ref{Name: "rust-container", Version: "1"}, providers.Values{
+		"ref":        interp.NewString("ghcr.io/acme/api-rust"),
+		"creds":      interp.NewSecret(&dagger.Secret{}),
+		"binaryName": interp.NewString("my-rust-service"),
+	})
+	if err != nil || rustPublisher == nil {
+		t.Fatalf("ResolveArtifactor(rust-container) = (%v, %v), want (non-nil rust.ContainerPublisher, nil)", rustPublisher, err)
+	}
+	rustContainerPublisher, ok := rustPublisher.(*rust.ContainerPublisher)
+	if !ok {
+		t.Fatalf("ResolveArtifactor(rust-container) = %T, want *rust.ContainerPublisher", rustPublisher)
+	}
+	if rustContainerPublisher.Config.BinaryName != "my-rust-service" {
+		t.Fatalf("rust.ContainerPublisher.Config.BinaryName = %q, want %q — the manifest's binaryName with-field never reached the provider", rustContainerPublisher.Config.BinaryName, "my-rust-service")
+	}
+}
+
+// TestRegisterDefaults_RustTest_RustVersionFlowsThrough is the P2 GREEN
+// evidence: "rust-test" must expose its own rustVersion with-field, wired
+// into RustUnitTester.RustVersion, so a manifest that builds with a
+// non-default rustVersion doesn't silently test against the unrelated
+// default toolchain — mirrors
+// TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough's own reasoning
+// for the "rust" builder.
+func TestRegisterDefaults_RustTest_RustVersionFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "rust-test", Version: "1"}, providers.Values{
+		"rustVersion": interp.NewString("1.90.0"),
+	})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(rust-test) = (%v, %v), want (non-nil RustUnitTester, nil)", tester, err)
+	}
+
+	rustTester, ok := tester.(*rust.RustUnitTester)
+	if !ok {
+		t.Fatalf("ResolveTester(rust-test) = %T, want *rust.RustUnitTester", tester)
+	}
+	if rustTester.RustVersion != "1.90.0" {
+		t.Fatalf("RustUnitTester.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustTester.RustVersion, "1.90.0")
 	}
 }
