@@ -133,6 +133,72 @@ edition = "2021"
 	}
 }
 
+// TestRustBuilder_Build_RealEngine_RepeatedBuildReusesCache is a smoke test
+// for the cargo registry/target Dagger cache volumes RustBuilder.Build now
+// mounts: it proves a second build of the same source, against the same
+// client (so the cache volumes persist across the two calls), still
+// succeeds and produces the expected binary. It does NOT assert a timing
+// improvement — Dagger cache-volume speedups aren't reliably measurable in
+// a single test run — only that mounting WithMountedCache doesn't change
+// Build's observable success/output behavior.
+func TestRustBuilder_Build_RealEngine_RepeatedBuildReusesCache(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real-container RustBuilder integration test in -short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		t.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	tmpDir := t.TempDir()
+	cargoToml := `[package]
+name = "cachetest"
+version = "0.1.0"
+edition = "2021"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "Cargo.toml"), []byte(cargoToml), 0o644); err != nil {
+		t.Fatalf("failed to write Cargo.toml: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(tmpDir, "src"), 0o755); err != nil {
+		t.Fatalf("failed to create src directory: %v", err)
+	}
+	mainRs := "fn main() {}\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "src", "main.rs"), []byte(mainRs), 0o644); err != nil {
+		t.Fatalf("failed to write main.rs: %v", err)
+	}
+
+	src := client.Host().Directory(tmpDir)
+	builder := &rust.RustBuilder{
+		Client:      client,
+		Config:      shipwright.BuildConfig{BinaryName: "cachetest"},
+		RustVersion: "1.83.0",
+	}
+
+	for i := 0; i < 2; i++ {
+		out, err := builder.Build(ctx, src)
+		if err != nil {
+			t.Fatalf("RustBuilder.Build() call #%d error = %v, want nil", i+1, err)
+		}
+		entries, err := out.Entries(ctx)
+		if err != nil {
+			t.Fatalf("failed to list build output directory entries on call #%d: %v", i+1, err)
+		}
+		found := false
+		for _, e := range entries {
+			if e == "cachetest" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("build output directory entries on call #%d = %v, want it to contain %q", i+1, entries, "cachetest")
+		}
+	}
+}
+
 // TestRustBuilder_Build_NilSource_RealClient covers the nil-source guard
 // clause with a real, connected Dagger client — cheap even under a real
 // engine because the guard returns before any container is built.

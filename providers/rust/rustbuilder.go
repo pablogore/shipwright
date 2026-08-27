@@ -111,8 +111,10 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 
 	container := b.Client.Container().
 		From("rust:"+rustVersion).
+		WithMountedCache(cargoRegistryMountPath, b.Client.CacheVolume(cargoRegistryCacheKey)).
 		WithMountedDirectory("/app", source).
 		WithWorkdir("/app").
+		WithMountedCache("/app/target", b.Client.CacheVolume(rustBuilderTargetCacheKey)).
 		WithExec(cargoBuildArgs(profile))
 
 	// Unlike `go build -o`, cargo does not accept an arbitrary output

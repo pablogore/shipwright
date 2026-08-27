@@ -59,8 +59,10 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 
 	container := t.Client.Container().
 		From("rust:"+rustVersion).
+		WithMountedCache(cargoRegistryMountPath, t.Client.CacheVolume(cargoRegistryCacheKey)).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
+		WithMountedCache("/src/target", t.Client.CacheVolume(rustUnitTesterTargetCacheKey)).
 		WithExec([]string{"cargo", "test", "--workspace", "--all-features"})
 
 	testOutput, err := container.Stdout(ctx)

@@ -44,8 +44,10 @@ func (l *RustLinter) Test(ctx context.Context, source *dagger.Directory) (*dagge
 
 	container := l.Client.Container().
 		From("rust:"+rustVersion).
+		WithMountedCache(cargoRegistryMountPath, l.Client.CacheVolume(cargoRegistryCacheKey)).
 		WithMountedDirectory("/app", source).
 		WithWorkdir("/app").
+		WithMountedCache("/app/target", l.Client.CacheVolume(rustLinterTargetCacheKey)).
 		WithExec([]string{"rustup", "component", "add", "clippy"})
 
 	lintContainer := container.WithExec([]string{"cargo", "clippy", "--all-targets", "--", "-D", "warnings"})

@@ -53,6 +53,7 @@ func (v *RustVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*
 
 	container := v.Client.Container().
 		From("rust:"+rustVersion).
+		WithMountedCache(cargoRegistryMountPath, v.Client.CacheVolume(cargoRegistryCacheKey)).
 		WithMountedDirectory("/app", source).
 		WithWorkdir("/app").
 		WithExec([]string{"cargo", "install", "cargo-audit", "--locked"})
