@@ -98,6 +98,24 @@ func TestUsePaths_UnparseableFileFailsClosed(t *testing.T) {
 	}
 }
 
+// TestRootGoModHasNoReplaceDirectives verifies that the committed root go.mod
+// contains zero replace directives. This enforces the Slice 2 contract: the
+// published providers/go@v0.1.0 must resolve from the real module proxy, not
+// from a local filesystem replace. When the replace directive is present, this
+// test MUST fail — proving the guard catches the violation before GREEN.
+func TestRootGoModHasNoReplaceDirectives(t *testing.T) {
+	root := repoRoot(t)
+
+	reps, err := ReplaceDirectives(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatalf("ReplaceDirectives(go.mod) error = %v", err)
+	}
+
+	if len(reps) != 0 {
+		t.Fatalf("root go.mod has %d replace directive(s): %v — Slice 2 requires zero (design.md D4)", len(reps), reps)
+	}
+}
+
 // TestCIMakefileExplicitlyTestsProvidersGo verifies that the Makefile and CI
 // workflow explicitly test/build providers/go as a separate module. Since
 // `go test ./...` from root never traverses nested modules (see design.md

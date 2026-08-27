@@ -41,6 +41,32 @@ func UsePaths(path string) ([]string, error) {
 	return uses, nil
 }
 
+// ReplaceDirectives reads path (a go.mod file) and returns the set of
+// replace directives it declares, each as "old => new" (with version or
+// local path). An empty slice means no replace directives exist.
+func ReplaceDirectives(path string) ([]string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("workspaceguard: read %s: %w", path, err)
+	}
+
+	f, err := modfile.Parse(path, raw, nil)
+	if err != nil {
+		return nil, fmt.Errorf("workspaceguard: parse %s: %w", path, err)
+	}
+
+	var reps []string
+	for _, r := range f.Replace {
+		if r.New.Version != "" {
+			reps = append(reps, r.Old.String()+" => "+r.New.Path+" "+r.New.Version)
+		} else {
+			reps = append(reps, r.Old.String()+" => "+r.New.Path)
+		}
+	}
+
+	return reps, nil
+}
+
 // DaggerUse reports the first `use` path (if any) whose cleaned path has a
 // segment equal to ".dagger" or "dagger" -- the isolation design.md's D-B
 // established for the .dagger/ Dagger-engine module, which D1 must never
