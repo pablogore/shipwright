@@ -11,9 +11,11 @@ Welcome to the Shipwright documentation. This directory contains comprehensive g
 
 ### Core Concepts
 - [Architecture Overview](ARCHITECTURE.md) - System design and component interactions
+- [Workflow Manifest Guide](WORKFLOW_GUIDE.md) - Authoring `shipwright.dev/v1` workflow manifests
 - [Pipeline Development](PIPELINE_DEVELOPMENT.md) - Creating custom pipelines
 - [Configuration Reference](CONFIGURATION.md) - Complete configuration options
-- [API Reference](API.md) - Programmatic interfaces and data structures
+- [API Reference](API.md) - `pkg/shipwright` capability interfaces (Layer 1)
+- [Dagger Module API Reference](DAGGER_MODULE_API.md) - `.dagger/` module composition surface (Layer 2)
 
 ### Pipeline Types
 - [Go-Kit Pipeline](PIPELINES/GO_KIT.md) - Microservice pipeline guide
@@ -70,7 +72,8 @@ docs/
 ├── ARCHITECTURE.md              # System architecture and design
 ├── PIPELINE_DEVELOPMENT.md      # Creating custom pipelines
 ├── CONFIGURATION.md             # Configuration reference
-├── API.md                       # API documentation
+├── API.md                       # API documentation (Layer 1 — pkg/shipwright)
+├── DAGGER_MODULE_API.md         # Dagger module API documentation (Layer 2 — .dagger/)
 ├── QUICK_START.md               # Quick start guide
 ├── INSTALLATION.md              # Installation instructions
 ├── BASIC_USAGE.md               # Basic usage guide
