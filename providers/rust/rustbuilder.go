@@ -129,7 +129,7 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 
 	built, err := container.Sync(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("rustbuilder: failed to build rust binary: %w", err)
+		return nil, wrapExecError("rustbuilder: failed to build rust binary", err)
 	}
 
 	return built.Directory("/output"), nil

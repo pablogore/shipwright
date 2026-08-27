@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"dagger.io/dagger"
@@ -76,6 +77,59 @@ edition = "2021"
 	}
 	if !found {
 		t.Fatalf("build output directory entries = %v, want it to contain %q", entries, "capabilitiestest")
+	}
+}
+
+// TestRustBuilder_Build_RealEngine_CompileErrorIncludesStderr proves
+// RustBuilder.Build's failure path now wraps *dagger.ExecError via
+// wrapExecError instead of a bare `%w`, so a real compile failure's actual
+// rustc diagnostics (only ever on stderr) reach the returned error instead
+// of being swallowed by dagger.ExecError.Error()'s generic "process ...
+// did not complete successfully" message.
+func TestRustBuilder_Build_RealEngine_CompileErrorIncludesStderr(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real-container RustBuilder integration test in -short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		t.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	tmpDir := t.TempDir()
+	cargoToml := `[package]
+name = "brokencrate"
+version = "0.1.0"
+edition = "2021"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "Cargo.toml"), []byte(cargoToml), 0o644); err != nil {
+		t.Fatalf("failed to write Cargo.toml: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(tmpDir, "src"), 0o755); err != nil {
+		t.Fatalf("failed to create src directory: %v", err)
+	}
+	// Deliberate syntax error: cargo build must fail with a real rustc
+	// diagnostic on stderr.
+	brokenMainRs := "fn main() { let x: i32 = \"not an int\"; }\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "src", "main.rs"), []byte(brokenMainRs), 0o644); err != nil {
+		t.Fatalf("failed to write main.rs: %v", err)
+	}
+
+	src := client.Host().Directory(tmpDir)
+	builder := &rust.RustBuilder{
+		Client:      client,
+		Config:      shipwright.BuildConfig{BinaryName: "brokencrate"},
+		RustVersion: "1.83.0",
+	}
+
+	_, err = builder.Build(ctx, src)
+	if err == nil {
+		t.Fatal("RustBuilder.Build() error = nil, want error for a crate that fails to compile")
+	}
+	if !strings.Contains(err.Error(), "stderr:") {
+		t.Fatalf("RustBuilder.Build() error = %v, want it to include wrapped stderr diagnostics", err)
 	}
 }
 
@@ -164,5 +218,58 @@ mod tests {
 	}
 	if out == nil {
 		t.Fatal("RustUnitTester.Test() returned a nil File on success")
+	}
+}
+
+// TestRustLinter_Test_RealEngine_ReportIncludesClippyDiagnostics proves
+// RustLinter.Test's report now contains clippy's actual diagnostics.
+// clippy, like rustc, writes its findings to stderr — capturing only Stdout
+// (the pre-fix behavior) produced a report with no diagnostic detail at
+// all, clean or not.
+func TestRustLinter_Test_RealEngine_ReportIncludesClippyDiagnostics(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real-container RustLinter integration test in -short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		t.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	tmpDir := t.TempDir()
+	cargoToml := `[package]
+name = "clippytest"
+version = "0.1.0"
+edition = "2021"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "Cargo.toml"), []byte(cargoToml), 0o644); err != nil {
+		t.Fatalf("failed to write Cargo.toml: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(tmpDir, "src"), 0o755); err != nil {
+		t.Fatalf("failed to create src directory: %v", err)
+	}
+	mainRs := "fn main() {}\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "src", "main.rs"), []byte(mainRs), 0o644); err != nil {
+		t.Fatalf("failed to write main.rs: %v", err)
+	}
+
+	src := client.Host().Directory(tmpDir)
+	linter := &rust.RustLinter{Client: client, RustVersion: "1.83.0"}
+
+	out, err := linter.Test(ctx, src)
+	if err != nil {
+		t.Fatalf("RustLinter.Test() error = %v, want nil", err)
+	}
+	contents, err := out.Contents(ctx)
+	if err != nil {
+		t.Fatalf("failed to read lint report contents: %v", err)
+	}
+	// clippy's compilation progress ("Compiling clippytest ...", "Finished
+	// ...") is only ever written to stderr, never stdout — its presence in
+	// the report proves stderr was actually captured.
+	if !strings.Contains(contents, "Compiling") && !strings.Contains(contents, "Finished") {
+		t.Fatalf("lint report contents = %q, want it to include clippy's stderr diagnostics", contents)
 	}
 }

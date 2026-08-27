@@ -300,6 +300,40 @@ func TestAuditVulnerabilitiesReported(t *testing.T) {
 	}
 }
 
+// TestAuditCombinedOutput covers the bug behind rustvulnscanner.go's
+// `combined := output + err.Error()`: dagger.ExecError.Error() never embeds
+// stdout/stderr (only wrapExecError's own doc comment explains why — it
+// defers to an unexported `original` field the dagger package alone
+// populates), so a real cargo-audit failure's CVE details never reached the
+// combined string audited for "N vulnerabilities found!". Constructed the
+// same way as TestWrapExecError's synthetic *dagger.ExecError, for the same
+// reason: only its exported fields (Stdout/Stderr/ExitCode) are settable
+// from outside dagger.io/dagger.
+func TestAuditCombinedOutput(t *testing.T) {
+	t.Run("plain error falls back to Error()", func(t *testing.T) {
+		base := errors.New("boom")
+		got := auditCombinedOutput("partial output", base)
+		if !strings.Contains(got, "partial output") || !strings.Contains(got, "boom") {
+			t.Fatalf("auditCombinedOutput() = %q, want it to contain the output and the base error", got)
+		}
+	})
+
+	t.Run("ExecError contributes its own stdout and stderr", func(t *testing.T) {
+		execErr := &dagger.ExecError{
+			ExitCode: 1,
+			Stdout:   "Scanning Cargo.lock for vulnerabilities (42 crate dependencies)\nerror: 1 vulnerability found!\n",
+			Stderr:   "warning: unmaintained crate\n",
+		}
+		got := auditCombinedOutput("", execErr)
+		if !strings.Contains(got, "1 vulnerability found!") {
+			t.Fatalf("auditCombinedOutput() = %q, want it to contain the ExecError's Stdout", got)
+		}
+		if !strings.Contains(got, "unmaintained crate") {
+			t.Fatalf("auditCombinedOutput() = %q, want it to contain the ExecError's Stderr", got)
+		}
+	})
+}
+
 func TestRegistryHost(t *testing.T) {
 	tests := []struct {
 		name string

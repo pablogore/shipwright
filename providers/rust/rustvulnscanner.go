@@ -41,10 +41,6 @@ var _ shipwright.Tester = (*RustVulnScanner)(nil)
 // Test installs and runs cargo-audit against the source Directory. It
 // fails when known vulnerabilities are reported, otherwise returns the
 // captured output as the report File.
-//
-// Same judgment call as GoVulnScanner: Dagger's ExecError embeds both
-// stdout and stderr in err.Error() itself, so this implementation checks
-// output+err.Error() instead of issuing a second container execution.
 func (v *RustVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
 	if v.Client == nil {
 		return nil, errors.New("rustvulnscanner: dagger client is not configured")
@@ -63,11 +59,11 @@ func (v *RustVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*
 
 	output, err := container.WithExec([]string{"cargo", "audit"}).Stdout(ctx)
 	if err != nil {
-		combined := output + err.Error()
+		combined := auditCombinedOutput(output, err)
 		if auditVulnerabilitiesReported(combined) {
 			return nil, fmt.Errorf("rustvulnscanner: security vulnerabilities detected:\n%s", combined)
 		}
-		return nil, fmt.Errorf("rustvulnscanner: cargo audit failed: %w", err)
+		return nil, wrapExecError("rustvulnscanner: cargo audit failed", err)
 	}
 
 	if auditVulnerabilitiesReported(output) {
@@ -76,6 +72,21 @@ func (v *RustVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*
 
 	reportContainer := container.WithNewFile("/tmp/vuln-report.txt", output)
 	return reportContainer.File("/tmp/vuln-report.txt"), nil
+}
+
+// auditCombinedOutput builds the text auditVulnerabilitiesReported scans for
+// cargo-audit's summary line. Unlike GoVulnScanner's analogous helper,
+// dagger.ExecError.Error() does NOT embed the failed command's stdout/stderr
+// (see wrapExecError's own doc comment) — appending err.Error() to output
+// therefore never surfaced cargo-audit's actual CVE details. Read the
+// ExecError's exported Stdout/Stderr fields directly instead, the same
+// pattern wrapExecError uses.
+func auditCombinedOutput(output string, err error) string {
+	var execErr *dagger.ExecError
+	if errors.As(err, &execErr) {
+		return output + execErr.Stdout + execErr.Stderr
+	}
+	return output + err.Error()
 }
 
 // auditVulnerabilitiesReported inspects cargo-audit's human-readable output
