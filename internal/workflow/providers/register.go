@@ -64,16 +64,21 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"ref":          interp.KindString,
 		"creds":        interp.KindSecret,
 		"registryUser": interp.KindString,
+		"binaryName":   interp.KindString,
 	}, func(v Values) shipwright.Artifactor {
 		return &golang.ContainerPublisher{
 			Client: client,
-			Config: shipwright.ArtifactConfig{RegistryUser: stringField(v, "registryUser")},
+			Config: shipwright.ArtifactConfig{
+				RegistryUser: stringField(v, "registryUser"),
+				BinaryName:   stringField(v, "binaryName"),
+			},
 		}
 	})
 
 	r.RegisterBuilder(Ref{Name: "rust", Version: "1"}, WithSchema{
-		"binaryName": interp.KindString,
-		"buildMode":  interp.KindString,
+		"binaryName":  interp.KindString,
+		"buildMode":   interp.KindString,
+		"rustVersion": interp.KindString,
 	}, func(v Values) shipwright.Builder {
 		return &rust.RustBuilder{
 			Client: client,
@@ -81,6 +86,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 				BinaryName: stringField(v, "binaryName"),
 				BuildMode:  stringField(v, "buildMode"),
 			},
+			RustVersion: stringField(v, "rustVersion"),
 		}
 	})
 
@@ -121,10 +127,14 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"ref":          interp.KindString,
 		"creds":        interp.KindSecret,
 		"registryUser": interp.KindString,
+		"binaryName":   interp.KindString,
 	}, func(v Values) shipwright.Artifactor {
 		return &rust.ContainerPublisher{
 			Client: client,
-			Config: shipwright.ArtifactConfig{RegistryUser: stringField(v, "registryUser")},
+			Config: shipwright.ArtifactConfig{
+				RegistryUser: stringField(v, "registryUser"),
+				BinaryName:   stringField(v, "binaryName"),
+			},
 		}
 	})
 

@@ -15,6 +15,8 @@ import (
 
 	"github.com/pablogore/shipwright/internal/workflow/interp"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
+	golang "github.com/pablogore/shipwright/providers/go"
+	"github.com/pablogore/shipwright/providers/rust"
 )
 
 // tasks.md 7.3, SECURITY RED: this is the test that proves the
@@ -171,5 +173,78 @@ func TestRegisterDefaults_InRepoProviderNotConfusedWithSameNamedModule(t *testin
 	_, err := r.ResolveBuilder(providers.Ref{Name: "go", Module: "go", Version: "1"}, providers.Values{})
 	if err == nil {
 		t.Fatal("ResolveBuilder(same Name via Module) error = nil, want unregistered — Module-qualified lookups must not fall back to the in-repo entry")
+	}
+}
+
+// TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough is the P1 GREEN
+// evidence: a manifest's `with: {rustVersion: ...}` on the "rust" builder
+// must actually reach RustBuilder.RustVersion, not just resolve without
+// error (checkWithSchema's own doc comment: an undeclared/unset with-field
+// is never an error there, so a resolve-without-error assertion alone
+// cannot catch a factory silently dropping the value — only a type
+// assertion on the resolved provider's own field does).
+func TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	builder, err := r.ResolveBuilder(providers.Ref{Name: "rust", Version: "1"}, providers.Values{
+		"rustVersion": interp.NewString("1.79.0"),
+	})
+	if err != nil || builder == nil {
+		t.Fatalf("ResolveBuilder(rust) = (%v, %v), want (non-nil RustBuilder, nil)", builder, err)
+	}
+
+	rustBuilder, ok := builder.(*rust.RustBuilder)
+	if !ok {
+		t.Fatalf("ResolveBuilder(rust) = %T, want *rust.RustBuilder", builder)
+	}
+	if rustBuilder.RustVersion != "1.79.0" {
+		t.Fatalf("RustBuilder.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustBuilder.RustVersion, "1.79.0")
+	}
+}
+
+// TestRegisterDefaults_ContainerPublishers_BinaryNameFlowsThrough is the
+// Blocker 2 GREEN evidence: a manifest's `with: {binaryName: ...}` on
+// "container" (golang) and "rust-container" (rust) must reach
+// ArtifactConfig.BinaryName, not just resolve without error, mirroring
+// TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough's own reasoning.
+func TestRegisterDefaults_ContainerPublishers_BinaryNameFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	goPublisher, err := r.ResolveArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.Values{
+		"ref":        interp.NewString("ghcr.io/acme/api"),
+		"creds":      interp.NewSecret(&dagger.Secret{}),
+		"binaryName": interp.NewString("my-service"),
+	})
+	if err != nil || goPublisher == nil {
+		t.Fatalf("ResolveArtifactor(container) = (%v, %v), want (non-nil ContainerPublisher, nil)", goPublisher, err)
+	}
+	goContainerPublisher, ok := goPublisher.(*golang.ContainerPublisher)
+	if !ok {
+		t.Fatalf("ResolveArtifactor(container) = %T, want *golang.ContainerPublisher", goPublisher)
+	}
+	if goContainerPublisher.Config.BinaryName != "my-service" {
+		t.Fatalf("golang.ContainerPublisher.Config.BinaryName = %q, want %q — the manifest's binaryName with-field never reached the provider", goContainerPublisher.Config.BinaryName, "my-service")
+	}
+
+	rustPublisher, err := r.ResolveArtifactor(providers.Ref{Name: "rust-container", Version: "1"}, providers.Values{
+		"ref":        interp.NewString("ghcr.io/acme/api-rust"),
+		"creds":      interp.NewSecret(&dagger.Secret{}),
+		"binaryName": interp.NewString("my-rust-service"),
+	})
+	if err != nil || rustPublisher == nil {
+		t.Fatalf("ResolveArtifactor(rust-container) = (%v, %v), want (non-nil rust.ContainerPublisher, nil)", rustPublisher, err)
+	}
+	rustContainerPublisher, ok := rustPublisher.(*rust.ContainerPublisher)
+	if !ok {
+		t.Fatalf("ResolveArtifactor(rust-container) = %T, want *rust.ContainerPublisher", rustPublisher)
+	}
+	if rustContainerPublisher.Config.BinaryName != "my-rust-service" {
+		t.Fatalf("rust.ContainerPublisher.Config.BinaryName = %q, want %q — the manifest's binaryName with-field never reached the provider", rustContainerPublisher.Config.BinaryName, "my-rust-service")
 	}
 }
