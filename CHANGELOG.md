@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`providers/rust` wired into the live workflow provider registry** (`internal/workflow/providers/register.go`): `rust` (build), `rust-test` (unit test), `clippy` (lint), `cargo-audit` (vulnerability scan), and `rust-container` (a Rust-specific image publisher, kept separate from `container` because a default Rust build links dynamically against glibc and breaks under `container`'s alpine base)
+- **Changelog generation as a real `Runner` provider** (`internal/workflow/providers/changelog.go`'s `ChangelogRunner`, registered as `changelog`): generates a Keep a Changelog "Unreleased" summary from git history inside a Dagger container and prepends it into `CHANGELOG.md`, replacing the previously dead-code (never executed by the CLI) `internal/app.ChangelogStepHandler`
+- **`ReplaceDirectives()` guard in `workspaceguard`** for general-purpose `go.mod` inspection, backed by a `TestRootGoModHasNoReplaceDirectives` regression test
 - **Automated release system** with conventional commits support
 - **Pre-release workflow** for develop branch testing
 - **Conventional commits helper script** for consistent commit messages
@@ -21,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributing guidelines
 
 ### Changed
+- **`providers/go` published as an independent module**: removed the temporary `replace github.com/pablogore/shipwright/providers/go => ./providers/go` from the root `go.mod`; `providers/go@v0.1.0` now resolves from `proxy.golang.org` instead of the local path
 - **Release workflow** now triggers automatically on main branch merges
 - **Version determination** now uses conventional commits instead of simple patch increments
 - **CI workflow** now skips tag pushes to avoid conflicts with release workflow
