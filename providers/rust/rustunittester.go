@@ -92,20 +92,26 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 // coverageTotalRegexp/parseCoveragePercentage already parse in
 // providers/go.
 //
-// --engine llvm: tarpaulin's default coverage engine instruments via
-// ptrace, which requires the SYS_PTRACE capability — not granted inside
-// Dagger's sandboxed exec environment, and the documented cause of
-// tarpaulin failing with cargo's generic exit code 101 under container
-// runtimes that restrict ptrace. --engine llvm switches to tarpaulin's
-// LLVM source-based instrumentation, its documented alternative for
-// exactly this class of restricted-container environment. This fix is
-// evidence-based (the known tarpaulin/ptrace-in-containers failure mode,
-// consistent with the exit 101 observed in CI) rather than locally
-// reproduced — no Dagger engine is available in this environment to
-// confirm it directly; it needs a real CI run to verify.
+// --engine llvm: switches tarpaulin to LLVM source-based instrumentation
+// instead of its default ptrace-based engine, which requires the
+// SYS_PTRACE capability Dagger's sandboxed exec doesn't grant. Kept as a
+// defensive default even though it was NOT the cause of the CI failure
+// below (ptrace was the original hypothesis before wrapExecError surfaced
+// the real stderr) — ptrace-in-containers remains a real, separate failure
+// mode this avoids.
+//
+// The actual CI failure (exit code 101) was cargo-tarpaulin's own install
+// step: `cargo install cargo-tarpaulin --locked` with no version pin always
+// pulls the latest release, and tarpaulin 0.37.2's Cargo.toml requires the
+// `edition2024` Cargo feature, which only stabilized in Rust 1.85.0 — the
+// image this ran under was still on the older defaultRustVersion
+// ("1.83.0"). Fixed by bumping defaultRustVersion (rustbuilder.go) to
+// 1.85.0 and pinning --version below, so a future tarpaulin release
+// bumping its own MSRV/edition again can't silently break this the same
+// way.
 func (t *RustUnitTester) enforceCoverageThreshold(ctx context.Context, container *dagger.Container) error {
 	coverageOutput, err := container.
-		WithExec([]string{"cargo", "install", "cargo-tarpaulin", "--locked"}).
+		WithExec([]string{"cargo", "install", "cargo-tarpaulin", "--locked", "--version", "0.37.2"}).
 		WithExec([]string{"cargo", "tarpaulin", "--workspace", "--out", "Stdout", "--engine", "llvm"}).
 		Stdout(ctx)
 	if err != nil {

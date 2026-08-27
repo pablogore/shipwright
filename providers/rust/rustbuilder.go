@@ -28,7 +28,13 @@ import (
 // whenever a caller leaves the toolchain version unspecified. Kept in step
 // with a recent stable Rust release, mirroring providers/go's
 // defaultGoVersion convention.
-const defaultRustVersion = "1.83.0"
+//
+// 1.85.0, not an older release: CI observed cargo-tarpaulin (installed
+// unpinned by RustUnitTester) failing to build under 1.83.0 with "feature
+// `edition2024` is required ... not stabilized in this version of Cargo" —
+// edition2024 stabilized in Rust 1.85.0, so the default toolchain must be
+// at least that to install current cargo-tarpaulin releases.
+const defaultRustVersion = "1.85.0"
 
 // defaultBinaryName mirrors providers/go's defaultBinaryName default output
 // binary name.
