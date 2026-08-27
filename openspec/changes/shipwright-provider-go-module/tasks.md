@@ -22,7 +22,7 @@ Chain strategy: stacked-to-main
 |------|------|-----------|----------------------|-----------------|-------------------|
 | 1 | Extract `providers/go` module, guards, importer swap | PR 1 | `go test -race ./... && GOWORK=off go build ./...` | `examples/workflow/diamond.yaml` run, pre/post compare | `git revert -m 1` (atomic: move + swap + `go.work`) |
 | 1b | Release automation (D6): fix `release.yml`'s 3 unfiltered `git describe` calls, `.goreleaser.yml` ignore_tags, new `release-provider-go.yml`, `internal/releaseguard/tags_test.go` guard | PR 1b (base `develop`, after PR 1 merges) | `go test -race ./internal/releaseguard/...` | N/A — GitHub Actions workflow only runs on a real `providers/go/v*` tag push; local guard test is the proof, no engine needed | Independent revert; touches only `.github/`, `.goreleaser.yml`, one test file |
-| tag | Cut `providers/go/v0.1.0` on PR 1's merge sha, after PR 1b is merged | manual, not a PR | `GOPROXY=direct go list -m .../providers/go@v0.1.0` | N/A — VCS-only; push triggers slice 1b's workflow, which is the runtime harness for the tag itself | Immutable once published; superseded by `v0.1.1`, never deleted |
+| tag | Cut `providers/go/v0.1.0` on PR 1b's merge sha (`ba01182`) which already contains the release workflow | manual, not a PR | `GOPROXY=direct go list -m .../providers/go@v0.1.0` | N/A — VCS-only; push triggers slice 1b's workflow, which is the runtime harness for the tag itself | Immutable once published; superseded by `v0.1.1`, never deleted |
 | 2 | Drop root `replace`, tag-based resolution, `go install` acceptance | PR 2 (base `develop`, after PR 1 + PR 1b + tag) | `go test -race ./...` (no-replace guard) | `go install github.com/pablogore/shipwright@<tag>` from clean `GOMODCACHE` | Independent revert to `replace` state |
 
 ## Phase 1: Slice 1 — Guards RED (TDD)
@@ -73,7 +73,7 @@ Chain strategy: stacked-to-main
 
 ## Phase 7: Tag interlude (manual)
 
-- [ ] 7.1 `git tag providers/go/v0.1.0 <slice-1 merge sha> && git push origin providers/go/v0.1.0` — this push triggers slice 1b's `release-provider-go.yml`
+- [ ] 7.1 `git tag providers/go/v0.1.0 ba011826da6b1a672e06396a0335f8fee27ed041 && git push origin providers/go/v0.1.0` — this push triggers slice 1b's `release-provider-go.yml`
 - [ ] 7.2 Confirm the triggered workflow run is green: shape, identity, isolation build/test, changelog, `gh release create`, and the proxy-visibility gate all pass
 - [ ] 7.3 Confirm resolution: `GOPROXY=direct go list -m github.com/pablogore/shipwright/providers/go@v0.1.0`; if repo visibility is unconfirmed, also `curl -s https://proxy.golang.org/github.com/pablogore/shipwright/@v/list` and report loudly if empty
 
