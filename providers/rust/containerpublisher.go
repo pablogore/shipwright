@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"dagger.io/dagger"
 
+	"github.com/pablogore/shipwright/pkg/containerutil"
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
@@ -58,11 +58,25 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 		return "", errors.New("containerpublisher: ref is empty")
 	}
 
-	entrypoint := computeEntrypoint(p.Config.BinaryName)
+	entrypoint := containerutil.ComputeEntrypoint(p.Config.BinaryName)
 
-	image := p.Client.Container().
+	staged := p.Client.Container().
 		From(defaultPublishBaseImage).
-		WithDirectory("/app", build).
+		WithDirectory("/app", build)
+
+	// PR #176 review finding #7: Config.BinaryName here and the paired
+	// RustBuilder's Config.BinaryName are independently configured
+	// manifest fields with no cross-validation, so a mismatch previously
+	// surfaced only as chmod's opaque "no such file or directory". Fail
+	// with an actionable message before that happens.
+	if _, err := staged.WithExec([]string{"test", "-f", entrypoint}).Sync(ctx); err != nil {
+		return "", fmt.Errorf(
+			"containerpublisher: expected binary at %q not found in container — check that binaryName matches the value used by the paired builder step: %w",
+			entrypoint, err,
+		)
+	}
+
+	image := staged.
 		WithExec([]string{"chmod", "+x", entrypoint}).
 		WithEntrypoint([]string{entrypoint})
 
@@ -70,7 +84,7 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 		if p.Config.RegistryUser == "" {
 			return "", errors.New("containerpublisher: registry credentials provided but RegistryUser is not configured")
 		}
-		image = image.WithRegistryAuth(registryHost(ref), p.Config.RegistryUser, creds)
+		image = image.WithRegistryAuth(containerutil.RegistryHost(ref), p.Config.RegistryUser, creds)
 	}
 
 	publishedRef, err := image.Publish(ctx, ref)
@@ -79,33 +93,4 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 	}
 
 	return publishedRef, nil
-}
-
-// computeEntrypoint returns the in-image path of the binary RustBuilder
-// produced, reusing resolveBinaryName (rustbuilder.go) so a non-default
-// Config.BinaryName and this package's own defaultBinaryName agree on the
-// same fallback ("app") when Config.BinaryName is left empty. Pure helper,
-// unit-testable without a Dagger client.
-func computeEntrypoint(binaryName string) string {
-	return "/app/" + resolveBinaryName(binaryName)
-}
-
-// registryHost extracts the registry address portion of an image
-// reference, e.g. "ghcr.io/acme/api:v1" -> "ghcr.io". A reference with no
-// registry-looking first segment (a bare Docker Hub name such as
-// "acme/api:v1") returns ref unchanged, which Dagger's WithRegistryAuth
-// then treats as docker.io-relative. Pure helper, unit-testable without a
-// Dagger client.
-func registryHost(ref string) string {
-	firstSlash := strings.Index(ref, "/")
-	if firstSlash == -1 {
-		return ref
-	}
-
-	host := ref[:firstSlash]
-	if host != "localhost" && !strings.ContainsAny(host, ".:") {
-		return ref
-	}
-
-	return host
 }

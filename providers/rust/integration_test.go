@@ -339,3 +339,45 @@ edition = "2021"
 		t.Fatalf("lint report contents = %q, want it to include clippy's stderr diagnostics", contents)
 	}
 }
+
+// TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine covers PR
+// #176 review finding #7: ContainerPublisher.Publish's Config.BinaryName
+// and the paired RustBuilder step's Config.BinaryName are independently
+// configured manifest fields with no cross-validation. Before this fix, a
+// mismatch surfaced only as chmod's opaque "no such file or directory";
+// Publish must now fail with an actionable message naming the missing
+// path.
+func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real-container ContainerPublisher integration test in -short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		t.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "my-service"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("failed to write fixture binary: %v", err)
+	}
+
+	build := client.Host().Directory(tmpDir)
+	publisher := &rust.ContainerPublisher{
+		Client: client,
+		// Deliberately omitted: BinaryName. Publish falls back to "app",
+		// but the build directory only contains "my-service" (as a real
+		// RustBuilder run configured with a non-default binaryName would
+		// produce), reproducing the cross-field mismatch.
+	}
+
+	_, err = publisher.Publish(ctx, build, "ghcr.io/acme/api:v1", nil)
+	if err == nil {
+		t.Fatal("ContainerPublisher.Publish() error = nil, want error for a binaryName mismatch")
+	}
+	if !strings.Contains(err.Error(), "expected binary at") || !strings.Contains(err.Error(), "not found in container") {
+		t.Fatalf("ContainerPublisher.Publish() error = %v, want it to name the missing entrypoint path", err)
+	}
+}
