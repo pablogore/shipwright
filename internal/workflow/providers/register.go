@@ -2,6 +2,7 @@ package providers
 
 import (
 	"strconv"
+	"strings"
 
 	"dagger.io/dagger"
 
@@ -76,9 +77,13 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	})
 
 	r.RegisterBuilder(Ref{Name: "rust", Version: "1"}, WithSchema{
-		"binaryName":  interp.KindString,
-		"buildMode":   interp.KindString,
-		"rustVersion": interp.KindString,
+		"binaryName":   interp.KindString,
+		"buildMode":    interp.KindString,
+		"rustVersion":  interp.KindString,
+		"manifestPath": interp.KindString,
+		"package":      interp.KindString,
+		"bin":          interp.KindString,
+		"locked":       interp.KindBool,
 	}, func(v Values) shipwright.Builder {
 		return &rust.RustBuilder{
 			Client: client,
@@ -86,18 +91,59 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 				BinaryName: stringField(v, "binaryName"),
 				BuildMode:  stringField(v, "buildMode"),
 			},
-			RustVersion: stringField(v, "rustVersion"),
+			RustVersion:  stringField(v, "rustVersion"),
+			ManifestPath: stringField(v, "manifestPath"),
+			Package:      stringField(v, "package"),
+			Bin:          stringField(v, "bin"),
+			Locked:       boolField(v, "locked"),
 		}
 	})
 
 	r.RegisterTester(Ref{Name: "rust-test", Version: "1"}, WithSchema{
-		"coverage":    interp.KindInt,
-		"rustVersion": interp.KindString,
+		"coverage":     interp.KindInt,
+		"rustVersion":  interp.KindString,
+		"manifestPath": interp.KindString,
+		"package":      interp.KindString,
+		"features":     interp.KindString,
+		"allFeatures":  interp.KindBool,
+		"locked":       interp.KindBool,
 	}, func(v Values) shipwright.Tester {
 		return &rust.RustUnitTester{
-			Client:      client,
-			Config:      shipwright.TestConfig{Coverage: floatField(v, "coverage")},
-			RustVersion: stringField(v, "rustVersion"),
+			Client:       client,
+			Config:       shipwright.TestConfig{Coverage: floatField(v, "coverage")},
+			RustVersion:  stringField(v, "rustVersion"),
+			ManifestPath: stringField(v, "manifestPath"),
+			Package:      stringField(v, "package"),
+			Features:     splitFeatures(stringField(v, "features")),
+			AllFeatures:  boolField(v, "allFeatures"),
+			Locked:       boolField(v, "locked"),
+		}
+	})
+
+	// "rust-integration-test", registered under the same "test" capability
+	// as "rust-test": runs a separate, service-dependent (Docker/
+	// Testcontainers) suite via its own ManifestPath, distinguished from
+	// "rust-test" purely by provider name and workflow step — see
+	// providers/rust/rustintegrationtester.go's own doc comment for why
+	// this is not a distinct "integration-test" capability kind.
+	r.RegisterTester(Ref{Name: "rust-integration-test", Version: "1"}, WithSchema{
+		"rustVersion":      interp.KindString,
+		"manifestPath":     interp.KindString,
+		"package":          interp.KindString,
+		"features":         interp.KindString,
+		"allFeatures":      interp.KindBool,
+		"locked":           interp.KindBool,
+		"dockerSocketPath": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &rust.RustIntegrationTester{
+			Client:           client,
+			RustVersion:      stringField(v, "rustVersion"),
+			ManifestPath:     stringField(v, "manifestPath"),
+			Package:          stringField(v, "package"),
+			Features:         splitFeatures(stringField(v, "features")),
+			AllFeatures:      boolField(v, "allFeatures"),
+			Locked:           boolField(v, "locked"),
+			DockerSocketPath: stringField(v, "dockerSocketPath"),
 		}
 	})
 
@@ -187,4 +233,41 @@ func floatField(v Values, key string) float64 {
 		return 0
 	}
 	return f
+}
+
+// boolField parses v[key]'s string form as a bool, returning false when
+// key is absent or unparseable, same absent/unparseable-defaults-to-zero
+// convention as floatField.
+func boolField(v Values, key string) bool {
+	val, ok := v[key]
+	if !ok {
+		return false
+	}
+	s, ok := val.String()
+	if !ok {
+		return false
+	}
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return false
+	}
+	return b
+}
+
+// splitFeatures splits a comma-separated "features" with-field (e.g.
+// "test-kit, other-feature") into individual, trimmed feature names.
+// Values has no list kind (interp.Kind is String/Int/Bool/Secret only), so
+// a manifest passes multiple Cargo features as one delimited string.
+func splitFeatures(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	features := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			features = append(features, p)
+		}
+	}
+	return features
 }

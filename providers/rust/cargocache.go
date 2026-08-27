@@ -22,4 +22,12 @@ const (
 	rustBuilderTargetCacheKey    = "shipwright-rust-builder-target"
 	rustUnitTesterTargetCacheKey = "shipwright-rust-unittester-target"
 	rustLinterTargetCacheKey     = "shipwright-rust-linter-target"
+	// rustIntegrationTesterTargetCacheKey is its own key, not shared with
+	// rustUnitTesterTargetCacheKey: RustIntegrationTester's ManifestPath
+	// typically points at a wholly separate Cargo workspace (e.g. ego-rs's
+	// integration-tests/Cargo.toml, deliberately excluded from the main
+	// workspace) with its own dependency graph and feature set
+	// (crash-test-failpoint), so sharing a target dir would invalidate
+	// incremental-compilation state between the two on every run.
+	rustIntegrationTesterTargetCacheKey = "shipwright-rust-integrationtester-target"
 )
