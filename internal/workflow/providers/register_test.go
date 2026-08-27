@@ -277,3 +277,46 @@ func TestRegisterDefaults_RustTest_RustVersionFlowsThrough(t *testing.T) {
 		t.Fatalf("RustUnitTester.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustTester.RustVersion, "1.90.0")
 	}
 }
+
+// TestRegisterDefaults_ClippyAndCargoAudit_RustVersionFlowsThrough is the
+// GREEN evidence that "clippy" and "cargo-audit" — unlike "rust" and
+// "rust-test" — actually expose and wire a rustVersion with-field. Both
+// were registered with an empty WithSchema{} and a factory that ignores v
+// entirely, so a manifest's `with: {rustVersion: ...}` on either silently
+// had no effect, unlike its sibling Rust registrations added in the same
+// PR. Mirrors TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough's
+// own reasoning.
+func TestRegisterDefaults_ClippyAndCargoAudit_RustVersionFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	linter, err := r.ResolveTester(providers.Ref{Name: "clippy", Version: "1"}, providers.Values{
+		"rustVersion": interp.NewString("1.79.0"),
+	})
+	if err != nil || linter == nil {
+		t.Fatalf("ResolveTester(clippy) = (%v, %v), want (non-nil RustLinter, nil)", linter, err)
+	}
+	rustLinter, ok := linter.(*rust.RustLinter)
+	if !ok {
+		t.Fatalf("ResolveTester(clippy) = %T, want *rust.RustLinter", linter)
+	}
+	if rustLinter.RustVersion != "1.79.0" {
+		t.Fatalf("RustLinter.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustLinter.RustVersion, "1.79.0")
+	}
+
+	vulnScanner, err := r.ResolveTester(providers.Ref{Name: "cargo-audit", Version: "1"}, providers.Values{
+		"rustVersion": interp.NewString("1.90.0"),
+	})
+	if err != nil || vulnScanner == nil {
+		t.Fatalf("ResolveTester(cargo-audit) = (%v, %v), want (non-nil RustVulnScanner, nil)", vulnScanner, err)
+	}
+	rustVulnScanner, ok := vulnScanner.(*rust.RustVulnScanner)
+	if !ok {
+		t.Fatalf("ResolveTester(cargo-audit) = %T, want *rust.RustVulnScanner", vulnScanner)
+	}
+	if rustVulnScanner.RustVersion != "1.90.0" {
+		t.Fatalf("RustVulnScanner.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustVulnScanner.RustVersion, "1.90.0")
+	}
+}

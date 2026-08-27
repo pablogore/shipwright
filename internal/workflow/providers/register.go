@@ -104,14 +104,18 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	// "clippy", not "rust-lint": mirrors golangci-lint's own convention of
 	// naming a Tester ref after the actual underlying tool rather than a
 	// generic "<language>-lint" placeholder.
-	r.RegisterTester(Ref{Name: "clippy", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
-		return &rust.RustLinter{Client: client}
+	r.RegisterTester(Ref{Name: "clippy", Version: "1"}, WithSchema{
+		"rustVersion": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &rust.RustLinter{Client: client, RustVersion: stringField(v, "rustVersion")}
 	})
 
 	// "cargo-audit", not "rust-vulncheck": mirrors govulncheck's own
 	// convention of naming a Tester ref after the actual underlying tool.
-	r.RegisterTester(Ref{Name: "cargo-audit", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
-		return &rust.RustVulnScanner{Client: client}
+	r.RegisterTester(Ref{Name: "cargo-audit", Version: "1"}, WithSchema{
+		"rustVersion": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &rust.RustVulnScanner{Client: client, RustVersion: stringField(v, "rustVersion")}
 	})
 
 	// rust.ContainerPublisher is registered under its own ref ("rust-
