@@ -105,6 +105,59 @@ func TestRegisterDefaults_RegistersAllFiveWU3Capabilities(t *testing.T) {
 	}
 }
 
+// providers/rust mirrors providers/go file-for-file (RustBuilder,
+// RustUnitTester, RustLinter, RustVulnScanner, ContainerPublisher). This is
+// the GREEN evidence that RegisterDefaults wires all five of them into a
+// Registry under their own manifest-facing names ("rust", "rust-test",
+// "clippy", "cargo-audit", "rust-container") and each resolves without
+// error, mirroring TestRegisterDefaults_RegistersAllFiveWU3Capabilities.
+func TestRegisterDefaults_RegistersRustProviders(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	builder, err := r.ResolveBuilder(providers.Ref{Name: "rust", Version: "1"}, providers.Values{
+		"binaryName": interp.NewString("myapp"),
+	})
+	if err != nil || builder == nil {
+		t.Fatalf("ResolveBuilder(rust) = (%v, %v), want (non-nil RustBuilder, nil)", builder, err)
+	}
+
+	unitTester, err := r.ResolveTester(providers.Ref{Name: "rust-test", Version: "1"}, providers.Values{})
+	if err != nil || unitTester == nil {
+		t.Fatalf("ResolveTester(rust-test) = (%v, %v), want (non-nil RustUnitTester, nil)", unitTester, err)
+	}
+
+	linter, err := r.ResolveTester(providers.Ref{Name: "clippy", Version: "1"}, providers.Values{})
+	if err != nil || linter == nil {
+		t.Fatalf("ResolveTester(clippy) = (%v, %v), want (non-nil RustLinter, nil)", linter, err)
+	}
+
+	vulnScanner, err := r.ResolveTester(providers.Ref{Name: "cargo-audit", Version: "1"}, providers.Values{})
+	if err != nil || vulnScanner == nil {
+		t.Fatalf("ResolveTester(cargo-audit) = (%v, %v), want (non-nil RustVulnScanner, nil)", vulnScanner, err)
+	}
+
+	publisher, err := r.ResolveArtifactor(providers.Ref{Name: "rust-container", Version: "1"}, providers.Values{
+		"ref":   interp.NewString("ghcr.io/acme/api-rust"),
+		"creds": interp.NewSecret(&dagger.Secret{}),
+	})
+	if err != nil || publisher == nil {
+		t.Fatalf("ResolveArtifactor(rust-container) = (%v, %v), want (non-nil rust.ContainerPublisher, nil)", publisher, err)
+	}
+
+	// "container" (golang.ContainerPublisher's ref) must remain unaffected
+	// by the rust registrations above, and rust's own container ref must
+	// not collide with it.
+	if _, err := r.ResolveArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.Values{
+		"ref":   interp.NewString("ghcr.io/acme/api"),
+		"creds": interp.NewSecret(&dagger.Secret{}),
+	}); err != nil {
+		t.Fatalf("ResolveArtifactor(container) after rust registration = %v, want nil", err)
+	}
+}
+
 // A same-named provider requested via uses.provider (Module=="") must
 // never resolve as though it had been requested via uses.module, and vice
 // versa (design.md D-I: "Module == "" means in-repo") — Ref is keyed by
