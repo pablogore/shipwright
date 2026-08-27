@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	dagger.io/dagger v0.21.8
-	github.com/pablogore/shipwright v0.0.0-20260826044612-e0a737b309af
+	github.com/pablogore/shipwright v0.0.0-20260827195634-902bebc332f7
 )
 
 require (
@@ -23,6 +23,6 @@ require (
 	go.opentelemetry.io/otel v1.41.0 // indirect
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 )
