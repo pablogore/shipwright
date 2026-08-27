@@ -54,6 +54,79 @@ func TestResolveBinaryName(t *testing.T) {
 	}
 }
 
+func TestParseCargoPackageName(t *testing.T) {
+	tests := []struct {
+		name      string
+		cargoToml string
+		want      string
+		wantErr   bool
+	}{
+		{
+			name: "simple package name",
+			cargoToml: `[package]
+name = "my-crate"
+version = "0.1.0"
+edition = "2021"
+`,
+			want: "my-crate",
+		},
+		{
+			name: "package name after other keys",
+			cargoToml: `[package]
+edition = "2021"
+name = "otherservice"
+version = "0.1.0"
+`,
+			want: "otherservice",
+		},
+		{
+			name: "ignores name keys outside [package]",
+			cargoToml: `[dependencies]
+name = "not-the-package-name"
+
+[package]
+name = "realname"
+`,
+			want: "realname",
+		},
+		{
+			name: "single-quoted name",
+			cargoToml: `[package]
+name = 'quoted'
+`,
+			want: "quoted",
+		},
+		{
+			name:      "no package section",
+			cargoToml: "[dependencies]\nserde = \"1\"\n",
+			wantErr:   true,
+		},
+		{
+			name:      "empty input",
+			cargoToml: "",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseCargoPackageName(tt.cargoToml)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("parseCargoPackageName(%q) = %q, want error", tt.cargoToml, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseCargoPackageName(%q) unexpected error: %v", tt.cargoToml, err)
+			}
+			if got != tt.want {
+				t.Fatalf("parseCargoPackageName(%q) = %q, want %q", tt.cargoToml, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestResolveCargoProfile(t *testing.T) {
 	tests := []struct {
 		name    string
