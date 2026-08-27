@@ -54,6 +54,79 @@ func TestResolveBinaryName(t *testing.T) {
 	}
 }
 
+func TestParseCargoPackageName(t *testing.T) {
+	tests := []struct {
+		name      string
+		cargoToml string
+		want      string
+		wantErr   bool
+	}{
+		{
+			name: "simple package name",
+			cargoToml: `[package]
+name = "my-crate"
+version = "0.1.0"
+edition = "2021"
+`,
+			want: "my-crate",
+		},
+		{
+			name: "package name after other keys",
+			cargoToml: `[package]
+edition = "2021"
+name = "otherservice"
+version = "0.1.0"
+`,
+			want: "otherservice",
+		},
+		{
+			name: "ignores name keys outside [package]",
+			cargoToml: `[dependencies]
+name = "not-the-package-name"
+
+[package]
+name = "realname"
+`,
+			want: "realname",
+		},
+		{
+			name: "single-quoted name",
+			cargoToml: `[package]
+name = 'quoted'
+`,
+			want: "quoted",
+		},
+		{
+			name:      "no package section",
+			cargoToml: "[dependencies]\nserde = \"1\"\n",
+			wantErr:   true,
+		},
+		{
+			name:      "empty input",
+			cargoToml: "",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseCargoPackageName(tt.cargoToml)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("parseCargoPackageName(%q) = %q, want error", tt.cargoToml, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseCargoPackageName(%q) unexpected error: %v", tt.cargoToml, err)
+			}
+			if got != tt.want {
+				t.Fatalf("parseCargoPackageName(%q) = %q, want %q", tt.cargoToml, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestResolveCargoProfile(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -142,38 +215,6 @@ func TestWrapExecError(t *testing.T) {
 	})
 }
 
-// TestComputeEntrypoint covers the same bug providers/go's containerpublisher
-// had: ContainerPublisher.Publish hardcoded "/app/"+defaultBinaryName as
-// the entrypoint, ignoring any non-default Config.BinaryName a manifest set
-// via the rust builder — so a manifest using `binaryName: my-service`
-// published an image whose entrypoint pointed at "/app/app", a file that
-// build never produced (the actual file is "/app/my-service").
-// computeEntrypoint must vary with its input rather than always returning
-// "/app/app".
-func TestComputeEntrypoint(t *testing.T) {
-	tests := []struct {
-		name       string
-		binaryName string
-		want       string
-	}{
-		{name: "empty falls back to default", binaryName: "", want: "/app/app"},
-		{name: "explicit binary name changes the entrypoint", binaryName: "my-service", want: "/app/my-service"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := computeEntrypoint(tt.binaryName)
-			if got != tt.want {
-				t.Fatalf("computeEntrypoint(%q) = %q, want %q", tt.binaryName, got, tt.want)
-			}
-		})
-	}
-
-	if got := computeEntrypoint("my-service"); got == "/app/app" {
-		t.Fatalf("computeEntrypoint(%q) = %q, want it to differ from the hardcoded default /app/app", "my-service", got)
-	}
-}
-
 func TestParseTarpaulinCoverage(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -227,25 +268,36 @@ func TestAuditVulnerabilitiesReported(t *testing.T) {
 	}
 }
 
-func TestRegistryHost(t *testing.T) {
-	tests := []struct {
-		name string
-		ref  string
-		want string
-	}{
-		{name: "dotted registry host", ref: "ghcr.io/acme/api:v1", want: "ghcr.io"},
-		{name: "host with port", ref: "localhost:5000/acme/api:v1", want: "localhost:5000"},
-		{name: "bare docker hub name has no registry segment", ref: "acme/api:v1", want: "acme/api:v1"},
-		{name: "no slash at all", ref: "api:v1", want: "api:v1"},
-		{name: "localhost without port", ref: "localhost/acme/api:v1", want: "localhost"},
-	}
+// TestAuditCombinedOutput covers the bug behind rustvulnscanner.go's
+// `combined := output + err.Error()`: dagger.ExecError.Error() never embeds
+// stdout/stderr (only wrapExecError's own doc comment explains why — it
+// defers to an unexported `original` field the dagger package alone
+// populates), so a real cargo-audit failure's CVE details never reached the
+// combined string audited for "N vulnerabilities found!". Constructed the
+// same way as TestWrapExecError's synthetic *dagger.ExecError, for the same
+// reason: only its exported fields (Stdout/Stderr/ExitCode) are settable
+// from outside dagger.io/dagger.
+func TestAuditCombinedOutput(t *testing.T) {
+	t.Run("plain error falls back to Error()", func(t *testing.T) {
+		base := errors.New("boom")
+		got := auditCombinedOutput("partial output", base)
+		if !strings.Contains(got, "partial output") || !strings.Contains(got, "boom") {
+			t.Fatalf("auditCombinedOutput() = %q, want it to contain the output and the base error", got)
+		}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := registryHost(tt.ref)
-			if got != tt.want {
-				t.Fatalf("registryHost(%q) = %q, want %q", tt.ref, got, tt.want)
-			}
-		})
-	}
+	t.Run("ExecError contributes its own stdout and stderr", func(t *testing.T) {
+		execErr := &dagger.ExecError{
+			ExitCode: 1,
+			Stdout:   "Scanning Cargo.lock for vulnerabilities (42 crate dependencies)\nerror: 1 vulnerability found!\n",
+			Stderr:   "warning: unmaintained crate\n",
+		}
+		got := auditCombinedOutput("", execErr)
+		if !strings.Contains(got, "1 vulnerability found!") {
+			t.Fatalf("auditCombinedOutput() = %q, want it to contain the ExecError's Stdout", got)
+		}
+		if !strings.Contains(got, "unmaintained crate") {
+			t.Fatalf("auditCombinedOutput() = %q, want it to contain the ExecError's Stderr", got)
+		}
+	})
 }

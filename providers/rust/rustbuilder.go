@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"dagger.io/dagger"
 
@@ -87,14 +88,33 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 	}
 
 	rustVersion := resolveRustVersion(b.RustVersion)
-	binaryName := resolveBinaryName(b.Config.BinaryName)
 	profile := resolveCargoProfile(b.Config.BuildMode)
 	subdir := targetSubdir(profile)
 
+	// Unlike GoBuilder's defaultBinaryName ("app"), a hardcoded fallback
+	// here can't ever be correct: cargo always names its build output after
+	// the crate's actual package name (Cargo.toml's [package].name), never
+	// a caller-chosen "-o" path, so a Config.BinaryName-less manifest must
+	// infer the real name from the source itself rather than guess "app"
+	// and have the build's cp step fail against almost every real crate.
+	binaryName := b.Config.BinaryName
+	if binaryName == "" {
+		cargoToml, err := source.File("Cargo.toml").Contents(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("rustbuilder: binaryName not set and failed to read Cargo.toml to infer it: %w", err)
+		}
+		binaryName, err = parseCargoPackageName(cargoToml)
+		if err != nil {
+			return nil, fmt.Errorf("rustbuilder: binaryName not set and failed to infer it from Cargo.toml: %w", err)
+		}
+	}
+
 	container := b.Client.Container().
 		From("rust:"+rustVersion).
+		WithMountedCache(cargoRegistryMountPath, b.Client.CacheVolume(cargoRegistryCacheKey)).
 		WithMountedDirectory("/app", source).
 		WithWorkdir("/app").
+		WithMountedCache("/app/target", b.Client.CacheVolume(rustBuilderTargetCacheKey)).
 		WithExec(cargoBuildArgs(profile))
 
 	// Unlike `go build -o`, cargo does not accept an arbitrary output
@@ -111,7 +131,7 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 
 	built, err := container.Sync(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("rustbuilder: failed to build rust binary: %w", err)
+		return nil, wrapExecError("rustbuilder: failed to build rust binary", err)
 	}
 
 	return built.Directory("/output"), nil
@@ -160,6 +180,37 @@ func resolveCargoProfile(cfgMode string) string {
 		return defaultCargoProfile
 	}
 	return cfgMode
+}
+
+// parseCargoPackageName extracts the `name` key from a Cargo.toml's
+// [package] table, the crate name cargo uses to name its build output under
+// target/<profile>/. A minimal line scanner rather than a full TOML parser:
+// providers/rust has no TOML dependency (go.mod), and only ever needs this
+// one key from one well-known table.
+func parseCargoPackageName(cargoToml string) (string, error) {
+	inPackageSection := false
+	for _, line := range strings.Split(cargoToml, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") {
+			inPackageSection = trimmed == "[package]"
+			continue
+		}
+		if !inPackageSection {
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, "=")
+		if !ok || strings.TrimSpace(key) != "name" {
+			continue
+		}
+		name := strings.Trim(strings.TrimSpace(value), `"'`)
+		if name != "" {
+			return name, nil
+		}
+	}
+	return "", errors.New("no [package] name found in Cargo.toml")
 }
 
 // targetSubdir returns the target/ subdirectory cargo places profile's

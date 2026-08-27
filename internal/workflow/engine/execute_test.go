@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -579,6 +580,62 @@ func TestExecute_InputReferencingNonDirectoryOutputIsRejected(t *testing.T) {
 	}
 	if kindErr.ReferencedStepID != "unit" || kindErr.Want != "directory" {
 		t.Fatalf("OutputKindMismatchError = %+v, want ReferencedStepID=unit Want=directory", kindErr)
+	}
+}
+
+// Closing the WU5/WU6 loop, container leg: a step's "input" field
+// referencing a Runner step's output must be able to consume it — a
+// Runner's *dagger.Container is a legitimate producer of Directory-typed
+// input, not just a Builder. Before this fix, resolveInput accepted only
+// outputDirectory, so a Runner's container was unconditionally rejected
+// with *engine.OutputKindMismatchError{Want: "directory"}, silently
+// discarding whatever the Runner produced (for example ChangelogRunner's
+// updated CHANGELOG.md) instead of feeding it downstream.
+//
+// fakeRunner returns a nil *dagger.Container by default — constructing a
+// real, non-nil *dagger.Container requires an actual connected Dagger
+// engine (see integration_test.go-style real-engine coverage elsewhere in
+// this tree for the full container -> directory export path), which this
+// fakes-only engine package deliberately never uses (package doc comment
+// above). This test proves the regression this finding reports is fixed at
+// the kind-check boundary: a container-typed output is no longer rejected
+// outright with OutputKindMismatchError; it now reaches the container
+// export step and fails there instead, on a distinct, more specific guard.
+func TestExecute_InputCanReferenceContainerOutput(t *testing.T) {
+	t.Parallel()
+
+	reg := providers.NewRegistry()
+	reg.RegisterRunner(providers.Ref{Name: "changelog", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Runner {
+		return fakeRunner{}
+	})
+	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
+		return fakeBuilder{}
+	})
+
+	steps := []manifest.Step{
+		{ID: "changelog", Capability: "run", Uses: manifest.UsesSpec{Provider: "changelog", Version: "1"}},
+		{ID: "build", Capability: "build", Uses: manifest.UsesSpec{Provider: "go", Version: "1"}, Needs: []string{"changelog"}, Input: "${{ steps.changelog.output }}"},
+	}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	cfg := engine.Config{Steps: steps, Graph: g, Registry: reg}
+
+	_, err = engine.Execute(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Execute() error = nil, want an error (fakeRunner returns a nil container)")
+	}
+	var stepFailed *engine.StepFailedError
+	if !errors.As(err, &stepFailed) {
+		t.Fatalf("Execute() error = %v (%T), want *engine.StepFailedError", err, err)
+	}
+	var kindErr *engine.OutputKindMismatchError
+	if errors.As(stepFailed.Err, &kindErr) {
+		t.Fatalf("StepFailedError.Err = %v, want the container output to be ACCEPTED (not rejected as a kind mismatch) — got the pre-fix OutputKindMismatchError", stepFailed.Err)
+	}
+	if !strings.Contains(stepFailed.Err.Error(), "nil container") {
+		t.Fatalf("StepFailedError.Err = %v, want it to mention the nil-container guard", stepFailed.Err)
 	}
 }
 

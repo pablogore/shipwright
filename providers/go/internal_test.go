@@ -47,37 +47,6 @@ func TestResolveBinaryName(t *testing.T) {
 	}
 }
 
-// TestComputeEntrypoint covers the bug a real reviewer found in PR #174:
-// ContainerPublisher.Publish hardcoded "/app/"+defaultBinaryName as the
-// entrypoint, ignoring any non-default Config.BinaryName a manifest set
-// via GoBuilder — so a manifest using `binaryName: my-service` published
-// an image whose entrypoint pointed at "/app/app", a file that build never
-// produced. computeEntrypoint must vary with its input rather than always
-// returning "/app/app".
-func TestComputeEntrypoint(t *testing.T) {
-	tests := []struct {
-		name       string
-		binaryName string
-		want       string
-	}{
-		{name: "empty falls back to default", binaryName: "", want: "/app/app"},
-		{name: "explicit binary name changes the entrypoint", binaryName: "my-service", want: "/app/my-service"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := computeEntrypoint(tt.binaryName)
-			if got != tt.want {
-				t.Fatalf("computeEntrypoint(%q) = %q, want %q", tt.binaryName, got, tt.want)
-			}
-		})
-	}
-
-	if got := computeEntrypoint("my-service"); got == "/app/app" {
-		t.Fatalf("computeEntrypoint(%q) = %q, want it to differ from the hardcoded default /app/app", "my-service", got)
-	}
-}
-
 func TestParseCoveragePercentage(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -138,29 +107,6 @@ func TestVulnerabilitiesReported(t *testing.T) {
 			got := vulnerabilitiesReported(tt.output)
 			if got != tt.want {
 				t.Fatalf("vulnerabilitiesReported(%q) = %v, want %v", tt.output, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestRegistryHost(t *testing.T) {
-	tests := []struct {
-		name string
-		ref  string
-		want string
-	}{
-		{name: "dotted registry host", ref: "ghcr.io/acme/api:v1", want: "ghcr.io"},
-		{name: "host with port", ref: "localhost:5000/acme/api:v1", want: "localhost:5000"},
-		{name: "bare docker hub name has no registry segment", ref: "acme/api:v1", want: "acme/api:v1"},
-		{name: "no slash at all", ref: "api:v1", want: "api:v1"},
-		{name: "localhost without port", ref: "localhost/acme/api:v1", want: "localhost"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := registryHost(tt.ref)
-			if got != tt.want {
-				t.Fatalf("registryHost(%q) = %q, want %q", tt.ref, got, tt.want)
 			}
 		})
 	}

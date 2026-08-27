@@ -100,6 +100,51 @@ func TestChangelogRunner_Run_RealEngine_NoTagBootstrap(t *testing.T) {
 	}
 }
 
+// TestChangelogRunner_Run_RealEngine_EmptyHistoryLeavesChangelogUntouched
+// covers a genuinely fresh repository with zero commits (an unborn HEAD) —
+// distinct from TestChangelogRunner_Run_RealEngine_NoTagBootstrap's "no tag
+// yet, but commits exist" case. `git log` itself fails against an unborn
+// HEAD ("fatal: your current branch ... does not have any commits yet"),
+// which previously hard-failed the whole step instead of falling through to
+// "no classifiable commits", exactly what Run's own doc comment promises
+// ("When there are no classifiable commits, the changelog is left
+// untouched").
+func TestChangelogRunner_Run_RealEngine_EmptyHistoryLeavesChangelogUntouched(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real-container ChangelogRunner integration test in -short mode")
+	}
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		t.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	tmpDir := initGitRepoWithChangelog(t, "# Changelog\n\n## [Unreleased]\n\n### Added\n- existing entry\n")
+	// Deliberately no commitFile call: the repository has zero commits, so
+	// HEAD is unborn and `git log` fails.
+
+	src := client.Host().Directory(tmpDir)
+	runner := &providers.ChangelogRunner{Client: client}
+
+	out, err := runner.Run(ctx, src)
+	if err != nil {
+		t.Fatalf("ChangelogRunner.Run() error = %v, want nil — an empty history should leave the changelog untouched, not fail the step", err)
+	}
+	if out == nil {
+		t.Fatal("ChangelogRunner.Run() returned a nil Container on success")
+	}
+
+	content, err := out.File("CHANGELOG.md").Contents(ctx)
+	if err != nil {
+		t.Fatalf("failed to read CHANGELOG.md from the resulting container: %v", err)
+	}
+	if content != "# Changelog\n\n## [Unreleased]\n\n### Added\n- existing entry\n" {
+		t.Fatalf("CHANGELOG.md content = %q, want it byte-for-byte untouched", content)
+	}
+}
+
 // TestChangelogRunner_Run_NilClient covers the nil-client guard clause —
 // a plain unit test, no Dagger engine involved.
 func TestChangelogRunner_Run_NilClient(t *testing.T) {

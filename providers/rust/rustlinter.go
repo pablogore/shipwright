@@ -3,7 +3,6 @@ package rust
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"dagger.io/dagger"
 
@@ -45,17 +44,32 @@ func (l *RustLinter) Test(ctx context.Context, source *dagger.Directory) (*dagge
 
 	container := l.Client.Container().
 		From("rust:"+rustVersion).
+		WithMountedCache(cargoRegistryMountPath, l.Client.CacheVolume(cargoRegistryCacheKey)).
 		WithMountedDirectory("/app", source).
 		WithWorkdir("/app").
+		WithMountedCache("/app/target", l.Client.CacheVolume(rustLinterTargetCacheKey)).
 		WithExec([]string{"rustup", "component", "add", "clippy"})
 
-	output, err := container.
-		WithExec([]string{"cargo", "clippy", "--all-targets", "--", "-D", "warnings"}).
-		Stdout(ctx)
+	lintContainer := container.WithExec([]string{"cargo", "clippy", "--all-targets", "--", "-D", "warnings"})
+
+	stdout, err := lintContainer.Stdout(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("rustlinter: cargo clippy found issues: %w", err)
+		return nil, wrapExecError("rustlinter: cargo clippy found issues", err)
+	}
+	// clippy, like rustc, writes its actual diagnostics (warnings/errors) to
+	// stderr rather than stdout — capturing only Stdout above left the
+	// report file (and, before wrapExecError, the returned error) without
+	// clippy's real diagnostic detail.
+	stderr, err := lintContainer.Stderr(ctx)
+	if err != nil {
+		return nil, wrapExecError("rustlinter: cargo clippy found issues", err)
 	}
 
-	reportContainer := container.WithNewFile("/tmp/lint-report.txt", output)
+	report := stdout
+	if stderr != "" {
+		report += "\n" + stderr
+	}
+
+	reportContainer := container.WithNewFile("/tmp/lint-report.txt", report)
 	return reportContainer.File("/tmp/lint-report.txt"), nil
 }
