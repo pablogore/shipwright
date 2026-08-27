@@ -29,12 +29,15 @@ import (
 // with a recent stable Rust release, mirroring providers/go's
 // defaultGoVersion convention.
 //
-// 1.85.0, not an older release: CI observed cargo-tarpaulin (installed
-// unpinned by RustUnitTester) failing to build under 1.83.0 with "feature
-// `edition2024` is required ... not stabilized in this version of Cargo" —
-// edition2024 stabilized in Rust 1.85.0, so the default toolchain must be
-// at least that to install current cargo-tarpaulin releases.
-const defaultRustVersion = "1.85.0"
+// 1.91.0, not an older release: CI observed cargo-tarpaulin==0.37.2
+// (RustUnitTester's pinned coverage tool) failing to build twice as this
+// value was raised — first under 1.83.0 ("feature `edition2024` is
+// required", stabilized in 1.85.0), then again under 1.85.0 itself
+// ("rustc 1.85.0 is not supported by the following packages:
+// cargo-platform@0.3.3 requires rustc 1.91", the highest MSRV among
+// tarpaulin's own locked transitive dependencies). 1.91.0 is that highest
+// observed requirement, not a guess.
+const defaultRustVersion = "1.91.0"
 
 // defaultBinaryName mirrors providers/go's defaultBinaryName default output
 // binary name.
