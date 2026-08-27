@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -113,7 +112,12 @@ func (r *ChangelogRunner) Run(ctx context.Context, build *dagger.Directory) (*da
 	}
 	logOutput, err := container.WithExec(logArgs).Stdout(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("changelogrunner: git log failed: %w", err)
+		// An unborn HEAD (a genuinely fresh repository with zero commits)
+		// makes `git log` itself fail, not just find nothing — the same "no
+		// history yet" bootstrap case the `git describe` failure above
+		// already tolerates. Treated as "no classifiable commits" rather
+		// than a hard failure, matching Run's own doc comment.
+		logOutput = ""
 	}
 
 	subjects := changelogCommitSubjects(logOutput)
