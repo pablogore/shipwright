@@ -15,13 +15,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-// Temporary local-development resolution mechanism, explicitly sanctioned
-// by proposal.md D4 as a slice-1-only interim: the providers/go/v0.1.0 tag
-// does not exist until the Phase 4 tag interlude runs after this slice
-// merges. Slice 2 removes this replace directive once the tag is published
-// and the committed root go.mod resolves it from a real published version.
-replace github.com/pablogore/shipwright/providers/go => ./providers/go
-
 require (
 	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
