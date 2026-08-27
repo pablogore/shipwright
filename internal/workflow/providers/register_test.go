@@ -248,3 +248,32 @@ func TestRegisterDefaults_ContainerPublishers_BinaryNameFlowsThrough(t *testing.
 		t.Fatalf("rust.ContainerPublisher.Config.BinaryName = %q, want %q — the manifest's binaryName with-field never reached the provider", rustContainerPublisher.Config.BinaryName, "my-rust-service")
 	}
 }
+
+// TestRegisterDefaults_RustTest_RustVersionFlowsThrough is the P2 GREEN
+// evidence: "rust-test" must expose its own rustVersion with-field, wired
+// into RustUnitTester.RustVersion, so a manifest that builds with a
+// non-default rustVersion doesn't silently test against the unrelated
+// default toolchain — mirrors
+// TestRegisterDefaults_RustBuilder_RustVersionFlowsThrough's own reasoning
+// for the "rust" builder.
+func TestRegisterDefaults_RustTest_RustVersionFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "rust-test", Version: "1"}, providers.Values{
+		"rustVersion": interp.NewString("1.90.0"),
+	})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(rust-test) = (%v, %v), want (non-nil RustUnitTester, nil)", tester, err)
+	}
+
+	rustTester, ok := tester.(*rust.RustUnitTester)
+	if !ok {
+		t.Fatalf("ResolveTester(rust-test) = %T, want *rust.RustUnitTester", tester)
+	}
+	if rustTester.RustVersion != "1.90.0" {
+		t.Fatalf("RustUnitTester.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustTester.RustVersion, "1.90.0")
+	}
+}

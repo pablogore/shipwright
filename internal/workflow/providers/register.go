@@ -91,11 +91,13 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	})
 
 	r.RegisterTester(Ref{Name: "rust-test", Version: "1"}, WithSchema{
-		"coverage": interp.KindInt,
+		"coverage":    interp.KindInt,
+		"rustVersion": interp.KindString,
 	}, func(v Values) shipwright.Tester {
 		return &rust.RustUnitTester{
-			Client: client,
-			Config: shipwright.TestConfig{Coverage: floatField(v, "coverage")},
+			Client:      client,
+			Config:      shipwright.TestConfig{Coverage: floatField(v, "coverage")},
+			RustVersion: stringField(v, "rustVersion"),
 		}
 	})
 
