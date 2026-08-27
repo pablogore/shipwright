@@ -1,6 +1,12 @@
 package rust
 
-import "testing"
+import (
+	"errors"
+	"strings"
+	"testing"
+
+	"dagger.io/dagger"
+)
 
 // Unit tests for unexported pure helpers shared across this package's
 // capability implementations. In-package (not rust_test) because these
@@ -89,6 +95,82 @@ func TestTargetSubdir(t *testing.T) {
 				t.Fatalf("targetSubdir(%q) = %q, want %q", tt.profile, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestWrapExecError covers the CI blind spot from
+// TestRustUnitTester_Test_RealEngine_PassesWithinThreshold's exit-code-101
+// failure: a bare `%w`-wrapped dagger.ExecError never surfaces stderr, so
+// wrapExecError must expand it into the outer message. The *dagger.ExecError
+// case is constructed via a keyed literal that only sets its exported
+// fields (Stderr/ExitCode is all this package can set from outside
+// dagger.io/dagger), leaving its unexported `original` field nil — proof
+// that wrapExecError reads only exported fields (never Error()/Message(),
+// which would panic against that nil field) is what keeps this safe to run
+// without a live Dagger client.
+func TestWrapExecError(t *testing.T) {
+	t.Run("plain error wraps normally", func(t *testing.T) {
+		base := errors.New("boom")
+		got := wrapExecError("rustunittester: tests failed", base)
+		if got == nil {
+			t.Fatal("wrapExecError() = nil, want non-nil error")
+		}
+		if !strings.Contains(got.Error(), "rustunittester: tests failed") || !strings.Contains(got.Error(), "boom") {
+			t.Fatalf("wrapExecError() = %q, want it to contain the prefix and the base error", got.Error())
+		}
+		if !errors.Is(got, base) {
+			t.Fatal("wrapExecError() does not unwrap to the original error via errors.Is")
+		}
+	})
+
+	t.Run("ExecError expands exit code and stderr", func(t *testing.T) {
+		execErr := &dagger.ExecError{
+			ExitCode: 101,
+			Stderr:   "thread 'main' panicked: ptrace(2): Operation not permitted (os error 1)\n",
+		}
+		got := wrapExecError("rustunittester: failed to compute coverage", execErr)
+		if got == nil {
+			t.Fatal("wrapExecError() = nil, want non-nil error")
+		}
+		msg := got.Error()
+		if !strings.Contains(msg, "101") {
+			t.Fatalf("wrapExecError() = %q, want it to contain the exit code 101", msg)
+		}
+		if !strings.Contains(msg, "ptrace") {
+			t.Fatalf("wrapExecError() = %q, want it to contain the captured stderr", msg)
+		}
+	})
+}
+
+// TestComputeEntrypoint covers the same bug providers/go's containerpublisher
+// had: ContainerPublisher.Publish hardcoded "/app/"+defaultBinaryName as
+// the entrypoint, ignoring any non-default Config.BinaryName a manifest set
+// via the rust builder — so a manifest using `binaryName: my-service`
+// published an image whose entrypoint pointed at "/app/app", a file that
+// build never produced (the actual file is "/app/my-service").
+// computeEntrypoint must vary with its input rather than always returning
+// "/app/app".
+func TestComputeEntrypoint(t *testing.T) {
+	tests := []struct {
+		name       string
+		binaryName string
+		want       string
+	}{
+		{name: "empty falls back to default", binaryName: "", want: "/app/app"},
+		{name: "explicit binary name changes the entrypoint", binaryName: "my-service", want: "/app/my-service"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeEntrypoint(tt.binaryName)
+			if got != tt.want {
+				t.Fatalf("computeEntrypoint(%q) = %q, want %q", tt.binaryName, got, tt.want)
+			}
+		})
+	}
+
+	if got := computeEntrypoint("my-service"); got == "/app/app" {
+		t.Fatalf("computeEntrypoint(%q) = %q, want it to differ from the hardcoded default /app/app", "my-service", got)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"dagger.io/dagger"
 
@@ -64,7 +65,7 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 
 	testOutput, err := container.Stdout(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("rustunittester: tests failed: %w", err)
+		return nil, wrapExecError("rustunittester: tests failed", err)
 	}
 
 	if t.Config.Coverage > 0 {
@@ -90,13 +91,25 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 // of `go tool cover -func`'s single total line that
 // coverageTotalRegexp/parseCoveragePercentage already parse in
 // providers/go.
+//
+// --engine llvm: tarpaulin's default coverage engine instruments via
+// ptrace, which requires the SYS_PTRACE capability — not granted inside
+// Dagger's sandboxed exec environment, and the documented cause of
+// tarpaulin failing with cargo's generic exit code 101 under container
+// runtimes that restrict ptrace. --engine llvm switches to tarpaulin's
+// LLVM source-based instrumentation, its documented alternative for
+// exactly this class of restricted-container environment. This fix is
+// evidence-based (the known tarpaulin/ptrace-in-containers failure mode,
+// consistent with the exit 101 observed in CI) rather than locally
+// reproduced — no Dagger engine is available in this environment to
+// confirm it directly; it needs a real CI run to verify.
 func (t *RustUnitTester) enforceCoverageThreshold(ctx context.Context, container *dagger.Container) error {
 	coverageOutput, err := container.
 		WithExec([]string{"cargo", "install", "cargo-tarpaulin", "--locked"}).
-		WithExec([]string{"cargo", "tarpaulin", "--workspace", "--out", "Stdout"}).
+		WithExec([]string{"cargo", "tarpaulin", "--workspace", "--out", "Stdout", "--engine", "llvm"}).
 		Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("rustunittester: failed to compute coverage: %w", err)
+		return wrapExecError("rustunittester: failed to compute coverage", err)
 	}
 
 	pct, err := parseTarpaulinCoverage(coverageOutput)
@@ -109,6 +122,32 @@ func (t *RustUnitTester) enforceCoverageThreshold(ctx context.Context, container
 	}
 
 	return nil
+}
+
+// wrapExecError formats err as a prefixed error, expanding a
+// *dagger.ExecError into its captured exit code and stderr rather than
+// leaving a bare `%w`-wrapped message — the blind spot that made
+// TestRustUnitTester_Test_RealEngine_PassesWithinThreshold's CI failure
+// ("rustunittester: failed to compute coverage: exit code: 101")
+// undiagnosable from the error text alone, since
+// dagger.ExecError.Error()/.Message() carries only the generic "process
+// ... did not complete successfully" text and never the command's actual
+// stderr output.
+//
+// Deliberately reads only ExecError's exported fields (ExitCode, Stderr)
+// rather than calling its Error()/Message() methods: those methods defer
+// to an unexported `original` field that only Dagger's own error
+// construction ever populates, so calling them on a synthetically built
+// *dagger.ExecError (as a unit test must, since that field can't be set
+// from outside the dagger package) would panic on a nil interface. Reading
+// only the exported fields keeps this helper safe to unit-test without a
+// live Dagger client, while behaving identically against a real one.
+func wrapExecError(prefix string, err error) error {
+	var execErr *dagger.ExecError
+	if errors.As(err, &execErr) {
+		return fmt.Errorf("%s: exit code %d: stderr: %s", prefix, execErr.ExitCode, strings.TrimSpace(execErr.Stderr))
+	}
+	return fmt.Errorf("%s: %w", prefix, err)
 }
 
 // parseTarpaulinCoverage extracts the total line-coverage percentage from
