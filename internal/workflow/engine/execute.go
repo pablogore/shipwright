@@ -33,6 +33,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -447,7 +448,7 @@ func executeStepOnce(ctx context.Context, s manifest.Step, outputs map[string]re
 		defer cancel()
 	}
 
-	input, err := resolveInput(s, outputs, cfg.Source)
+	input, err := resolveInput(stepCtx, s, outputs, cfg.Source)
 	if err != nil {
 		return result{}, err
 	}
@@ -471,8 +472,10 @@ func executeStepOnce(ctx context.Context, s manifest.Step, outputs map[string]re
 // default Source when Input is unset (design.md D-H schema simplification
 // note — "A step's Directory-typed input is bound by steps[].input,
 // default spec.source"), or the Directory produced by exactly one
-// "${{ steps.<id>.output }}" reference.
-func resolveInput(s manifest.Step, outputs map[string]result, source *dagger.Directory) (*dagger.Directory, error) {
+// "${{ steps.<id>.output }}" reference — either directly (a Builder's
+// outputDirectory) or exported from a Runner's outputContainer via
+// containerOutputDirectory.
+func resolveInput(ctx context.Context, s manifest.Step, outputs map[string]result, source *dagger.Directory) (*dagger.Directory, error) {
 	if s.Input == "" {
 		return source, nil
 	}
@@ -490,10 +493,48 @@ func resolveInput(s manifest.Step, outputs map[string]result, source *dagger.Dir
 	if !ok {
 		return nil, &MissingStepOutputError{StepID: s.ID, ReferencedStepID: refStepID}
 	}
-	if out.kind != outputDirectory {
+
+	switch out.kind {
+	case outputDirectory:
+		return out.directory, nil
+	case outputContainer:
+		dir, err := containerOutputDirectory(ctx, out.container)
+		if err != nil {
+			return nil, fmt.Errorf("engine: step %q field \"input\": %w", s.ID, err)
+		}
+		return dir, nil
+	default:
 		return nil, &OutputKindMismatchError{StepID: s.ID, ReferencedStepID: refStepID, Field: "input", Want: "directory"}
 	}
-	return out.directory, nil
+}
+
+// containerOutputDirectory exports a Runner's produced Container as a
+// Directory, so a downstream step's Input can consume it the same way it
+// consumes a Builder's Directory output — otherwise a Runner's output (for
+// example ChangelogRunner's updated CHANGELOG.md) has no path back into the
+// workflow and is silently discarded.
+//
+// The exported subtree is rooted at the container's own working directory
+// (dagger.Container.Workdir), not "/": a Runner's container commonly still
+// carries its full base-image filesystem (see providers/changelog.go's
+// alpine base), so exporting "/" would hand a downstream Directory-typed
+// input the entire OS layer instead of just the workspace the Runner
+// actually mutated. A Runner that wants its container consumed downstream
+// this way is expected to leave WithWorkdir pointing at that workspace
+// before returning — the same convention a container image's own WORKDIR
+// already carries.
+func containerOutputDirectory(ctx context.Context, container *dagger.Container) (*dagger.Directory, error) {
+	if container == nil {
+		return nil, errors.New("engine: runner produced a nil container, cannot export its directory")
+	}
+	workdir, err := container.Workdir(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("engine: failed to resolve container workdir: %w", err)
+	}
+	if workdir == "" {
+		workdir = "/"
+	}
+	return container.Directory(workdir), nil
 }
 
 // resolveWith interpolates and binds every entry in s.With into a
