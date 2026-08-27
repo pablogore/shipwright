@@ -63,7 +63,7 @@ func TestConfigStructs_ScopedToOwnCapability(t *testing.T) {
 			name: "ArtifactConfig",
 			typ:  reflect.TypeFor[shipwright.ArtifactConfig](),
 			fields: []string{
-				"BranchName", "BuildTag", "CommitSHA", "ImageName", "ImageTag",
+				"BinaryName", "BranchName", "BuildTag", "CommitSHA", "ImageName", "ImageTag",
 				"Registry", "RegistryPass", "RegistryToken", "RegistryURL",
 				"RegistryUser", "Token", "Version",
 			},

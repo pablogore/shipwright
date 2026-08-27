@@ -35,14 +35,15 @@ const defaultPublishBaseImage = "alpine:latest"
 //     RegistryUser (shipwright.ArtifactConfig, also shipped in WU1)
 //     supplies that missing piece, preserving the legacy split between a
 //     configured username and a secret credential.
-//   - shipwright.ArtifactConfig has no binary-filename field (only
-//     ImageName, the published image's name), so this type assumes the
-//     build Directory contains a single binary named defaultBinaryName
-//     ("app") — the same default GoBuilder uses when its own
-//     BuildConfig.BinaryName is left empty. Threading a custom binary name
-//     across the Build -> Artifact boundary would require a manifest-level
-//     binding (Phase 7's provider `with` values) and is out of scope for
-//     this purely-additive work unit.
+//   - shipwright.ArtifactConfig.BinaryName carries the binary filename
+//     across the Build -> Artifact boundary (a manifest-level `with`
+//     binding, register.go), computed by computeEntrypoint below. Left
+//     empty, this type assumes the build Directory contains a single
+//     binary named defaultBinaryName ("app") — the same default GoBuilder
+//     uses when its own BuildConfig.BinaryName is left empty. A caller
+//     that sets a non-default BuildConfig.BinaryName on GoBuilder MUST set
+//     the matching ArtifactConfig.BinaryName here, or Publish computes an
+//     entrypoint pointing at a file the build never produced.
 type ContainerPublisher struct {
 	// Client is the Dagger client used to construct the runtime image.
 	Client *dagger.Client
@@ -69,7 +70,7 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 		return "", errors.New("containerpublisher: ref is empty")
 	}
 
-	entrypoint := "/app/" + defaultBinaryName
+	entrypoint := computeEntrypoint(p.Config.BinaryName)
 
 	image := p.Client.Container().
 		From(defaultPublishBaseImage).
@@ -90,6 +91,15 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 	}
 
 	return publishedRef, nil
+}
+
+// computeEntrypoint returns the in-image path of the binary a Builder
+// produced, reusing resolveBinaryName (gobuilder.go) so a non-default
+// BuildConfig.BinaryName and the matching ArtifactConfig.BinaryName agree
+// on the same fallback ("app") when either is left empty. Pure helper,
+// unit-testable without a Dagger client.
+func computeEntrypoint(binaryName string) string {
+	return "/app/" + resolveBinaryName(binaryName)
 }
 
 // registryHost extracts the registry address portion of an image

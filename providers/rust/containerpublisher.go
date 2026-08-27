@@ -58,7 +58,7 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 		return "", errors.New("containerpublisher: ref is empty")
 	}
 
-	entrypoint := "/app/" + defaultBinaryName
+	entrypoint := computeEntrypoint(p.Config.BinaryName)
 
 	image := p.Client.Container().
 		From(defaultPublishBaseImage).
@@ -79,6 +79,15 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 	}
 
 	return publishedRef, nil
+}
+
+// computeEntrypoint returns the in-image path of the binary RustBuilder
+// produced, reusing resolveBinaryName (rustbuilder.go) so a non-default
+// Config.BinaryName and this package's own defaultBinaryName agree on the
+// same fallback ("app") when Config.BinaryName is left empty. Pure helper,
+// unit-testable without a Dagger client.
+func computeEntrypoint(binaryName string) string {
+	return "/app/" + resolveBinaryName(binaryName)
 }
 
 // registryHost extracts the registry address portion of an image
