@@ -1,6 +1,15 @@
 # Shipwright Makefile
 # Usage: make [target] [options]
 
+# GNU Make defaults every recipe to /bin/sh, ignoring the invoking user's
+# shell. On macOS /bin/sh is bash in POSIX mode (accepts `set -o pipefail`),
+# but on Linux CI runners /bin/sh is dash, which rejects it outright
+# ("Illegal option -o pipefail") — caught when the `security` target failed
+# on the first real push to develop that exercised it via ci-final, despite
+# passing every local run on macOS. Force bash for every recipe so bash-only
+# syntax (pipefail, [[ ]], etc.) behaves identically on every platform.
+SHELL := /bin/bash
+
 # Variables
 GOCMD=go
 GOBUILD=$(GOCMD) build
