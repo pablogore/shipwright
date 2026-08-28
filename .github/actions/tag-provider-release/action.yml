@@ -1,0 +1,98 @@
+name: 'Tag provider release'
+description: >-
+  Shared helper (used by providers/go and providers/rust, and any future
+  provider) that automates the tag-creation half of design.md D6's
+  tag-reacting release model. Checks whether provider-path has any commits
+  since its own tag-prefix's latest tag; if none, no-ops (a provider whose
+  path did not change never gets a new tag or release -- "nunca se dispara
+  sin que existan cambios"). If it did change, computes the next version
+  with the exact same source-branch/commit-message heuristic release.yml
+  uses for the root (hotfix -> patch; develop with a BREAKING commit ->
+  major; develop with a feat commit -> minor; develop otherwise -> minor),
+  then creates and pushes the new tag. It never touches any other
+  provider's or the root's tag namespace, and it still never runs
+  `gh release create` itself -- pushing the tag is enough to let the
+  existing tag-reacting release-provider-<lang>.yml pick it up exactly as
+  if a human had pushed it, so those workflows need no changes at all.
+inputs:
+  provider-path:
+    description: 'Repo-relative path this provider owns (e.g. providers/rust)'
+    required: true
+  tag-prefix:
+    description: "This provider's tag prefix, trailing 'v' (e.g. providers/rust/v)"
+    required: true
+  source-branch:
+    description: 'Detected merge source branch (develop, hotfix/<name>, or empty)'
+    required: true
+outputs:
+  tagged:
+    description: "'true' if a new tag was created and pushed, else 'false'"
+    value: '${{ steps.tag.outputs.tagged }}'
+  tag:
+    description: 'The tag that was created (empty when tagged=false)'
+    value: '${{ steps.tag.outputs.tag }}'
+runs:
+  using: 'composite'
+  steps:
+  - name: 'Determine version and tag if changed'
+    id: 'tag'
+    shell: 'bash'
+    run: |
+      PROVIDER_PATH='${{ inputs.provider-path }}'
+      TAG_PREFIX='${{ inputs.tag-prefix }}'
+      SOURCE_BRANCH='${{ inputs.source-branch }}'
+
+      LATEST_TAG=$(git tag --list "${TAG_PREFIX}"'*' --sort=-v:refname | head -n1)
+
+      if [ -n "$LATEST_TAG" ]; then
+        RANGE="$LATEST_TAG..HEAD"
+      else
+        RANGE="HEAD"
+      fi
+
+      if [ -z "$(git log --oneline "$RANGE" -- "$PROVIDER_PATH")" ]; then
+        echo "⏭️  No changes under $PROVIDER_PATH since ${LATEST_TAG:-the beginning} -- skipping tag"
+        echo "tagged=false" >> "$GITHUB_OUTPUT"
+        echo "tag=" >> "$GITHUB_OUTPUT"
+        exit 0
+      fi
+
+      if [ -n "$LATEST_TAG" ]; then
+        VERSION_NUMBER="${LATEST_TAG#"$TAG_PREFIX"}"
+      else
+        VERSION_NUMBER='0.0.0'
+      fi
+
+      # Same source-branch/commit-message heuristic as release.yml's own
+      # "Determine release type and version" step, scoped to this provider.
+      COMMIT_MSG=$(git log -1 --pretty=%B)
+      if echo "$SOURCE_BRANCH" | grep -qiE '^hotfix/'; then
+        echo "🔥 Hotfix detected from branch: $SOURCE_BRANCH -- bumping patch version"
+        NEW_VERSION=$(echo "$VERSION_NUMBER" | awk -F. '{print $1"."$2"."$3+1}')
+      elif echo "$COMMIT_MSG" | grep -qiE '^(breaking|BREAKING)'; then
+        echo "⚠️  Breaking change detected: bumping major version"
+        NEW_VERSION=$(echo "$VERSION_NUMBER" | awk -F. '{print $1+1".0.0"}')
+      elif echo "$COMMIT_MSG" | grep -qiE '^(feat|feature)(\(.+\))?:'; then
+        echo "📦 Feature detected: bumping minor version"
+        NEW_VERSION=$(echo "$VERSION_NUMBER" | awk -F. '{print $1"."$2+1".0"}')
+      else
+        echo "📝 Default for develop: bumping minor version"
+        NEW_VERSION=$(echo "$VERSION_NUMBER" | awk -F. '{print $1"."$2+1".0"}')
+      fi
+
+      # Major is capped at 1 (design.md D6): a provider module's own /vN
+      # path-major-suffix rule means major >= 2 needs a deliberate module
+      # path migration, never an automatic bump.
+      NEW_MAJOR=$(echo "$NEW_VERSION" | cut -d. -f1)
+      if [ "$NEW_MAJOR" -ge 2 ]; then
+        echo "::error::Computed major version $NEW_MAJOR for $TAG_PREFIX would exceed design.md D6's major<=1 cap -- a major bump for this provider needs a manual module-path migration, not an automatic tag."
+        exit 1
+      fi
+
+      NEW_TAG="${TAG_PREFIX}${NEW_VERSION}"
+      echo "🏷️  Tagging $PROVIDER_PATH: $NEW_TAG"
+      git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+      git push origin "$NEW_TAG"
+
+      echo "tagged=true" >> "$GITHUB_OUTPUT"
+      echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
