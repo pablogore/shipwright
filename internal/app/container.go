@@ -14,6 +14,7 @@ import (
 
 	"github.com/pablogore/kit-logger/pkg/logger"
 	golang "github.com/pablogore/shipwright/providers/go"
+	godaggerkit "github.com/pablogore/shipwright/providers/go/daggerkit"
 
 	"github.com/pablogore/shipwright/internal/config"
 	"github.com/pablogore/shipwright/internal/executors"
@@ -640,8 +641,10 @@ func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capa
 		return plugins.Capabilities{}
 	}
 
+	goClient := godaggerkit.NewDaggerAdapter(client)
+
 	builder := &golang.GoBuilder{
-		Client: client,
+		Client: goClient,
 		Config: shipwright.BuildConfig{
 			GoVersion:   cfg.GoVersion,
 			JavaVersion: cfg.JavaVersion,
@@ -650,12 +653,12 @@ func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capa
 
 	testers := []shipwright.Tester{
 		&golang.GoUnitTester{
-			Client:    client,
+			Client:    goClient,
 			Config:    shipwright.TestConfig{Coverage: cfg.Coverage},
 			GoVersion: cfg.GoVersion,
 		},
-		&golang.GoLinter{Client: client},
-		&golang.GoVulnScanner{Client: client, GoVersion: cfg.GoVersion},
+		&golang.GoLinter{Client: goClient},
+		&golang.GoVulnScanner{Client: goClient, GoVersion: cfg.GoVersion},
 	}
 
 	artifactConfig := shipwright.ArtifactConfig{
@@ -680,7 +683,7 @@ func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capa
 	}
 
 	artifactor := &golang.ContainerPublisher{
-		Client: client,
+		Client: goClient,
 		Config: artifactConfig,
 	}
 

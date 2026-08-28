@@ -8,6 +8,7 @@ import (
 
 	"dagger.io/dagger"
 
+	"github.com/pablogore/shipwright/internal/daggerkit"
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
@@ -66,7 +67,7 @@ type changelogCommitClassification struct {
 type ChangelogRunner struct {
 	// Client is the Dagger client used to construct the git/changelog
 	// container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 }
 
 // Compile-time conformance assertion: ChangelogRunner must satisfy Layer
@@ -89,17 +90,17 @@ func (r *ChangelogRunner) Run(ctx context.Context, build *dagger.Directory) (*da
 
 	container := r.Client.Container().
 		From(changelogImage).
-		WithMountedDirectory("/work", build).
+		WithMountedDirectory("/work", daggerkit.NewDaggerDirectoryAdapter(build)).
 		WithWorkdir("/work").
-		WithExec([]string{"apk", "add", "--no-cache", "git"}).
+		WithExec([]string{"apk", "add", "--no-cache", "git"}, daggerkit.DaggerContainerWithExecOpts{}).
 		// Dagger mounts /work with an owner that commonly differs from the
 		// container's git user, which git's own ownership check refuses to
 		// operate on ("detected dubious ownership") unless explicitly
 		// trusted.
-		WithExec([]string{"git", "config", "--global", "--add", "safe.directory", "/work"})
+		WithExec([]string{"git", "config", "--global", "--add", "safe.directory", "/work"}, daggerkit.DaggerContainerWithExecOpts{})
 
 	lastTag := ""
-	if tagOut, err := container.WithExec([]string{"git", "describe", "--tags", "--abbrev=0"}).Stdout(ctx); err == nil {
+	if tagOut, err := container.WithExec([]string{"git", "describe", "--tags", "--abbrev=0"}, daggerkit.DaggerContainerWithExecOpts{}).Stdout(ctx); err == nil {
 		lastTag = strings.TrimSpace(tagOut)
 	}
 	// A non-nil error above (no reachable tag, or no commits at all) is
@@ -110,7 +111,7 @@ func (r *ChangelogRunner) Run(ctx context.Context, build *dagger.Directory) (*da
 	if lastTag != "" {
 		logArgs = []string{"git", "log", lastTag + "..HEAD", "--pretty=format:%s"}
 	}
-	logOutput, err := container.WithExec(logArgs).Stdout(ctx)
+	logOutput, err := container.WithExec(logArgs, daggerkit.DaggerContainerWithExecOpts{}).Stdout(ctx)
 	if err != nil {
 		// An unborn HEAD (a genuinely fresh repository with zero commits)
 		// makes `git log` itself fail, not just find nothing — the same "no
@@ -124,7 +125,7 @@ func (r *ChangelogRunner) Run(ctx context.Context, build *dagger.Directory) (*da
 	classification := classifyChangelogCommits(subjects)
 	section := buildChangelogSection(classification)
 	if section == "" {
-		return container, nil
+		return container.GetRealContainer(), nil
 	}
 
 	existing := ""
@@ -137,7 +138,7 @@ func (r *ChangelogRunner) Run(ctx context.Context, build *dagger.Directory) (*da
 
 	updated := prependUnreleasedSection(existing, section)
 
-	return container.WithNewFile(changelogFileName, updated), nil
+	return container.WithNewFile(changelogFileName, updated).GetRealContainer(), nil
 }
 
 // changelogCommitSubjects splits git log's `--pretty=format:%s` stdout
