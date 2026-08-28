@@ -38,6 +38,31 @@ type RustUnitTester struct {
 	// own rationale (TestConfig intentionally has no toolchain-version
 	// field). Defaults to defaultRustVersion when left empty.
 	RustVersion string
+	// ManifestPath selects a Cargo.toml other than the source root's own,
+	// mirroring `cargo test --manifest-path`. Needed for a workspace like
+	// ego-rs's, which keeps its Testcontainers-backed integration suite in
+	// a deliberately separate, non-member workspace
+	// (integration-tests/Cargo.toml) precisely so `cargo test --workspace`
+	// never touches Docker.
+	ManifestPath string
+	// Package restricts the run to one workspace member (`cargo test
+	// --package`) instead of the whole workspace. Mutually exclusive with
+	// --workspace in practice, so set it leaves --workspace off entirely
+	// (see cargoTestArgs).
+	Package string
+	// Features lists the Cargo features to enable via `--features`.
+	// Ignored when AllFeatures is set.
+	Features []string
+	// AllFeatures maps to `--all-features`. Left false by default
+	// (previously always forced on) because a provider must not decide a
+	// consumer's feature policy: ego-rs's own crash-test-failpoint feature
+	// is documented to stay off outside its isolated integration-tests
+	// workspace, which --all-features would silently violate.
+	AllFeatures bool
+	// Locked maps to `--locked`, forbidding Cargo from updating
+	// Cargo.lock so the same lockfile always produces the same dependency
+	// graph in CI.
+	Locked bool
 }
 
 // Compile-time conformance assertion: RustUnitTester must satisfy Layer 1's
@@ -63,7 +88,7 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithMountedCache("/src/target", t.Client.CacheVolume(rustUnitTesterTargetCacheKey)).
-		WithExec([]string{"cargo", "test", "--workspace", "--all-features"})
+		WithExec(t.cargoTestArgs())
 
 	testOutput, err := container.Stdout(ctx)
 	if err != nil {
@@ -78,6 +103,20 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 
 	reportContainer := container.WithNewFile("/tmp/test-output.txt", testOutput)
 	return reportContainer.File("/tmp/test-output.txt"), nil
+}
+
+// cargoTestArgs builds the `cargo test` invocation from t's configuration.
+// See cargoTestArgsFor (cargotestargs.go) for the shared selection logic.
+func (t *RustUnitTester) cargoTestArgs() []string {
+	return cargoTestArgsFor(t.ManifestPath, t.Package, t.Locked, t.AllFeatures, t.Features)
+}
+
+// tarpaulinArgs builds the `cargo tarpaulin` invocation from t's
+// configuration, sharing cargoScopeArgsFor with cargoTestArgs so coverage is
+// always measured over exactly the scope that was tested.
+func (t *RustUnitTester) tarpaulinArgs() []string {
+	return append([]string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm"},
+		cargoScopeArgsFor(t.ManifestPath, t.Package, t.Locked, t.AllFeatures, t.Features)...)
 }
 
 // enforceCoverageThreshold installs cargo-tarpaulin and runs it against the
@@ -114,7 +153,7 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 func (t *RustUnitTester) enforceCoverageThreshold(ctx context.Context, container *dagger.Container) error {
 	coverageOutput, err := container.
 		WithExec([]string{"cargo", "install", "cargo-tarpaulin", "--locked", "--version", "0.37.2"}).
-		WithExec([]string{"cargo", "tarpaulin", "--workspace", "--out", "Stdout", "--engine", "llvm"}).
+		WithExec(t.tarpaulinArgs()).
 		Stdout(ctx)
 	if err != nil {
 		return wrapExecError("rustunittester: failed to compute coverage", err)

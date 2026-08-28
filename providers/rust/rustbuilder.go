@@ -71,6 +71,22 @@ type RustBuilder struct {
 	// GoUnitTester applies to its own GoVersion field. Defaults to
 	// defaultRustVersion when left empty.
 	RustVersion string
+	// ManifestPath selects a Cargo.toml other than the source root's own,
+	// mirroring `cargo build --manifest-path`. Needed to build a single
+	// member out of a large workspace (e.g. ego-rs's
+	// examples/reference-app/Cargo.toml) without cd'ing into it.
+	ManifestPath string
+	// Package restricts the build to one workspace member via `cargo build
+	// --package`, e.g. ego-rs's "reference-app" among its 19 members.
+	Package string
+	// Bin selects one binary target within the package via `cargo build
+	// --bin`, needed when a package defines more than one (e.g.
+	// examples/reference-app/src/bin/server.rs).
+	Bin string
+	// Locked maps to `--locked`, forbidding Cargo from updating
+	// Cargo.lock so the same lockfile always produces the same dependency
+	// graph in CI.
+	Locked bool
 }
 
 // Compile-time conformance assertion: RustBuilder must satisfy Layer 1's
@@ -98,14 +114,31 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 	// infer the real name from the source itself rather than guess "app"
 	// and have the build's cp step fail against almost every real crate.
 	binaryName := b.Config.BinaryName
-	if binaryName == "" {
-		cargoToml, err := source.File("Cargo.toml").Contents(ctx)
+	switch {
+	case binaryName != "":
+		// explicit Config.BinaryName always wins.
+	case b.Bin != "":
+		// --bin names the exact binary target cargo will produce.
+		binaryName = b.Bin
+	case b.Package != "":
+		// No --bin given: cargo names a package's single default binary
+		// target after the package itself in the common case. A package
+		// with several bin targets, or a bin name that differs from its
+		// package name (examples/reference-app/src/bin/server.rs), needs
+		// an explicit BinaryName or Bin instead.
+		binaryName = b.Package
+	default:
+		manifestPath := b.ManifestPath
+		if manifestPath == "" {
+			manifestPath = "Cargo.toml"
+		}
+		cargoToml, err := source.File(manifestPath).Contents(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("rustbuilder: binaryName not set and failed to read Cargo.toml to infer it: %w", err)
+			return nil, fmt.Errorf("rustbuilder: binaryName not set and failed to read %s to infer it: %w", manifestPath, err)
 		}
 		binaryName, err = parseCargoPackageName(cargoToml)
 		if err != nil {
-			return nil, fmt.Errorf("rustbuilder: binaryName not set and failed to infer it from Cargo.toml: %w", err)
+			return nil, fmt.Errorf("rustbuilder: binaryName not set and failed to infer it from %s: %w", manifestPath, err)
 		}
 	}
 
@@ -115,7 +148,7 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 		WithMountedDirectory("/app", source).
 		WithWorkdir("/app").
 		WithMountedCache("/app/target", b.Client.CacheVolume(rustBuilderTargetCacheKey)).
-		WithExec(cargoBuildArgs(profile))
+		WithExec(b.cargoBuildArgs(profile))
 
 	// Unlike `go build -o`, cargo does not accept an arbitrary output
 	// path/name on stable toolchains (`--out-dir` remains unstable) — the
@@ -137,19 +170,37 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 	return built.Directory("/output"), nil
 }
 
-// cargoBuildArgs returns the `cargo build` invocation for profile. cargo
-// treats "release" and "debug"/"dev" as its two built-in profiles (`cargo
-// build --release` and plain `cargo build` respectively); any other name is
-// a custom profile (stable since Rust 1.57) invoked via `--profile`.
-func cargoBuildArgs(profile string) []string {
+// cargoBuildArgs returns the `cargo build` invocation for profile, given
+// b's manifest/package/bin/locked configuration. cargo treats "release" and
+// "debug"/"dev" as its two built-in profiles (`cargo build --release` and
+// plain `cargo build` respectively); any other name is a custom profile
+// (stable since Rust 1.57) invoked via `--profile`.
+func (b *RustBuilder) cargoBuildArgs(profile string) []string {
+	args := []string{"cargo", "build"}
+
+	if b.ManifestPath != "" {
+		args = append(args, "--manifest-path", b.ManifestPath)
+	}
+	if b.Package != "" {
+		args = append(args, "--package", b.Package)
+	}
+	if b.Bin != "" {
+		args = append(args, "--bin", b.Bin)
+	}
+	if b.Locked {
+		args = append(args, "--locked")
+	}
+
 	switch profile {
 	case "release":
-		return []string{"cargo", "build", "--release"}
+		args = append(args, "--release")
 	case "debug", "dev":
-		return []string{"cargo", "build"}
+		// plain `cargo build` already builds the debug profile.
 	default:
-		return []string{"cargo", "build", "--profile", profile}
+		args = append(args, "--profile", profile)
 	}
+
+	return args
 }
 
 // resolveRustVersion returns rustVersion, or defaultRustVersion when

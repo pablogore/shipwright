@@ -54,6 +54,136 @@ func TestResolveBinaryName(t *testing.T) {
 	}
 }
 
+func TestRustBuilder_CargoBuildArgs(t *testing.T) {
+	tests := []struct {
+		name    string
+		builder RustBuilder
+		profile string
+		want    []string
+	}{
+		{
+			name:    "default release profile",
+			builder: RustBuilder{},
+			profile: "release",
+			want:    []string{"cargo", "build", "--release"},
+		},
+		{
+			name:    "debug profile adds no extra flag",
+			builder: RustBuilder{},
+			profile: "debug",
+			want:    []string{"cargo", "build"},
+		},
+		{
+			name:    "custom profile uses --profile",
+			builder: RustBuilder{},
+			profile: "bench-profile",
+			want:    []string{"cargo", "build", "--profile", "bench-profile"},
+		},
+		{
+			name:    "package is passed ahead of the profile flag",
+			builder: RustBuilder{Package: "reference-app"},
+			profile: "release",
+			want:    []string{"cargo", "build", "--package", "reference-app", "--release"},
+		},
+		{
+			name:    "bin narrows within the selected package",
+			builder: RustBuilder{Package: "reference-app", Bin: "server"},
+			profile: "release",
+			want:    []string{"cargo", "build", "--package", "reference-app", "--bin", "server", "--release"},
+		},
+		{
+			name:    "locked adds --locked before the profile flag",
+			builder: RustBuilder{Locked: true},
+			profile: "release",
+			want:    []string{"cargo", "build", "--locked", "--release"},
+		},
+		{
+			name:    "manifestPath is passed ahead of package/bin selection",
+			builder: RustBuilder{ManifestPath: "examples/reference-app/Cargo.toml", Package: "reference-app"},
+			profile: "release",
+			want:    []string{"cargo", "build", "--manifest-path", "examples/reference-app/Cargo.toml", "--package", "reference-app", "--release"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.builder.cargoBuildArgs(tt.profile)
+			if len(got) != len(tt.want) {
+				t.Fatalf("cargoBuildArgs(%q) = %v, want %v", tt.profile, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("cargoBuildArgs(%q) = %v, want %v", tt.profile, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestResolveDockerSocketPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfgPath string
+		want    string
+	}{
+		{name: "empty falls back to default", cfgPath: "", want: defaultDockerSocketPath},
+		{name: "explicit path is preserved", cfgPath: "/custom/docker.sock", want: "/custom/docker.sock"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveDockerSocketPath(tt.cfgPath)
+			if got != tt.want {
+				t.Fatalf("resolveDockerSocketPath(%q) = %q, want %q", tt.cfgPath, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRustIntegrationTester_CargoTestArgs(t *testing.T) {
+	tests := []struct {
+		name   string
+		tester RustIntegrationTester
+		want   []string
+	}{
+		{
+			name:   "manifestPath selects the isolated integration workspace",
+			tester: RustIntegrationTester{ManifestPath: "integration-tests/Cargo.toml"},
+			want:   []string{"cargo", "test", "--manifest-path", "integration-tests/Cargo.toml", "--workspace"},
+		},
+		{
+			name: "package, locked, and features combine as expected",
+			tester: RustIntegrationTester{
+				ManifestPath: "integration-tests/Cargo.toml",
+				Package:      "ego-integration",
+				Locked:       true,
+				Features:     []string{"crash-test-failpoint"},
+			},
+			want: []string{
+				"cargo", "test",
+				"--manifest-path", "integration-tests/Cargo.toml",
+				"--package", "ego-integration",
+				"--locked",
+				"--features", "crash-test-failpoint",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.tester.cargoTestArgs()
+			if len(got) != len(tt.want) {
+				t.Fatalf("cargoTestArgs() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("cargoTestArgs() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
 func TestParseCargoPackageName(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -213,6 +343,102 @@ func TestWrapExecError(t *testing.T) {
 			t.Fatalf("wrapExecError() = %q, want it to contain the captured stderr", msg)
 		}
 	})
+}
+
+func TestRustUnitTester_CargoTestArgs(t *testing.T) {
+	tests := []struct {
+		name   string
+		tester RustUnitTester
+		want   []string
+	}{
+		{
+			name:   "default runs the whole workspace with no feature flags",
+			tester: RustUnitTester{},
+			want:   []string{"cargo", "test", "--workspace"},
+		},
+		{
+			name:   "package drops --workspace in favor of --package",
+			tester: RustUnitTester{Package: "security-jwt"},
+			want:   []string{"cargo", "test", "--package", "security-jwt"},
+		},
+		{
+			name:   "features are joined and passed without --all-features",
+			tester: RustUnitTester{Features: []string{"test-kit", "other-feature"}},
+			want:   []string{"cargo", "test", "--workspace", "--features", "test-kit,other-feature"},
+		},
+		{
+			name:   "allFeatures wins over an explicit features list",
+			tester: RustUnitTester{Features: []string{"test-kit"}, AllFeatures: true},
+			want:   []string{"cargo", "test", "--workspace", "--all-features"},
+		},
+		{
+			name:   "locked adds --locked before feature flags",
+			tester: RustUnitTester{Locked: true},
+			want:   []string{"cargo", "test", "--workspace", "--locked"},
+		},
+		{
+			name:   "manifestPath is passed ahead of workspace/package selection",
+			tester: RustUnitTester{ManifestPath: "integration-tests/Cargo.toml", Package: "integration-tests"},
+			want:   []string{"cargo", "test", "--manifest-path", "integration-tests/Cargo.toml", "--package", "integration-tests"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.tester.cargoTestArgs()
+			if len(got) != len(tt.want) {
+				t.Fatalf("cargoTestArgs() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("cargoTestArgs() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestRustUnitTester_TarpaulinArgs(t *testing.T) {
+	tests := []struct {
+		name   string
+		tester RustUnitTester
+		want   []string
+	}{
+		{
+			name:   "default measures the whole workspace",
+			tester: RustUnitTester{},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--workspace"},
+		},
+		{
+			name:   "package and features scope coverage identically to cargo test",
+			tester: RustUnitTester{Package: "security-jwt", Features: []string{"test-kit"}},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--package", "security-jwt", "--features", "test-kit"},
+		},
+		{
+			name:   "manifestPath scopes coverage to the same non-root manifest as cargo test",
+			tester: RustUnitTester{ManifestPath: "integration-tests/Cargo.toml", Package: "integration-tests"},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--manifest-path", "integration-tests/Cargo.toml", "--package", "integration-tests"},
+		},
+		{
+			name:   "allFeatures carries over to coverage",
+			tester: RustUnitTester{AllFeatures: true},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--workspace", "--all-features"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.tester.tarpaulinArgs()
+			if len(got) != len(tt.want) {
+				t.Fatalf("tarpaulinArgs() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("tarpaulinArgs() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
 }
 
 func TestParseTarpaulinCoverage(t *testing.T) {
