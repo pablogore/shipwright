@@ -16,8 +16,8 @@ phases:
   spec: done
   design: done
   tasks: done
-  apply: pending
-  verify: pending
+  apply: partial (slice 1/4 applied -- tasks 1.1-1.24 done, phases 2-4 not started)
+  verify: partial (slice 1/4 verified -- PASS)
   archive: pending
 
 artifacts:
@@ -46,9 +46,31 @@ decisions:
     spec_impact: none — capability returns a mutated directory, no remote-write path exists
 
 next_recommended:
-  - sdd-apply
+  - open PR #1 (feature/runtime-inspect-go -> develop) -- slice 1 verify PASSed
+  - sdd-apply (slice 2, phase 2 of tasks.md, after PR #1 merges to develop)
 
 open_risks:
+  - VERIFIED (slice 1/4, 2026-08-28) -- runtime-inspect end-to-end on
+    feature/runtime-inspect-go PASSes: all 24 Phase-1 tasks confirmed against
+    real code (not just checkmarks); spec.md runtime-toolchain scenarios
+    (zero-mutation, ambiguous-reported-not-guessed, missing-location-omitted,
+    failOnDrift fail-closed) each covered by a passing runtime test; design.md
+    D-1/D-2/D-3/D-4/D-4b/D-8/D-9 decisions match implementation; static
+    import-guard (threat_matrix_test.go) plus direct source read confirm no
+    network/git/SCM/os.WriteFile/exec.Command path in toolchain.go or
+    runtimeinspector.go; api.golden/capabilities_test.go correctly carry 6
+    interfaces; no RuntimeUpgrader/mutation code exists yet (correctly
+    deferred to Phase 2). go build ./..., go test -race ./... (root +
+    providers/go), golangci-lint run ./... (root + providers/go) all
+    independently reconfirmed clean (only the 3 known pre-existing
+    staticcheck issues in internalimport_test.go/naming_test.go, both
+    untouched by this diff). Live --list-steps smoke test against a
+    runtime-inspect manifest step succeeded (exit 0). Full report: Engram
+    sdd/shipwright-runtime-toolchain-upgrade/verify-report.
+  - NOTE -- phases.apply was still "pending" in state.yaml despite
+    apply-progress recording all of Phase 1 (tasks 1.1-1.24) complete;
+    corrected to "partial (slice 1/4)" by this verify pass. Phases 2-4 apply
+    work remains genuinely unstarted.
   - RESOLVED BY TASKS — 4-slice chain confirmed (feature/runtime-inspect-go,
     feature/runtime-upgrade-single-module, feature/runtime-upgrade-workspace,
     feature/runtime-upgrade-tidy-validate), each cut from and merged to
