@@ -1078,6 +1078,9 @@ jobs:
           echo "⏭️  providers/rust not found — skipping sub-module tests"
         fi
 
+    - name: 'Test tag-provider-release action'
+      run: './.github/actions/tag-provider-release/test.sh'
+
   # Stage 5: Security (only for main/develop/PRs)
   security:
     runs-on: 'ubuntu-latest'
