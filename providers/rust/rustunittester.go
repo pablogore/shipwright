@@ -11,6 +11,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // tarpaulinCoverageRegexp matches cargo-tarpaulin's `--out Stdout` summary
@@ -30,7 +31,7 @@ var tarpaulinCoverageRegexp = regexp.MustCompile(`(\d+\.\d+)% coverage`)
 // race-detector flag is threaded through cargo test.
 type RustUnitTester struct {
 	// Client is the Dagger client used to construct the test container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// Config carries the minimum required test coverage percentage.
 	Config shipwright.TestConfig
 	// RustVersion selects the Rust toolchain image. Kept as its own field
@@ -81,11 +82,12 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 	}
 
 	rustVersion := resolveRustVersion(t.RustVersion)
+	sourceDir := daggerkit.NewDaggerDirectoryAdapter(source)
 
 	container := t.Client.Container().
 		From("rust:"+rustVersion).
 		WithMountedCache(cargoRegistryMountPath, t.Client.CacheVolume(cargoRegistryCacheKey)).
-		WithMountedDirectory("/src", source).
+		WithMountedDirectory("/src", sourceDir).
 		WithWorkdir("/src").
 		WithMountedCache("/src/target", t.Client.CacheVolume(rustUnitTesterTargetCacheKey)).
 		WithExec(t.cargoTestArgs())
@@ -102,7 +104,7 @@ func (t *RustUnitTester) Test(ctx context.Context, source *dagger.Directory) (*d
 	}
 
 	reportContainer := container.WithNewFile("/tmp/test-output.txt", testOutput)
-	return reportContainer.File("/tmp/test-output.txt"), nil
+	return reportContainer.File("/tmp/test-output.txt").GetRealFile(), nil
 }
 
 // cargoTestArgs builds the `cargo test` invocation from t's configuration.
@@ -150,7 +152,7 @@ func (t *RustUnitTester) tarpaulinArgs() []string {
 // 1.85.0 and pinning --version below, so a future tarpaulin release
 // bumping its own MSRV/edition again can't silently break this the same
 // way.
-func (t *RustUnitTester) enforceCoverageThreshold(ctx context.Context, container *dagger.Container) error {
+func (t *RustUnitTester) enforceCoverageThreshold(ctx context.Context, container daggerkit.DaggerContainer) error {
 	coverageOutput, err := container.
 		WithExec([]string{"cargo", "install", "cargo-tarpaulin", "--locked", "--version", "0.37.2"}).
 		WithExec(t.tarpaulinArgs()).

@@ -11,6 +11,7 @@ import (
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
 	"github.com/pablogore/shipwright/providers/rust"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // TestRustBuilder_Build_RealEngine exercises RustBuilder.Build end to end
@@ -50,7 +51,7 @@ edition = "2021"
 
 	src := client.Host().Directory(tmpDir)
 	builder := &rust.RustBuilder{
-		Client:      client,
+		Client:      daggerkit.NewDaggerAdapter(client),
 		Config:      shipwright.BuildConfig{BinaryName: "capabilitiestest"},
 		RustVersion: "1.83.0",
 	}
@@ -119,7 +120,7 @@ edition = "2021"
 
 	src := client.Host().Directory(tmpDir)
 	builder := &rust.RustBuilder{
-		Client:      client,
+		Client:      daggerkit.NewDaggerAdapter(client),
 		Config:      shipwright.BuildConfig{BinaryName: "brokencrate"},
 		RustVersion: "1.83.0",
 	}
@@ -172,7 +173,7 @@ edition = "2021"
 
 	src := client.Host().Directory(tmpDir)
 	builder := &rust.RustBuilder{
-		Client:      client,
+		Client:      daggerkit.NewDaggerAdapter(client),
 		Config:      shipwright.BuildConfig{BinaryName: "cachetest"},
 		RustVersion: "1.83.0",
 	}
@@ -216,7 +217,7 @@ func TestRustBuilder_Build_NilSource_RealClient(t *testing.T) {
 	}
 	defer client.Close()
 
-	builder := &rust.RustBuilder{Client: client}
+	builder := &rust.RustBuilder{Client: daggerkit.NewDaggerAdapter(client)}
 
 	_, err = builder.Build(ctx, nil)
 	if err == nil {
@@ -274,7 +275,7 @@ mod tests {
 
 	src := client.Host().Directory(tmpDir)
 	tester := &rust.RustUnitTester{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		Config: shipwright.TestConfig{Coverage: 1},
 	}
 
@@ -322,7 +323,7 @@ edition = "2021"
 	}
 
 	src := client.Host().Directory(tmpDir)
-	linter := &rust.RustLinter{Client: client, RustVersion: "1.83.0"}
+	linter := &rust.RustLinter{Client: daggerkit.NewDaggerAdapter(client), RustVersion: "1.83.0"}
 
 	out, err := linter.Test(ctx, src)
 	if err != nil {
@@ -366,7 +367,7 @@ func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) 
 
 	build := client.Host().Directory(tmpDir)
 	publisher := &rust.ContainerPublisher{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		// Deliberately omitted: BinaryName. Publish falls back to "app",
 		// but the build directory only contains "my-service" (as a real
 		// RustBuilder run configured with a non-default binaryName would

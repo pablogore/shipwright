@@ -7,6 +7,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // defaultDockerSocketPath is the conventional Unix socket path a Docker
@@ -42,7 +43,7 @@ const defaultDockerSocketPath = "/var/run/docker.sock"
 // change this Tester's public shape.
 type RustIntegrationTester struct {
 	// Client is the Dagger client used to construct the test container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// RustVersion selects the Rust toolchain image. Defaults to
 	// defaultRustVersion when left empty, same convention as
 	// RustUnitTester.RustVersion.
@@ -87,11 +88,12 @@ func (t *RustIntegrationTester) Test(ctx context.Context, source *dagger.Directo
 	rustVersion := resolveRustVersion(t.RustVersion)
 	socketPath := resolveDockerSocketPath(t.DockerSocketPath)
 	dockerSocket := t.Client.Host().UnixSocket(socketPath)
+	sourceDir := daggerkit.NewDaggerDirectoryAdapter(source)
 
 	container := t.Client.Container().
 		From("rust:"+rustVersion).
 		WithMountedCache(cargoRegistryMountPath, t.Client.CacheVolume(cargoRegistryCacheKey)).
-		WithMountedDirectory("/src", source).
+		WithMountedDirectory("/src", sourceDir).
 		WithWorkdir("/src").
 		WithMountedCache("/src/target", t.Client.CacheVolume(rustIntegrationTesterTargetCacheKey)).
 		WithUnixSocket(socketPath, dockerSocket).
@@ -103,7 +105,7 @@ func (t *RustIntegrationTester) Test(ctx context.Context, source *dagger.Directo
 	}
 
 	reportContainer := container.WithNewFile("/tmp/integration-test-output.txt", testOutput)
-	return reportContainer.File("/tmp/integration-test-output.txt"), nil
+	return reportContainer.File("/tmp/integration-test-output.txt").GetRealFile(), nil
 }
 
 // cargoTestArgs builds the `cargo test` invocation from t's configuration.

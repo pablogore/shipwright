@@ -9,6 +9,7 @@ import (
 
 	"github.com/pablogore/shipwright/pkg/containerutil"
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // defaultPublishBaseImage is the minimal runtime image a compiled Rust
@@ -34,7 +35,7 @@ const defaultPublishBaseImage = "debian:bookworm-slim"
 // with RustBuilder.
 type ContainerPublisher struct {
 	// Client is the Dagger client used to construct the runtime image.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// Config carries the registry username used alongside the creds
 	// secret passed to Publish.
 	Config shipwright.ArtifactConfig
@@ -59,10 +60,11 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 	}
 
 	entrypoint := containerutil.ComputeEntrypoint(p.Config.BinaryName)
+	buildDir := daggerkit.NewDaggerDirectoryAdapter(build)
 
 	staged := p.Client.Container().
 		From(defaultPublishBaseImage).
-		WithDirectory("/app", build)
+		WithDirectory("/app", buildDir)
 
 	// PR #176 review finding #7: Config.BinaryName here and the paired
 	// RustBuilder's Config.BinaryName are independently configured
