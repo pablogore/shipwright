@@ -262,18 +262,34 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 #    Closes via: N/A — same reasoning as `dagger-test`.
 #
 # 4) `internal/daggerkit` coverage exclusion — ARCHITECTURAL DECISION.
-#    Excluded from `make coverage`'s calculation alongside `/mocks`,
-#    `/examples`, `/app`, `/config`. daggerkit's adapter code is a thin,
-#    mechanical passthrough to the real Dagger SDK types (see
-#    internal/daggerkit/adapter_test.go for what IS tested: pure roundtrips
-#    and type-assertion guards); the passthrough branches themselves are
-#    only meaningfully exercised against a live engine, i.e. by
-#    `test-integration`, not by a coverage-counted unit test. Risk left open:
-#    none — this mirrors the existing, already-accepted treatment of
-#    `/mocks` and `/app` for the same reason (thin wrappers around
-#    real/external dependencies).
+#    Excluded from the coverage calculation (both `coverage` and
+#    `coverage-gate`, see below) alongside `/mocks`, `/examples`, `/app`,
+#    `/config`. daggerkit's adapter code is a thin, mechanical passthrough to
+#    the real Dagger SDK types (see internal/daggerkit/adapter_test.go for
+#    what IS tested: pure roundtrips and type-assertion guards); the
+#    passthrough branches themselves are only meaningfully exercised against
+#    a live engine, i.e. by `test-integration`, not by a coverage-counted
+#    unit test. Risk left open: none — this mirrors the existing,
+#    already-accepted treatment of `/mocks` and `/app` for the same reason
+#    (thin wrappers around real/external dependencies).
 #    Closes via: N/A — permanent, same category as the existing /mocks and
 #    /app exclusions.
+#
+# 5) ci-final gates on `coverage-gate`, NOT `coverage` — CORRECTED DEFECT,
+#    found by the first real push to develop after this gate went live.
+#    `coverage` enforces COVERAGE_THRESHOLD=90, a bar this repo's own total
+#    coverage has never reached (see coverage-ci, added in e85a137 with
+#    COVERAGE_THRESHOLD_CI=70 specifically because 90% total was never
+#    realistic to enforce automatically; also documented as the "90% local /
+#    70% CI" convention in openspec/changes/archive/2026-08-26-.../tasks.md).
+#    ci-final originally depended on `coverage` (90%, fail-closed), which
+#    meant the Final-SHA gate could never pass for any SHA — caught when
+#    SHA 041361d failed final-sha-validation on the first real push to
+#    develop at 73.6% total coverage. `coverage-gate` is the fail-closed
+#    counterpart of the pre-existing `coverage-ci` (same 70% bar, but exits 1
+#    instead of only warning); `coverage` (90%) stays as-is for local/
+#    aspirational use, `coverage-ci` stays as-is for its existing callers.
+#    Closes via: already closed by this correction.
 #
 # Given the above, ci-final still represents the valid minimum
 # production-critical set: build/test/coverage/security are the only checks
@@ -284,7 +300,7 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 # structurally cannot be, by the same reproducibility requirement that
 # motivates ci-final's existence.
 .PHONY: ci-final
-ci-final: build test coverage security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
+ci-final: build test coverage-gate security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
@@ -467,6 +483,27 @@ coverage-ci: ## Generate coverage report for CI with relaxed threshold
 		fi; \
 	else \
 		echo -e "$(YELLOW)⚠️  Could not determine coverage percentage$(NC)"; \
+	fi
+
+# coverage-gate is the fail-closed counterpart of coverage-ci: same 70% CI
+# threshold (COVERAGE_THRESHOLD_CI), but exits 1 instead of only warning.
+# `coverage` (90%) is the local/aspirational bar — never realistic as an
+# automated gate, which is exactly why coverage-ci exists — so ci-final
+# must not depend on it directly. This is the target ci-final actually uses.
+coverage-gate: ## Fail-closed coverage validation at the CI threshold (used by ci-final)
+	@echo -e "$(BLUE)Validating coverage against the CI gate threshold...$(NC)"
+	@mkdir -p coverage
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
+	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
+	if [ -z "$$COVERAGE" ]; then \
+		echo -e "$(RED)❌ Could not determine coverage percentage$(NC)"; \
+		exit 1; \
+	fi; \
+	if [ $$(echo "$$COVERAGE < $(COVERAGE_THRESHOLD_CI)" | bc -l 2>/dev/null || echo "1") -eq 1 ]; then \
+		echo -e "$(RED)❌ Coverage $${COVERAGE}% is below CI gate threshold $(COVERAGE_THRESHOLD_CI)%$(NC)"; \
+		exit 1; \
+	else \
+		echo -e "$(GREEN)✅ Coverage $${COVERAGE}% meets CI gate threshold $(COVERAGE_THRESHOLD_CI)%$(NC)"; \
 	fi
 
 # Local pipeline execution
