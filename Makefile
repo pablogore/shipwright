@@ -219,20 +219,72 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 
 # PROD-001: single repository-owned source of truth for "what makes a SHA
 # production-ready", run identically by any CI provider or locally.
+# ci-final = build + test + coverage + security. Four things are deliberately
+# excluded from that composition (or from the coverage calculation); each is
+# documented below as: why it's out, debt vs. architectural decision, the
+# open risk, and what closes it.
 #
-# `lint` is deliberately NOT part of this composition today: as of this
-# writing `make lint` fails with ~104 preexisting findings across the root
-# module and providers/go/providers/rust (gocyclo, staticcheck, revive,
-# testifylint, unused, etc.), none introduced by this change and none
-# trivial to fix inline (several are gocyclo-15 violations and an
-# exported-type "stutter" rename in providers/rust that would be a breaking
-# public API change to a separately-versioned module). Gating ci-final on
-# `lint` today would block every push to develop on unrelated, pre-existing
-# debt that nobody asked to fix as part of this work. `make lint` still
-# exists, fail-closed, so the debt is visible and can be paid down; add it
-# to this composition once that backlog is cleared.
+# 1) `lint` — EXCLUDED, PRE-EXISTING DEBT (not a decision).
+#    `make lint` currently fails with 110 pre-existing findings (root 97,
+#    providers/go 3, providers/rust 10 — bodyclose, errcheck, gocritic,
+#    gocyclo, perfsprint, revive, staticcheck, testifylint, thelper, unparam,
+#    unused, usetesting), none introduced by the Final-SHA work and none
+#    trivial to fix inline (4 are gocyclo>15 violations up to complexity 34;
+#    5 are exported-type "stutter" renames in providers/rust that would be a
+#    breaking public API change to a separately, tag-released module).
+#    Risk left open: a real style/complexity/correctness-adjacent regression
+#    can land on develop without failing CI, since nothing enforces lint today.
+#    Closes via: https://github.com/pablogore/shipwright/issues/186 (tracks
+#    the exact findings). Add `lint` to this composition once that issue is
+#    resolved — `make lint` stays fail-closed in the meantime so the debt
+#    stays visible.
+#
+# 2) `dagger-test` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
+#    `.dagger/`'s own module tests require `dagger run`, i.e. a live Dagger
+#    engine — see design.md D-B isolation. A fail-closed, CI-provider-
+#    independent gate cannot depend on an engine being reachable at
+#    validation time. Risk left open: none beyond what `test-integration`
+#    (below) already covers for real-engine behavior; `.dagger/`'s own logic
+#    is still exercised by `make dagger-test` on demand, just not gated.
+#    Closes via: N/A — this exclusion cannot be lifted without dropping the
+#    "runs identically anywhere, no live engine required" property ci-final
+#    exists to guarantee.
+#
+# 3) `test-integration` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
+#    `testing/integration/{go,rust,changelog}/` (build tag `integration`)
+#    exercises the real `dagger.io/dagger` SDK against a live engine, by
+#    design — that's the point of separating it from the daggerkit-mocked
+#    unit suite. Same fail-closed/reproducibility argument as `dagger-test`.
+#    Risk left open: daggerkit's interface/adapter layer could in principle
+#    drift from real SDK behavior without ci-final noticing; that drift is
+#    caught by `make test-integration` run on demand (and in CI where an
+#    engine is available), not by the gate itself.
+#    Closes via: N/A — same reasoning as `dagger-test`.
+#
+# 4) `internal/daggerkit` coverage exclusion — ARCHITECTURAL DECISION.
+#    Excluded from `make coverage`'s calculation alongside `/mocks`,
+#    `/examples`, `/app`, `/config`. daggerkit's adapter code is a thin,
+#    mechanical passthrough to the real Dagger SDK types (see
+#    internal/daggerkit/adapter_test.go for what IS tested: pure roundtrips
+#    and type-assertion guards); the passthrough branches themselves are
+#    only meaningfully exercised against a live engine, i.e. by
+#    `test-integration`, not by a coverage-counted unit test. Risk left open:
+#    none — this mirrors the existing, already-accepted treatment of
+#    `/mocks` and `/app` for the same reason (thin wrappers around
+#    real/external dependencies).
+#    Closes via: N/A — permanent, same category as the existing /mocks and
+#    /app exclusions.
+#
+# Given the above, ci-final still represents the valid minimum
+# production-critical set: build/test/coverage/security are the only checks
+# that (a) can run fail-closed with zero external dependencies and (b) map
+# directly to "this SHA compiles, behaves correctly under test, meets its
+# coverage bar, and has no known vulnerabilities." lint is enforceable this
+# way too and will be added once #186 closes; dagger-test/test-integration
+# structurally cannot be, by the same reproducibility requirement that
+# motivates ci-final's existence.
 .PHONY: ci-final
-ci-final: build test coverage security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above re: lint)
+ci-final: build test coverage security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
