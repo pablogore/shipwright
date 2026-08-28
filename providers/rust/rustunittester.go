@@ -111,6 +111,14 @@ func (t *RustUnitTester) cargoTestArgs() []string {
 	return cargoTestArgsFor(t.ManifestPath, t.Package, t.Locked, t.AllFeatures, t.Features)
 }
 
+// tarpaulinArgs builds the `cargo tarpaulin` invocation from t's
+// configuration, sharing cargoScopeArgsFor with cargoTestArgs so coverage is
+// always measured over exactly the scope that was tested.
+func (t *RustUnitTester) tarpaulinArgs() []string {
+	return append([]string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm"},
+		cargoScopeArgsFor(t.ManifestPath, t.Package, t.Locked, t.AllFeatures, t.Features)...)
+}
+
 // enforceCoverageThreshold installs cargo-tarpaulin and runs it against the
 // already-tested container, returning an error naming the shortfall when
 // coverage is below Config.Coverage.
@@ -145,7 +153,7 @@ func (t *RustUnitTester) cargoTestArgs() []string {
 func (t *RustUnitTester) enforceCoverageThreshold(ctx context.Context, container *dagger.Container) error {
 	coverageOutput, err := container.
 		WithExec([]string{"cargo", "install", "cargo-tarpaulin", "--locked", "--version", "0.37.2"}).
-		WithExec([]string{"cargo", "tarpaulin", "--workspace", "--out", "Stdout", "--engine", "llvm"}).
+		WithExec(t.tarpaulinArgs()).
 		Stdout(ctx)
 	if err != nil {
 		return wrapExecError("rustunittester: failed to compute coverage", err)

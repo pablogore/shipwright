@@ -398,6 +398,49 @@ func TestRustUnitTester_CargoTestArgs(t *testing.T) {
 	}
 }
 
+func TestRustUnitTester_TarpaulinArgs(t *testing.T) {
+	tests := []struct {
+		name   string
+		tester RustUnitTester
+		want   []string
+	}{
+		{
+			name:   "default measures the whole workspace",
+			tester: RustUnitTester{},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--workspace"},
+		},
+		{
+			name:   "package and features scope coverage identically to cargo test",
+			tester: RustUnitTester{Package: "security-jwt", Features: []string{"test-kit"}},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--package", "security-jwt", "--features", "test-kit"},
+		},
+		{
+			name:   "manifestPath scopes coverage to the same non-root manifest as cargo test",
+			tester: RustUnitTester{ManifestPath: "integration-tests/Cargo.toml", Package: "integration-tests"},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--manifest-path", "integration-tests/Cargo.toml", "--package", "integration-tests"},
+		},
+		{
+			name:   "allFeatures carries over to coverage",
+			tester: RustUnitTester{AllFeatures: true},
+			want:   []string{"cargo", "tarpaulin", "--out", "Stdout", "--engine", "llvm", "--workspace", "--all-features"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.tester.tarpaulinArgs()
+			if len(got) != len(tt.want) {
+				t.Fatalf("tarpaulinArgs() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("tarpaulinArgs() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
 func TestParseTarpaulinCoverage(t *testing.T) {
 	tests := []struct {
 		name    string
