@@ -31,7 +31,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final
+.PHONY: all build clean test dagger-test test-integration deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final
 
 # Help target
 .PHONY: help
@@ -116,6 +116,11 @@ dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT p
 	@echo -e "$(BLUE)Running .dagger module tests...$(NC)"
 	cd .dagger && dagger run $(GOTEST) -race ./...
 	@echo -e "$(GREEN)✅ .dagger module tests completed$(NC)"
+
+test-integration: ## Run real-Dagger-engine tests under testing/integration/ (requires a running Dagger engine; deliberately NOT part of `test`/`check`/`ci-final` — mock tests cover this logic for the default suite)
+	@echo -e "$(BLUE)Running Dagger integration tests...$(NC)"
+	$(GOTEST) -tags integration -v -race ./testing/...
+	@echo -e "$(GREEN)✅ Integration tests completed$(NC)"
 
 deps: ## Download and tidy dependencies
 	@echo -e "$(BLUE)Downloading dependencies...$(NC)"
