@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	dagger.io/dagger v0.21.8
-	github.com/pablogore/shipwright v0.0.0-20260826044612-e0a737b309af
+	github.com/pablogore/shipwright v0.0.0-20260828024355-6f9962e67091
 )
 
 require (
