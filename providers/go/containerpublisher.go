@@ -9,6 +9,7 @@ import (
 
 	"github.com/pablogore/shipwright/pkg/containerutil"
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
 // defaultPublishBaseImage matches the legacy pipeline's minimal runtime
@@ -47,7 +48,7 @@ const defaultPublishBaseImage = "alpine:latest"
 //     review finding #7).
 type ContainerPublisher struct {
 	// Client is the Dagger client used to construct the runtime image.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// Config carries the registry username used alongside the creds
 	// secret passed to Publish.
 	Config shipwright.ArtifactConfig
@@ -75,14 +76,14 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 
 	staged := p.Client.Container().
 		From(defaultPublishBaseImage).
-		WithDirectory("/app", build)
+		WithDirectory("/app", daggerkit.NewDaggerDirectoryAdapter(build))
 
 	// PR #176 review finding #7: Config.BinaryName here and the paired
 	// Builder's BuildConfig.BinaryName are independently configured
 	// manifest fields with no cross-validation, so a mismatch previously
 	// surfaced only as chmod's opaque "no such file or directory". Fail
 	// with an actionable message before that happens.
-	if _, err := staged.WithExec([]string{"test", "-f", entrypoint}).Sync(ctx); err != nil {
+	if _, err := staged.WithExec([]string{"test", "-f", entrypoint}, daggerkit.DaggerContainerWithExecOpts{}).Sync(ctx); err != nil {
 		return "", fmt.Errorf(
 			"containerpublisher: expected binary at %q not found in container — check that binaryName matches the value used by the paired builder step: %w",
 			entrypoint, err,
@@ -90,7 +91,7 @@ func (p *ContainerPublisher) Publish(ctx context.Context, build *dagger.Director
 	}
 
 	image := staged.
-		WithExec([]string{"chmod", "+x", entrypoint}).
+		WithExec([]string{"chmod", "+x", entrypoint}, daggerkit.DaggerContainerWithExecOpts{}).
 		WithEntrypoint([]string{entrypoint})
 
 	if creds != nil {

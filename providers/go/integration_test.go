@@ -11,6 +11,7 @@ import (
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
 	"github.com/pablogore/shipwright/providers/go"
+	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
 // TestGoBuilder_Build_RealEngine exercises GoBuilder.Build end to end
@@ -47,7 +48,7 @@ func main() {}
 
 	src := client.Host().Directory(tmpDir)
 	builder := &golang.GoBuilder{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		Config: shipwright.BuildConfig{GoVersion: "1.26.1", BinaryName: "capabilitiestest"},
 	}
 
@@ -93,7 +94,7 @@ func TestGoBuilder_Build_NilSource_RealClient(t *testing.T) {
 	}
 	defer client.Close()
 
-	builder := &golang.GoBuilder{Client: client}
+	builder := &golang.GoBuilder{Client: daggerkit.NewDaggerAdapter(client)}
 
 	_, err = builder.Build(ctx, nil)
 	if err == nil {
@@ -158,7 +159,7 @@ func TestAdd(t *testing.T) {
 
 	src := client.Host().Directory(tmpDir)
 	tester := &golang.GoUnitTester{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		Config: shipwright.TestConfig{Coverage: 1},
 	}
 
@@ -197,7 +198,7 @@ func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) 
 
 	build := client.Host().Directory(tmpDir)
 	publisher := &golang.ContainerPublisher{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		// Deliberately omitted: BinaryName. Publish falls back to "app",
 		// but the build directory only contains "my-service" (as a real
 		// GoBuilder run configured with a non-default binaryName would

@@ -8,6 +8,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
 // defaultLinterImage matches the legacy pipeline's golangci-lint image
@@ -25,7 +26,7 @@ const defaultLinterTimeout = "5m"
 // decomposition (design.md D-F).
 type GoLinter struct {
 	// Client is the Dagger client used to construct the lint container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 }
 
 // Compile-time conformance assertion (tasks.md 3.5): GoLinter must satisfy
@@ -46,18 +47,18 @@ func (l *GoLinter) Test(ctx context.Context, source *dagger.Directory) (*dagger.
 
 	container := l.Client.Container().
 		From(defaultLinterImage).
-		WithMountedDirectory("/app", source).
+		WithMountedDirectory("/app", daggerkit.NewDaggerDirectoryAdapter(source)).
 		WithWorkdir("/app").
 		WithEnvVariable("GO111MODULE", "on").
 		WithEnvVariable("CGO_ENABLED", "0")
 
 	output, err := container.
-		WithExec([]string{"golangci-lint", "run", "--timeout", defaultLinterTimeout, "./..."}).
+		WithExec([]string{"golangci-lint", "run", "--timeout", defaultLinterTimeout, "./..."}, daggerkit.DaggerContainerWithExecOpts{}).
 		Stdout(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("golinter: golangci-lint found issues: %w", err)
 	}
 
 	reportContainer := container.WithNewFile("/tmp/lint-report.txt", output)
-	return reportContainer.File("/tmp/lint-report.txt"), nil
+	return reportContainer.File("/tmp/lint-report.txt").GetRealFile(), nil
 }

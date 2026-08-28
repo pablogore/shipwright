@@ -35,6 +35,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
 // defaultGoVersion mirrors the legacy go-service pipeline's own default
@@ -63,7 +64,7 @@ const defaultBinaryName = "app"
 // with design.md's Data Flow diagram (Build -> Directory -> Artifact).
 type GoBuilder struct {
 	// Client is the Dagger client used to construct the build container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// Config configures the Go toolchain version and output binary name.
 	Config shipwright.BuildConfig
 }
@@ -89,19 +90,19 @@ func (b *GoBuilder) Build(ctx context.Context, source *dagger.Directory) (*dagge
 
 	container := b.Client.Container().
 		From("golang:"+goVersion).
-		WithMountedDirectory("/app", source).
+		WithMountedDirectory("/app", daggerkit.NewDaggerDirectoryAdapter(source)).
 		WithWorkdir("/app").
 		WithEnvVariable("GOPATH", "/go").
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "mod", "tidy"}).
-		WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", outPath, "."})
+		WithExec([]string{"go", "mod", "tidy"}, daggerkit.DaggerContainerWithExecOpts{}).
+		WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", outPath, "."}, daggerkit.DaggerContainerWithExecOpts{})
 
 	built, err := container.Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("gobuilder: failed to build go binary: %w", err)
 	}
 
-	return built.Directory("/output"), nil
+	return built.Directory("/output").GetRealDirectory(), nil
 }
 
 // resolveGoVersion returns cfgVersion, or defaultGoVersion when cfgVersion
