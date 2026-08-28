@@ -11,6 +11,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
 // affectedCountRegexp captures the vulnerability count from govulncheck's
@@ -24,7 +25,7 @@ var affectedCountRegexp = regexp.MustCompile(`Your code is affected by (\d+) vul
 // decomposition (design.md D-F).
 type GoVulnScanner struct {
 	// Client is the Dagger client used to construct the scan container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// GoVersion selects the Go toolchain image used to install and run
 	// govulncheck. Defaults to defaultGoVersion when left empty.
 	GoVersion string
@@ -56,13 +57,13 @@ func (v *GoVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*da
 
 	container := v.Client.Container().
 		From("golang:"+goVersion).
-		WithMountedDirectory("/app", source).
+		WithMountedDirectory("/app", daggerkit.NewDaggerDirectoryAdapter(source)).
 		WithWorkdir("/app").
 		WithEnvVariable("GO111MODULE", "on").
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@latest"})
+		WithExec([]string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@latest"}, daggerkit.DaggerContainerWithExecOpts{})
 
-	output, err := container.WithExec([]string{"govulncheck", "./..."}).Stdout(ctx)
+	output, err := container.WithExec([]string{"govulncheck", "./..."}, daggerkit.DaggerContainerWithExecOpts{}).Stdout(ctx)
 	if err != nil {
 		combined := output + err.Error()
 		if vulnerabilitiesReported(combined) {
@@ -76,7 +77,7 @@ func (v *GoVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*da
 	}
 
 	reportContainer := container.WithNewFile("/tmp/vuln-report.txt", output)
-	return reportContainer.File("/tmp/vuln-report.txt"), nil
+	return reportContainer.File("/tmp/vuln-report.txt").GetRealFile(), nil
 }
 
 // vulnerabilitiesReported inspects govulncheck's human-readable output for

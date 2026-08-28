@@ -7,6 +7,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // RustLinter runs cargo clippy against a source Directory and returns its
@@ -15,7 +16,7 @@ import (
 // the Rust toolchain.
 type RustLinter struct {
 	// Client is the Dagger client used to construct the lint container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// RustVersion selects the Rust toolchain image tag. Unlike
 	// golangci-lint (a standalone binary distributed in its own image),
 	// clippy is a rustup component bound to a specific toolchain, so this
@@ -41,11 +42,12 @@ func (l *RustLinter) Test(ctx context.Context, source *dagger.Directory) (*dagge
 	}
 
 	rustVersion := resolveRustVersion(l.RustVersion)
+	sourceDir := daggerkit.NewDaggerDirectoryAdapter(source)
 
 	container := l.Client.Container().
 		From("rust:"+rustVersion).
 		WithMountedCache(cargoRegistryMountPath, l.Client.CacheVolume(cargoRegistryCacheKey)).
-		WithMountedDirectory("/app", source).
+		WithMountedDirectory("/app", sourceDir).
 		WithWorkdir("/app").
 		WithMountedCache("/app/target", l.Client.CacheVolume(rustLinterTargetCacheKey)).
 		WithExec([]string{"rustup", "component", "add", "clippy"})
@@ -71,5 +73,5 @@ func (l *RustLinter) Test(ctx context.Context, source *dagger.Directory) (*dagge
 	}
 
 	reportContainer := container.WithNewFile("/tmp/lint-report.txt", report)
-	return reportContainer.File("/tmp/lint-report.txt"), nil
+	return reportContainer.File("/tmp/lint-report.txt").GetRealFile(), nil
 }

@@ -13,6 +13,16 @@ import (
 	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
+// HTTPClient abstracts *http.Client so health checks can be tested with a mock
+// instead of making real network calls.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func defaultHTTPClient() HTTPClient {
+	return &http.Client{Timeout: 5 * time.Second}
+}
+
 // CheckDaggerEngine verifies that the Dagger engine is accessible and responsive.
 func CheckDaggerEngine(ctx context.Context, client *dagger.Client) error {
 	if client == nil {
@@ -32,6 +42,10 @@ func CheckDaggerEngine(ctx context.Context, client *dagger.Client) error {
 // CheckRegistry verifies that the Docker registry is accessible.
 // It performs a basic connectivity check to the registry URL.
 func CheckRegistry(ctx context.Context, registryURL, user, pass string) error {
+	return checkRegistry(ctx, defaultHTTPClient(), registryURL, user, pass)
+}
+
+func checkRegistry(ctx context.Context, client HTTPClient, registryURL, user, pass string) error {
 	if registryURL == "" {
 		return fmt.Errorf("registry URL is empty")
 	}
@@ -55,11 +69,6 @@ func CheckRegistry(ctx context.Context, registryURL, user, pass string) error {
 	// Use normalized URL for the health check
 	registryURL = normalizedURL
 
-	// Create HTTP client with timeout
-	httpClient := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-
 	// Try to connect to the registry (v2 API endpoint)
 	healthURL := fmt.Sprintf("%s/v2/", registryURL)
 	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
@@ -72,7 +81,7 @@ func CheckRegistry(ctx context.Context, registryURL, user, pass string) error {
 		req.SetBasicAuth(user, pass)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to connect to registry at %s: %w (check network connectivity and registry availability)", registryURL, err)
 	}
@@ -89,6 +98,10 @@ func CheckRegistry(ctx context.Context, registryURL, user, pass string) error {
 // CheckGitRepo verifies that a Git repository is accessible.
 // It performs basic validation of the repository URL format.
 func CheckGitRepo(ctx context.Context, repoURL string) error {
+	return checkGitRepo(ctx, defaultHTTPClient(), repoURL)
+}
+
+func checkGitRepo(ctx context.Context, client HTTPClient, repoURL string) error {
 	if repoURL == "" {
 		return fmt.Errorf("Git repository URL is empty")
 	}
@@ -127,10 +140,6 @@ func CheckGitRepo(ctx context.Context, repoURL string) error {
 
 	// For HTTPS URLs, we can try a lightweight HTTP HEAD request
 	if parsedURL.Scheme == "https" || parsedURL.Scheme == "http" {
-		httpClient := &http.Client{
-			Timeout: 5 * time.Second,
-		}
-
 		req, err := http.NewRequestWithContext(ctx, "HEAD", repoURL, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create Git repository request: %w", err)
@@ -139,7 +148,7 @@ func CheckGitRepo(ctx context.Context, repoURL string) error {
 		// Set User-Agent to avoid blocking
 		req.Header.Set("User-Agent", "shipwright/1.0")
 
-		resp, err := httpClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			// Connection errors are acceptable - the URL format is valid
 			return nil
@@ -156,14 +165,18 @@ func CheckGitRepo(ctx context.Context, repoURL string) error {
 // RunHealthChecks executes all health checks for the configured services.
 // It checks Dagger engine, registry (if configured), and Git repository (if configured).
 func RunHealthChecks(ctx context.Context, cfg interfaces.Configuration) error {
+	return runHealthChecks(ctx, defaultHTTPClient(), cfg)
+}
+
+func runHealthChecks(ctx context.Context, client HTTPClient, cfg interfaces.Configuration) error {
 	var errors []error
 
 	// Check Dagger engine
-	client, err := GetDaggerClientFromConfig(ctx, cfg)
+	daggerClient, err := GetDaggerClientFromConfig(ctx, cfg)
 	if err != nil {
 		errors = append(errors, fmt.Errorf("failed to get Dagger client: %w", err))
 	} else {
-		if err := CheckDaggerEngine(ctx, client); err != nil {
+		if err := CheckDaggerEngine(ctx, daggerClient); err != nil {
 			errors = append(errors, fmt.Errorf("Dagger engine check failed: %w", err))
 		} else {
 			logger.L().InfoContext(ctx, "Dagger engine is accessible")
@@ -175,7 +188,7 @@ func RunHealthChecks(ctx context.Context, cfg interfaces.Configuration) error {
 	if registryURL != "" {
 		user := cfg.GetString("registry.user")
 		pass := cfg.GetString("registry.pass")
-		if err := CheckRegistry(ctx, registryURL, user, pass); err != nil {
+		if err := checkRegistry(ctx, client, registryURL, user, pass); err != nil {
 			errors = append(errors, fmt.Errorf("registry check failed: %w", err))
 		} else {
 			logger.L().InfoContext(ctx, "Registry is accessible", "registry_url", registryURL)
@@ -187,7 +200,7 @@ func RunHealthChecks(ctx context.Context, cfg interfaces.Configuration) error {
 	// Check Git repository if configured
 	gitRepo := cfg.GetString("git.repo")
 	if gitRepo != "" {
-		if err := CheckGitRepo(ctx, gitRepo); err != nil {
+		if err := checkGitRepo(ctx, client, gitRepo); err != nil {
 			errors = append(errors, fmt.Errorf("Git repository check failed: %w", err))
 		} else {
 			logger.L().InfoContext(ctx, "Git repository is accessible", "git_repo", gitRepo)

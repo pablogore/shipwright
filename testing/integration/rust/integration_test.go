@@ -1,3 +1,5 @@
+//go:build integration
+
 package rust_test
 
 import (
@@ -11,19 +13,16 @@ import (
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
 	"github.com/pablogore/shipwright/providers/rust"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // TestRustBuilder_Build_RealEngine exercises RustBuilder.Build end to end
 // against a real Dagger engine, mirroring providers/go's
 // TestGoBuilder_Build_RealEngine. Per shipwright-testing-strategy, any test
 // reaching a real Dagger container belongs at the integration level, never
-// as a plain unit test, and MUST be guarded by testing.Short() so
-// `go test -short ./...` stays fast and skips it cleanly.
+// as a plain unit test, and MUST be guarded by the `integration` build tag
+// so `go test ./...` stays fast and skips it cleanly.
 func TestRustBuilder_Build_RealEngine(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container RustBuilder integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -50,7 +49,7 @@ edition = "2021"
 
 	src := client.Host().Directory(tmpDir)
 	builder := &rust.RustBuilder{
-		Client:      client,
+		Client:      daggerkit.NewDaggerAdapter(client),
 		Config:      shipwright.BuildConfig{BinaryName: "capabilitiestest"},
 		RustVersion: "1.83.0",
 	}
@@ -87,10 +86,6 @@ edition = "2021"
 // of being swallowed by dagger.ExecError.Error()'s generic "process ...
 // did not complete successfully" message.
 func TestRustBuilder_Build_RealEngine_CompileErrorIncludesStderr(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container RustBuilder integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -119,7 +114,7 @@ edition = "2021"
 
 	src := client.Host().Directory(tmpDir)
 	builder := &rust.RustBuilder{
-		Client:      client,
+		Client:      daggerkit.NewDaggerAdapter(client),
 		Config:      shipwright.BuildConfig{BinaryName: "brokencrate"},
 		RustVersion: "1.83.0",
 	}
@@ -142,10 +137,6 @@ edition = "2021"
 // a single test run — only that mounting WithMountedCache doesn't change
 // Build's observable success/output behavior.
 func TestRustBuilder_Build_RealEngine_RepeatedBuildReusesCache(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container RustBuilder integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -172,7 +163,7 @@ edition = "2021"
 
 	src := client.Host().Directory(tmpDir)
 	builder := &rust.RustBuilder{
-		Client:      client,
+		Client:      daggerkit.NewDaggerAdapter(client),
 		Config:      shipwright.BuildConfig{BinaryName: "cachetest"},
 		RustVersion: "1.83.0",
 	}
@@ -205,10 +196,6 @@ edition = "2021"
 // Complements TestRustBuilder_Build_NilClient (pure unit test, no engine)
 // so both branches of the guard chain have coverage.
 func TestRustBuilder_Build_NilSource_RealClient(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-engine test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -216,7 +203,7 @@ func TestRustBuilder_Build_NilSource_RealClient(t *testing.T) {
 	}
 	defer client.Close()
 
-	builder := &rust.RustBuilder{Client: client}
+	builder := &rust.RustBuilder{Client: daggerkit.NewDaggerAdapter(client)}
 
 	_, err = builder.Build(ctx, nil)
 	if err == nil {
@@ -230,10 +217,6 @@ func TestRustBuilder_Build_NilSource_RealClient(t *testing.T) {
 // unit test can prove a container's toolchain/coverage wiring is correct;
 // only a real engine run can.
 func TestRustUnitTester_Test_RealEngine_PassesWithinThreshold(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container RustUnitTester integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -274,7 +257,7 @@ mod tests {
 
 	src := client.Host().Directory(tmpDir)
 	tester := &rust.RustUnitTester{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		Config: shipwright.TestConfig{Coverage: 1},
 	}
 
@@ -293,10 +276,6 @@ mod tests {
 // (the pre-fix behavior) produced a report with no diagnostic detail at
 // all, clean or not.
 func TestRustLinter_Test_RealEngine_ReportIncludesClippyDiagnostics(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container RustLinter integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -322,7 +301,7 @@ edition = "2021"
 	}
 
 	src := client.Host().Directory(tmpDir)
-	linter := &rust.RustLinter{Client: client, RustVersion: "1.83.0"}
+	linter := &rust.RustLinter{Client: daggerkit.NewDaggerAdapter(client), RustVersion: "1.83.0"}
 
 	out, err := linter.Test(ctx, src)
 	if err != nil {
@@ -348,10 +327,6 @@ edition = "2021"
 // Publish must now fail with an actionable message naming the missing
 // path.
 func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container ContainerPublisher integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -366,7 +341,7 @@ func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) 
 
 	build := client.Host().Directory(tmpDir)
 	publisher := &rust.ContainerPublisher{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		// Deliberately omitted: BinaryName. Publish falls back to "app",
 		// but the build directory only contains "my-service" (as a real
 		// RustBuilder run configured with a non-default binaryName would

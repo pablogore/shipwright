@@ -31,7 +31,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms
+.PHONY: all build clean test dagger-test test-integration deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final
 
 # Help target
 .PHONY: help
@@ -63,7 +63,9 @@ help: ## Show this help message
 	@echo "Development:"
 	@echo "  make fmt                # Format code"
 	@echo "  make vet                # Run go vet"
+	@echo "  make lint               # Run golangci-lint"
 	@echo "  make quality            # Run all quality checks"
+	@echo "  make ci-final           # Full production-critical validation contract (build, test, coverage, security)"
 	@echo "  make clean              # Clean build artifacts"
 	@echo ""
 	@echo "Pipeline:"
@@ -74,9 +76,19 @@ help: ## Show this help message
 
 all: test build
 
-build: ## Build the application
+build: ## Build the application (root binary + full compile-check of root, providers/go, providers/rust)
 	@echo -e "$(BLUE)Building application...$(NC)"
 	$(GOBUILD) -o $(BINARY_NAME) .
+	@# `go build -o` above only builds the main package; `./...` below is a
+	@# side-effect-free compile-check of every root package (go discards
+	@# build output when the pattern matches multiple packages, so this is
+	@# safe to run from a plain checkout — no stray binaries), matching what
+	@# CI's build job already does. providers/go and providers/rust are
+	@# separate modules in go.work; `./...` never crosses that boundary, so
+	@# each needs its own invocation, same as test/vet/fmt/security.
+	$(GOBUILD) ./...
+	cd providers/go && $(GOBUILD) ./...
+	cd providers/rust && $(GOBUILD) ./...
 	@echo -e "$(GREEN)✅ Build completed$(NC)"
 
 clean: ## Clean build artifacts
@@ -104,6 +116,11 @@ dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT p
 	@echo -e "$(BLUE)Running .dagger module tests...$(NC)"
 	cd .dagger && dagger run $(GOTEST) -race ./...
 	@echo -e "$(GREEN)✅ .dagger module tests completed$(NC)"
+
+test-integration: ## Run real-Dagger-engine tests under testing/integration/ (requires a running Dagger engine; deliberately NOT part of `test`/`check`/`ci-final` — mock tests cover this logic for the default suite)
+	@echo -e "$(BLUE)Running Dagger integration tests...$(NC)"
+	$(GOTEST) -tags integration -v -race ./testing/...
+	@echo -e "$(GREEN)✅ Integration tests completed$(NC)"
 
 deps: ## Download and tidy dependencies
 	@echo -e "$(BLUE)Downloading dependencies...$(NC)"
@@ -145,27 +162,130 @@ vet: ## Run go vet
 	cd providers/rust && $(GOCMD) vet ./...
 	@echo -e "$(GREEN)✅ Go vet completed$(NC)"
 
+# Lint check
+# golangci-lint does not span go.work module boundaries either: run from
+# providers/go or providers/rust it auto-discovers and applies the root
+# .golangci.yml by walking up parent directories (verified via
+# `golangci-lint run -v`, which logs "Used config file ../../.golangci.yml"),
+# so no explicit --config flag is needed. Iterate all three modules
+# explicitly, same pattern as vet/test/security.
+lint: ## Run golangci-lint
+	@echo -e "$(BLUE)Running golangci-lint...$(NC)"
+	@which golangci-lint > /dev/null || (echo -e "$(RED)golangci-lint not found. Install it first (e.g. 'brew install golangci-lint' or see https://golangci-lint.run/welcome/install/).$(NC)" && exit 1)
+	golangci-lint run ./...
+	cd providers/go && golangci-lint run ./...
+	cd providers/rust && golangci-lint run ./...
+	@echo -e "$(GREEN)✅ Lint completed$(NC)"
+
 # Security check
 # govulncheck does not span go.work module boundaries (verified: findings
 # from root, providers/go, and providers/rust are disjoint), so it must run
 # once per module.
+#
+# PROD-001: the previous version of this target concatenated all three
+# modules' reports into one vuln_report.txt and passed if the string
+# "No vulnerabilities found." appeared ANYWHERE in it. That is a false-pass:
+# if providers/go and providers/rust are clean but root is affected, root's
+# report never contains that string, but the concatenated file still does
+# (from the clean modules), so the old check reported PASS. Verified with a
+# real finding (GO-2026-5158 in go.opentelemetry.io/otel, reachable from
+# internal/app/health.go). Fixed by (a) trusting govulncheck's own exit code
+# per module via pipefail instead of losing it through `| tee`, and (b)
+# failing if "Your code is affected" appears anywhere in the combined report,
+# instead of requiring the clean string to appear anywhere.
 security: ## Run security vulnerability check
 	@echo -e "$(BLUE)Running security vulnerability check...$(NC)"
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
-	@govulncheck ./... | tee vuln_report.txt
-	@cd providers/go && govulncheck ./... | tee -a ../../vuln_report.txt
-	@cd providers/rust && govulncheck ./... | tee -a ../../vuln_report.txt
-	@if grep -q "No vulnerabilities found." vuln_report.txt; then \
-		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
-	else \
-		echo -e "$(RED)❌ Security vulnerabilities detected! Please update dependencies.$(NC)"; \
+	@set -o pipefail; \
+	FAILED=0; \
+	govulncheck ./... | tee vuln_report.txt || FAILED=1; \
+	(cd providers/go && govulncheck ./...) | tee -a vuln_report.txt || FAILED=1; \
+	(cd providers/rust && govulncheck ./...) | tee -a vuln_report.txt || FAILED=1; \
+	if grep -q "Your code is affected" vuln_report.txt; then \
+		FAILED=1; \
+	fi; \
+	if [ "$$FAILED" -eq 1 ]; then \
+		echo -e "$(RED)❌ Security vulnerabilities detected (or scan failed)! Please review.$(NC)"; \
 		cat vuln_report.txt; \
+		rm -f vuln_report.txt; \
 		exit 1; \
+	else \
+		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
+		rm -f vuln_report.txt; \
 	fi
-	@rm -f vuln_report.txt
 
 # Run all code quality checks
 quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, security)
+
+# PROD-001: single repository-owned source of truth for "what makes a SHA
+# production-ready", run identically by any CI provider or locally.
+# ci-final = build + test + coverage + security. Four things are deliberately
+# excluded from that composition (or from the coverage calculation); each is
+# documented below as: why it's out, debt vs. architectural decision, the
+# open risk, and what closes it.
+#
+# 1) `lint` — EXCLUDED, PRE-EXISTING DEBT (not a decision).
+#    `make lint` currently fails with 110 pre-existing findings (root 97,
+#    providers/go 3, providers/rust 10 — bodyclose, errcheck, gocritic,
+#    gocyclo, perfsprint, revive, staticcheck, testifylint, thelper, unparam,
+#    unused, usetesting), none introduced by the Final-SHA work and none
+#    trivial to fix inline (4 are gocyclo>15 violations up to complexity 34;
+#    5 are exported-type "stutter" renames in providers/rust that would be a
+#    breaking public API change to a separately, tag-released module).
+#    Risk left open: a real style/complexity/correctness-adjacent regression
+#    can land on develop without failing CI, since nothing enforces lint today.
+#    Closes via: https://github.com/pablogore/shipwright/issues/186 (tracks
+#    the exact findings). Add `lint` to this composition once that issue is
+#    resolved — `make lint` stays fail-closed in the meantime so the debt
+#    stays visible.
+#
+# 2) `dagger-test` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
+#    `.dagger/`'s own module tests require `dagger run`, i.e. a live Dagger
+#    engine — see design.md D-B isolation. A fail-closed, CI-provider-
+#    independent gate cannot depend on an engine being reachable at
+#    validation time. Risk left open: none beyond what `test-integration`
+#    (below) already covers for real-engine behavior; `.dagger/`'s own logic
+#    is still exercised by `make dagger-test` on demand, just not gated.
+#    Closes via: N/A — this exclusion cannot be lifted without dropping the
+#    "runs identically anywhere, no live engine required" property ci-final
+#    exists to guarantee.
+#
+# 3) `test-integration` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
+#    `testing/integration/{go,rust,changelog}/` (build tag `integration`)
+#    exercises the real `dagger.io/dagger` SDK against a live engine, by
+#    design — that's the point of separating it from the daggerkit-mocked
+#    unit suite. Same fail-closed/reproducibility argument as `dagger-test`.
+#    Risk left open: daggerkit's interface/adapter layer could in principle
+#    drift from real SDK behavior without ci-final noticing; that drift is
+#    caught by `make test-integration` run on demand (and in CI where an
+#    engine is available), not by the gate itself.
+#    Closes via: N/A — same reasoning as `dagger-test`.
+#
+# 4) `internal/daggerkit` coverage exclusion — ARCHITECTURAL DECISION.
+#    Excluded from `make coverage`'s calculation alongside `/mocks`,
+#    `/examples`, `/app`, `/config`. daggerkit's adapter code is a thin,
+#    mechanical passthrough to the real Dagger SDK types (see
+#    internal/daggerkit/adapter_test.go for what IS tested: pure roundtrips
+#    and type-assertion guards); the passthrough branches themselves are
+#    only meaningfully exercised against a live engine, i.e. by
+#    `test-integration`, not by a coverage-counted unit test. Risk left open:
+#    none — this mirrors the existing, already-accepted treatment of
+#    `/mocks` and `/app` for the same reason (thin wrappers around
+#    real/external dependencies).
+#    Closes via: N/A — permanent, same category as the existing /mocks and
+#    /app exclusions.
+#
+# Given the above, ci-final still represents the valid minimum
+# production-critical set: build/test/coverage/security are the only checks
+# that (a) can run fail-closed with zero external dependencies and (b) map
+# directly to "this SHA compiles, behaves correctly under test, meets its
+# coverage bar, and has no known vulnerabilities." lint is enforceable this
+# way too and will be added once #186 closes; dagger-test/test-integration
+# structurally cannot be, by the same reproducibility requirement that
+# motivates ci-final's existence.
+.PHONY: ci-final
+ci-final: build test coverage security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
+	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
 # NOTE: all `go list ./...`-based package lists below intentionally do NOT
@@ -177,16 +297,24 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 # and does not belong merged into root's coverage.out. It gets its own tests
 # run (see `test` above); a dedicated coverage target for it, analogous to
 # `dagger-test`'s isolation, is future work if/when it needs one.
+#
+# The filters also exclude /daggerkit: each module's daggerkit package is a
+# thin adapter over the real dagger.io/dagger SDK types. Its mocks are
+# exercised by consumer packages' tests (cross-package usage that Go's
+# default per-package coverage doesn't credit without -coverpkg), and its
+# adapter methods mostly delegate straight into the real SDK, so they can
+# only be proven against a live engine — that's exactly what
+# testing/integration/ (make test-integration) is for, not this local gate.
 coverage: ## Generate comprehensive ASCII coverage report with threshold validation
 	@echo -e "$(BLUE)Generating comprehensive coverage report...$(NC)"
 	@mkdir -p coverage
-	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config)
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
 	@echo ""
 	@echo -e "$(CYAN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
 	@echo -e "$(CYAN)║                           📊 COVERAGE SUMMARY                                ║$(NC)"
 	@echo -e "$(CYAN)╚══════════════════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
+	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
 	echo -e "$(GREEN)✅ Total Coverage: $${COVERAGE}%$(NC)"; \
 	if [ -n "$$COVERAGE" ] && [ "$$COVERAGE" != "" ]; then \
 		if [ $$(echo "$$COVERAGE < $(COVERAGE_THRESHOLD)" | bc -l 2>/dev/null || echo "1") -eq 1 ]; then \
@@ -202,7 +330,7 @@ coverage: ## Generate comprehensive ASCII coverage report with threshold validat
 coverage-html: ## Generate HTML coverage report
 	@echo -e "$(BLUE)Generating HTML coverage report...$(NC)"
 	@mkdir -p coverage
-	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config)
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
 	@$(GOCMD) tool cover -html=coverage/coverage.out -o coverage/coverage.html
 	@echo -e "$(GREEN)✅ HTML coverage report generated: coverage/coverage.html$(NC)"
 
@@ -211,7 +339,7 @@ coverage-report: coverage-package coverage-file ## Generate detailed coverage re
 coverage-package: ## Generate detailed ASCII coverage report by package
 	@echo -e "$(BLUE)Generating package coverage report...$(NC)"
 	@mkdir -p coverage
-	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config)
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
 	@echo ""
 	@echo -e "$(CYAN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
 	@echo -e "$(CYAN)║                        📦 PACKAGE COVERAGE REPORT                            ║$(NC)"
@@ -219,7 +347,7 @@ coverage-package: ## Generate detailed ASCII coverage report by package
 	@echo ""
 	@echo -e "$(WHITE)Package Coverage Breakdown:$(NC)"
 	@echo -e "$(WHITE)────────────────────────────$(NC)"
-	@$(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/app/" | grep -v "/config/" | \
+	@$(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep -v "/app/" | grep -v "/config/" | \
 	awk '{ \
 		coverage = $$3; \
 		gsub(/%/, "", coverage); \
@@ -230,13 +358,13 @@ coverage-package: ## Generate detailed ASCII coverage report by package
 		printf "%s%-60s %s%6s%s\n", color, $$1, color, $$3, "$(NC)"; \
 	}' | sort -k2 -nr
 	@echo ""
-	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
+	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
 	echo -e "$(GREEN)✅ Total Package Coverage: $${COVERAGE}%$(NC)"
 
 coverage-file: ## Generate detailed ASCII coverage report by file
 	@echo -e "$(BLUE)Generating file coverage report...$(NC)"
 	@mkdir -p coverage
-	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config)
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
 	@echo ""
 	@echo -e "$(CYAN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
 	@echo -e "$(CYAN)║                         📄 FILE COVERAGE REPORT                              ║$(NC)"
@@ -244,7 +372,7 @@ coverage-file: ## Generate detailed ASCII coverage report by file
 	@echo ""
 	@echo -e "$(WHITE)File Coverage Breakdown:$(NC)"
 	@echo -e "$(WHITE)─────────────────────────$(NC)"
-	@$(GOCMD) tool cover -func=coverage/coverage.out | grep -E "\.go:" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | \
+	@$(GOCMD) tool cover -func=coverage/coverage.out | grep -E "\.go:" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | \
 	awk '{ \
 		coverage = $$3; \
 		gsub(/%/, "", coverage); \
@@ -255,13 +383,13 @@ coverage-file: ## Generate detailed ASCII coverage report by file
 		printf "%s%-70s %s%6s%s\n", color, $$1, color, $$3, "$(NC)"; \
 	}' | sort -k2 -nr
 	@echo ""
-	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
+	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
 	echo -e "$(GREEN)✅ Total File Coverage: $${COVERAGE}%$(NC)"
 
 coverage-summary: ## Generate comprehensive coverage summary with statistics
 	@echo -e "$(BLUE)Generating comprehensive coverage summary...$(NC)"
 	@mkdir -p coverage
-	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config)
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
 	@echo ""
 	@echo -e "$(CYAN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
 	@echo -e "$(CYAN)║                        📈 COMPREHENSIVE COVERAGE SUMMARY                     ║$(NC)"
@@ -269,12 +397,12 @@ coverage-summary: ## Generate comprehensive coverage summary with statistics
 	@echo ""
 	@echo -e "$(WHITE)Coverage Statistics:$(NC)"
 	@echo -e "$(WHITE)────────────────────$(NC)"
-	@TOTAL_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
-	PACKAGES=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | wc -l); \
-	FILES=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "\.go:" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | wc -l); \
-	HIGH_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | awk '{gsub(/%/, "", $$3); if ($$3 >= 90) print $$1}' | wc -l); \
-	MEDIUM_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | awk '{gsub(/%/, "", $$3); if ($$3 >= 80 && $$3 < 90) print $$1}' | wc -l); \
-	LOW_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | awk '{gsub(/%/, "", $$3); if ($$3 < 80) print $$1}' | wc -l); \
+	@TOTAL_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
+	PACKAGES=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | wc -l); \
+	FILES=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "\.go:" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | wc -l); \
+	HIGH_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | awk '{gsub(/%/, "", $$3); if ($$3 >= 90) print $$1}' | wc -l); \
+	MEDIUM_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | awk '{gsub(/%/, "", $$3); if ($$3 >= 80 && $$3 < 90) print $$1}' | wc -l); \
+	LOW_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | awk '{gsub(/%/, "", $$3); if ($$3 < 80) print $$1}' | wc -l); \
 	echo -e "$(GREEN)Total Coverage: $${TOTAL_COVERAGE}%$(NC)"; \
 	echo -e "$(BLUE)Total Packages: $${PACKAGES}$(NC)"; \
 	echo -e "$(BLUE)Total Files: $${FILES}$(NC)"; \
@@ -292,13 +420,13 @@ coverage-summary: ## Generate comprehensive coverage summary with statistics
 coverage-threshold: ## Validate coverage against threshold with detailed reporting
 	@echo -e "$(BLUE)Validating coverage threshold...$(NC)"
 	@mkdir -p coverage
-	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config)
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
 	@echo ""
 	@echo -e "$(CYAN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
 	@echo -e "$(CYAN)║                        🎯 COVERAGE THRESHOLD VALIDATION                      ║$(NC)"
 	@echo -e "$(CYAN)╚══════════════════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@TOTAL_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
+	@TOTAL_COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
 	echo -e "$(WHITE)Threshold Validation:$(NC)"; \
 	echo -e "$(WHITE)─────────────────────$(NC)"; \
 	echo -e "$(BLUE)Required Threshold: $(COVERAGE_THRESHOLD)%$(NC)"; \
@@ -308,7 +436,7 @@ coverage-threshold: ## Validate coverage against threshold with detailed reporti
 		echo -e "$(RED)❌ FAILED: Coverage $${TOTAL_COVERAGE}% is below threshold $(COVERAGE_THRESHOLD)%$(NC)"; \
 		echo ""; \
 		echo -e "$(YELLOW)Packages below threshold:$(NC)"; \
-		$(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | \
+		$(GOCMD) tool cover -func=coverage/coverage.out | grep -E "gitlab.com/syntegrity" | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | \
 		awk -v threshold=$(COVERAGE_THRESHOLD) '{ \
 			coverage = $$3; \
 			gsub(/%/, "", coverage); \
@@ -322,13 +450,13 @@ coverage-threshold: ## Validate coverage against threshold with detailed reporti
 coverage-ci: ## Generate coverage report for CI with relaxed threshold
 	@echo -e "$(BLUE)Generating CI coverage report...$(NC)"
 	@mkdir -p coverage
-	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config)
+	@$(GOTEST) -coverprofile=coverage/coverage.out -covermode=atomic $(shell go list ./... | grep -v /examples | grep -v /mocks | grep -v /app | grep -v /config | grep -v /daggerkit)
 	@echo ""
 	@echo -e "$(CYAN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
 	@echo -e "$(CYAN)║                        📊 CI COVERAGE SUMMARY                                 ║$(NC)"
 	@echo -e "$(CYAN)╚══════════════════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
+	@COVERAGE=$$($(GOCMD) tool cover -func=coverage/coverage.out | grep -v "/mocks/" | grep -v "/examples/" | grep -v "/proto/" | grep -v "/app/" | grep -v "/config/" | grep -v "/daggerkit/" | grep total | awk '{print $$3}' | sed 's/%//' | sed 's/(statements)//' | tr -d ' '); \
 	echo -e "$(GREEN)✅ Total Coverage: $${COVERAGE}%$(NC)"; \
 	if [ -n "$$COVERAGE" ] && [ "$$COVERAGE" != "" ]; then \
 		if [ $$(echo "$$COVERAGE < $(COVERAGE_THRESHOLD_CI)" | bc -l 2>/dev/null || echo "1") -eq 1 ]; then \

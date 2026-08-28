@@ -7,8 +7,11 @@ import (
 	"dagger.io/dagger"
 
 	golang "github.com/pablogore/shipwright/providers/go"
+	godaggerkit "github.com/pablogore/shipwright/providers/go/daggerkit"
 	"github.com/pablogore/shipwright/providers/rust"
+	rustdaggerkit "github.com/pablogore/shipwright/providers/rust/daggerkit"
 
+	"github.com/pablogore/shipwright/internal/daggerkit"
 	"github.com/pablogore/shipwright/internal/workflow/interp"
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
@@ -31,12 +34,15 @@ import (
 // (providers/go/gobuilder.go etc.) and returns an error rather than
 // panicking, so registration itself never needs a live client.
 func RegisterDefaults(r *Registry, client *dagger.Client) {
+	goClient := newGoDaggerClient(client)
+	rustClient := newRustDaggerClient(client)
+
 	r.RegisterBuilder(Ref{Name: "go", Version: "1"}, WithSchema{
 		"goVersion":  interp.KindString,
 		"binaryName": interp.KindString,
 	}, func(v Values) shipwright.Builder {
 		return &golang.GoBuilder{
-			Client: client,
+			Client: goClient,
 			Config: shipwright.BuildConfig{
 				GoVersion:  stringField(v, "goVersion"),
 				BinaryName: stringField(v, "binaryName"),
@@ -48,17 +54,17 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"coverage": interp.KindInt,
 	}, func(v Values) shipwright.Tester {
 		return &golang.GoUnitTester{
-			Client: client,
+			Client: goClient,
 			Config: shipwright.TestConfig{Coverage: floatField(v, "coverage")},
 		}
 	})
 
 	r.RegisterTester(Ref{Name: "golangci-lint", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
-		return &golang.GoLinter{Client: client}
+		return &golang.GoLinter{Client: goClient}
 	})
 
 	r.RegisterTester(Ref{Name: "govulncheck", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
-		return &golang.GoVulnScanner{Client: client}
+		return &golang.GoVulnScanner{Client: goClient}
 	})
 
 	r.RegisterArtifactor(Ref{Name: "container", Version: "1"}, WithSchema{
@@ -68,7 +74,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"binaryName":   interp.KindString,
 	}, func(v Values) shipwright.Artifactor {
 		return &golang.ContainerPublisher{
-			Client: client,
+			Client: goClient,
 			Config: shipwright.ArtifactConfig{
 				RegistryUser: stringField(v, "registryUser"),
 				BinaryName:   stringField(v, "binaryName"),
@@ -86,7 +92,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"locked":       interp.KindBool,
 	}, func(v Values) shipwright.Builder {
 		return &rust.RustBuilder{
-			Client: client,
+			Client: rustClient,
 			Config: shipwright.BuildConfig{
 				BinaryName: stringField(v, "binaryName"),
 				BuildMode:  stringField(v, "buildMode"),
@@ -109,7 +115,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"locked":       interp.KindBool,
 	}, func(v Values) shipwright.Tester {
 		return &rust.RustUnitTester{
-			Client:       client,
+			Client:       rustClient,
 			Config:       shipwright.TestConfig{Coverage: floatField(v, "coverage")},
 			RustVersion:  stringField(v, "rustVersion"),
 			ManifestPath: stringField(v, "manifestPath"),
@@ -136,7 +142,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"dockerSocketPath": interp.KindString,
 	}, func(v Values) shipwright.Tester {
 		return &rust.RustIntegrationTester{
-			Client:           client,
+			Client:           rustClient,
 			RustVersion:      stringField(v, "rustVersion"),
 			ManifestPath:     stringField(v, "manifestPath"),
 			Package:          stringField(v, "package"),
@@ -153,7 +159,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	r.RegisterTester(Ref{Name: "clippy", Version: "1"}, WithSchema{
 		"rustVersion": interp.KindString,
 	}, func(v Values) shipwright.Tester {
-		return &rust.RustLinter{Client: client, RustVersion: stringField(v, "rustVersion")}
+		return &rust.RustLinter{Client: rustClient, RustVersion: stringField(v, "rustVersion")}
 	})
 
 	// "cargo-audit", not "rust-vulncheck": mirrors govulncheck's own
@@ -161,7 +167,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	r.RegisterTester(Ref{Name: "cargo-audit", Version: "1"}, WithSchema{
 		"rustVersion": interp.KindString,
 	}, func(v Values) shipwright.Tester {
-		return &rust.RustVulnScanner{Client: client, RustVersion: stringField(v, "rustVersion")}
+		return &rust.RustVulnScanner{Client: rustClient, RustVersion: stringField(v, "rustVersion")}
 	})
 
 	// rust.ContainerPublisher is registered under its own ref ("rust-
@@ -182,7 +188,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		"binaryName":   interp.KindString,
 	}, func(v Values) shipwright.Artifactor {
 		return &rust.ContainerPublisher{
-			Client: client,
+			Client: rustClient,
 			Config: shipwright.ArtifactConfig{
 				RegistryUser: stringField(v, "registryUser"),
 				BinaryName:   stringField(v, "binaryName"),
@@ -193,8 +199,40 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	// ChangelogRunner (changelog.go) has no with-field configuration, same
 	// as golangci-lint/govulncheck above.
 	r.RegisterRunner(Ref{Name: "changelog", Version: "1"}, WithSchema{}, func(v Values) shipwright.Runner {
-		return &ChangelogRunner{Client: client}
+		return &ChangelogRunner{Client: newChangelogDaggerClient(client)}
 	})
+}
+
+// newGoDaggerClient wraps client for providers/go's own daggerkit.DaggerClient
+// interface, preserving a nil client as a nil interface (rather than a
+// non-nil interface wrapping a nil pointer) so every provider's existing
+// "Client == nil" guard clause keeps working for the nil-client,
+// resolution-only path documented on RegisterDefaults above.
+func newGoDaggerClient(client *dagger.Client) godaggerkit.DaggerClient {
+	if client == nil {
+		return nil
+	}
+	return godaggerkit.NewDaggerAdapter(client)
+}
+
+// newRustDaggerClient is newGoDaggerClient's counterpart for providers/rust's
+// own daggerkit.DaggerClient interface.
+func newRustDaggerClient(client *dagger.Client) rustdaggerkit.DaggerClient {
+	if client == nil {
+		return nil
+	}
+	return rustdaggerkit.NewDaggerAdapter(client)
+}
+
+// newChangelogDaggerClient is newGoDaggerClient's counterpart for this
+// package's own ChangelogRunner, which uses the root module's
+// internal/daggerkit.DaggerClient interface directly (no separate module
+// boundary to cross, unlike providers/go and providers/rust).
+func newChangelogDaggerClient(client *dagger.Client) daggerkit.DaggerClient {
+	if client == nil {
+		return nil
+	}
+	return daggerkit.NewDaggerAdapter(client)
 }
 
 // stringField returns the string form of v[key], or "" when key is

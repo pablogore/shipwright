@@ -16,7 +16,8 @@ Load this skill when writing or reviewing Go tests in this repo, adding coverage
 - Prefer table-driven tests for multiple cases; use `t.Run(tt.name, ...)`.
 - Test behavior and state transitions, not implementation trivia.
 - Use `t.TempDir()` for filesystem tests; never rely on a real home directory or the developer's working tree.
-- Keep integration tests skippable with `testing.Short()` when they run external commands, real Dagger containers, or slow flows.
+- Mock the Dagger client for anything that touches `dagger.io/dagger` — each module (root, `providers/go`, `providers/rust`) has its own `daggerkit` package with testify-based mocks (`daggerkit.MockDaggerClient`/`MockDaggerContainer`/`MockDaggerDirectory`/`MockDaggerFile`). A unit test never needs a real engine to prove Dagger-driven logic.
+- Only what genuinely can't be mocked — a real external command or an end-to-end real-engine run — lives in `testing/integration/{go,rust,changelog}/`, guarded by the `integration` build tag and run via `make test-integration`, never as an in-package `testing.Short()`-guarded test.
 - Use small mocks/interfaces around execution boundaries — this repo already does this for executors (`internal/executors/mocks.go`) and plugins (`internal/plugins/mocks.go`); extend those rather than hand-rolling new fakes.
 - Golden files must be deterministic; update only through the repo's `-update` path and rerun tests without `-update`.
 - **Local/CI semantic parity is a hard requirement.** Shipwright's whole premise is that a step run through the `NativeExecutor` locally and the same step run through the `DockerExecutor`/`CicdExecutor` in CI produce equivalent results (see `internal/executors/selector.go`). A test that only exercises one executor path for a step that has both is incomplete — cover the executor selection logic itself when adding a new step, and prefer testing behavior against the `Executor` interface so both implementations are exercised.
@@ -31,8 +32,8 @@ Load this skill when writing or reviewing Go tests in this repo, adding coverage
 | File operations | `t.TempDir()` plus focused assertions. |
 | Executor behavior (`internal/executors`) | Test against the `Executor` interface via mocks; add a parity case when both native and container paths exist for the step. |
 | Plugin hook/step (`internal/plugins`) | Use `PluginContext` mocks; assert hook registration and step execution independently. |
-| Dagger-driven step output | Golden file test where output is deterministic; skip real container execution under `-short`. |
-| Real external command (`go`, `golangci-lint`, `govulncheck`, `dagger`) | Integration test; skip in `-short`. |
+| Dagger-driven step output | Golden file test against the module's mocked `daggerkit` client — deterministic, no real container needed. |
+| Real external command that can't be mocked, or a real-Dagger-engine end-to-end check | `testing/integration/` test, guarded by the `integration` build tag, run via `make test-integration`. |
 
 ## Execution Steps
 
@@ -46,7 +47,7 @@ Load this skill when writing or reviewing Go tests in this repo, adding coverage
 
 ## Output Contract
 
-Report test files changed, scenarios covered, commands executed, golden files updated, local/CI parity verified or explicitly N/A with reason, and any skipped integration scope.
+Report test files changed, scenarios covered, commands executed, golden files updated, local/CI parity verified or explicitly N/A with reason, and any coverage that lives in `testing/integration/` instead of as a mocked unit test.
 
 ## Examples
 
@@ -129,5 +130,5 @@ go test -v ./internal/executors/...
 go test -run TestValidateGoVersion ./internal/config
 go test -cover ./...
 go test ./internal/config -update
-go test -short ./...
+make test-integration
 ```

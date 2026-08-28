@@ -2,11 +2,14 @@ package app
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"testing"
 	"time"
 
 	"dagger.io/dagger"
 	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,6 +58,7 @@ func TestCheckRegistry(t *testing.T) {
 		user        string
 		pass        string
 		wantErr     bool
+		mockSetup   func(*MockHTTPClient)
 	}{
 		{
 			name:        "empty registry URL",
@@ -62,6 +66,7 @@ func TestCheckRegistry(t *testing.T) {
 			user:        "user",
 			pass:        "pass",
 			wantErr:     true,
+			mockSetup:   nil,
 		},
 		{
 			name:        "invalid registry URL",
@@ -69,6 +74,13 @@ func TestCheckRegistry(t *testing.T) {
 			user:        "user",
 			pass:        "pass",
 			wantErr:     true,
+			// "not-a-url" is normalized to "https://not-a-url", which passes URL
+			// validation (it has a scheme and a host), so checkRegistry proceeds
+			// to call the client; the error comes from the (mocked) connection
+			// failure, not from URL validation.
+			mockSetup: func(m *MockHTTPClient) {
+				m.On("Do", mock.Anything).Return(nil, errors.New("mock connection error: no such host"))
+			},
 		},
 		{
 			name:        "valid registry URL format",
@@ -76,6 +88,9 @@ func TestCheckRegistry(t *testing.T) {
 			user:        "user",
 			pass:        "pass",
 			wantErr:     false, // May fail on actual connection, but format is valid
+			mockSetup: func(m *MockHTTPClient) {
+				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil)
+			},
 		},
 	}
 
@@ -84,7 +99,12 @@ func TestCheckRegistry(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			err := CheckRegistry(ctx, tt.registryURL, tt.user, tt.pass)
+			mockClient := new(MockHTTPClient)
+			if tt.mockSetup != nil {
+				tt.mockSetup(mockClient)
+			}
+
+			err := checkRegistry(ctx, mockClient, tt.registryURL, tt.user, tt.pass)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -93,35 +113,44 @@ func TestCheckRegistry(t *testing.T) {
 					t.Logf("Registry check failed (may be expected in test environment): %v", err)
 				}
 			}
+
+			mockClient.AssertExpectations(t)
 		})
 	}
 }
 
 func TestCheckGitRepo(t *testing.T) {
 	tests := []struct {
-		name    string
-		repoURL string
-		wantErr bool
+		name      string
+		repoURL   string
+		wantErr   bool
+		mockSetup func(*MockHTTPClient)
 	}{
 		{
-			name:    "empty repo URL",
-			repoURL: "",
-			wantErr: true,
+			name:      "empty repo URL",
+			repoURL:   "",
+			wantErr:   true,
+			mockSetup: nil,
 		},
 		{
-			name:    "invalid repo URL",
-			repoURL: "not-a-url",
-			wantErr: true,
+			name:      "invalid repo URL",
+			repoURL:   "not-a-url",
+			wantErr:   true,
+			mockSetup: nil,
 		},
 		{
 			name:    "valid HTTPS repo URL",
 			repoURL: "https://github.com/pablogore/shipwright",
 			wantErr: false, // May fail on actual connection, but format is valid
+			mockSetup: func(m *MockHTTPClient) {
+				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil)
+			},
 		},
 		{
-			name:    "valid SSH repo URL",
-			repoURL: "git@github.com:pablogore/shipwright.git",
-			wantErr: false, // May fail on actual connection, but format is valid
+			name:      "valid SSH repo URL",
+			repoURL:   "git@github.com:pablogore/shipwright.git",
+			wantErr:   false, // May fail on actual connection, but format is valid
+			mockSetup: nil,   // SSH never touches HTTP
 		},
 	}
 
@@ -130,7 +159,12 @@ func TestCheckGitRepo(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			err := CheckGitRepo(ctx, tt.repoURL)
+			mockClient := new(MockHTTPClient)
+			if tt.mockSetup != nil {
+				tt.mockSetup(mockClient)
+			}
+
+			err := checkGitRepo(ctx, mockClient, tt.repoURL)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -139,15 +173,18 @@ func TestCheckGitRepo(t *testing.T) {
 					t.Logf("Git repo check failed (may be expected in test environment): %v", err)
 				}
 			}
+
+			mockClient.AssertExpectations(t)
 		})
 	}
 }
 
 func TestRunHealthChecks(t *testing.T) {
 	tests := []struct {
-		name    string
-		setup   func() interfaces.Configuration
-		wantErr bool
+		name      string
+		setup     func() interfaces.Configuration
+		wantErr   bool
+		mockSetup func(*MockHTTPClient)
 	}{
 		{
 			name: "valid configuration",
@@ -170,6 +207,11 @@ func TestRunHealthChecks(t *testing.T) {
 				return mockConfig
 			},
 			wantErr: false, // May have connection errors, but config is valid
+			mockSetup: func(m *MockHTTPClient) {
+				// A single generic expectation covers both the registry GET and
+				// the git HEAD calls.
+				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil)
+			},
 		},
 		{
 			name: "missing registry config",
@@ -180,7 +222,8 @@ func TestRunHealthChecks(t *testing.T) {
 				}
 				return mockConfig
 			},
-			wantErr: false, // Health checks should skip missing configs
+			wantErr:   false, // Health checks should skip missing configs
+			mockSetup: nil,   // No URLs configured, so neither check fires an HTTP call.
 		},
 	}
 
@@ -191,7 +234,12 @@ func TestRunHealthChecks(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			err := RunHealthChecks(ctx, cfg)
+			mockClient := new(MockHTTPClient)
+			if tt.mockSetup != nil {
+				tt.mockSetup(mockClient)
+			}
+
+			err := runHealthChecks(ctx, mockClient, cfg)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -200,6 +248,8 @@ func TestRunHealthChecks(t *testing.T) {
 					t.Logf("Health checks failed (may be expected in test environment): %v", err)
 				}
 			}
+
+			mockClient.AssertExpectations(t)
 		})
 	}
 }

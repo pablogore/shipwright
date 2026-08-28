@@ -10,6 +10,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
 // coverageTotalRegexp matches `go tool cover -func`'s total-coverage line,
@@ -27,7 +28,7 @@ var coverageTotalRegexp = regexp.MustCompile(`total:\s+\(statements\)\s+(\d+\.\d
 // GoLinter, GoVulnScanner each register separately for capability: test).
 type GoUnitTester struct {
 	// Client is the Dagger client used to construct the test container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// Config carries the minimum required coverage percentage.
 	Config shipwright.TestConfig
 	// GoVersion selects the Go toolchain image. Kept as its own field
@@ -56,7 +57,7 @@ func (t *GoUnitTester) Test(ctx context.Context, source *dagger.Directory) (*dag
 
 	container := t.Client.Container().
 		From("golang:"+goVersion).
-		WithMountedDirectory("/src", source).
+		WithMountedDirectory("/src", daggerkit.NewDaggerDirectoryAdapter(source)).
 		WithWorkdir("/src").
 		WithEnvVariable("GO111MODULE", "on").
 		// CGO_ENABLED=1, not 0: `go test -race` requires cgo. The legacy
@@ -66,7 +67,7 @@ func (t *GoUnitTester) Test(ctx context.Context, source *dagger.Directory) (*dag
 		// mocked in its own test suite. Surfaced and fixed here via this
 		// package's real-engine integration test.
 		WithEnvVariable("CGO_ENABLED", "1").
-		WithExec([]string{"go", "test", "-v", "-race", "-coverprofile=/tmp/coverage.out", "./..."})
+		WithExec([]string{"go", "test", "-v", "-race", "-coverprofile=/tmp/coverage.out", "./..."}, daggerkit.DaggerContainerWithExecOpts{})
 
 	ran, err := container.Sync(ctx)
 	if err != nil {
@@ -79,14 +80,14 @@ func (t *GoUnitTester) Test(ctx context.Context, source *dagger.Directory) (*dag
 		}
 	}
 
-	return ran.File("/tmp/coverage.out"), nil
+	return ran.File("/tmp/coverage.out").GetRealFile(), nil
 }
 
 // enforceCoverageThreshold reads the coverage percentage from the already
 // executed container and returns an error naming the shortfall when it is
 // below Config.Coverage.
-func (t *GoUnitTester) enforceCoverageThreshold(ctx context.Context, ran *dagger.Container) error {
-	coverageOutput, err := ran.WithExec([]string{"go", "tool", "cover", "-func=/tmp/coverage.out"}).Stdout(ctx)
+func (t *GoUnitTester) enforceCoverageThreshold(ctx context.Context, ran daggerkit.DaggerContainer) error {
+	coverageOutput, err := ran.WithExec([]string{"go", "tool", "cover", "-func=/tmp/coverage.out"}, daggerkit.DaggerContainerWithExecOpts{}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("gounittester: failed to compute coverage: %w", err)
 	}

@@ -232,6 +232,21 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 go install golang.org/x/vuln/cmd/govulncheck@latest
 ```
 
+### Error: `cargo-tarpaulin` falla por falta de memoria (OOM) en Colima
+
+**Problema**: El step de coverage de `providers/rust` (`cargo tarpaulin --engine llvm`) muere sin mensaje claro, o el contenedor Dagger se cierra abruptamente, al ejecutar `make test-integration` localmente sobre Colima sobre macOS.
+
+**Causa**: `tarpaulin` con `--engine llvm` instrumenta cada crate del workspace y puede superar la memoria asignada por defecto a la VM de Colima, especialmente en workspaces con varias crates o dependencias pesadas.
+
+**Solución**: Aumenta la memoria de la VM de Colima antes de correr la suite:
+
+```bash
+colima stop
+colima start --memory 8   # ajusta según los recursos disponibles en tu máquina
+```
+
+Es una limitación conocida del entorno local (Colima + Dagger + tarpaulin), no del pipeline: en CI, los runners de GitHub Actions ya cuentan con memoria suficiente y no se ve este problema.
+
 ### Ejecución Lenta
 
 **Problema**: La ejecución local es más lenta de lo esperado

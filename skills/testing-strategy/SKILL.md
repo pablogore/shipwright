@@ -11,7 +11,7 @@ metadata:
 ## Activation Contract
 
 Load this skill when:
-- Deciding whether a change needs a unit test or a `-short`-skippable integration test
+- Deciding whether a change needs a mocked unit test or belongs in the `testing/integration/` real-engine suite
 - Reviewing whether a PR meets the coverage and complexity gates
 - Adding tests to a package that has none
 - Arguing about test level or test placement
@@ -56,18 +56,19 @@ Shipwright has no Rust-style workspace/crate boundaries, so its test levels aren
 
 | Level | Location | What belongs |
 |---|---|---|
-| Unit | in-package `_test.go`, mocked `Executor`/`PluginContext` boundaries | Pure functions, config parsing, decision/selection logic |
-| Integration (`-short`-skippable) | in-package `_test.go`, guarded by `testing.Short()` | Real Dagger container execution, real external commands (`go`, `golangci-lint`, `govulncheck`, `dagger`) |
+| Unit | in-package `_test.go`, mocked `Executor`/`PluginContext` boundaries, mocked Dagger client/container/directory/file via each module's own `daggerkit` package | Pure functions, config parsing, decision/selection logic, and any provider logic that talks to Dagger — mock the client, don't reach a real engine |
+| Integration (`testing/integration/`, `integration` build tag) | `testing/integration/{go,rust,changelog}/`, guarded by `//go:build integration`, run via `make test-integration` | Only what genuinely can't be mocked: end-to-end real Dagger container execution, real external commands (`go`, `golangci-lint`, `govulncheck`, `dagger`) |
 | Parity case | wherever the step's test already lives | The same behavior asserted through both the `NativeExecutor` and `DockerExecutor`/`CicdExecutor` paths, via the `Executor` interface |
 
-A unit test that reaches a real container, a real external command, or the network is misclassified — it moves to the integration level and gets a `testing.Short()` guard, not a feature flag or an `-ignore`-style skip.
+A unit test that reaches a real Dagger container is misclassified — mock the client via that module's `daggerkit` package (root, `providers/go`, and `providers/rust` each have their own). Only a test that still needs a real engine or an external command that can't be mocked moves to `testing/integration/` under the `integration` build tag, not a feature flag or an `-ignore`-style skip.
 
 ## Decision Gates
 
 | Question | Answer |
 |---|---|
 | Touches only in-memory state or mocked `Executor`/`PluginContext` | Unit — in-package `_test.go` |
-| Runs a real external command or real Dagger container | Integration — same package, guarded by `testing.Short()` |
+| Touches a Dagger client/container/directory/file | Unit — mock it via the module's `daggerkit` package (`daggerkit.MockDaggerClient` etc.) |
+| Needs a real Dagger engine end-to-end, or a real external command that can't be mocked | Integration — `testing/integration/`, `integration` build tag, run via `make test-integration` |
 | The step exists through both `NativeExecutor` and `DockerExecutor`/`CicdExecutor` | Add or update the parity case (see `shipwright-testing`) |
 | PR touches `internal/executors`, `internal/plugins`, `internal/config`, or `internal/pipelines` | Coverage gate applies — 90% local (`make coverage`), 70% CI floor (`make coverage-threshold`) |
 | A function crosses gocyclo complexity 15 | Extract functions before merge; verify with `golangci-lint run` |
@@ -75,9 +76,9 @@ A unit test that reaches a real container, a real external command, or the netwo
 ## Running Tests
 
 ```bash
-go test ./...                # everything
+go test ./...                # everything (Dagger calls are mocked, no real engine needed)
 go test -race ./...          # race detector — matches `make test` and CI
-go test -short ./...         # skip integration/container tests
+make test-integration         # real-Dagger-engine tests under testing/integration/ (requires a running engine)
 make coverage                 # coverage report against the 90% local threshold
 make coverage-threshold       # CI-equivalent check against the 70% floor
 make coverage-100             # opt-in 100% mode
@@ -94,7 +95,7 @@ golangci-lint run              # gocyclo (15) plus the rest of .golangci.yml —
 ## Output Contract
 
 Report, for every change:
-1. Which level(s) the new tests live at (unit / `-short` integration), and why.
+1. Which level(s) the new tests live at (unit, mocking Dagger via `daggerkit` / `testing/integration/` real-engine), and why.
 2. That `go test -race ./...` passes with 0 failures.
 3. Coverage impact if the change touches a package under the coverage gate.
 4. Any function that crossed gocyclo complexity 15 and how it was split.

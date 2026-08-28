@@ -23,6 +23,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // defaultRustVersion is the Rust toolchain (rustc/cargo) version used
@@ -59,7 +60,7 @@ const defaultCargoProfile = "release"
 // the resulting Directory is ContainerPublisher's job (Artifactor.Publish).
 type RustBuilder struct {
 	// Client is the Dagger client used to construct the build container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// Config configures the output binary name (BinaryName) and cargo
 	// build profile (BuildMode, e.g. "release", "debug", or a custom
 	// named profile).
@@ -113,6 +114,8 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 	// a caller-chosen "-o" path, so a Config.BinaryName-less manifest must
 	// infer the real name from the source itself rather than guess "app"
 	// and have the build's cp step fail against almost every real crate.
+	sourceDir := daggerkit.NewDaggerDirectoryAdapter(source)
+
 	binaryName := b.Config.BinaryName
 	switch {
 	case binaryName != "":
@@ -132,7 +135,7 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 		if manifestPath == "" {
 			manifestPath = "Cargo.toml"
 		}
-		cargoToml, err := source.File(manifestPath).Contents(ctx)
+		cargoToml, err := sourceDir.File(manifestPath).Contents(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("rustbuilder: binaryName not set and failed to read %s to infer it: %w", manifestPath, err)
 		}
@@ -145,7 +148,7 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 	container := b.Client.Container().
 		From("rust:"+rustVersion).
 		WithMountedCache(cargoRegistryMountPath, b.Client.CacheVolume(cargoRegistryCacheKey)).
-		WithMountedDirectory("/app", source).
+		WithMountedDirectory("/app", sourceDir).
 		WithWorkdir("/app").
 		WithMountedCache("/app/target", b.Client.CacheVolume(rustBuilderTargetCacheKey)).
 		WithExec(b.cargoBuildArgs(profile))
@@ -167,7 +170,7 @@ func (b *RustBuilder) Build(ctx context.Context, source *dagger.Directory) (*dag
 		return nil, wrapExecError("rustbuilder: failed to build rust binary", err)
 	}
 
-	return built.Directory("/output"), nil
+	return built.Directory("/output").GetRealDirectory(), nil
 }
 
 // cargoBuildArgs returns the `cargo build` invocation for profile, given

@@ -10,6 +10,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
 // auditVulnerabilityCountRegexp captures the vulnerability count from
@@ -28,7 +29,7 @@ var auditVulnerabilityCountRegexp = regexp.MustCompile(`(\d+) vulnerabilit(?:y|i
 // GoVulnScanner mirrors.
 type RustVulnScanner struct {
 	// Client is the Dagger client used to construct the scan container.
-	Client *dagger.Client
+	Client daggerkit.DaggerClient
 	// RustVersion selects the Rust toolchain image used to install and run
 	// cargo-audit. Defaults to defaultRustVersion when left empty.
 	RustVersion string
@@ -50,11 +51,12 @@ func (v *RustVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*
 	}
 
 	rustVersion := resolveRustVersion(v.RustVersion)
+	sourceDir := daggerkit.NewDaggerDirectoryAdapter(source)
 
 	container := v.Client.Container().
 		From("rust:"+rustVersion).
 		WithMountedCache(cargoRegistryMountPath, v.Client.CacheVolume(cargoRegistryCacheKey)).
-		WithMountedDirectory("/app", source).
+		WithMountedDirectory("/app", sourceDir).
 		WithWorkdir("/app").
 		WithExec([]string{"cargo", "install", "cargo-audit", "--locked"})
 
@@ -72,7 +74,7 @@ func (v *RustVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*
 	}
 
 	reportContainer := container.WithNewFile("/tmp/vuln-report.txt", output)
-	return reportContainer.File("/tmp/vuln-report.txt"), nil
+	return reportContainer.File("/tmp/vuln-report.txt").GetRealFile(), nil
 }
 
 // auditCombinedOutput builds the text auditVulnerabilitiesReported scans for

@@ -1510,3 +1510,112 @@ jobs:
           echo ""
           echo "✅ This Pull Request is ready to be merged"
         fi
+
+  # PROD-001: Final-SHA validation.
+  #
+  # Every job above this point decides whether to run tests/coverage/security
+  # on a push to develop/main based on the IS_PR_MERGE heuristics in
+  # `determine-pipeline` (commit message wording, commit author) — see e.g.
+  # lines ~406-414 for develop, ~371-379 for main. Those heuristics are
+  # falsifiable by construction (a squash-merge commit message that doesn't
+  # match the regex, a bot author, a rebase-merge) and, even when correct,
+  # they assume "this SHA already passed validation as a PR head" — which is
+  # not the same SHA once GitHub creates a merge/squash commit, and is never
+  # true at all for a direct push. So the exact SHA that lands on the
+  # integration branch may never actually be validated end-to-end.
+  #
+  # This job closes that gap independently of any merge-detection heuristic:
+  # it runs on every push to develop or main, checks out that exact SHA, and
+  # runs the single repository-owned validation contract (`make ci-final`)
+  # against it — never reusing a prior PR run's result. `make ci-final` is
+  # the source of truth for "is this SHA valid"; this job is only the GitHub
+  # Actions adapter that invokes it. The same command run locally via
+  # `git checkout <sha> && make ci-final` must produce the same PASS/FAIL,
+  # and running it under a different CI provider requires only rewriting
+  # this adapter, not reimplementing the guards.
+  #
+  # Scoped to develop and main only (not the feature/shipwright-public-*
+  # push trigger above) because those are this repository's integration
+  # branches; feature branches keep their existing lightweight pipeline.
+  #
+  # No concurrency group is defined here deliberately: each push triggers an
+  # independent workflow run that checks out its own exact SHA into its own
+  # isolated runner, so two SHAs landing on develop in quick succession are
+  # already correctly isolated — there is no shared mutable state for a
+  # concurrency group to protect.
+  final-sha-validation:
+    runs-on: 'ubuntu-latest'
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    steps:
+    - name: 'Checkout exact Final SHA'
+      uses: 'actions/checkout@v7'
+      with:
+        ref: '${{ github.sha }}'
+
+    - name: 'Verify checked-out SHA matches the pushed SHA'
+      run: |
+        EXPECTED="${{ github.sha }}"
+        ACTUAL="$(git rev-parse HEAD)"
+        echo "Expected (github.sha): $EXPECTED"
+        echo "Checked out (git rev-parse HEAD): $ACTUAL"
+        if [[ "$EXPECTED" != "$ACTUAL" ]]; then
+          echo "❌ Checkout integrity failure: checked-out SHA does not match the pushed SHA"
+          exit 1
+        fi
+        echo "✅ Checked-out SHA matches the pushed SHA"
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v7'
+      with:
+        go-version: '${{ env.GO_VERSION }}'
+        cache: false  # Disable default cache to use our custom one
+
+    - name: 'Cache Go modules'
+      uses: 'actions/cache@v6'
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
+        restore-keys: |
+          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
+          go-mod-${{ hashFiles('go.sum') }}-
+          go-mod-
+        fail-on-cache-miss: false
+
+    - name: 'Run repository-owned Final-SHA validation contract'
+      run: |
+        echo "🔐 Running 'make ci-final' against $(git rev-parse HEAD)"
+        make ci-final
+
+  # Single, unambiguous aggregator for the Final-SHA verdict. Fail-closed by
+  # construction: it only reports VALID when final-sha-validation's result is
+  # exactly 'success'. Any other result — failure, cancellation, or an
+  # unexpected skip — falls through to INVALID, because `!= 'success'` is the
+  # only comparison this job makes.
+  final-sha-gate:
+    runs-on: 'ubuntu-latest'
+    needs: ['final-sha-validation']
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    steps:
+    - name: 'Final SHA verdict'
+      run: |
+        SHA="${{ github.sha }}"
+        RESULT="${{ needs.final-sha-validation.result }}"
+        echo "SHA: $SHA"
+        echo "final-sha-validation result: $RESULT"
+        if [[ "$RESULT" != "success" ]]; then
+          echo ""
+          echo "❌ FINAL SHA INVALID — $SHA"
+          echo "final-sha-validation did not succeed (result: $RESULT)."
+          echo "This SHA must NOT be considered production-ready."
+          exit 1
+        fi
+        echo ""
+        echo "✅ FINAL SHA VALID — $SHA"
+        echo "All mandatory production-critical guards (build, test, coverage, security) passed for this exact SHA via 'make ci-final'."

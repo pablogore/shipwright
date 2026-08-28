@@ -1,3 +1,5 @@
+//go:build integration
+
 package golang_test
 
 import (
@@ -11,20 +13,17 @@ import (
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
 	"github.com/pablogore/shipwright/providers/go"
+	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
 // TestGoBuilder_Build_RealEngine exercises GoBuilder.Build end to end
-// against a real Dagger engine — the -short-guarded real-container case
+// against a real Dagger engine — the integration-tagged real-container case
 // required by tasks.md's Phase 3 work-unit table (row 3). Per
 // shipwright-testing-strategy, any test reaching a real Dagger container
 // belongs at the integration level, never as a plain unit test, and MUST
-// be guarded by testing.Short() so `go test -short ./...` stays fast and
-// skips it cleanly.
+// be guarded by the `integration` build tag so `go test ./...` stays fast
+// and skips it cleanly.
 func TestGoBuilder_Build_RealEngine(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container GoBuilder integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -47,7 +46,7 @@ func main() {}
 
 	src := client.Host().Directory(tmpDir)
 	builder := &golang.GoBuilder{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		Config: shipwright.BuildConfig{GoVersion: "1.26.1", BinaryName: "capabilitiestest"},
 	}
 
@@ -82,10 +81,6 @@ func main() {}
 // Complements TestGoBuilder_Build_NilClient (pure unit test, no engine) so
 // both branches of the guard chain have coverage.
 func TestGoBuilder_Build_NilSource_RealClient(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-engine test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -93,7 +88,7 @@ func TestGoBuilder_Build_NilSource_RealClient(t *testing.T) {
 	}
 	defer client.Close()
 
-	builder := &golang.GoBuilder{Client: client}
+	builder := &golang.GoBuilder{Client: daggerkit.NewDaggerAdapter(client)}
 
 	_, err = builder.Build(ctx, nil)
 	if err == nil {
@@ -110,10 +105,6 @@ func TestGoBuilder_Build_NilSource_RealClient(t *testing.T) {
 // "-race requires cgo" on every real invocation. No unit test can prove a
 // container's env vars are wired correctly; only a real engine run can.
 func TestGoUnitTester_Test_RealEngine_PassesWithinThreshold(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container GoUnitTester integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -158,7 +149,7 @@ func TestAdd(t *testing.T) {
 
 	src := client.Host().Directory(tmpDir)
 	tester := &golang.GoUnitTester{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		Config: shipwright.TestConfig{Coverage: 1},
 	}
 
@@ -179,10 +170,6 @@ func TestAdd(t *testing.T) {
 // Publish must now fail with an actionable message naming the missing
 // path.
 func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping real-container ContainerPublisher integration test in -short mode")
-	}
-
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
 	if err != nil {
@@ -197,7 +184,7 @@ func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) 
 
 	build := client.Host().Directory(tmpDir)
 	publisher := &golang.ContainerPublisher{
-		Client: client,
+		Client: daggerkit.NewDaggerAdapter(client),
 		// Deliberately omitted: BinaryName. Publish falls back to "app",
 		// but the build directory only contains "my-service" (as a real
 		// GoBuilder run configured with a non-default binaryName would

@@ -1,3 +1,4 @@
+version: "2"
 linters:
   enable:
     - bodyclose
@@ -18,28 +19,43 @@ linters:
     - unparam
     - usetesting
     - wastedassign
-
-linters-settings:
-  depguard:
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: use errors.New() instead
+            - pkg: github.com/sirupsen/logrus
+              desc: use log/slog instead
+    gocyclo:
+      min-complexity: 15
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      main:
-        deny:
-          - pkg: github.com/pkg/errors
-            desc: "use errors.New() instead"
-          - pkg: github.com/sirupsen/logrus
-            desc: "use log/slog instead"
-  gocyclo:
-    min-complexity: 15
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - noctx
-        - perfsprint
-    - path: third_party$
-      text: ".*"
-    - path: builtin$
-      text: ".*"
-    - path: examples$
-      text: ".*"
+      - linters:
+          - noctx
+          - perfsprint
+        path: _test\.go
+      - path: third_party$
+        text: .*
+      - path: builtin$
+        text: .*
+      - path: examples$
+        text: .*
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
