@@ -1414,15 +1414,73 @@ jobs:
             }
           }
 
+  # Closes the gap tracked in #191: final-sha-gate (#185, #187-#190) only
+  # runs on `push` to develop/main, so it can never itself be a required
+  # status check on a pull_request — GitHub never asks a push-only job to
+  # report on a PR's head SHA. Meanwhile verify-pipeline-success is the
+  # only check actually required by branch protection on develop and main,
+  # and it runs on `pull_request` only, so it never sees final-sha-gate's
+  # verdict either. A develop->main promotion PR could therefore merge
+  # even when the develop HEAD it promotes never passed (or never ran)
+  # `make ci-final`.
+  #
+  # For a develop->main promotion PR specifically, this job looks up the
+  # check-runs already recorded against the PR's head SHA (the develop
+  # HEAD being promoted) and requires a 'final-sha-gate' check-run with
+  # conclusion 'success'. verify-pipeline-success folds this job's result
+  # into its own gate below, so the existing required status check
+  # enforces it without any branch-protection reconfiguration.
+  verify-final-sha-promotion:
+    runs-on: 'ubuntu-latest'
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'develop'
+    permissions:
+      contents: 'read'
+      checks: 'read'
+    steps:
+    - name: 'Verify final-sha-gate verdict for develop HEAD'
+      uses: 'actions/github-script@v9'
+      with:
+        github-token: '${{ secrets.GITHUB_TOKEN }}'
+        script: |
+          const sha = context.payload.pull_request.head.sha;
+          const { data } = await github.rest.checks.listForRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: sha,
+          });
+          const gate = data.check_runs.find((run) => run.name === 'final-sha-gate');
+          if (!gate) {
+            core.setFailed(
+              `No 'final-sha-gate' check-run found for develop HEAD ${sha}. ` +
+              `This SHA was never validated by 'make ci-final' via a push to develop - promotion cannot proceed.`
+            );
+            return;
+          }
+          if (gate.conclusion !== 'success') {
+            core.setFailed(
+              `'final-sha-gate' for develop HEAD ${sha} concluded '${gate.conclusion}', not 'success'. ` +
+              `This SHA is not Final-SHA valid - promotion cannot proceed.`
+            );
+            return;
+          }
+          console.log(`✅ final-sha-gate verdict for ${sha}: success`);
+
   # Final stage: Verify all critical jobs passed (blocks merge if any failed)
   verify-pipeline-success:
     runs-on: 'ubuntu-latest'
-    needs: ['determine-pipeline', 'setup', 'build', 'test', 'security']
+    needs: ['determine-pipeline', 'setup', 'build', 'test', 'security', 'verify-final-sha-promotion']
     if: |
       always() &&
       github.event_name == 'pull_request'
     steps:
     - name: 'Verify all critical jobs passed'
+      env:
+        # SECURITY: Using env: block prevents shell injection from GitHub context variables
+        PR_BASE_REF: '${{ github.event.pull_request.base.ref }}'
+        PR_HEAD_REF: '${{ github.event.pull_request.head.ref }}'
       run: |
         echo "🔍 Verifying all critical pipeline jobs completed successfully..."
         echo ""
@@ -1459,6 +1517,15 @@ jobs:
           fi
         fi
 
+        # Final-SHA promotion gate is conditional - only applies to develop->main promotion PRs
+        IS_DEVELOP_PROMOTION="false"
+        if [[ "$PR_BASE_REF" == "main" && "$PR_HEAD_REF" == "develop" ]]; then
+          IS_DEVELOP_PROMOTION="true"
+          if [[ "${{ needs.verify-final-sha-promotion.result }}" != "success" ]]; then
+            FAILED_JOBS="${FAILED_JOBS}verify-final-sha-promotion "
+          fi
+        fi
+
         if [[ -n "$FAILED_JOBS" ]]; then
           echo "❌ ERROR: The following critical jobs failed:"
           echo "   $FAILED_JOBS"
@@ -1483,6 +1550,11 @@ jobs:
           else
             echo "   - security: skipped (not required for this pipeline type)"
           fi
+          if [[ "$IS_DEVELOP_PROMOTION" == "true" ]]; then
+            echo "   - verify-final-sha-promotion: ${{ needs.verify-final-sha-promotion.result }}"
+          else
+            echo "   - verify-final-sha-promotion: skipped (not a develop->main promotion PR)"
+          fi
           echo ""
           echo "💡 Please fix the failing jobs and push new commits to retry"
           exit 1
@@ -1506,6 +1578,11 @@ jobs:
             echo "   - security: ✅ ${{ needs.security.result }}"
           else
             echo "   - security: ⏭️  skipped (not required for this pipeline type)"
+          fi
+          if [[ "$IS_DEVELOP_PROMOTION" == "true" ]]; then
+            echo "   - verify-final-sha-promotion: ✅ ${{ needs.verify-final-sha-promotion.result }}"
+          else
+            echo "   - verify-final-sha-promotion: ⏭️  skipped (not a develop->main promotion PR)"
           fi
           echo ""
           echo "✅ This Pull Request is ready to be merged"
