@@ -2,12 +2,14 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"dagger.io/dagger"
 
 	"github.com/pablogore/kit-logger/pkg/logger"
+
 	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/pablogore/shipwright/internal/plugins"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
@@ -39,7 +41,8 @@ func Initialize(ctx context.Context, cfg interfaces.Configuration) error {
 
 		// Initialize logger (go-kit-logger is initialized in registerLoggingComponents)
 		if err := container.CreateLogger(); err != nil {
-			// Logger initialization error is non-fatal, continue with default logger
+			// Logger initialization error is non-fatal, continue with default logger.
+			_ = err
 		}
 
 		if err := container.Start(ctx); err != nil {
@@ -132,7 +135,7 @@ func (a *App) LoadAndInitializePlugins(
 	daggerClient *dagger.Client,
 ) error {
 	if providerRegistry == nil {
-		return fmt.Errorf("provider registry cannot be nil")
+		return errors.New("provider registry cannot be nil")
 	}
 
 	registry, err := a.container.Get("pluginRegistry")

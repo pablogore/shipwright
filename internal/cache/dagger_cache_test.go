@@ -50,7 +50,7 @@ func TestDaggerCacheManager_GetCacheVolume(t *testing.T) {
 	// Test that manager is created correctly
 	assert.NotNil(t, manager)
 	assert.NotNil(t, manager.cacheVolumes)
-	assert.Len(t, manager.cacheVolumes, 0)
+	assert.Empty(t, manager.cacheVolumes)
 
 	// Note: GetCacheVolume will panic with nil client, which is expected
 	// In production, a valid Dagger client must be provided
@@ -66,7 +66,7 @@ func TestDaggerCacheManager_Invalidate(t *testing.T) {
 
 	err := manager.Invalidate(context.Background(), "test-key")
 	require.NoError(t, err)
-	assert.Len(t, manager.cacheVolumes, 0)
+	assert.Empty(t, manager.cacheVolumes)
 }
 
 func TestDaggerCacheManager_Get_NotSupported(t *testing.T) {
@@ -94,12 +94,12 @@ func TestDaggerCacheManager_WarmUp(t *testing.T) {
 	ctx := context.Background()
 
 	keys := []string{"key1", "key2", "key3"}
-	generator := func(key string) ([]byte, error) {
+	generator := func(_ string) ([]byte, error) {
 		return []byte("data"), nil
 	}
 
 	// WarmUp requires a valid Dagger client
 	err := manager.WarmUp(ctx, keys, generator)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Dagger client is required")
+	assert.Contains(t, err.Error(), "dagger client is required")
 }

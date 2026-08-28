@@ -14,9 +14,9 @@ func TestNewDaggerAdapter_GetRealClient(t *testing.T) {
 	client := &dagger.Client{}
 	adapter := NewDaggerAdapter(client)
 
-	real, ok := adapter.(*DaggerAdapter)
+	daggerAdapter, ok := adapter.(*DaggerAdapter)
 	assert.True(t, ok)
-	assert.Same(t, client, real.GetRealClient())
+	assert.Same(t, client, daggerAdapter.GetRealClient())
 }
 
 // TestNewDaggerDirectoryAdapter_GetRealDirectory proves the directory

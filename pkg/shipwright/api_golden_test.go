@@ -3,6 +3,7 @@ package shipwright_test
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/printer"
@@ -64,24 +65,53 @@ func renderExportedSurface(t *testing.T) string {
 	pkgDir := filepath.Dir(thisFile)
 
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, pkgDir, nonTestGoFile, parser.ParseComments)
+	pkg, err := parsePackageDir(fset, pkgDir)
 	if err != nil {
 		t.Fatalf("failed to parse package directory %s: %v", pkgDir, err)
 	}
 
-	pkg, ok := pkgs["shipwright"]
-	if !ok {
-		t.Fatalf("package %q not found while parsing %s", "shipwright", pkgDir)
+	return renderPackageSurface(t, fset, pkg)
+}
+
+// parsedPackage is a minimal stand-in for the deprecated go/ast.Package
+// (SA1019: deprecated since Go 1.22, use go/types instead) — renderPackageSurface
+// only ever needs the parsed files, never Package's Name/Scope/Imports.
+type parsedPackage struct {
+	Files map[string]*ast.File
+}
+
+// parsePackageDir parses every non-test .go file directly in dir, replacing
+// the deprecated parser.ParseDir/ast.Package pairing (SA1019: ParseDir has
+// been deprecated since Go 1.25) with an explicit directory walk plus
+// parser.ParseFile.
+func parsePackageDir(fset *token.FileSet, dir string) (*parsedPackage, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory %s: %w", dir, err)
 	}
 
-	return renderPackageSurface(t, fset, pkg)
+	files := make(map[string]*ast.File)
+	for _, entry := range entries {
+		if entry.IsDir() || !nonTestGoFile(entry.Name()) {
+			continue
+		}
+
+		path := filepath.Join(dir, entry.Name())
+		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+		}
+		files[entry.Name()] = file
+	}
+
+	return &parsedPackage{Files: files}, nil
 }
 
 // renderPackageSurface walks every top-level declaration in pkg and prints
 // the exported ones deterministically. Extracted from renderExportedSurface
 // so the rendering logic itself — not just the real pkg/shipwright
 // directory — can be exercised directly against synthetic fixtures.
-func renderPackageSurface(t *testing.T, fset *token.FileSet, pkg *ast.Package) string {
+func renderPackageSurface(t *testing.T, fset *token.FileSet, pkg *parsedPackage) string {
 	t.Helper()
 
 	var decls []string
@@ -224,16 +254,16 @@ func filterExportedValueSpec(valueSpec *ast.ValueSpec) *ast.ValueSpec {
 	return &filtered
 }
 
-// nonTestGoFile is a parser.ParseDir filter that excludes _test.go files,
-// so the golden test reflects only the package's public production source.
-func nonTestGoFile(info os.FileInfo) bool {
-	return !strings.HasSuffix(info.Name(), "_test.go")
+// nonTestGoFile excludes _test.go files, so the golden test reflects only
+// the package's public production source.
+func nonTestGoFile(name string) bool {
+	return !strings.HasSuffix(name, "_test.go")
 }
 
 // parseFixturePackage parses a synthetic single-file "shipwright" package
 // from source, so renderPackageSurface's rendering logic can be exercised
 // directly without depending on the real pkg/shipwright directory contents.
-func parseFixturePackage(t *testing.T, fset *token.FileSet, source string) *ast.Package {
+func parseFixturePackage(t *testing.T, fset *token.FileSet, source string) *parsedPackage {
 	t.Helper()
 
 	file, err := parser.ParseFile(fset, "fixture.go", source, parser.ParseComments)
@@ -241,8 +271,7 @@ func parseFixturePackage(t *testing.T, fset *token.FileSet, source string) *ast.
 		t.Fatalf("failed to parse fixture source: %v", err)
 	}
 
-	return &ast.Package{
-		Name:  "shipwright",
+	return &parsedPackage{
 		Files: map[string]*ast.File{"fixture.go": file},
 	}
 }

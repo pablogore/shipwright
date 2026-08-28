@@ -41,6 +41,7 @@ const defaultDockerSocketPath = "/var/run/docker.sock"
 // later iteration replacing this with Dagger-native `services:` bindings
 // (Postgres as a service dependency, no Docker socket at all) does not
 // change this Tester's public shape.
+//nolint:revive // stutters with package rust by design: mirrors providers/go's naming convention (every rust.Rust* type names what it implements, matching its Go-provider counterpart)
 type RustIntegrationTester struct {
 	// Client is the Dagger client used to construct the test container.
 	Client daggerkit.DaggerClient

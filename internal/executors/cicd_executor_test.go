@@ -11,8 +11,7 @@ import (
 
 func TestDetectCICD_GitHubActions(t *testing.T) {
 	// Arrange
-	os.Setenv("GITHUB_ACTIONS", "true")
-	defer os.Unsetenv("GITHUB_ACTIONS")
+	t.Setenv("GITHUB_ACTIONS", "true")
 
 	ctx := context.Background()
 
@@ -25,8 +24,7 @@ func TestDetectCICD_GitHubActions(t *testing.T) {
 
 func TestDetectCICD_GitLabCI(t *testing.T) {
 	// Arrange
-	os.Setenv("GITLAB_CI", "true")
-	defer os.Unsetenv("GITLAB_CI")
+	t.Setenv("GITLAB_CI", "true")
 
 	ctx := context.Background()
 
@@ -39,8 +37,7 @@ func TestDetectCICD_GitLabCI(t *testing.T) {
 
 func TestDetectCICD_Jenkins(t *testing.T) {
 	// Arrange
-	os.Setenv("JENKINS_URL", "http://jenkins.example.com")
-	defer os.Unsetenv("JENKINS_URL")
+	t.Setenv("JENKINS_URL", "http://jenkins.example.com")
 
 	ctx := context.Background()
 
@@ -53,8 +50,7 @@ func TestDetectCICD_Jenkins(t *testing.T) {
 
 func TestDetectCICD_CircleCI(t *testing.T) {
 	// Arrange
-	os.Setenv("CIRCLECI", "true")
-	defer os.Unsetenv("CIRCLECI")
+	t.Setenv("CIRCLECI", "true")
 
 	ctx := context.Background()
 
@@ -99,8 +95,7 @@ func TestNewCICDExecutor(t *testing.T) {
 
 func TestCICDExecutor_IsCIEnvironment_True(t *testing.T) {
 	// Arrange
-	os.Setenv("GITHUB_ACTIONS", "true")
-	defer os.Unsetenv("GITHUB_ACTIONS")
+	t.Setenv("GITHUB_ACTIONS", "true")
 
 	// Act
 	executor := NewCICDExecutor()

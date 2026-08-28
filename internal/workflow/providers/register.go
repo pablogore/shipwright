@@ -59,11 +59,11 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		}
 	})
 
-	r.RegisterTester(Ref{Name: "golangci-lint", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
+	r.RegisterTester(Ref{Name: "golangci-lint", Version: "1"}, WithSchema{}, func(_ Values) shipwright.Tester {
 		return &golang.GoLinter{Client: goClient}
 	})
 
-	r.RegisterTester(Ref{Name: "govulncheck", Version: "1"}, WithSchema{}, func(v Values) shipwright.Tester {
+	r.RegisterTester(Ref{Name: "govulncheck", Version: "1"}, WithSchema{}, func(_ Values) shipwright.Tester {
 		return &golang.GoVulnScanner{Client: goClient}
 	})
 
@@ -198,7 +198,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 
 	// ChangelogRunner (changelog.go) has no with-field configuration, same
 	// as golangci-lint/govulncheck above.
-	r.RegisterRunner(Ref{Name: "changelog", Version: "1"}, WithSchema{}, func(v Values) shipwright.Runner {
+	r.RegisterRunner(Ref{Name: "changelog", Version: "1"}, WithSchema{}, func(_ Values) shipwright.Runner {
 		return &ChangelogRunner{Client: newChangelogDaggerClient(client)}
 	})
 }

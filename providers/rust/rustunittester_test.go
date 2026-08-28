@@ -33,7 +33,7 @@ func TestRustUnitTester_Test_NilClient(t *testing.T) {
 // mockUnitTestContainer builds the mocked container chain shared by both
 // coverage-threshold mock tests below, parameterized by the
 // cargo-tarpaulin Stdout output the coverage step should observe.
-func mockUnitTestContainer(t *testing.T, tarpaulinStdout string) (*daggerkit.MockDaggerClient, *daggerkit.MockDaggerContainer) {
+func mockUnitTestContainer(t *testing.T, tarpaulinStdout string) *daggerkit.MockDaggerClient {
 	t.Helper()
 
 	client := &daggerkit.MockDaggerClient{}
@@ -59,14 +59,14 @@ func mockUnitTestContainer(t *testing.T, tarpaulinStdout string) (*daggerkit.Moc
 	client.On("Container").Return(container)
 	client.On("CacheVolume", mock.Anything).Return(&daggerkit.MockDaggerCacheVolume{})
 
-	return client, container
+	return client
 }
 
 // TestRustUnitTester_Test_MockClient_PassesWithinThreshold mirrors
 // TestRustUnitTester_Test_RealEngine_PassesWithinThreshold: a coverage
 // percentage at or above Config.Coverage must let Test succeed.
 func TestRustUnitTester_Test_MockClient_PassesWithinThreshold(t *testing.T) {
-	client, _ := mockUnitTestContainer(t, "87.50% coverage, 10/12 lines covered\n")
+	client := mockUnitTestContainer(t, "87.50% coverage, 10/12 lines covered\n")
 
 	tester := &rust.RustUnitTester{
 		Client: client,
@@ -84,7 +84,7 @@ func TestRustUnitTester_Test_MockClient_PassesWithinThreshold(t *testing.T) {
 // percentage under Config.Coverage must fail Test with an error naming the
 // shortfall, with no real engine involved.
 func TestRustUnitTester_Test_MockClient_FailsBelowThreshold(t *testing.T) {
-	client, _ := mockUnitTestContainer(t, "10.00% coverage, 1/10 lines covered\n")
+	client := mockUnitTestContainer(t, "10.00% coverage, 1/10 lines covered\n")
 
 	tester := &rust.RustUnitTester{
 		Client: client,

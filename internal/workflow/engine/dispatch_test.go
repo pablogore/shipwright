@@ -23,7 +23,7 @@ func TestExecute_DispatchesDeployer(t *testing.T) {
 	rec := &recorder{}
 	reg := providers.NewRegistry()
 	reg.RegisterDeployer(providers.Ref{Name: "nomad", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Deployer {
-		return fakeDeployer{DeployFunc: func(ctx context.Context, artifactRef, environment string, creds *dagger.Secret) (string, error) {
+		return fakeDeployer{DeployFunc: func(_ context.Context, artifactRef, environment string, _ *dagger.Secret) (string, error) {
 			rec.record("deploy")
 			return artifactRef + "@" + environment, nil
 		}}
@@ -58,7 +58,7 @@ func TestExecute_DispatchesRunner(t *testing.T) {
 	rec := &recorder{}
 	reg := providers.NewRegistry()
 	reg.RegisterRunner(providers.Ref{Name: "local", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Runner {
-		return fakeRunner{RunFunc: func(ctx context.Context, build *dagger.Directory) (*dagger.Container, error) {
+		return fakeRunner{RunFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.Container, error) {
 			rec.record("run")
 			return nil, nil
 		}}
@@ -181,7 +181,7 @@ func TestExecute_TesterAndArtifactorPropagateCapabilityErrors(t *testing.T) {
 		t.Parallel()
 		reg := providers.NewRegistry()
 		reg.RegisterTester(providers.Ref{Name: "go-test", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
-			return fakeTester{TestFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+			return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 				return nil, errors.New("tests failed")
 			}}
 		})
@@ -202,7 +202,7 @@ func TestExecute_TesterAndArtifactorPropagateCapabilityErrors(t *testing.T) {
 		t.Parallel()
 		reg := providers.NewRegistry()
 		reg.RegisterArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Artifactor {
-			return fakeArtifactor{PublishFunc: func(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error) {
+			return fakeArtifactor{PublishFunc: func(_ context.Context, _ *dagger.Directory, _ string, _ *dagger.Secret) (string, error) {
 				return "", errors.New("publish failed")
 			}}
 		})

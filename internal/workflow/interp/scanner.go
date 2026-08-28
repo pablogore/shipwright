@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -131,7 +132,7 @@ func Scan(s string) ([]Token, error) {
 			return nil, fmt.Errorf("interp: unclosed %q delimiter", openDelim)
 		}
 		if nextOpenIdx != -1 && nextOpenIdx < closeIdx {
-			return nil, fmt.Errorf("interp: nested placeholder is not allowed")
+			return nil, errors.New("interp: nested placeholder is not allowed")
 		}
 
 		body := s[bodyStart : bodyStart+closeIdx]

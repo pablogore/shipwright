@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewCacheMetrics(t *testing.T) {
-	metrics := NewCacheMetrics()
+	metrics := NewMetrics()
 
 	assert.NotNil(t, metrics)
 	assert.Equal(t, int64(0), metrics.GetHits())
@@ -19,7 +19,7 @@ func TestNewCacheMetrics(t *testing.T) {
 }
 
 func TestCacheMetrics_RecordHit(t *testing.T) {
-	metrics := NewCacheMetrics()
+	metrics := NewMetrics()
 
 	metrics.RecordHit(10 * time.Millisecond)
 
@@ -28,7 +28,7 @@ func TestCacheMetrics_RecordHit(t *testing.T) {
 }
 
 func TestCacheMetrics_RecordMiss(t *testing.T) {
-	metrics := NewCacheMetrics()
+	metrics := NewMetrics()
 
 	metrics.RecordMiss(20 * time.Millisecond)
 
@@ -37,10 +37,10 @@ func TestCacheMetrics_RecordMiss(t *testing.T) {
 }
 
 func TestCacheMetrics_GetHitRate(t *testing.T) {
-	metrics := NewCacheMetrics()
+	metrics := NewMetrics()
 
 	// No requests
-	assert.Equal(t, 0.0, metrics.GetHitRate())
+	assert.InDelta(t, 0.0, metrics.GetHitRate(), 0.0001)
 
 	// 2 hits, 1 miss
 	metrics.RecordHit(10 * time.Millisecond)
@@ -52,7 +52,7 @@ func TestCacheMetrics_GetHitRate(t *testing.T) {
 }
 
 func TestCacheMetrics_GetAverageLatency(t *testing.T) {
-	metrics := NewCacheMetrics()
+	metrics := NewMetrics()
 
 	metrics.RecordHit(10 * time.Millisecond)
 	metrics.RecordHit(20 * time.Millisecond)
@@ -66,7 +66,7 @@ func TestCacheMetrics_GetAverageLatency(t *testing.T) {
 }
 
 func TestCacheMetrics_Reset(t *testing.T) {
-	metrics := NewCacheMetrics()
+	metrics := NewMetrics()
 
 	metrics.RecordHit(10 * time.Millisecond)
 	metrics.RecordMiss(20 * time.Millisecond)
@@ -99,7 +99,7 @@ func TestMetricsWrapper_GetMetrics(t *testing.T) {
 
 func TestMetricsWrapper_Get_TracksMetrics(t *testing.T) {
 	mockStrategy := NewMockStrategy()
-	mockStrategy.GetFunc = func(ctx context.Context, key string) ([]byte, error) {
+	mockStrategy.GetFunc = func(_ context.Context, _ string) ([]byte, error) {
 		return []byte("data"), nil
 	}
 

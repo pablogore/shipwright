@@ -75,7 +75,7 @@ func (l *loader) LoadFromFile(ctx context.Context, filePath string) (Plugin, err
 	// Type assert to Plugin
 	pluginInstance, ok := symbol.(Plugin)
 	if !ok {
-		return nil, fmt.Errorf("plugin does not implement Plugin interface")
+		return nil, errors.New("plugin does not implement Plugin interface")
 	}
 
 	logger.L().InfoContext(ctx, "Plugin loaded from file", "path", absPath, "name", pluginInstance.Name())

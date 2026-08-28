@@ -13,18 +13,25 @@ import (
 
 // Example of how to use the dynamic pipeline system
 func main() {
-	ctx := context.Background()
+	if err := run(context.Background()); err != nil {
+		log.Fatalf("%v", err)
+	}
+}
 
+// run executes the dynamic pipeline example and returns any error encountered,
+// so main can defer app.Reset() and still guarantee it runs before exit
+// (log.Fatal/os.Exit after a defer would otherwise skip it).
+func run(ctx context.Context) error {
 	// 1. Load configuration
 	cfg, err := config.NewConfigurationWrapper()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// 2. Initialize the application
 	err = app.Initialize(ctx, cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
+		return fmt.Errorf("failed to initialize application: %w", err)
 	}
 	defer app.Reset()
 
@@ -34,7 +41,7 @@ func main() {
 	// 4. Get the step registry
 	stepRegistry, err := container.Get("stepRegistry")
 	if err != nil {
-		log.Fatalf("Failed to get step registry: %v", err)
+		return fmt.Errorf("failed to get step registry: %w", err)
 	}
 
 	registry := stepRegistry.(interfaces.StepRegistry)
@@ -58,13 +65,13 @@ func main() {
 	fmt.Println("\n=== Executing setup step ===")
 	handler, err := registry.GetStepHandler("setup")
 	if err != nil {
-		log.Fatalf("Failed to get setup handler: %v", err)
+		return fmt.Errorf("failed to get setup handler: %w", err)
 	}
 
 	stepConfig := handler.GetStepInfo("setup")
 	err = handler.Execute(ctx, "setup", stepConfig)
 	if err != nil {
-		log.Fatalf("Setup step failed: %v", err)
+		return fmt.Errorf("setup step failed: %w", err)
 	}
 
 	// 8. Execute multiple steps in sequence
@@ -118,6 +125,8 @@ func main() {
 			fmt.Println("✅ Custom step executed successfully")
 		}
 	}
+
+	return nil
 }
 
 // shouldExecuteStep determines if a step should be executed based on its conditions
@@ -156,7 +165,7 @@ func (h *DynamicCustomStepHandler) CanHandle(stepName string) bool {
 	return stepName == "custom"
 }
 
-func (h *DynamicCustomStepHandler) Execute(ctx context.Context, stepName string, config interfaces.StepConfig) error {
+func (h *DynamicCustomStepHandler) Execute(_ context.Context, _ string, config interfaces.StepConfig) error {
 	fmt.Printf("🎯 Executing custom step: %s\n", config.Description)
 
 	// Custom logic here
@@ -170,7 +179,7 @@ func (h *DynamicCustomStepHandler) Execute(ctx context.Context, stepName string,
 	return nil
 }
 
-func (h *DynamicCustomStepHandler) GetStepInfo(stepName string) interfaces.StepConfig {
+func (h *DynamicCustomStepHandler) GetStepInfo(_ string) interfaces.StepConfig {
 	return interfaces.StepConfig{
 		Name:        "custom",
 		Description: "Custom step for demonstration purposes",

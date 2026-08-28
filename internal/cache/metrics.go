@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// CacheMetrics tracks cache performance metrics.
-type CacheMetrics struct {
+// Metrics tracks cache performance metrics.
+type Metrics struct {
 	mu            sync.RWMutex
 	hits          int64
 	misses        int64
@@ -16,13 +16,13 @@ type CacheMetrics struct {
 	errors        int64
 }
 
-// NewCacheMetrics creates a new CacheMetrics instance.
-func NewCacheMetrics() *CacheMetrics {
-	return &CacheMetrics{}
+// NewMetrics creates a new Metrics instance.
+func NewMetrics() *Metrics {
+	return &Metrics{}
 }
 
 // RecordHit records a cache hit.
-func (m *CacheMetrics) RecordHit(latency time.Duration) {
+func (m *Metrics) RecordHit(latency time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.hits++
@@ -31,7 +31,7 @@ func (m *CacheMetrics) RecordHit(latency time.Duration) {
 }
 
 // RecordMiss records a cache miss.
-func (m *CacheMetrics) RecordMiss(latency time.Duration) {
+func (m *Metrics) RecordMiss(latency time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.misses++
@@ -40,14 +40,14 @@ func (m *CacheMetrics) RecordMiss(latency time.Duration) {
 }
 
 // RecordError records a cache error.
-func (m *CacheMetrics) RecordError() {
+func (m *Metrics) RecordError() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.errors++
 }
 
 // GetHitRate returns the cache hit rate as a percentage.
-func (m *CacheMetrics) GetHitRate() float64 {
+func (m *Metrics) GetHitRate() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -59,7 +59,7 @@ func (m *CacheMetrics) GetHitRate() float64 {
 }
 
 // GetAverageLatency returns the average latency for cache operations.
-func (m *CacheMetrics) GetAverageLatency() time.Duration {
+func (m *Metrics) GetAverageLatency() time.Duration {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -71,35 +71,35 @@ func (m *CacheMetrics) GetAverageLatency() time.Duration {
 }
 
 // GetHits returns the number of cache hits.
-func (m *CacheMetrics) GetHits() int64 {
+func (m *Metrics) GetHits() int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.hits
 }
 
 // GetMisses returns the number of cache misses.
-func (m *CacheMetrics) GetMisses() int64 {
+func (m *Metrics) GetMisses() int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.misses
 }
 
 // GetTotalRequests returns the total number of cache requests.
-func (m *CacheMetrics) GetTotalRequests() int64 {
+func (m *Metrics) GetTotalRequests() int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.totalRequests
 }
 
 // GetErrors returns the number of cache errors.
-func (m *CacheMetrics) GetErrors() int64 {
+func (m *Metrics) GetErrors() int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.errors
 }
 
 // Reset resets all metrics to zero.
-func (m *CacheMetrics) Reset() {
+func (m *Metrics) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.hits = 0
@@ -112,14 +112,14 @@ func (m *CacheMetrics) Reset() {
 // MetricsWrapper wraps a Strategy with metrics collection.
 type MetricsWrapper struct {
 	strategy Strategy
-	metrics  *CacheMetrics
+	metrics  *Metrics
 }
 
 // NewMetricsWrapper creates a new MetricsWrapper.
 func NewMetricsWrapper(strategy Strategy) *MetricsWrapper {
 	return &MetricsWrapper{
 		strategy: strategy,
-		metrics:  NewCacheMetrics(),
+		metrics:  NewMetrics(),
 	}
 }
 
@@ -191,6 +191,6 @@ func (w *MetricsWrapper) WarmUp(ctx context.Context, keys []string, generator fu
 }
 
 // GetMetrics returns the metrics instance.
-func (w *MetricsWrapper) GetMetrics() *CacheMetrics {
+func (w *MetricsWrapper) GetMetrics() *Metrics {
 	return w.metrics
 }

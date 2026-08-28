@@ -34,7 +34,7 @@ func TestLoader_RegisterBuiltin(t *testing.T) {
 
 		// Assert
 		result, err := loader.LoadBuiltin(context.Background(), "test-plugin")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, plugin, result)
 	})
 }
@@ -53,7 +53,7 @@ func TestLoader_LoadBuiltin(t *testing.T) {
 		result, err := loader.LoadBuiltin(context.Background(), "test-plugin")
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, plugin, result)
 	})
 
@@ -65,7 +65,7 @@ func TestLoader_LoadBuiltin(t *testing.T) {
 		result, err := loader.LoadBuiltin(context.Background(), "")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "plugin name cannot be empty")
 	})
@@ -78,7 +78,7 @@ func TestLoader_LoadBuiltin(t *testing.T) {
 		result, err := loader.LoadBuiltin(context.Background(), "non-existent")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -94,7 +94,7 @@ func TestLoader_LoadBuiltin(t *testing.T) {
 		result, err := loader.LoadBuiltin(context.Background(), "nil-plugin")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "factory returned nil")
 	})
@@ -118,7 +118,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 		result, err := loader.LoadFromConfig(context.Background(), config)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, plugin, result)
 	})
 
@@ -126,7 +126,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 		// Arrange
 		loader := NewLoader().(*loader)
 		// Create a temporary file for testing
-		tmpFile, err := os.CreateTemp("", "test-plugin-*.so")
+		tmpFile, err := os.CreateTemp(t.TempDir(), "test-plugin-*.so")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
 		_ = tmpFile.Close()
@@ -142,7 +142,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 
 		// Assert
 		// We expect an error because the file is not a valid plugin, but the path should be resolved
-		assert.Error(t, err)
+		require.Error(t, err)
 		// The error should be about plugin loading, not file not found
 		assert.NotContains(t, err.Error(), "file not found")
 	})
@@ -155,7 +155,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 		result, err := loader.LoadFromConfig(context.Background(), nil)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "plugin configuration cannot be nil")
 	})
@@ -171,7 +171,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 		result, err := loader.LoadFromConfig(context.Background(), config)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "builtin plugin requires 'name' field")
 	})
@@ -187,7 +187,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 		result, err := loader.LoadFromConfig(context.Background(), config)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "file plugin requires 'path' field")
 	})
@@ -203,7 +203,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 		result, err := loader.LoadFromConfig(context.Background(), config)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "unknown plugin type")
 	})
@@ -224,7 +224,7 @@ func TestLoader_LoadFromConfig(t *testing.T) {
 		result, err := loader.LoadFromConfig(context.Background(), config)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, plugin, result)
 	})
 }
@@ -238,7 +238,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		result, err := loader.LoadFromFile(context.Background(), "")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "file path cannot be empty")
 	})
@@ -251,7 +251,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		result, err := loader.LoadFromFile(context.Background(), "/non/existent/path.so")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "plugin file not found")
 	})
@@ -260,7 +260,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		// Arrange
 		loader := NewLoader().(*loader)
 		// Create a temporary file that is not a valid plugin
-		tmpFile, err := os.CreateTemp("", "test-*.txt")
+		tmpFile, err := os.CreateTemp(t.TempDir(), "test-*.txt")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
 		_, _ = tmpFile.WriteString("not a plugin")
@@ -270,7 +270,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		result, err := loader.LoadFromFile(context.Background(), tmpFile.Name())
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		// Should fail when trying to open as plugin
 		assert.Contains(t, err.Error(), "failed to open plugin")
@@ -287,7 +287,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		result, err := loader.LoadFromFile(context.Background(), "/valid/path/that/does/not/exist.so")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		// Should fail because file doesn't exist
 		assert.Contains(t, err.Error(), "plugin file not found")
@@ -305,7 +305,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		result, err := loader.LoadFromFile(context.Background(), "./nonexistent.so")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		// Should fail because file doesn't exist (after path resolution)
 		assert.Contains(t, err.Error(), "plugin file not found")
@@ -316,7 +316,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		loader := NewLoader().(*loader)
 		// Create a temporary file that exists but is not a valid plugin
 		// This test covers the type assertion failure at line 62-65
-		tmpFile, err := os.CreateTemp("", "test-plugin-*.so")
+		tmpFile, err := os.CreateTemp(t.TempDir(), "test-plugin-*.so")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
 		_, _ = tmpFile.WriteString("not a valid plugin")
@@ -326,7 +326,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		result, err := loader.LoadFromFile(context.Background(), tmpFile.Name())
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		// Should fail when trying to open as plugin, lookup symbol, or type assert
 		assert.True(t,
@@ -339,7 +339,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		// Arrange
 		loader := NewLoader().(*loader)
 		// Create a temporary file that exists but is not a valid plugin
-		tmpFile, err := os.CreateTemp("", "test-plugin-*.so")
+		tmpFile, err := os.CreateTemp(t.TempDir(), "test-plugin-*.so")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
 		_, _ = tmpFile.WriteString("not a valid plugin")
@@ -349,7 +349,7 @@ func TestLoader_LoadFromFile(t *testing.T) {
 		result, err := loader.LoadFromFile(context.Background(), tmpFile.Name())
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		// Should fail when trying to open as plugin or lookup symbol
 		assert.True(t,

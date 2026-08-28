@@ -58,6 +58,7 @@ const defaultCargoProfile = "release"
 // Behavioral judgment call, same as GoBuilder: RustBuilder always performs
 // the binary-compile path; producing and publishing a container image from
 // the resulting Directory is ContainerPublisher's job (Artifactor.Publish).
+//nolint:revive // stutters with package rust by design: this is a deliberate structural mirror of providers/go's GoBuilder (see doc comment above), and every rust.Rust* type follows the same cross-provider naming symmetry
 type RustBuilder struct {
 	// Client is the Dagger client used to construct the build container.
 	Client daggerkit.DaggerClient

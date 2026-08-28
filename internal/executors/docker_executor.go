@@ -50,7 +50,7 @@ func (e *DockerExecutor) Name() string {
 
 // CanExecute checks if Docker execution is possible.
 // Docker execution requires a valid Dagger client.
-func (e *DockerExecutor) CanExecute(ctx context.Context) bool {
+func (e *DockerExecutor) CanExecute(_ context.Context) bool {
 	return e.client != nil
 }
 
@@ -64,7 +64,7 @@ func (e *DockerExecutor) CanExecute(ctx context.Context) bool {
 //   - An error if the step execution fails, otherwise nil.
 func (e *DockerExecutor) ExecuteStep(ctx context.Context, stepName string) error {
 	if e.client == nil {
-		return errors.New("Docker executor requires Dagger client")
+		return errors.New("docker executor requires dagger client")
 	}
 
 	switch stepName {
@@ -96,13 +96,13 @@ func (e *DockerExecutor) GetCacheStrategy() CacheStrategy {
 }
 
 // executeSetup performs setup using Dagger.
-func (e *DockerExecutor) executeSetup(ctx context.Context) error {
+func (e *DockerExecutor) executeSetup(_ context.Context) error {
 	// Setup is handled by pipeline Setup method, not executor
 	return nil
 }
 
 // executeBuild performs build using Dagger (delegates to pipeline).
-func (e *DockerExecutor) executeBuild(ctx context.Context) error {
+func (e *DockerExecutor) executeBuild(_ context.Context) error {
 	// Build logic is in pipeline, executor just coordinates
 	return nil
 }
@@ -114,7 +114,7 @@ func (e *DockerExecutor) executeTest(ctx context.Context) error {
 	}
 
 	if e.client == nil {
-		return errors.New("Dagger client not available")
+		return errors.New("dagger client not available")
 	}
 
 	// Convert to adapter to get real client
@@ -136,19 +136,19 @@ func (e *DockerExecutor) executeTest(ctx context.Context) error {
 }
 
 // executeLint performs linting using Dagger.
-func (e *DockerExecutor) executeLint(ctx context.Context) error {
+func (e *DockerExecutor) executeLint(_ context.Context) error {
 	// Lint logic is in pipeline, executor coordinates
 	return nil
 }
 
 // executeSecurity performs security scanning using Dagger.
-func (e *DockerExecutor) executeSecurity(ctx context.Context) error {
+func (e *DockerExecutor) executeSecurity(_ context.Context) error {
 	// Security logic is in pipeline, executor coordinates
 	return nil
 }
 
 // executePackage performs packaging using Dagger.
-func (e *DockerExecutor) executePackage(ctx context.Context) error {
+func (e *DockerExecutor) executePackage(_ context.Context) error {
 	// Package logic is in pipeline, executor coordinates
 	return nil
 }

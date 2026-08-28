@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func NewGitHubActionsCache(cacheDir string) *GitHubActionsCache {
 // Get retrieves a value from cache by key.
 // In GitHub Actions, cache is restored by the cache action before this runs.
 // This method reads from the local cache directory.
-func (c *GitHubActionsCache) Get(ctx context.Context, key string) ([]byte, error) {
+func (c *GitHubActionsCache) Get(_ context.Context, key string) ([]byte, error) {
 	// In GitHub Actions, the cache action restores files to cacheDir
 	// We read from the restored cache directory
 	cachePath := filepath.Join(c.cacheDir, key)
@@ -53,7 +54,7 @@ func (c *GitHubActionsCache) Get(ctx context.Context, key string) ([]byte, error
 
 // Set stores a value in cache with the specified key and TTL.
 // In GitHub Actions, files are saved to cacheDir and the cache action saves them.
-func (c *GitHubActionsCache) Set(ctx context.Context, key string, data []byte, ttl time.Duration) error {
+func (c *GitHubActionsCache) Set(_ context.Context, key string, data []byte, _ time.Duration) error {
 	// Ensure cache directory exists
 	if err := os.MkdirAll(c.cacheDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
@@ -72,7 +73,7 @@ func (c *GitHubActionsCache) Set(ctx context.Context, key string, data []byte, t
 }
 
 // Invalidate removes a value from cache by key.
-func (c *GitHubActionsCache) Invalidate(ctx context.Context, key string) error {
+func (c *GitHubActionsCache) Invalidate(_ context.Context, key string) error {
 	cachePath := filepath.Join(c.cacheDir, key)
 	if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove cache file: %w", err)
@@ -136,8 +137,10 @@ func IsGitHubActions() bool {
 // The key should be unique per cache entry and include version information.
 func GetCacheKey(prefix string, version string, additional ...string) string {
 	key := fmt.Sprintf("%s-%s", prefix, version)
+	var keySb139 strings.Builder
 	for _, add := range additional {
-		key += "-" + add
+		keySb139.WriteString("-" + add)
 	}
+	key += keySb139.String()
 	return key
 }

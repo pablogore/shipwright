@@ -56,7 +56,7 @@ func TestContainerPublisher_Publish_MockClient_BinaryNameMismatch(t *testing.T) 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expected binary at")
 	require.Contains(t, err.Error(), "not found in container")
-	require.Equal(t, "", ref)
+	require.Empty(t, ref)
 	container.AssertExpectations(t)
 	container.AssertNotCalled(t, "WithEntrypoint", mock.Anything)
 }

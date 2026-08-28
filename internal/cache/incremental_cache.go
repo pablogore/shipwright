@@ -35,7 +35,7 @@ func NewIncrementalCache(baseDir string) *IncrementalCache {
 }
 
 // Get retrieves a value from cache by key.
-func (c *IncrementalCache) Get(ctx context.Context, key string) ([]byte, error) {
+func (c *IncrementalCache) Get(_ context.Context, key string) ([]byte, error) {
 	cachePath := c.getCachePath(key)
 
 	data, err := os.ReadFile(cachePath)
@@ -50,7 +50,7 @@ func (c *IncrementalCache) Get(ctx context.Context, key string) ([]byte, error) 
 }
 
 // Set stores a value in cache with the specified key and TTL.
-func (c *IncrementalCache) Set(ctx context.Context, key string, data []byte, ttl time.Duration) error {
+func (c *IncrementalCache) Set(_ context.Context, key string, data []byte, _ time.Duration) error {
 	cachePath := c.getCachePath(key)
 
 	// Ensure cache directory exists
@@ -67,7 +67,7 @@ func (c *IncrementalCache) Set(ctx context.Context, key string, data []byte, ttl
 }
 
 // Invalidate removes a value from cache by key.
-func (c *IncrementalCache) Invalidate(ctx context.Context, key string) error {
+func (c *IncrementalCache) Invalidate(_ context.Context, key string) error {
 	cachePath := c.getCachePath(key)
 	if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove cache file: %w", err)
@@ -145,7 +145,7 @@ func (c *IncrementalCache) GetCacheKeyForFiles(files []string) (string, error) {
 	}
 
 	hash := hasher.Sum(nil)
-	return hex.EncodeToString(hash[:]), nil
+	return hex.EncodeToString(hash), nil
 }
 
 // IsCacheValid checks if cache is still valid for the given files.

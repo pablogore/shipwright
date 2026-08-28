@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -82,13 +83,11 @@ func (c *CLI) Run(args []string) error {
 				return fmt.Errorf("failed to load YAML configuration: %w", err)
 			}
 			c.yamlConfig = yamlCfg
-		} else {
-			// File doesn't exist - this is OK, we'll use defaults
-			// Only warn if the user explicitly specified --config
-			if flags.configFile != ".shipwright.yml" {
-				logger.L().WarnContext(ctx, "Configuration file not found, using defaults",
-					"config_file", flags.configFile)
-			}
+		} else if flags.configFile != ".shipwright.yml" {
+			// File doesn't exist - this is OK, we'll use defaults.
+			// Only warn if the user explicitly specified --config.
+			logger.L().WarnContext(ctx, "Configuration file not found, using defaults",
+				"config_file", flags.configFile)
 		}
 	}
 
@@ -478,10 +477,7 @@ func (c *CLI) runWorkflowEngine(
 		return fmt.Errorf("workflow: %w", err)
 	}
 
-	secrets, err := resolveWorkflowSecrets(client, m.Spec.Secrets)
-	if err != nil {
-		return fmt.Errorf("workflow: %w", err)
-	}
+	secrets := resolveWorkflowSecrets(client, m.Spec.Secrets)
 
 	source, err := resolveWorkflowSource(ctx, client, m.Spec.Source, shared.CloneRepo)
 	if err != nil {
@@ -528,7 +524,7 @@ func (c *CLI) workflowDaggerClient() (*dagger.Client, error) {
 	}
 	daggerClient, ok := client.(*dagger.Client)
 	if !ok || daggerClient == nil {
-		return nil, fmt.Errorf("workflow: Dagger client unavailable")
+		return nil, errors.New("workflow: Dagger client unavailable")
 	}
 	return daggerClient, nil
 }
@@ -540,17 +536,18 @@ func (c *CLI) workflowDaggerClient() (*dagger.Client, error) {
 // manifest/schema.go's SecretSpec doc comment). The plaintext value never
 // leaves this function as anything other than the argument to SetSecret —
 // engine.Config.Secrets only ever holds the resulting *dagger.Secret
-// handles (design.md D-L).
-func resolveWorkflowSecrets(client *dagger.Client, secrets map[string]manifest.SecretSpec) (map[string]*dagger.Secret, error) {
+// handles (design.md D-L). client.SetSecret itself cannot fail, so this
+// never returns an error.
+func resolveWorkflowSecrets(client *dagger.Client, secrets map[string]manifest.SecretSpec) map[string]*dagger.Secret {
 	if len(secrets) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	out := make(map[string]*dagger.Secret, len(secrets))
 	for name, spec := range secrets {
 		out[name] = client.SetSecret(name, os.Getenv(spec.FromEnv))
 	}
-	return out, nil
+	return out
 }
 
 // cloneRepoFunc is the signature shared.CloneRepo satisfies. Accepting
@@ -571,7 +568,7 @@ func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec mani
 		}
 
 		if spec.Ref == "" {
-			return nil, fmt.Errorf("workflow: source.ref is required when source.repo is set")
+			return nil, errors.New("workflow: source.ref is required when source.repo is set")
 		}
 
 		protocol := "https"

@@ -29,6 +29,7 @@ var tarpaulinCoverageRegexp = regexp.MustCompile(`(\d+\.\d+)% coverage`)
 // statically rule out data races in safe code at compile time — the same
 // guarantee `go test -race` checks dynamically at runtime — so no
 // race-detector flag is threaded through cargo test.
+//nolint:revive // stutters with package rust by design: this is a deliberate structural mirror of providers/go's GoUnitTester (see doc comment above), and every rust.Rust* type follows the same cross-provider naming symmetry
 type RustUnitTester struct {
 	// Client is the Dagger client used to construct the test container.
 	Client daggerkit.DaggerClient

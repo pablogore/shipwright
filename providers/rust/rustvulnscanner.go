@@ -27,6 +27,7 @@ var auditVulnerabilityCountRegexp = regexp.MustCompile(`(\d+) vulnerabilit(?:y|i
 // does one thing — scan Cargo.lock against the RustSec advisory database —
 // making it the direct, single-purpose analog to govulncheck, which
 // GoVulnScanner mirrors.
+//nolint:revive // stutters with package rust by design: this is a deliberate structural mirror of providers/go's GoVulnScanner (see doc comment above), and every rust.Rust* type follows the same cross-provider naming symmetry
 type RustVulnScanner struct {
 	// Client is the Dagger client used to construct the scan container.
 	Client daggerkit.DaggerClient

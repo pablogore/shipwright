@@ -128,7 +128,7 @@ func TestRender_ConcatenationErrorNamesTheOffendingReference(t *testing.T) {
 	// namespace — this fake resolver exercises that path deliberately, to
 	// prove Render's rejection is driven by the Value, not a namespace
 	// special-case.
-	resolve := func(ref interp.Reference) (interp.Value, error) {
+	resolve := func(_ interp.Reference) (interp.Value, error) {
 		return interp.NewSecret(&dagger.Secret{}), nil
 	}
 
@@ -155,7 +155,7 @@ func TestRender_SecretAloneInAFieldResolvesToSecretValue(t *testing.T) {
 	}
 
 	handle := &dagger.Secret{}
-	resolve := func(ref interp.Reference) (interp.Value, error) {
+	resolve := func(_ interp.Reference) (interp.Value, error) {
 		return interp.NewSecret(handle), nil
 	}
 
@@ -184,7 +184,7 @@ func TestRender_LiteralTextConcatenatesWithNonSecretReferences(t *testing.T) {
 		t.Fatalf("Scan() error = %v, want nil", err)
 	}
 
-	resolve := func(ref interp.Reference) (interp.Value, error) {
+	resolve := func(_ interp.Reference) (interp.Value, error) {
 		return interp.NewString("world"), nil
 	}
 

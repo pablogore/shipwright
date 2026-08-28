@@ -106,7 +106,7 @@ func (r *registry) LoadPluginsFromConfig(ctx context.Context, pluginCtx PluginCo
 
 	pluginsMap, ok := pluginsConfig.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("invalid plugins configuration format")
+		return errors.New("invalid plugins configuration format")
 	}
 
 	var errors []error

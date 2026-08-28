@@ -83,13 +83,10 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 		container = container.WithEnvVariable(k, v)
 	}
 
-	// Run Go commands: tidy dependencies and build the binary
-	// Using Sync() to ensure commands complete before proceeding
-	// Add retry logic for connection errors with exponential backoff
-	maxRetries := 5
-	retryDelay := 3 * time.Second
-	var err error
-	var result *dagger.Container
+	const (
+		maxRetries = 5
+		retryDelay = 3 * time.Second
+	)
 
 	// Give daemon a moment to be ready before first attempt
 	select {
@@ -99,58 +96,42 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 		// Continue with first attempt
 	}
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Wait before retrying (exponential backoff)
-			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
-			if waitTime > 15*time.Second {
-				waitTime = 15 * time.Second // Cap at 15 seconds
-			}
-
-			select {
-			case <-ctx.Done():
-				return "", fmt.Errorf("context cancelled during build retry: %w", ctx.Err())
-			case <-time.After(waitTime):
-				// Continue with retry
-			}
-		}
-
-		result, err = container.
+	// Run Go commands: tidy dependencies and build the binary.
+	// Using Sync() to ensure commands complete before proceeding.
+	var result *dagger.Container
+	err := retryOnConnectionError(ctx, maxRetries, retryDelay, "build", func() error {
+		var buildErr error
+		result, buildErr = container.
 			WithExec([]string{"go", "mod", "tidy"}).
 			WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", target, "main.go"}).
 			Sync(ctx)
-
-		if err == nil {
-			break // Success
-		}
-
-		// Check if error is a connection error that should be retried
-		errStr := err.Error()
-		isConnectionError := strings.Contains(errStr, "connection refused") ||
-			strings.Contains(errStr, "dial tcp") ||
-			strings.Contains(errStr, "connection reset") ||
-			strings.Contains(errStr, "no connection could be made")
-
-		if !isConnectionError || attempt >= maxRetries {
-			// Not a connection error or max retries reached
-			return "", fmt.Errorf("failed to build Go binary: %w", err)
-		}
-
-		// Log retry attempt
-		logger.L().WarnContext(ctx, "Build connection attempt failed, retrying",
-			"attempt", attempt+1,
-			"max_retries", maxRetries+1,
-			"error", err)
-	}
-
+		return buildErr
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to build Go binary after %d attempts: %w", maxRetries+1, err)
+		return "", fmt.Errorf("failed to build Go binary: %w", err)
 	}
 
-	// Export the built binary to the host filesystem
-	// Use the result container from Sync() for export
-	// Add retry logic for connection errors during export
+	// Export the built binary to the host filesystem.
+	// Use the result container from Sync() for export.
 	file := result.File("/app/" + target)
+	err = retryOnConnectionError(ctx, maxRetries, retryDelay, "export", func() error {
+		_, exportErr := file.Export(ctx, outPath)
+		return exportErr
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to export binary to %s: %w", outPath, err)
+	}
+
+	return outPath, nil
+}
+
+// retryOnConnectionError runs execFn, retrying with exponential backoff
+// (capped at 15s) when the failure looks like a transient Dagger daemon
+// connection error. label identifies the operation in retry logs and the
+// context-cancellation error.
+func retryOnConnectionError(ctx context.Context, maxRetries int, retryDelay time.Duration, label string, execFn func() error) error {
+	var err error
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			// Wait before retrying (exponential backoff)
@@ -161,15 +142,15 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 
 			select {
 			case <-ctx.Done():
-				return "", fmt.Errorf("context cancelled during export retry: %w", ctx.Err())
+				return fmt.Errorf("context cancelled during %s retry: %w", label, ctx.Err())
 			case <-time.After(waitTime):
 				// Continue with retry
 			}
 		}
 
-		_, err = file.Export(ctx, outPath)
+		err = execFn()
 		if err == nil {
-			break // Success
+			return nil
 		}
 
 		// Check if error is a connection error that should be retried
@@ -181,19 +162,15 @@ func (b *GoBuilder) Build(ctx context.Context, outPath string, target string, en
 
 		if !isConnectionError || attempt >= maxRetries {
 			// Not a connection error or max retries reached
-			return "", fmt.Errorf("failed to export binary to %s: %w", outPath, err)
+			return err
 		}
 
 		// Log retry attempt
-		logger.L().WarnContext(ctx, "Export connection attempt failed, retrying",
+		logger.L().WarnContext(ctx, label+" connection attempt failed, retrying",
 			"attempt", attempt+1,
 			"max_retries", maxRetries+1,
 			"error", err)
 	}
 
-	if err != nil {
-		return "", fmt.Errorf("failed to export binary to %s after %d attempts: %w", outPath, maxRetries+1, err)
-	}
-
-	return outPath, nil
+	return err
 }

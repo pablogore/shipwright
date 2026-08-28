@@ -1,6 +1,7 @@
 package pipelines
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -10,7 +11,7 @@ import (
 // Supports both HTTPS (https://github.com/user/repo.git) and SSH (git@github.com:user/repo.git) formats.
 func ExtractHostFromRepoURL(repoURL string) (string, error) {
 	if repoURL == "" {
-		return "", fmt.Errorf("repository URL is empty")
+		return "", errors.New("repository URL is empty")
 	}
 
 	// Handle SSH format: git@host:user/repo.git
@@ -52,6 +53,7 @@ func GenerateNetrc(repoURL, user, token string) (string, error) {
 }
 
 // GitlabNetrc generates a .netrc file content for GitLab authentication (deprecated, use GenerateNetrc instead)
+//
 // Deprecated: Use GenerateNetrc instead which extracts host from repo URL
 func GitlabNetrc(user, token string) string {
 	return fmt.Sprintf("machine gitlab.com login %s password %s\n", user, token)

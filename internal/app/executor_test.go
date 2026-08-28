@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pablogore/shipwright/internal/config"
-	"github.com/pablogore/shipwright/internal/executors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pablogore/shipwright/internal/config"
+	"github.com/pablogore/shipwright/internal/executors"
 )
 
 func TestContainer_GetExecutorSelector(t *testing.T) {
@@ -18,7 +19,7 @@ func TestContainer_GetExecutorSelector(t *testing.T) {
 	container := NewContainer(ctx, cfg)
 	err = container.Start(ctx)
 	require.NoError(t, err)
-	defer container.Stop(ctx)
+	defer func() { _ = container.Stop(ctx) }()
 
 	selector, err := container.Get("executorSelector")
 	require.NoError(t, err)
@@ -42,7 +43,7 @@ func TestContainer_ExecutorSelector_AutoDetect(t *testing.T) {
 	container := NewContainer(ctx, cfg)
 	err = container.Start(ctx)
 	require.NoError(t, err)
-	defer container.Stop(ctx)
+	defer func() { _ = container.Stop(ctx) }()
 
 	selector, err := container.Get("executorSelector")
 	require.NoError(t, err)

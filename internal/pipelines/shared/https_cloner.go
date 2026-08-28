@@ -89,17 +89,9 @@ func NewHTTPSCloner(opts ...CloneOptions) *HTTPSCloner {
 }
 
 func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts GitCloneOpts) (*dagger.Directory, error) {
-	if opts.Branch == "" {
-		opts.Branch = "main"
-	}
-	if opts.UserEmail == "" {
-		opts.UserEmail = "ci@example.com"
-	}
-	if opts.UserName == "" {
-		opts.UserName = "CI User"
-	}
-	if opts.Repo == "" {
-		return nil, errors.New("invalid repository URL: repo is empty")
+	opts, err := normalizeCloneOpts(opts)
+	if err != nil {
+		return nil, err
 	}
 	logger.L().InfoContext(ctx, "Cloning repo (HTTPS)", "name", opts.Name, "branch", opts.Branch)
 
@@ -117,14 +109,47 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 	ctx, cancel := context.WithTimeout(ctx, c.opts.Timeout)
 	defer cancel()
 
-	// Prepare the cloning command
-	cloneCmd := []string{"git", "clone"}
-	if c.opts.ShallowClone {
-		cloneCmd = append(cloneCmd, fmt.Sprintf("--depth=%d", c.opts.Depth))
-	}
-	cloneCmd = append(cloneCmd, "--branch", opts.Branch, opts.Repo, opts.Name)
+	cloneCmd := buildCloneCommand(c.opts, opts)
 
-	// Configure the base container
+	container, err := buildCloneContainer(client, opts, creds)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.cloneWithRetry(ctx, container, cloneCmd, opts.Name)
+}
+
+// normalizeCloneOpts fills in default values for optional fields and
+// validates that the required repository URL is present.
+func normalizeCloneOpts(opts GitCloneOpts) (GitCloneOpts, error) {
+	if opts.Branch == "" {
+		opts.Branch = "main"
+	}
+	if opts.UserEmail == "" {
+		opts.UserEmail = "ci@example.com"
+	}
+	if opts.UserName == "" {
+		opts.UserName = "CI User"
+	}
+	if opts.Repo == "" {
+		return opts, errors.New("invalid repository URL: repo is empty")
+	}
+	return opts, nil
+}
+
+// buildCloneCommand assembles the `git clone` command line from the cloner's
+// options and the target repository.
+func buildCloneCommand(cloneOpts CloneOptions, opts GitCloneOpts) []string {
+	cloneCmd := []string{"git", "clone"}
+	if cloneOpts.ShallowClone {
+		cloneCmd = append(cloneCmd, fmt.Sprintf("--depth=%d", cloneOpts.Depth))
+	}
+	return append(cloneCmd, "--branch", opts.Branch, opts.Repo, opts.Name)
+}
+
+// buildCloneContainer configures the base Alpine container with git,
+// optional HTTPS credentials, and the git user identity used for commits.
+func buildCloneContainer(client *dagger.Client, opts GitCloneOpts, creds *GitCredentials) (*dagger.Container, error) {
 	container := client.Container().
 		From("alpine:latest").
 		WithExec([]string{"apk", "add", "--no-cache", "git", "ca-certificates"})
@@ -160,7 +185,12 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 		WithExec([]string{"git", "config", "--global", "user.email", email}).
 		WithExec([]string{"git", "config", "--global", "user.name", name})
 
-	// Try cloning with retries
+	return container, nil
+}
+
+// cloneWithRetry executes cloneCmd against container, retrying up to
+// c.opts.MaxRetries times if the resulting directory is missing or empty.
+func (c *HTTPSCloner) cloneWithRetry(ctx context.Context, container *dagger.Container, cloneCmd []string, dirName string) (*dagger.Directory, error) {
 	var dir *dagger.Directory
 	var lastErr error
 	for i := 0; i < c.opts.MaxRetries; i++ {
@@ -171,7 +201,7 @@ func (c *HTTPSCloner) Clone(ctx context.Context, client *dagger.Client, opts Git
 
 		// Execute the cloning
 		container = container.WithExec(cloneCmd)
-		dir = container.Directory(opts.Name)
+		dir = container.Directory(dirName)
 
 		// Check that the directory is not empty
 		entries, err := dir.Entries(ctx)

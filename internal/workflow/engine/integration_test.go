@@ -47,19 +47,19 @@ func TestEndToEnd_DiamondExampleManifest(t *testing.T) {
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{
 		"goVersion": interp.KindString,
 	}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 			rec.record("build")
 			return source, nil
 		}}
 	})
 	reg.RegisterTester(providers.Ref{Name: "go-test", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
-		return fakeTester{TestFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 			rec.record("unit")
 			return nil, nil
 		}}
 	})
 	reg.RegisterTester(providers.Ref{Name: "govulncheck", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
-		return fakeTester{TestFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 			rec.record("vuln")
 			return nil, nil
 		}}
@@ -68,7 +68,7 @@ func TestEndToEnd_DiamondExampleManifest(t *testing.T) {
 		"ref":   interp.KindString,
 		"creds": interp.KindSecret,
 	}, func(providers.Values) shipwright.Artifactor {
-		return fakeArtifactor{PublishFunc: func(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error) {
+		return fakeArtifactor{PublishFunc: func(_ context.Context, _ *dagger.Directory, ref string, _ *dagger.Secret) (string, error) {
 			rec.record("publish")
 			return ref, nil
 		}}

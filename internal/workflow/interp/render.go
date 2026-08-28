@@ -62,9 +62,9 @@ func Render(tokens []Token, resolve func(Reference) (Value, error)) (Value, erro
 func describeRef(ref Reference) string {
 	switch ref.Namespace {
 	case NamespaceVariables:
-		return fmt.Sprintf("variables.%s", ref.Name)
+		return "variables." + ref.Name
 	case NamespaceSecrets:
-		return fmt.Sprintf("secrets.%s", ref.Name)
+		return "secrets." + ref.Name
 	case NamespaceSteps:
 		return fmt.Sprintf("steps.%s.output", ref.StepID)
 	default:

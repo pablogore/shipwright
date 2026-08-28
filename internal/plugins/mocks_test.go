@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"dagger.io/dagger"
 
@@ -51,7 +52,7 @@ func TestMockPlugin(t *testing.T) {
 		// Assert
 		assert.Equal(t, "custom-plugin", name)
 		assert.Equal(t, "2.0.0", version)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Error(t, initErr)
 	})
 }
@@ -73,7 +74,7 @@ func TestMockPluginContext(t *testing.T) {
 		// Assert
 		assert.Nil(t, cfg)
 		assert.Nil(t, client)
-		assert.NoError(t, clientErr)
+		require.NoError(t, clientErr)
 		assert.Nil(t, hookManager)
 		assert.Nil(t, logger)
 		assert.Equal(t, Capabilities{}, caps)
@@ -113,7 +114,7 @@ func TestMockPluginContext(t *testing.T) {
 		// Assert
 		assert.Equal(t, mockCfg, cfg)
 		assert.Equal(t, daggerClient, client)
-		assert.NoError(t, clientErr)
+		require.NoError(t, clientErr)
 		assert.Equal(t, mockHookManager, hookManager)
 		assert.Equal(t, mockLogger, logger)
 		assert.Equal(t, mockCaps, caps)
@@ -134,9 +135,9 @@ func TestMockPluginLoader(t *testing.T) {
 
 		// Assert
 		assert.Nil(t, plugin)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, plugin2)
-		assert.NoError(t, err2)
+		require.NoError(t, err2)
 		assert.Nil(t, plugin3)
 		assert.NoError(t, err3)
 	})
@@ -167,9 +168,9 @@ func TestMockPluginLoader(t *testing.T) {
 
 		// Assert
 		assert.Equal(t, testPlugin, plugin1)
-		assert.NoError(t, err1)
+		require.NoError(t, err1)
 		assert.Equal(t, testPlugin, plugin2)
-		assert.NoError(t, err2)
+		require.NoError(t, err2)
 		assert.Equal(t, testPlugin, plugin3)
 		assert.NoError(t, err3)
 	})

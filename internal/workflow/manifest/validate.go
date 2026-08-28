@@ -1,6 +1,9 @@
 package manifest
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // allowedAPIVersions is the schema's apiVersion allowlist (stage 2,
 // design.md D-H). Design.md D-E: the manifest schema version evolves
@@ -34,21 +37,21 @@ var validCapabilities = map[string]bool{
 // structure is inspected here — that is ValidateStructure's job (stage 3).
 func ValidateIdentity(m *Manifest) error {
 	if m.APIVersion == "" {
-		return fmt.Errorf("manifest: missing required field apiVersion")
+		return errors.New("manifest: missing required field apiVersion")
 	}
 	if !allowedAPIVersions[m.APIVersion] {
 		return fmt.Errorf("manifest: unsupported apiVersion %q", m.APIVersion)
 	}
 
 	if m.Kind == "" {
-		return fmt.Errorf("manifest: missing required field kind")
+		return errors.New("manifest: missing required field kind")
 	}
 	if m.Kind != workflowKind {
 		return fmt.Errorf("manifest: unsupported kind %q, want %q", m.Kind, workflowKind)
 	}
 
 	if m.Metadata.Name == "" {
-		return fmt.Errorf("manifest: missing required field metadata.name")
+		return errors.New("manifest: missing required field metadata.name")
 	}
 
 	return nil

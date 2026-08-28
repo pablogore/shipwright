@@ -277,7 +277,7 @@ func TestNomadDeployPlugin_Initialize_DoesNotRegisterHooksOrSteps(t *testing.T) 
 	pluginCtx := NewMockPluginContext()
 	pluginCtx.GetHookManagerFunc = func() interfaces.HookManager { return hookManager }
 	pluginCtx.GetStepRegistryFunc = func() interfaces.StepRegistry { return stepRegistry }
-	pluginCtx.GetProviderRegistryFunc = func() *providers.Registry { return providers.NewRegistry() }
+	pluginCtx.GetProviderRegistryFunc = providers.NewRegistry
 
 	require.NoError(t, NewNomadDeployPlugin().Initialize(context.Background(), pluginCtx))
 

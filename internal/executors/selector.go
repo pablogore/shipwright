@@ -38,7 +38,7 @@ func (s *Selector) RegisterExecutor(name string, executor Executor) {
 // Returns:
 //   - The selected executor.
 //   - An error if no suitable executor is found.
-func (s *Selector) SelectExecutor(ctx context.Context, client *dagger.Client, config pipelines.Config, preferredExecutor string) (Executor, error) {
+func (s *Selector) SelectExecutor(ctx context.Context, _ *dagger.Client, _ pipelines.Config, preferredExecutor string) (Executor, error) {
 	// If preferred executor is specified, use it if available
 	if preferredExecutor != "" {
 		executor, ok := s.executors[preferredExecutor]

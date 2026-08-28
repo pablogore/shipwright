@@ -110,7 +110,7 @@ func TestValidateConvertedConfig(t *testing.T) {
 func TestConvertConfig_WithValidation(t *testing.T) {
 	mockConfig := NewMockConfiguration()
 	mockConfig.EnvironmentFunc = func() string { return "dev" }
-	mockConfig.GetBoolFunc = func(key string) bool { return false }
+	mockConfig.GetBoolFunc = func(_ string) bool { return false }
 	mockConfig.GetStringFunc = func(key string) string {
 		switch key {
 		case "git.ref":
@@ -125,7 +125,7 @@ func TestConvertConfig_WithValidation(t *testing.T) {
 			return ""
 		}
 	}
-	mockConfig.GetFloatFunc = func(key string) float64 { return 90.0 }
+	mockConfig.GetFloatFunc = func(_ string) float64 { return 90.0 }
 
 	// Convert config
 	converted := convertConfig(mockConfig)

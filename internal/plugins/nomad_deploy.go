@@ -249,6 +249,7 @@ func (p *NomadDeployPlugin) resolvedNomadAddr() string {
 // Actually running `nomad job run` inside it needs a reachable Nomad server
 // and is out of scope for this remediation, which restores the plugin's
 // reachability rather than adding new deployment behavior.
+//nolint:unparam // always nil today by design: staging deliberately never executes (see doc comment above); the error return stays part of the signature for when real `nomad job run` execution lands
 func (p *NomadDeployPlugin) stageNomadJob(
 	ctx context.Context,
 	addr string,
@@ -288,6 +289,7 @@ func (p *NomadDeployPlugin) stageNomadJob(
 // against Nomad runnable on a machine with no Nomad installed, the same
 // tolerance the previous hook-based implementation had. Like stageNomadJob,
 // issuing the real `nomad job run` invocation is out of scope here.
+//nolint:unparam // always nil today by design: this only checks for a local Nomad CLI and logs (see doc comment above); the error return stays part of the signature for when real `nomad job run` execution lands
 func (p *NomadDeployPlugin) runNomadCommand(ctx context.Context, nomadAddr, jobFile, artifactRef string) error {
 	if _, err := exec.LookPath("nomad"); err != nil {
 		logger.L().WarnContext(ctx, "Nomad CLI not found, skipping local deployment",

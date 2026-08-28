@@ -228,27 +228,21 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 
 # PROD-001: single repository-owned source of truth for "what makes a SHA
 # production-ready", run identically by any CI provider or locally.
-# ci-final = build + test + coverage + security. Four things are deliberately
-# excluded from that composition (or from the coverage calculation); each is
-# documented below as: why it's out, debt vs. architectural decision, the
-# open risk, and what closes it.
+# ci-final = lint + build + test + coverage + security. Three things are
+# deliberately excluded from that composition (or from the coverage
+# calculation); each is documented below as: why it's out, debt vs.
+# architectural decision, the open risk, and what closes it.
 #
-# 1) `lint` — EXCLUDED, PRE-EXISTING DEBT (not a decision).
-#    `make lint` currently fails with 110 pre-existing findings (root 97,
-#    providers/go 3, providers/rust 10 — bodyclose, errcheck, gocritic,
-#    gocyclo, perfsprint, revive, staticcheck, testifylint, thelper, unparam,
-#    unused, usetesting), none introduced by the Final-SHA work and none
-#    trivial to fix inline (4 are gocyclo>15 violations up to complexity 34;
-#    5 are exported-type "stutter" renames in providers/rust that would be a
-#    breaking public API change to a separately, tag-released module).
-#    Risk left open: a real style/complexity/correctness-adjacent regression
-#    can land on develop without failing CI, since nothing enforces lint today.
-#    Closes via: https://github.com/pablogore/shipwright/issues/186 (tracks
-#    the exact findings). Add `lint` to this composition once that issue is
-#    resolved — `make lint` stays fail-closed in the meantime so the debt
-#    stays visible.
+# `lint` was excluded here as pre-existing debt (110 findings across root,
+# providers/go, providers/rust) tracked by
+# https://github.com/pablogore/shipwright/issues/186. That issue is now
+# resolved: `make lint` passes with 0 findings in all three modules (the 5
+# providers/rust exported-type "stutter" names are intentional — see their
+# `//nolint:revive` rationale at each declaration — and are not renamed,
+# since that would be a breaking public API change to a separately,
+# tag-released module). `lint` is included in ci-final's composition below.
 #
-# 2) `dagger-test` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
+# 1) `dagger-test` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
 #    `.dagger/`'s own module tests require `dagger run`, i.e. a live Dagger
 #    engine — see design.md D-B isolation. A fail-closed, CI-provider-
 #    independent gate cannot depend on an engine being reachable at
@@ -259,7 +253,7 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 #    "runs identically anywhere, no live engine required" property ci-final
 #    exists to guarantee.
 #
-# 3) `test-integration` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
+# 2) `test-integration` — EXCLUDED, ARCHITECTURAL DECISION (permanent).
 #    `testing/integration/{go,rust,changelog}/` (build tag `integration`)
 #    exercises the real `dagger.io/dagger` SDK against a live engine, by
 #    design — that's the point of separating it from the daggerkit-mocked
@@ -270,7 +264,7 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 #    engine is available), not by the gate itself.
 #    Closes via: N/A — same reasoning as `dagger-test`.
 #
-# 4) `internal/daggerkit` coverage exclusion — ARCHITECTURAL DECISION.
+# 3) `internal/daggerkit` coverage exclusion — ARCHITECTURAL DECISION.
 #    Excluded from the coverage calculation (both `coverage` and
 #    `coverage-gate`, see below) alongside `/mocks`, `/examples`, `/app`,
 #    `/config`. daggerkit's adapter code is a thin, mechanical passthrough to
@@ -284,7 +278,7 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 #    Closes via: N/A — permanent, same category as the existing /mocks and
 #    /app exclusions.
 #
-# 5) ci-final gates on `coverage-gate`, NOT `coverage` — CORRECTED DEFECT,
+# 4) ci-final gates on `coverage-gate`, NOT `coverage` — CORRECTED DEFECT,
 #    found by the first real push to develop after this gate went live.
 #    `coverage` enforces COVERAGE_THRESHOLD=90, a bar this repo's own total
 #    coverage has never reached (see coverage-ci, added in e85a137 with
@@ -300,16 +294,15 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 #    aspirational use, `coverage-ci` stays as-is for its existing callers.
 #    Closes via: already closed by this correction.
 #
-# Given the above, ci-final still represents the valid minimum
-# production-critical set: build/test/coverage/security are the only checks
-# that (a) can run fail-closed with zero external dependencies and (b) map
-# directly to "this SHA compiles, behaves correctly under test, meets its
-# coverage bar, and has no known vulnerabilities." lint is enforceable this
-# way too and will be added once #186 closes; dagger-test/test-integration
-# structurally cannot be, by the same reproducibility requirement that
-# motivates ci-final's existence.
+# Given the above, ci-final represents the valid minimum production-critical
+# set: lint/build/test/coverage/security are the only checks that (a) can run
+# fail-closed with zero external dependencies and (b) map directly to "this
+# SHA compiles cleanly, behaves correctly under test, meets its coverage bar,
+# and has no known vulnerabilities." dagger-test/test-integration structurally
+# cannot be, by the same reproducibility requirement that motivates
+# ci-final's existence.
 .PHONY: ci-final
-ci-final: build test coverage-gate security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
+ci-final: lint build test coverage-gate security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
