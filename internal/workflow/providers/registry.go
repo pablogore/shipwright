@@ -243,6 +243,7 @@ type Registry struct {
 	artifactors *table[shipwright.Artifactor]
 	deployers   *table[shipwright.Deployer]
 	runners     *table[shipwright.Runner]
+	inspectors  *table[shipwright.RuntimeInspector]
 }
 
 // NewRegistry constructs an empty Registry. Register the in-repo WU3
@@ -254,6 +255,7 @@ func NewRegistry() *Registry {
 		artifactors: newTable[shipwright.Artifactor](),
 		deployers:   newTable[shipwright.Deployer](),
 		runners:     newTable[shipwright.Runner](),
+		inspectors:  newTable[shipwright.RuntimeInspector](),
 	}
 }
 
@@ -321,4 +323,17 @@ func (r *Registry) RegisterRunner(ref Ref, schema WithSchema, f func(Values) shi
 // WithSchema) to a concrete shipwright.Runner.
 func (r *Registry) ResolveRunner(ref Ref, v Values) (shipwright.Runner, error) {
 	return r.runners.resolve("run", ref, v)
+}
+
+// RegisterRuntimeInspector registers a RuntimeInspector provider factory
+// under ref (runtime-toolchain-upgrade, design.md D-4b). Sixth typed pair,
+// same shape as the original five above.
+func (r *Registry) RegisterRuntimeInspector(ref Ref, schema WithSchema, f func(Values) shipwright.RuntimeInspector) {
+	r.inspectors.register(ref, schema, f)
+}
+
+// ResolveRuntimeInspector resolves ref (and validates v against its
+// declared WithSchema) to a concrete shipwright.RuntimeInspector.
+func (r *Registry) ResolveRuntimeInspector(ref Ref, v Values) (shipwright.RuntimeInspector, error) {
+	return r.inspectors.resolve("runtime-inspect", ref, v)
 }

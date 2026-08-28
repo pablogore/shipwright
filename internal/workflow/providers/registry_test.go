@@ -59,6 +59,16 @@ func (fakeRunner) Run(ctx context.Context, build *dagger.Directory) (*dagger.Con
 	return nil, nil
 }
 
+// fakeRuntimeInspector satisfies shipwright.RuntimeInspector
+// (runtime-toolchain-upgrade, design.md D-4b) — this package tests provider
+// RESOLUTION for the sixth capability the same way it does the original
+// five, not any concrete provider's own behavior.
+type fakeRuntimeInspector struct{}
+
+func (fakeRuntimeInspector) Inspect(ctx context.Context, source *dagger.Directory) (string, error) {
+	return "{}", nil
+}
+
 // tasks.md 7.1: one Register*/Resolve* hit/miss pair per capability — five
 // total (Builder, Tester, Artifactor, Deployer, Runner), matching
 // design.md D-I's five typed register methods exactly.
@@ -159,6 +169,37 @@ func TestRegistry_RunnerResolutionHitAndMiss(t *testing.T) {
 
 	if _, err := r.ResolveRunner(providers.Ref{Name: "ghost", Version: "1"}, providers.Values{}); err == nil {
 		t.Fatal("ResolveRunner(unregistered ref) error = nil, want an error (miss)")
+	}
+}
+
+// RuntimeInspector's own hit/miss pair (runtime-toolchain-upgrade,
+// design.md D-4b task 1.16): the sixth capability follows the exact same
+// Register*/Resolve* shape as the original five above.
+func TestRegistry_RuntimeInspectorResolutionHitAndMiss(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	ref := providers.Ref{Name: "go-runtime", Version: "1"}
+	r.RegisterRuntimeInspector(ref, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeInspector {
+		return fakeRuntimeInspector{}
+	})
+
+	got, err := r.ResolveRuntimeInspector(ref, providers.Values{})
+	if err != nil {
+		t.Fatalf("ResolveRuntimeInspector(registered ref) error = %v, want nil (hit)", err)
+	}
+	if got == nil {
+		t.Fatal("ResolveRuntimeInspector(registered ref) = nil, want a resolved shipwright.RuntimeInspector")
+	}
+
+	miss := providers.Ref{Name: "ghost", Version: "1"}
+	_, err = r.ResolveRuntimeInspector(miss, providers.Values{})
+	if err == nil {
+		t.Fatal("ResolveRuntimeInspector(unregistered ref) error = nil, want an error (miss)")
+	}
+	var unregistered *providers.UnregisteredProviderError
+	if !errors.As(err, &unregistered) {
+		t.Fatalf("ResolveRuntimeInspector(unregistered ref) error = %v (%T), want *providers.UnregisteredProviderError", err, err)
 	}
 }
 

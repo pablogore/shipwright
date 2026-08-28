@@ -83,6 +83,43 @@ func TestExecute_DispatchesRunner(t *testing.T) {
 	}
 }
 
+// TestExecute_DispatchesRuntimeInspector guards dispatchRuntimeInspect's
+// straight-line resolve->call->wrap shape (runtime-toolchain-upgrade,
+// design.md D-4b, tasks.md 1.19/1.20): no blocking code, output.kind is
+// outputText (mirroring Artifactor/Deployer's own string result), and the
+// step's produced report string is exactly what the resolved
+// RuntimeInspector.Inspect returned.
+func TestExecute_DispatchesRuntimeInspector(t *testing.T) {
+	t.Parallel()
+
+	rec := &recorder{}
+	reg := providers.NewRegistry()
+	reg.RegisterRuntimeInspector(providers.Ref{Name: "go-runtime", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeInspector {
+		return fakeRuntimeInspector{InspectFunc: func(ctx context.Context, source *dagger.Directory) (string, error) {
+			rec.record("inspect")
+			return `{"workspaceRoot":"."}`, nil
+		}}
+	})
+
+	steps := []manifest.Step{{ID: "inspect", Capability: "runtime-inspect", Uses: manifest.UsesSpec{Provider: "go-runtime", Version: "1"}}}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	cfg := engine.Config{Steps: steps, Graph: g, Registry: reg}
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+	if res.Failed() {
+		t.Fatalf("Execute() Failures = %v, want none", res.Failures)
+	}
+	if got := rec.snapshot(); len(got) != 1 || got[0] != "inspect" {
+		t.Fatalf("invocation order = %v, want [inspect]", got)
+	}
+}
+
 func TestExecute_UnknownCapabilityRejected(t *testing.T) {
 	t.Parallel()
 

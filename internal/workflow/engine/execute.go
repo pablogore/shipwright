@@ -655,6 +655,8 @@ func dispatch(ctx context.Context, s manifest.Step, input *dagger.Directory, val
 		return dispatchDeploy(ctx, s.ID, ref, values, reg)
 	case "run":
 		return dispatchRun(ctx, ref, input, values, reg)
+	case "runtime-inspect":
+		return dispatchRuntimeInspect(ctx, ref, input, values, reg)
 	default:
 		return result{}, &UnknownCapabilityError{StepID: s.ID, Capability: s.Capability}
 	}
@@ -755,6 +757,26 @@ func dispatchRun(ctx context.Context, ref providers.Ref, input *dagger.Directory
 		return result{}, err
 	}
 	return result{kind: outputContainer, container: c}, nil
+}
+
+// dispatchRuntimeInspect is a straight-line resolve->call->wrap, exactly
+// like dispatchRun above: unlike Artifactor/Deployer,
+// RuntimeInspector.Inspect takes no with-derived arguments — every with
+// value (workspaceRoot/expectedVersion/failOnDrift,
+// internal/workflow/providers/register.go's own field-name consts) is
+// already baked into the resolved RuntimeInspector by its provider factory
+// closure, so no stringWith/secretWith extraction happens here (D1
+// confirmation, runtime-toolchain-upgrade design.md D-4b).
+func dispatchRuntimeInspect(ctx context.Context, ref providers.Ref, input *dagger.Directory, values providers.Values, reg *providers.Registry) (result, error) {
+	i, err := reg.ResolveRuntimeInspector(ref, values)
+	if err != nil {
+		return result{}, err
+	}
+	report, err := i.Inspect(ctx, input)
+	if err != nil {
+		return result{}, err
+	}
+	return result{kind: outputText, text: report}, nil
 }
 
 func stringWith(stepID string, values providers.Values, field string) (string, error) {

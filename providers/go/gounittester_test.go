@@ -47,7 +47,7 @@ func TestGoUnitTester_Test_PassesWithinThreshold(t *testing.T) {
 	realCoverageFile := &dagger.File{}
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golang:1.25.5").Return(mockContainer)
+	mockContainer.On("From", "golang:1.26.7").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/src", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithWorkdir", "/src").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GO111MODULE", "on").Return(mockContainer)
@@ -80,7 +80,7 @@ func TestGoUnitTester_Test_BelowThreshold_Fails(t *testing.T) {
 	src := &dagger.Directory{}
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golang:1.25.5").Return(mockContainer)
+	mockContainer.On("From", "golang:1.26.7").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/src", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithWorkdir", "/src").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GO111MODULE", "on").Return(mockContainer)

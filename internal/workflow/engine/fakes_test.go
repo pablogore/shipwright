@@ -72,6 +72,20 @@ func (f fakeRunner) Run(ctx context.Context, build *dagger.Directory) (*dagger.C
 	return nil, nil
 }
 
+// fakeRuntimeInspector satisfies shipwright.RuntimeInspector
+// (runtime-toolchain-upgrade, design.md D-4b) — same configurable-func fake
+// style as the original five above.
+type fakeRuntimeInspector struct {
+	InspectFunc func(ctx context.Context, source *dagger.Directory) (string, error)
+}
+
+func (f fakeRuntimeInspector) Inspect(ctx context.Context, source *dagger.Directory) (string, error) {
+	if f.InspectFunc != nil {
+		return f.InspectFunc(ctx, source)
+	}
+	return "{}", nil
+}
+
 // recorder records step invocation order, guarded by a mutex so `go test
 // -race` genuinely proves serial access rather than merely assuming it —
 // if wave execution ever became concurrent (it must not, design.md D-K),

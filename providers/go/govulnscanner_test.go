@@ -44,7 +44,7 @@ func TestGoVulnScanner_Test_CleanScan(t *testing.T) {
 	const cleanOutput = "No vulnerabilities found.\n\nYour code is affected by 0 vulnerabilities."
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golang:1.25.5").Return(mockContainer)
+	mockContainer.On("From", "golang:1.26.7").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/app", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GO111MODULE", "on").Return(mockContainer)
@@ -76,7 +76,7 @@ func TestGoVulnScanner_Test_VulnerabilitiesDetected(t *testing.T) {
 	const vulnOutput = "Your code is affected by 2 vulnerabilities"
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golang:1.25.5").Return(mockContainer)
+	mockContainer.On("From", "golang:1.26.7").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/app", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GO111MODULE", "on").Return(mockContainer)
