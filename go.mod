@@ -1,6 +1,6 @@
 module github.com/pablogore/shipwright
 
-go 1.26.2
+go 1.26.7
 
 require (
 	dagger.io/dagger v0.21.8
