@@ -2,9 +2,13 @@ package app
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"strings"
 	"time"
 
 	"dagger.io/dagger"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/pablogore/shipwright/internal/interfaces"
 )
@@ -460,4 +464,31 @@ func (m *MockLinter) GetReport(ctx context.Context) (string, error) {
 // NewMockLinter creates a new mock linter.
 func NewMockLinter() *MockLinter {
 	return &MockLinter{}
+}
+
+// MockHTTPClient implements HTTPClient using testify's mock package, so health
+// check tests can assert on requests and control responses without making
+// real network calls.
+type MockHTTPClient struct {
+	mock.Mock
+}
+
+// Do implements HTTPClient.
+func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	args := m.Called(req)
+	var resp *http.Response
+	if v := args.Get(0); v != nil {
+		resp = v.(*http.Response)
+	}
+	return resp, args.Error(1)
+}
+
+// NewMockHTTPResponse builds a minimal *http.Response for MockHTTPClient
+// expectations to return.
+func NewMockHTTPResponse(statusCode int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: statusCode,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     make(http.Header),
+	}
 }
