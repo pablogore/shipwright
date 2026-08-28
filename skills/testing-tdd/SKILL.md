@@ -31,12 +31,12 @@ This workflow governs **new tests and tests you modify**. The existing suite is 
 | Complexity | gocyclo ≤ 15 (`.golangci.yml`), checked via `golangci-lint run` — not yet CI-enforced |
 | Race detector | `go test -race ./...` — CI-enforced |
 | Mock framework | `go.uber.org/mock` (mockgen) for generated mocks in `mocks/`; hand-rolled function-field fakes for `internal/executors`, `internal/plugins` |
-| Real infrastructure | Real Dagger containers or external commands, always guarded by `testing.Short()` |
+| Real infrastructure | Real Dagger containers: mocked by default via each module's own `daggerkit` package; genuine real-engine/external-command coverage lives in `testing/integration/`, guarded by the `integration` build tag |
 
 ```bash
 go test ./...
 go test -race ./...
-go test -short ./...
+make test-integration
 go test -run TestValidateGoVersion ./internal/config
 make coverage
 golangci-lint run
@@ -64,7 +64,7 @@ Never write a unit test against a real resource:
 client, _ := dagger.Connect(ctx)
 container := client.Container().From("golang:1.26.1-alpine")
 
-// WRONG — real external command outside a -short guard
+// WRONG — real external command outside testing/integration/
 out, _ := exec.Command("golangci-lint", "run").Output()
 
 // WRONG — real wall clock
@@ -74,6 +74,13 @@ expired := time.Since(issuedAt) > time.Hour
 Use a double instead:
 
 ```go
+// Dagger client/container/directory/file boundary — always the module's own
+// daggerkit mocks, never a real dagger.Connect() in a unit test
+mockClient := &daggerkit.MockDaggerClient{}
+mockContainer := &daggerkit.MockDaggerContainer{}
+mockClient.On("Container").Return(mockContainer)
+mockContainer.On("From", "alpine:latest").Return(mockContainer)
+
 // Existing hand-rolled fake first — real interface, isolated instance
 exec := &executors.MockExecutor{
     ExecuteStepFunc: func(ctx context.Context, step string) error { return nil },
@@ -119,13 +126,14 @@ Apply in order. Stop at the first that fits.
 
 | Order | Double | When |
 |---|---|---|
-| 1 | Existing hand-rolled fake (`internal/executors/mocks.go`, `internal/plugins/mocks.go`) | The interface already has one — extend it, don't hand-roll a new one |
-| 2 | Existing gomock mock (`mocks/*.go`) | A generated mock already covers the interface |
-| 3 | New gomock mock via `mockgen` | The interface has no existing mock and has 3+ methods or is reused across packages |
-| 4 | Hand-rolled stub | A one- or two-method interface used once; gomock is overkill |
-| 5 | No double — move the test | It needs a real Dagger container or external command → it is not a unit test |
+| 1 | The module's own `daggerkit` mocks (`daggerkit.MockDaggerClient`/`MockDaggerContainer`/`MockDaggerDirectory`/`MockDaggerFile`) | The boundary is a Dagger client, container, directory, or file — always mock it here first, never connect to a real engine |
+| 2 | Existing hand-rolled fake (`internal/executors/mocks.go`, `internal/plugins/mocks.go`) | The interface already has one — extend it, don't hand-roll a new one |
+| 3 | Existing gomock mock (`mocks/*.go`) | A generated mock already covers the interface |
+| 4 | New gomock mock via `mockgen` | The interface has no existing mock and has 3+ methods or is reused across packages |
+| 5 | Hand-rolled stub | A one- or two-method interface used once; gomock is overkill |
+| 6 | No double — move the test | It needs a real Dagger engine end-to-end or a real external command that can't be mocked → it is not a unit test |
 
-Step 5 is not a suggestion. A unit test that reaches a real container, a real external command, or the network is **misclassified**, and the fix is never a permanent `t.Skip()` or an environment-conditional guard — it moves to an in-package integration test behind `testing.Short()` (see `shipwright-testing-strategy`).
+Step 6 is not a suggestion. A unit test that reaches a real container, a real external command, or the network is **misclassified**, and the fix is never a permanent `t.Skip()` or an environment-conditional guard — it moves to `testing/integration/` under the `integration` build tag (see `shipwright-testing-strategy`).
 
 ## Test Patterns
 
@@ -215,7 +223,7 @@ err := exec.ExecuteStep(ctx, step)
 if err != nil { t.Fatalf(...) }          // GOOD
 ```
 
-**Permanent `t.Skip()` as an escape hatch.** Reserved for a known-flaky test with a tracking issue. Needing a real container or command means it belongs behind `testing.Short()` as an integration test, not silenced in place.
+**Permanent `t.Skip()` as an escape hatch.** Reserved for a known-flaky test with a tracking issue. Needing a real container or command means it belongs in `testing/integration/` under the `integration` build tag, not silenced in place.
 
 **Blind-accepting golden files.** Running with `-update` and committing without reading the diff turns a regression into a committed expectation (see `shipwright-testing`'s golden file rule).
 
@@ -227,7 +235,7 @@ Before opening a PR:
 - [ ] Every error path asserts the specific error, not just `err != nil`
 - [ ] Edge cases: empty, zero, nil, cancelled/timed-out context
 - [ ] `go test -race ./...` passes with 0 failures
-- [ ] `go test -short ./...` still passes (integration tests skip cleanly)
+- [ ] `go test ./...` still passes (real-engine tests under `testing/integration/` are excluded by the `integration` build tag, not skipped at runtime)
 - [ ] No function exceeds gocyclo complexity 15
 - [ ] Golden files, if touched, were reviewed via `-update` diff, not blind-accepted
 
