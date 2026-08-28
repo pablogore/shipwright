@@ -31,7 +31,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms
+.PHONY: all build clean test dagger-test deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final
 
 # Help target
 .PHONY: help
@@ -63,7 +63,9 @@ help: ## Show this help message
 	@echo "Development:"
 	@echo "  make fmt                # Format code"
 	@echo "  make vet                # Run go vet"
+	@echo "  make lint               # Run golangci-lint"
 	@echo "  make quality            # Run all quality checks"
+	@echo "  make ci-final           # Full production-critical validation contract (build, test, coverage, security)"
 	@echo "  make clean              # Clean build artifacts"
 	@echo ""
 	@echo "Pipeline:"
@@ -74,9 +76,19 @@ help: ## Show this help message
 
 all: test build
 
-build: ## Build the application
+build: ## Build the application (root binary + full compile-check of root, providers/go, providers/rust)
 	@echo -e "$(BLUE)Building application...$(NC)"
 	$(GOBUILD) -o $(BINARY_NAME) .
+	@# `go build -o` above only builds the main package; `./...` below is a
+	@# side-effect-free compile-check of every root package (go discards
+	@# build output when the pattern matches multiple packages, so this is
+	@# safe to run from a plain checkout — no stray binaries), matching what
+	@# CI's build job already does. providers/go and providers/rust are
+	@# separate modules in go.work; `./...` never crosses that boundary, so
+	@# each needs its own invocation, same as test/vet/fmt/security.
+	$(GOBUILD) ./...
+	cd providers/go && $(GOBUILD) ./...
+	cd providers/rust && $(GOBUILD) ./...
 	@echo -e "$(GREEN)✅ Build completed$(NC)"
 
 clean: ## Clean build artifacts
@@ -145,27 +157,78 @@ vet: ## Run go vet
 	cd providers/rust && $(GOCMD) vet ./...
 	@echo -e "$(GREEN)✅ Go vet completed$(NC)"
 
+# Lint check
+# golangci-lint does not span go.work module boundaries either: run from
+# providers/go or providers/rust it auto-discovers and applies the root
+# .golangci.yml by walking up parent directories (verified via
+# `golangci-lint run -v`, which logs "Used config file ../../.golangci.yml"),
+# so no explicit --config flag is needed. Iterate all three modules
+# explicitly, same pattern as vet/test/security.
+lint: ## Run golangci-lint
+	@echo -e "$(BLUE)Running golangci-lint...$(NC)"
+	@which golangci-lint > /dev/null || (echo -e "$(RED)golangci-lint not found. Install it first (e.g. 'brew install golangci-lint' or see https://golangci-lint.run/welcome/install/).$(NC)" && exit 1)
+	golangci-lint run ./...
+	cd providers/go && golangci-lint run ./...
+	cd providers/rust && golangci-lint run ./...
+	@echo -e "$(GREEN)✅ Lint completed$(NC)"
+
 # Security check
 # govulncheck does not span go.work module boundaries (verified: findings
 # from root, providers/go, and providers/rust are disjoint), so it must run
 # once per module.
+#
+# PROD-001: the previous version of this target concatenated all three
+# modules' reports into one vuln_report.txt and passed if the string
+# "No vulnerabilities found." appeared ANYWHERE in it. That is a false-pass:
+# if providers/go and providers/rust are clean but root is affected, root's
+# report never contains that string, but the concatenated file still does
+# (from the clean modules), so the old check reported PASS. Verified with a
+# real finding (GO-2026-5158 in go.opentelemetry.io/otel, reachable from
+# internal/app/health.go). Fixed by (a) trusting govulncheck's own exit code
+# per module via pipefail instead of losing it through `| tee`, and (b)
+# failing if "Your code is affected" appears anywhere in the combined report,
+# instead of requiring the clean string to appear anywhere.
 security: ## Run security vulnerability check
 	@echo -e "$(BLUE)Running security vulnerability check...$(NC)"
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
-	@govulncheck ./... | tee vuln_report.txt
-	@cd providers/go && govulncheck ./... | tee -a ../../vuln_report.txt
-	@cd providers/rust && govulncheck ./... | tee -a ../../vuln_report.txt
-	@if grep -q "No vulnerabilities found." vuln_report.txt; then \
-		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
-	else \
-		echo -e "$(RED)❌ Security vulnerabilities detected! Please update dependencies.$(NC)"; \
+	@set -o pipefail; \
+	FAILED=0; \
+	govulncheck ./... | tee vuln_report.txt || FAILED=1; \
+	(cd providers/go && govulncheck ./...) | tee -a vuln_report.txt || FAILED=1; \
+	(cd providers/rust && govulncheck ./...) | tee -a vuln_report.txt || FAILED=1; \
+	if grep -q "Your code is affected" vuln_report.txt; then \
+		FAILED=1; \
+	fi; \
+	if [ "$$FAILED" -eq 1 ]; then \
+		echo -e "$(RED)❌ Security vulnerabilities detected (or scan failed)! Please review.$(NC)"; \
 		cat vuln_report.txt; \
+		rm -f vuln_report.txt; \
 		exit 1; \
+	else \
+		echo -e "$(GREEN)✅ No security vulnerabilities found.$(NC)"; \
+		rm -f vuln_report.txt; \
 	fi
-	@rm -f vuln_report.txt
 
 # Run all code quality checks
 quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, security)
+
+# PROD-001: single repository-owned source of truth for "what makes a SHA
+# production-ready", run identically by any CI provider or locally.
+#
+# `lint` is deliberately NOT part of this composition today: as of this
+# writing `make lint` fails with ~104 preexisting findings across the root
+# module and providers/go/providers/rust (gocyclo, staticcheck, revive,
+# testifylint, unused, etc.), none introduced by this change and none
+# trivial to fix inline (several are gocyclo-15 violations and an
+# exported-type "stutter" rename in providers/rust that would be a breaking
+# public API change to a separately-versioned module). Gating ci-final on
+# `lint` today would block every push to develop on unrelated, pre-existing
+# debt that nobody asked to fix as part of this work. `make lint` still
+# exists, fail-closed, so the debt is visible and can be paid down; add it
+# to this composition once that backlog is cleared.
+.PHONY: ci-final
+ci-final: build test coverage security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above re: lint)
+	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
 # NOTE: all `go list ./...`-based package lists below intentionally do NOT
