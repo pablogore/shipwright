@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -163,7 +164,7 @@ func (u *GoRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Director
 		result = result.WithNewFile(".go-version", string(mutateGoVersion(targetVersion)))
 	}
 
-	return u.validateAndFinalize(ctx, result, root, targetVersion, []string{"."}, map[string][]byte{".": mutatedMod}, []shipwright.ModuleDrift{drift})
+	return u.validateAndFinalize(ctx, result, dir, root, targetVersion, []string{"."}, map[string][]byte{".": mutatedMod}, []shipwright.ModuleDrift{drift})
 }
 
 // validateWorkspaceModulePaths guards design.md's Threat Matrix "Path
@@ -261,7 +262,7 @@ func (u *GoRuntimeUpgrader) upgradeWorkspace(ctx context.Context, dir daggerkit.
 		result = result.WithNewFile(path.Join(modPath, "go.mod"), string(mutatedMod))
 	}
 
-	return u.validateAndFinalize(ctx, result, root, targetVersion, modulePaths, mutatedByPath, drifts)
+	return u.validateAndFinalize(ctx, result, dir, root, targetVersion, modulePaths, mutatedByPath, drifts)
 }
 
 // ValidationError is returned by GoRuntimeUpgrader.Upgrade when
@@ -305,8 +306,11 @@ func (e *ValidationError) Unwrap() error { return e.Err }
 // report "something failed somewhere". mutatedByPath carries each
 // module's already-mutated go.mod bytes (no extra read needed) as the
 // "before" side of the per-module require-list delta recorded in the
-// final report (design.md D-7's go.sum-delta fields, tasks.md 4.4).
-func (u *GoRuntimeUpgrader) validateAndFinalize(ctx context.Context, dir daggerkit.DaggerDirectory, root, targetVersion string, modulePaths []string, mutatedByPath map[string][]byte, drifts []shipwright.ModuleDrift) (*dagger.Directory, error) {
+// final report (design.md D-7's require-list delta fields, tasks.md 4.4).
+// originalDir is the untouched pre-mutation source Directory (Upgrade
+// itself never writes go.sum), used by recordModuleDelta as the "before"
+// side of each module's go.sum byte comparison.
+func (u *GoRuntimeUpgrader) validateAndFinalize(ctx context.Context, dir, originalDir daggerkit.DaggerDirectory, root, targetVersion string, modulePaths []string, mutatedByPath map[string][]byte, drifts []shipwright.ModuleDrift) (*dagger.Directory, error) {
 	driftByPath := make(map[string]*shipwright.ModuleDrift, len(drifts))
 	for i := range drifts {
 		driftByPath[drifts[i].Path] = &drifts[i]
@@ -329,7 +333,7 @@ func (u *GoRuntimeUpgrader) validateAndFinalize(ctx context.Context, dir daggerk
 		}
 		container = synced
 
-		if err := recordModuleDelta(ctx, container, workdir, modPath, mutatedByPath[modPath], driftByPath[modPath]); err != nil {
+		if err := recordModuleDelta(ctx, container, originalDir, workdir, modPath, mutatedByPath[modPath], driftByPath[modPath]); err != nil {
 			return nil, err
 		}
 
@@ -361,17 +365,26 @@ func moduleContainerWorkdir(modPath string) string {
 	return path.Join(runtimeUpgradeContainerRoot, modPath)
 }
 
-// recordModuleDelta fills in drift's GoSumChanged/AddedModules/
-// RemovedModules fields (design.md D-7) by diffing beforeModBytes'
-// require directives (already in memory — the bytes Upgrade itself wrote
-// into the container, before `go mod tidy` ran) against workdir/go.mod's
-// require directives as `go mod tidy` left them inside container. Reports
-// only the added/removed require module paths — never the raw go.sum
-// diff, which can run to thousands of unreviewable lines (design.md D-7).
-// GoSumChanged is true whenever the require list itself changed: `go mod
-// tidy` normalizing go.sum's hash entries with no require-list change has
-// no externally observable effect worth a consumer's attention.
-func recordModuleDelta(ctx context.Context, container daggerkit.DaggerContainer, workdir, modPath string, beforeModBytes []byte, drift *shipwright.ModuleDrift) error {
+// recordModuleDelta fills in drift's AddedModules/RemovedModules fields
+// (design.md D-7) by diffing beforeModBytes' require directives (already
+// in memory — the bytes Upgrade itself wrote into the container, before
+// `go mod tidy` ran) against workdir/go.mod's require directives as `go
+// mod tidy` left them inside the container. Reports only the added/
+// removed require module paths — never the raw go.sum diff, which can run
+// to thousands of unreviewable lines (design.md D-7).
+//
+// GoSumChanged is computed independently of that require-list delta: a
+// literal byte comparison of modPath's go.sum content in originalDir (the
+// untouched pre-mutation source — Upgrade itself never writes go.sum)
+// against workdir/go.sum as `go mod tidy` left it inside the container.
+// A require-path diff alone misses `go mod tidy` bumping an *existing*
+// dependency's version, which changes go.sum's hash entries (and the
+// require directive's version) without changing the require path set —
+// the byte comparison catches that case where the old path-diff proxy
+// silently reported no change. go.sum absent on either side (e.g. a
+// module with zero external dependencies) is treated as empty for
+// comparison purposes, never a hard failure.
+func recordModuleDelta(ctx context.Context, container daggerkit.DaggerContainer, originalDir daggerkit.DaggerDirectory, workdir, modPath string, beforeModBytes []byte, drift *shipwright.ModuleDrift) error {
 	if drift == nil {
 		return fmt.Errorf("runtimeupgrader: no drift entry recorded for module %s", modPath)
 	}
@@ -406,9 +419,44 @@ func recordModuleDelta(ctx context.Context, container daggerkit.DaggerContainer,
 
 	drift.AddedModules = added
 	drift.RemovedModules = removed
-	drift.GoSumChanged = len(added) > 0 || len(removed) > 0
+
+	beforeSum, err := readOptionalFileContents(ctx, originalDir.File(path.Join(modPath, "go.sum")))
+	if err != nil {
+		return fmt.Errorf("runtimeupgrader: failed to read pre-validation %s/go.sum: %w", modPath, err)
+	}
+	afterSum, err := readOptionalFileContents(ctx, container.File(path.Join(workdir, "go.sum")))
+	if err != nil {
+		return fmt.Errorf("runtimeupgrader: failed to read post-validation %s/go.sum: %w", modPath, err)
+	}
+	drift.GoSumChanged = !bytes.Equal(beforeSum, afterSum)
 
 	return nil
+}
+
+// readOptionalFileContents reads f's full content, treating a "file does
+// not exist" error as a legitimate absent state ((nil, nil), equivalent to
+// empty for a later byte comparison) rather than a hard failure — go.sum
+// is not guaranteed to exist either before or after `go mod tidy` runs
+// (e.g. a module with zero external dependencies never has one). Any
+// other error is propagated unchanged.
+func readOptionalFileContents(ctx context.Context, f daggerkit.DaggerFile) ([]byte, error) {
+	contents, err := f.Contents(ctx)
+	if err != nil {
+		if isFileNotFoundError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return []byte(contents), nil
+}
+
+// isFileNotFoundError reports whether err represents a missing file rather
+// than some other read failure. Dagger's SDK has no typed "not exist"
+// sentinel for File.Contents (unlike os.IsNotExist), so this matches the
+// engine's own "no such file or directory" message — the same substring a
+// missing-path read surfaces through buildkit.
+func isFileNotFoundError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no such file or directory")
 }
 
 // requireModulePaths parses modBytes and returns the set of module paths

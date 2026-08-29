@@ -87,10 +87,14 @@ type ModuleDrift struct {
 	// UpdatedToolchain is the module's toolchain directive value after
 	// mutation ("" if it had none before, and therefore was left absent).
 	UpdatedToolchain string `json:"updatedToolchain,omitempty"`
-	// GoSumChanged is true when this module's go.mod require list itself
-	// changed as a result of post-mutation `go mod tidy` (design.md D-7).
-	// It never carries the raw go.sum diff, which can run to thousands of
-	// unreviewable lines.
+	// GoSumChanged is true when this module's go.sum content actually
+	// changed as a result of post-mutation `go mod tidy` (design.md D-7),
+	// determined by a literal byte comparison of go.sum before and after
+	// tidy ran — never inferred from the go.mod require-list delta, which
+	// misses `go mod tidy` bumping an already-required dependency's
+	// version (the require path stays the same; only its pinned version
+	// and go.sum's hash entries change). It never carries the raw go.sum
+	// diff itself, which can run to thousands of unreviewable lines.
 	GoSumChanged bool `json:"goSumChanged"`
 	// AddedModules lists every require module path `go mod tidy` added
 	// that was not present before validation ran.

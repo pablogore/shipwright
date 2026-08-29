@@ -82,13 +82,21 @@ open_risks:
     module's failure aborts the *whole* operation, not just that module.
     UpgradeReport/ModuleDrift's new GoSumChanged/AddedModules/RemovedModules
     fields (pkg/shipwright/runtime.go) are genuinely populated by
-    recordModuleDelta, which diffs the pre-mutation go.mod bytes Upgrade
-    itself wrote against the post-`go mod tidy` go.mod read back from the
-    container via daggerkit's real File(...).Contents(ctx) -- not stubbed --
-    confirmed by TestGoRuntimeUpgrader_Upgrade_WritesUpgradeReport asserting
-    GoSumChanged=true, AddedModules=["example.com/dep"], RemovedModules empty,
-    against a mocked post-tidy go.mod carrying one require line absent from
-    the pre-mutation fixture. `validation: "build"` is recorded in the report
+    recordModuleDelta. AddedModules/RemovedModules diff the pre-mutation
+    go.mod bytes Upgrade itself wrote against the post-`go mod tidy` go.mod
+    read back from the container via daggerkit's real File(...).Contents(ctx)
+    -- not stubbed -- confirmed by TestGoRuntimeUpgrader_Upgrade_WritesUpgradeReport
+    asserting AddedModules=["example.com/dep"], RemovedModules empty, against
+    a mocked post-tidy go.mod carrying one require line absent from the
+    pre-mutation fixture. GoSumChanged is computed independently (post-slice
+    fix, PR #197 review feedback): a literal byte comparison of go.sum read
+    from the original pre-mutation source Directory against go.sum read back
+    from the container after tidy, via the same real File(...).Contents(ctx)
+    path -- not derived from the go.mod require-list diff above, which
+    misses `go mod tidy` bumping an already-required dependency's version
+    (same require path, different pinned version and go.sum hash). A go.sum
+    absent on either side is treated as empty, never a hard failure.
+    `validation: "build"` is recorded in the report
     (runtimeValidationKind = "build", assigned to UpgradeReport.Validation),
     confirmed by the same WritesUpgradeReport test's
     assert.Equal(t, "build", report.Validation) and independently by both
