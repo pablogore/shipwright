@@ -1,7 +1,7 @@
 # SDD DAG state for change: shipwright-runtime-toolchain-upgrade
 change: shipwright-runtime-toolchain-upgrade
 title: Provider-Managed Runtime/Toolchain Upgrade (Go First)
-updated: 2026-08-29 (slice 3 apply)
+updated: 2026-08-29 (slice 3 verify)
 
 session:
   execution_mode: auto
@@ -17,7 +17,7 @@ phases:
   design: done
   tasks: done
   apply: partial (slice 3/4 applied -- tasks 1.1-1.24, 2.1-2.17, and 3.1-3.6 done, phase 4 not started)
-  verify: partial (slice 2/4 verified -- PASS WITH WARNINGS; slice 3 not yet verified)
+  verify: partial (slice 3/4 verified -- PASS WITH WARNINGS; slice 4 not yet applied/verified)
   archive: pending
 
 artifacts:
@@ -48,7 +48,7 @@ decisions:
 next_recommended:
   - open PR #1 (feature/runtime-inspect-go -> develop) -- slice 1 verify PASSed
   - open PR #2 (feature/runtime-upgrade-single-module -> feature/runtime-inspect-go) -- slice 2 verify PASS WITH WARNINGS
-  - sdd-verify (slice 3, phase 3 of tasks.md, on feature/runtime-upgrade-workspace) -- apply just completed, not yet verified
+  - open PR #3 (feature/runtime-upgrade-workspace -> feature/runtime-upgrade-single-module) -- slice 3 verify PASS WITH WARNINGS
   - sdd-apply (slice 4, phase 4 of tasks.md, after PR #3 merges to develop)
 
 open_risks:
@@ -97,6 +97,71 @@ open_risks:
     review budget guideline -- PR #2's reviewer should be aware. Full report:
     Engram sdd/shipwright-runtime-toolchain-upgrade/verify-report (upserted,
     slice 2 content).
+  - VERIFIED (slice 3/4, 2026-08-29) -- multi-module go.work upgrade on
+    feature/runtime-upgrade-workspace (commit 5df1a98) PASS WITH WARNINGS: all
+    6 Phase-3 tasks (3.1-3.6) confirmed against real code, not just
+    checkmarks. Multi-Module Workspace Consistency (all-or-nothing abort):
+    GoRuntimeUpgrader.Upgrade calls detectConflicts (A1/A2/A3) before any
+    WithNewFile, confirmed by direct source read (runtimeupgrader.go:95-107)
+    -- a conflict anywhere in the workspace aborts the whole call, never a
+    per-module skip. A7 path-escape guard (validateModulePaths in
+    toolchain.go) runs before gatherWorkspaceInput/any mutation;
+    TestUpgrade_PathEscape asserts both CodeA7 and
+    mockDir.AssertNotCalled(t, "WithNewFile", ...) -- the stronger
+    zero-mutation guarantee the task specifically asked for, not just an
+    error return. D2 structural safety preserved: toolchain.go and
+    runtimeupgrader.go import only fmt/path/sort/strings/modfile/semver
+    (and json/errors/context/dagger in runtimeupgrader.go) -- no os,
+    os/exec, net, or git-library import; module-path validation and the
+    mutation loop stay pure-Go over already-read bytes/paths. pkg/shipwright/
+    runtime.go's UpgradeReport.Modules []ModuleDrift is genuinely populated:
+    TestUpgrade_Workspace drives Upgrade() end-to-end over a 3-module mocked
+    DaggerDirectory chain and asserts all 3 modules present in the decoded
+    JSON report with correct PreviousGo/UpdatedGo. Phase 2 regression:
+    single-module behavioral tests (NilClient, NilSource, SingleModule_
+    HappyPath, Downgrade_AmbiguousAbort, Malformed_AmbiguousAbort,
+    WritesUpgradeReport) are byte-for-byte unmodified in this diff (hunk
+    boundaries confirmed) and still pass; only the now-obsolete
+    TestGoRuntimeUpgrader_Upgrade_GoWork_NotYetSupported was removed, which
+    is the correct, designed consequence of Phase 3 lifting that explicit
+    Phase-2 scope boundary. Task 3.5's integration-tagged real-engine test
+    (TestGoRuntimeUpgrader_Upgrade_Workspace_RealEngine) was appended to the
+    pre-existing testing/integration/go/integration_test.go (relocated
+    there in commit 5e396f0, predating this change) -- no new location or
+    convention invented. Scope check: diff (511+/47- across 7 files, incl.
+    tasks.md/state.yaml) stays inside Phase 3 -- no go mod tidy invocation,
+    no From("golang:"...) container chain, no GoSumChanged/AddedModules/
+    RemovedModules fields; those remain correctly deferred to Phase 4.
+    Independently reconfirmed clean: go build ./... (root + providers/go),
+    go test -race ./... (root + providers/go, all green), go test -run
+    TestUpgrade_Workspace ./providers/go/... (task 3.6's named check,
+    PASS), golangci-lint run ./... (root: 97 pre-existing issues, zero in
+    the 6 changed non-test/test files; providers/go: 3 pre-existing
+    staticcheck issues in internalimport_test.go/naming_test.go, zero in
+    changed files), golangci-lint run --build-tags=integration
+    ./testing/integration/go/... (0 issues). ONE WARNING, zero CRITICALs:
+    task 3.1's own framing ("wire A1/A2/A3 detectConflicts results... into
+    Upgrade's pre-mutation abort path... over workspace-3-modules,
+    divergent-go, divergent-toolchain, work-go-mismatch fixtures") implies
+    an Upgrade()-level regression test proving zero mutation on those three
+    conflict fixtures, matching the pattern TestUpgrade_PathEscape
+    established for A7 (mock AssertNotCalled). What was actually delivered
+    is TestDetectConflicts_WorkspacePreMutation, which drives
+    detectConflicts directly over those four fixtures (correct results,
+    including the workspace-3-modules no-conflict case) but never through
+    GoRuntimeUpgrader.Upgrade itself. The wiring is verified correct by
+    direct source read (Upgrade calls detectConflicts before any
+    WithNewFile, unconditionally, for both the single-module and
+    workspace paths), and the general Upgrade-aborts-cleanly pattern is
+    independently proven at least once end-to-end by both
+    TestUpgrade_PathEscape (A7) and Phase 2's still-passing
+    Downgrade_AmbiguousAbort/Malformed_AmbiguousAbort (A4/A5) -- so this is
+    a test-strength gap, not a functional gap. Recommend an
+    Upgrade()-level regression test for A1/A2/A3 (mirroring
+    TestUpgrade_PathEscape's AssertNotCalled pattern) either now or folded
+    into slice 4's cleanup, but it does not block PR #3. Full report:
+    Engram sdd/shipwright-runtime-toolchain-upgrade/verify-report (upserted,
+    slice 3 content).
   - NOTE -- phases.apply was still "pending" in state.yaml despite
     apply-progress recording all of Phase 1 (tasks 1.1-1.24) complete;
     corrected to "partial (slice 1/4)" by this verify pass. Phases 2-4 apply
