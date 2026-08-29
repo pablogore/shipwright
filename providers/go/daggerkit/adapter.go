@@ -55,6 +55,10 @@ func (a *DaggerDirectoryAdapter) Entries(ctx context.Context) ([]string, error) 
 	return a.directory.Entries(ctx)
 }
 
+func (a *DaggerDirectoryAdapter) WithNewFile(path, contents string) DaggerDirectory {
+	return &DaggerDirectoryAdapter{directory: a.directory.WithNewFile(path, contents)}
+}
+
 var _ DaggerContainer = (*DaggerContainerAdapter)(nil)
 
 // DaggerContainerAdapter adapts a real *dagger.Container to DaggerContainer.

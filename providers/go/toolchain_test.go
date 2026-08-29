@@ -175,3 +175,190 @@ func TestDetectConflicts_A6_NoWorkspaceSources(t *testing.T) {
 		t.Fatalf("detectConflicts() code = %s, want %s", got.Code, CodeA6)
 	}
 }
+
+// TestMutateGoMod is the TDD mass for design.md D-7/D-9's mutation step,
+// table-driven over testdata/runtime/* fixtures — pure Go, no Dagger.
+func TestMutateGoMod(t *testing.T) {
+	tests := []struct {
+		name          string
+		fixture       string
+		targetVersion string
+		wantErrCode   string // "" means no error expected
+	}{
+		{
+			name:          "single module: go directive updated",
+			fixture:       "single-module",
+			targetVersion: "1.27.0",
+		},
+		{
+			name:          "downgrade fixture: mutateGoMod itself does not enforce A4 (detectConflicts's job, called by the caller first)",
+			fixture:       "downgrade",
+			targetVersion: "1.20.0",
+		},
+		{
+			name:          "malformed go.mod: A5",
+			fixture:       "malformed",
+			targetVersion: "1.27.0",
+			wantErrCode:   CodeA5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := loadFixture(t, tt.fixture)
+			modBytes := input.Modules["."]
+
+			got, err := mutateGoMod(modBytes, tt.targetVersion)
+
+			if tt.wantErrCode != "" {
+				var ambiguous *AmbiguousToolchainError
+				if !errors.As(err, &ambiguous) {
+					t.Fatalf("mutateGoMod(%s) error = %v, want an *AmbiguousToolchainError", tt.fixture, err)
+				}
+				if ambiguous.Code != tt.wantErrCode {
+					t.Fatalf("mutateGoMod(%s) code = %s, want %s", tt.fixture, ambiguous.Code, tt.wantErrCode)
+				}
+				if got != nil {
+					t.Fatalf("mutateGoMod(%s) bytes = %q, want nil on error", tt.fixture, got)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("mutateGoMod(%s) error = %v, want nil", tt.fixture, err)
+			}
+
+			mutated, parseErr := parseWorkspace(WorkspaceInput{Modules: map[string][]byte{".": got}})
+			if parseErr != nil {
+				t.Fatalf("mutateGoMod(%s) produced unparseable bytes: %v\n%s", tt.fixture, parseErr, got)
+			}
+			if mutated.Modules[0].Go != tt.targetVersion {
+				t.Fatalf("mutateGoMod(%s) go directive = %s, want %s", tt.fixture, mutated.Modules[0].Go, tt.targetVersion)
+			}
+		})
+	}
+}
+
+// TestMutateGoMod_UpdatesExistingToolchainDirective proves the toolchain
+// directive is updated in place when the original go.mod already declares
+// one — discovery-driven: mutateGoMod never introduces a toolchain
+// directive that was not there before.
+func TestMutateGoMod_UpdatesExistingToolchainDirective(t *testing.T) {
+	original := []byte("module example.com/fixture/toolchain\n\ngo 1.26.7\n\ntoolchain go1.26.7\n")
+
+	got, err := mutateGoMod(original, "1.27.0")
+	if err != nil {
+		t.Fatalf("mutateGoMod() error = %v, want nil", err)
+	}
+
+	mf, err := parseWorkspace(WorkspaceInput{Modules: map[string][]byte{".": got}})
+	if err != nil {
+		t.Fatalf("mutateGoMod() produced unparseable bytes: %v\n%s", err, got)
+	}
+	if mf.Modules[0].Toolchain != "go1.27.0" {
+		t.Fatalf("mutateGoMod() toolchain = %s, want go1.27.0", mf.Modules[0].Toolchain)
+	}
+}
+
+// TestMutateGoMod_ThreatMatrix_MaliciousTargetVersion is the RED test
+// design.md's Threat Matrix row "Command construction from config values"
+// requires: targetVersion is validated against modfile.GoVersionRE before
+// any write, rejecting strings shaped like shell injection or flag
+// injection attempts before they ever reach "golang:"+v or an argv slice.
+func TestMutateGoMod_ThreatMatrix_MaliciousTargetVersion(t *testing.T) {
+	malicious := []string{
+		"1.26.7; rm -rf /",
+		"--flag",
+		"",
+		"$(whoami)",
+	}
+
+	modBytes := loadFixture(t, "single-module").Modules["."]
+
+	for _, target := range malicious {
+		t.Run(target, func(t *testing.T) {
+			got, err := mutateGoMod(modBytes, target)
+
+			var ambiguous *AmbiguousToolchainError
+			if !errors.As(err, &ambiguous) {
+				t.Fatalf("mutateGoMod(%q) error = %v, want an *AmbiguousToolchainError", target, err)
+			}
+			if ambiguous.Code != CodeA5 {
+				t.Fatalf("mutateGoMod(%q) code = %s, want %s", target, ambiguous.Code, CodeA5)
+			}
+			if got != nil {
+				t.Fatalf("mutateGoMod(%q) bytes = %q, want nil on a rejected target", target, got)
+			}
+		})
+	}
+}
+
+// TestMutateGoWork proves go.work's own go directive is updated the same
+// way mutateGoMod updates go.mod's — pure Go, no wiring into Upgrade yet
+// (tasks.md Phase 3).
+func TestMutateGoWork(t *testing.T) {
+	input := loadFixture(t, "workspace-3-modules")
+
+	got, err := mutateGoWork(input.GoWork, "1.27.0")
+	if err != nil {
+		t.Fatalf("mutateGoWork() error = %v, want nil", err)
+	}
+
+	mutated, err := parseWorkspace(WorkspaceInput{GoWork: got})
+	if err != nil {
+		t.Fatalf("mutateGoWork() produced unparseable bytes: %v\n%s", err, got)
+	}
+	if mutated.GoWorkGo != "1.27.0" {
+		t.Fatalf("mutateGoWork() go directive = %s, want 1.27.0", mutated.GoWorkGo)
+	}
+}
+
+// TestMutateGoWork_MalformedFailsClosed mirrors TestMutateGoMod's A5 case
+// for go.work.
+func TestMutateGoWork_MalformedFailsClosed(t *testing.T) {
+	got, err := mutateGoWork([]byte("go notaversion\n"), "1.27.0")
+
+	var ambiguous *AmbiguousToolchainError
+	if !errors.As(err, &ambiguous) {
+		t.Fatalf("mutateGoWork() error = %v, want an *AmbiguousToolchainError", err)
+	}
+	if ambiguous.Code != CodeA5 {
+		t.Fatalf("mutateGoWork() code = %s, want %s", ambiguous.Code, CodeA5)
+	}
+	if got != nil {
+		t.Fatalf("mutateGoWork() bytes = %q, want nil on error", got)
+	}
+}
+
+// TestMutateGoWork_ThreatMatrix_MaliciousTargetVersion mirrors
+// TestMutateGoMod_ThreatMatrix_MaliciousTargetVersion for go.work.
+func TestMutateGoWork_ThreatMatrix_MaliciousTargetVersion(t *testing.T) {
+	workBytes := loadFixture(t, "workspace-3-modules").GoWork
+
+	for _, target := range []string{"1.26.7; rm -rf /", "--flag"} {
+		t.Run(target, func(t *testing.T) {
+			got, err := mutateGoWork(workBytes, target)
+
+			var ambiguous *AmbiguousToolchainError
+			if !errors.As(err, &ambiguous) {
+				t.Fatalf("mutateGoWork(%q) error = %v, want an *AmbiguousToolchainError", target, err)
+			}
+			if ambiguous.Code != CodeA5 {
+				t.Fatalf("mutateGoWork(%q) code = %s, want %s", target, ambiguous.Code, CodeA5)
+			}
+			if got != nil {
+				t.Fatalf("mutateGoWork(%q) bytes = %q, want nil on a rejected target", target, got)
+			}
+		})
+	}
+}
+
+// TestMutateGoVersion proves the trivial .go-version mutation: a single
+// line, exactly targetVersion.
+func TestMutateGoVersion(t *testing.T) {
+	got := mutateGoVersion("1.27.0")
+
+	if string(got) != "1.27.0\n" {
+		t.Fatalf("mutateGoVersion() = %q, want %q", got, "1.27.0\n")
+	}
+}

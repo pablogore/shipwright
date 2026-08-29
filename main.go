@@ -375,10 +375,11 @@ func resolveStepInfos(steps []manifest.Step, reg *providers.Registry) ([]workflo
 
 // resolveCapabilityRef dispatches ref to the Resolve* method matching
 // capability — manifest.ValidateStructure (stage 3, already run by
-// manifest.ParseFile) rejects any capability outside the six known
-// values (runtime-toolchain-upgrade, design.md D-4b/D-8 adds
-// runtime-inspect), so the default case here is defensive only, never
-// reachable through the normal parse -> list pipeline.
+// manifest.ParseFile) rejects any capability outside the seven known
+// values (runtime-toolchain-upgrade, design.md D-4b/D-8/D-9 adds
+// runtime-inspect and runtime-upgrade), so the default case here is
+// defensive only, never reachable through the normal parse -> list
+// pipeline.
 func resolveCapabilityRef(reg *providers.Registry, capability string, ref providers.Ref) error {
 	empty := providers.Values{}
 
@@ -400,6 +401,9 @@ func resolveCapabilityRef(reg *providers.Registry, capability string, ref provid
 		return err
 	case "runtime-inspect":
 		_, err := reg.ResolveRuntimeInspector(ref, empty)
+		return err
+	case "runtime-upgrade":
+		_, err := reg.ResolveRuntimeUpgrader(ref, empty)
 		return err
 	default:
 		return fmt.Errorf("unknown capability %q", capability)

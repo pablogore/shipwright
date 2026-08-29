@@ -55,6 +55,12 @@ func (stubRuntimeInspector) Inspect(_ context.Context, _ *dagger.Directory) (str
 	return "", nil
 }
 
+type stubRuntimeUpgrader struct{}
+
+func (stubRuntimeUpgrader) Upgrade(_ context.Context, source *dagger.Directory, _ string) (*dagger.Directory, error) {
+	return source, nil
+}
+
 // Compile-time proof: each capability interface is satisfied by a concrete,
 // non-generic type — referencing "shipwright.Builder" (etc.) with no type
 // argument would itself fail to compile if the interface declared one.
@@ -65,6 +71,7 @@ var (
 	_ shipwright.Deployer         = stubDeployer{}
 	_ shipwright.Runner           = stubRunner{}
 	_ shipwright.RuntimeInspector = stubRuntimeInspector{}
+	_ shipwright.RuntimeUpgrader  = stubRuntimeUpgrader{}
 )
 
 // allowedSignatureType reports whether t is one of the types design.md D-A
@@ -100,6 +107,7 @@ func TestCapabilityInterfaces_NoGenericTypeParametersAndDaggerOnlySignatures(t *
 		"Deployer":         reflect.TypeFor[shipwright.Deployer](),
 		"Runner":           reflect.TypeFor[shipwright.Runner](),
 		"RuntimeInspector": reflect.TypeFor[shipwright.RuntimeInspector](),
+		"RuntimeUpgrader":  reflect.TypeFor[shipwright.RuntimeUpgrader](),
 	}
 
 	for name, ifaceType := range interfaces {

@@ -29,6 +29,22 @@ const (
 	runtimeInspectFailOnDriftField     = "failOnDrift"
 )
 
+// runtimeUpgradeTargetVersionField/runtimeUpgradeWorkspaceRootField/
+// runtimeUpgradeTidyField/runtimeUpgradeAllowDowngradeField name the
+// go-runtime provider's runtime-upgrade with-fields (design.md D-9),
+// bound directly into GoRuntimeUpgrader's own struct fields by this file's
+// factory closure below. targetVersion's requiredness is NOT enforced by
+// this WithSchema (checkWithSchema only validates the KIND of fields
+// actually present, registry.go's own doc comment) — it is enforced at
+// dispatch time via internal/workflow/engine/execute.go's stringWith,
+// mirroring artifactRefField/deployArtifactRefField's existing precedent.
+const (
+	runtimeUpgradeTargetVersionField  = "targetVersion"
+	runtimeUpgradeWorkspaceRootField  = "workspaceRoot"
+	runtimeUpgradeTidyField           = "tidy"
+	runtimeUpgradeAllowDowngradeField = "allowDowngrade"
+)
+
 // RegisterDefaults registers Shipwright's five in-repo capability
 // implementations (providers/go, extracted from the former
 // internal/capabilities, WU3) into r under the provider names design.md's
@@ -215,12 +231,12 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		return &ChangelogRunner{Client: newChangelogDaggerClient(client)}
 	})
 
-	// go-runtime: registered under runtime-inspect only in this phase
-	// (runtime-toolchain-upgrade, design.md D-4b, Open Questions "Provider
-	// name" — confirmed against this file's existing hyphenated naming
-	// convention at apply time). A later phase registers the same provider
-	// name under the mutating runtime-upgrade capability kind too, mirroring
-	// how golang.ContainerPublisher is one type registered under one kind.
+	// go-runtime: registered under both runtime-inspect (design.md D-4b)
+	// and runtime-upgrade (design.md D-9) capability kinds — two distinct
+	// Go types, golang.GoRuntimeInspector and golang.GoRuntimeUpgrader,
+	// sharing one provider name, mirroring how golang.ContainerPublisher
+	// is one type registered under one kind but at a different name-per-
+	// kind granularity.
 	r.RegisterRuntimeInspector(Ref{Name: "go-runtime", Version: "1"}, WithSchema{
 		runtimeInspectWorkspaceRootField:   interp.KindString,
 		runtimeInspectExpectedVersionField: interp.KindString,
@@ -231,6 +247,20 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 			WorkspaceRoot:   stringField(v, runtimeInspectWorkspaceRootField),
 			ExpectedVersion: stringField(v, runtimeInspectExpectedVersionField),
 			FailOnDrift:     boolField(v, runtimeInspectFailOnDriftField),
+		}
+	})
+
+	r.RegisterRuntimeUpgrader(Ref{Name: "go-runtime", Version: "1"}, WithSchema{
+		runtimeUpgradeTargetVersionField:  interp.KindString,
+		runtimeUpgradeWorkspaceRootField:  interp.KindString,
+		runtimeUpgradeTidyField:           interp.KindBool,
+		runtimeUpgradeAllowDowngradeField: interp.KindBool,
+	}, func(v Values) shipwright.RuntimeUpgrader {
+		return &golang.GoRuntimeUpgrader{
+			Client:         goClient,
+			WorkspaceRoot:  stringField(v, runtimeUpgradeWorkspaceRootField),
+			Tidy:           boolFieldDefault(v, runtimeUpgradeTidyField, true),
+			AllowDowngrade: boolField(v, runtimeUpgradeAllowDowngradeField),
 		}
 	})
 }
@@ -320,6 +350,27 @@ func boolField(v Values, key string) bool {
 	b, err := strconv.ParseBool(s)
 	if err != nil {
 		return false
+	}
+	return b
+}
+
+// boolFieldDefault is boolField's counterpart for a with-field whose
+// documented default is true (design.md's `runtime-upgrade`.`tidy`, "no
+// (default true)") rather than boolField's own hardcoded absent-means-false
+// zero-value convention — key absent or unparseable both return def
+// unchanged, key present with a valid bool string overrides it either way.
+func boolFieldDefault(v Values, key string, def bool) bool {
+	val, ok := v[key]
+	if !ok {
+		return def
+	}
+	s, ok := val.String()
+	if !ok {
+		return def
+	}
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return def
 	}
 	return b
 }

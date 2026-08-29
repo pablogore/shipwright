@@ -69,6 +69,16 @@ func (fakeRuntimeInspector) Inspect(ctx context.Context, source *dagger.Director
 	return "{}", nil
 }
 
+// fakeRuntimeUpgrader satisfies shipwright.RuntimeUpgrader
+// (runtime-toolchain-upgrade, design.md D-9) — this package tests provider
+// RESOLUTION for the seventh capability the same way it does the others,
+// not any concrete provider's own behavior.
+type fakeRuntimeUpgrader struct{}
+
+func (fakeRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) {
+	return source, nil
+}
+
 // tasks.md 7.1: one Register*/Resolve* hit/miss pair per capability — five
 // total (Builder, Tester, Artifactor, Deployer, Runner), matching
 // design.md D-I's five typed register methods exactly.
@@ -200,6 +210,37 @@ func TestRegistry_RuntimeInspectorResolutionHitAndMiss(t *testing.T) {
 	var unregistered *providers.UnregisteredProviderError
 	if !errors.As(err, &unregistered) {
 		t.Fatalf("ResolveRuntimeInspector(unregistered ref) error = %v (%T), want *providers.UnregisteredProviderError", err, err)
+	}
+}
+
+// RuntimeUpgrader's own hit/miss pair (runtime-toolchain-upgrade,
+// design.md D-9): the seventh capability follows the exact same
+// Register*/Resolve* shape as the others above.
+func TestRegistry_RuntimeUpgraderResolutionHitAndMiss(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	ref := providers.Ref{Name: "go-runtime", Version: "1"}
+	r.RegisterRuntimeUpgrader(ref, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeUpgrader {
+		return fakeRuntimeUpgrader{}
+	})
+
+	got, err := r.ResolveRuntimeUpgrader(ref, providers.Values{})
+	if err != nil {
+		t.Fatalf("ResolveRuntimeUpgrader(registered ref) error = %v, want nil (hit)", err)
+	}
+	if got == nil {
+		t.Fatal("ResolveRuntimeUpgrader(registered ref) = nil, want a resolved shipwright.RuntimeUpgrader")
+	}
+
+	miss := providers.Ref{Name: "ghost", Version: "1"}
+	_, err = r.ResolveRuntimeUpgrader(miss, providers.Values{})
+	if err == nil {
+		t.Fatal("ResolveRuntimeUpgrader(unregistered ref) error = nil, want an error (miss)")
+	}
+	var unregistered *providers.UnregisteredProviderError
+	if !errors.As(err, &unregistered) {
+		t.Fatalf("ResolveRuntimeUpgrader(unregistered ref) error = %v (%T), want *providers.UnregisteredProviderError", err, err)
 	}
 }
 

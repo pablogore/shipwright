@@ -657,6 +657,8 @@ func dispatch(ctx context.Context, s manifest.Step, input *dagger.Directory, val
 		return dispatchRun(ctx, ref, input, values, reg)
 	case "runtime-inspect":
 		return dispatchRuntimeInspect(ctx, ref, input, values, reg)
+	case "runtime-upgrade":
+		return dispatchRuntimeUpgrade(ctx, s.ID, ref, input, values, reg)
 	default:
 		return result{}, &UnknownCapabilityError{StepID: s.ID, Capability: s.Capability}
 	}
@@ -777,6 +779,36 @@ func dispatchRuntimeInspect(ctx context.Context, ref providers.Ref, input *dagge
 		return result{}, err
 	}
 	return result{kind: outputText, text: report}, nil
+}
+
+// runtimeUpgradeTargetVersionField is the with-field name a runtime-upgrade
+// step's targetVersion argument is bound from — matching register.go's
+// RegisterDefaults GoRuntimeUpgrader WithSchema exactly ("targetVersion":
+// KindString). Unlike workspaceRoot/tidy/allowDowngrade (already baked into
+// the resolved RuntimeUpgrader by its provider factory closure, same as
+// dispatchRuntimeInspect above), targetVersion is Upgrade's own method
+// parameter (design.md's Interfaces/Contracts note: "the type system
+// forbids a zero-value default — an upgrade always carries an explicit
+// target"), so it is extracted here via stringWith, mirroring
+// artifactRefField's existing precedent — this is where design.md D-9's
+// "targetVersion required" table row is actually enforced (registry.go's
+// WithSchema only validates KIND, never presence).
+const runtimeUpgradeTargetVersionField = "targetVersion"
+
+func dispatchRuntimeUpgrade(ctx context.Context, stepID string, ref providers.Ref, input *dagger.Directory, values providers.Values, reg *providers.Registry) (result, error) {
+	u, err := reg.ResolveRuntimeUpgrader(ref, values)
+	if err != nil {
+		return result{}, err
+	}
+	targetVersion, err := stringWith(stepID, values, runtimeUpgradeTargetVersionField)
+	if err != nil {
+		return result{}, err
+	}
+	dir, err := u.Upgrade(ctx, input, targetVersion)
+	if err != nil {
+		return result{}, err
+	}
+	return result{kind: outputDirectory, directory: dir}, nil
 }
 
 func stringWith(stepID string, values providers.Values, field string) (string, error) {

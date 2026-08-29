@@ -86,6 +86,18 @@ type RuntimeInspector interface {
 	Inspect(ctx context.Context, source *dagger.Directory) (string, error)
 }
 
+// RuntimeUpgrader mutates a workspace's declarative toolchain-version
+// sources to targetVersion and returns the mutated Directory. Not wired
+// into Plan, for the same reason as RuntimeInspector above. Upgrade drops
+// `error` (unlike RuntimeInspector.Inspect above), matching
+// Builder.Build/Tester.Test/Runner.Run: it returns a lazy-chainable Dagger
+// core type (*dagger.Directory), so the v0.21.8 codegen limitation
+// documented in this file's package doc applies.
+type RuntimeUpgrader interface {
+	dagger.DaggerObject
+	Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) *dagger.Directory
+}
+
 // Shipwright is the module's entrypoint Object.
 type Shipwright struct{}
 

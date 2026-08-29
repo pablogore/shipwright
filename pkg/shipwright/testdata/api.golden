@@ -100,6 +100,24 @@ type DriftReport struct {
 	Conflict	ConflictState	`json:"conflict"`
 }
 
+type ModuleDrift struct {
+	// Path is the module's directory relative to the workspace root ("."
+	// for a single go.mod at the workspace root itself).
+	Path	string	`json:"path"`
+	// PreviousGo is the module's go directive value before mutation ("" if
+	// absent).
+	PreviousGo	string	`json:"previousGo,omitempty"`
+	// UpdatedGo is the module's go directive value after mutation.
+	UpdatedGo	string	`json:"updatedGo,omitempty"`
+	// PreviousToolchain is the module's toolchain directive value before
+	// mutation ("" if it had none — a toolchain directive is never added
+	// where none existed before).
+	PreviousToolchain	string	`json:"previousToolchain,omitempty"`
+	// UpdatedToolchain is the module's toolchain directive value after
+	// mutation ("" if it had none before, and therefore was left absent).
+	UpdatedToolchain	string	`json:"updatedToolchain,omitempty"`
+}
+
 type ModuleVersion struct {
 	// Path is the module's directory relative to the workspace root ("."
 	// for a single go.mod at the workspace root itself).
@@ -118,6 +136,10 @@ type Runner interface {
 
 type RuntimeInspector interface {
 	Inspect(ctx context.Context, source *dagger.Directory) (string, error)
+}
+
+type RuntimeUpgrader interface {
+	Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error)
 }
 
 type SourceConfig struct {
@@ -145,5 +167,17 @@ type TestConfig struct {
 
 type Tester interface {
 	Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error)
+}
+
+type UpgradeReport struct {
+	// WorkspaceRoot is the upgraded workspace-relative root ("." by
+	// default).
+	WorkspaceRoot	string	`json:"workspaceRoot"`
+	// TargetVersion is the version every mutated directive was set to.
+	TargetVersion	string	`json:"targetVersion"`
+	// Modules lists every module actually mutated. Phase 2 (single-module
+	// only, no go.work traversal) always reports exactly one entry with
+	// Path ".".
+	Modules	[]ModuleDrift	`json:"modules"`
 }
 

@@ -86,6 +86,20 @@ func (f fakeRuntimeInspector) Inspect(ctx context.Context, source *dagger.Direct
 	return "{}", nil
 }
 
+// fakeRuntimeUpgrader satisfies shipwright.RuntimeUpgrader
+// (runtime-toolchain-upgrade, design.md D-9) — same configurable-func fake
+// style as the others above.
+type fakeRuntimeUpgrader struct {
+	UpgradeFunc func(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error)
+}
+
+func (f fakeRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) {
+	if f.UpgradeFunc != nil {
+		return f.UpgradeFunc(ctx, source, targetVersion)
+	}
+	return source, nil
+}
+
 // recorder records step invocation order, guarded by a mutex so `go test
 // -race` genuinely proves serial access rather than merely assuming it —
 // if wave execution ever became concurrent (it must not, design.md D-K),
