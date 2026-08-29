@@ -2,6 +2,7 @@ package golang
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -18,6 +19,7 @@ const (
 	CodeA4 = "A4" // target version is a downgrade from current, and downgrade is not allowed
 	CodeA5 = "A5" // malformed target version or existing directive
 	CodeA6 = "A6" // neither go.work nor go.mod found at the workspace root
+	CodeA7 = "A7" // a go.work use directive is absolute or escapes the workspace root
 )
 
 // AmbiguousToolchainError is returned whenever a workspace's tier-1 version
@@ -293,6 +295,41 @@ func validTargetVersion(target string) *AmbiguousToolchainError {
 	return nil
 }
 
+// validateModulePaths returns an A7 *AmbiguousToolchainError naming every
+// path in paths that is absolute or escapes the workspace root, or nil
+// when every path stays within it (design.md Threat Matrix: "Path
+// traversal via go.work use"). It is pure Go over already-parsed paths —
+// no Dagger, no filesystem access — and is called by the mutation loop
+// (GoRuntimeUpgrader.Upgrade) before any workspace module is read or
+// mutated, so a malicious go.work use directive can never cause a read or
+// write outside the workspace root.
+func validateModulePaths(paths []string) *AmbiguousToolchainError {
+	var sites []string
+	for _, p := range paths {
+		if !isWithinWorkspace(p) {
+			sites = append(sites, fmt.Sprintf("go.work: use %s escapes the workspace root", p))
+		}
+	}
+	if len(sites) == 0 {
+		return nil
+	}
+	return &AmbiguousToolchainError{Code: CodeA7, Sites: sites}
+}
+
+// isWithinWorkspace reports whether p — a go.work use directive's
+// workspace-relative path — stays within the workspace root: not
+// absolute, and not "." /".." itself nor prefixed with "../" once
+// cleaned. Uses the "path" package (forward-slash paths), matching
+// goWorkModulePaths's own convention for go.work use directives, which
+// are always slash-separated per Go tooling regardless of host OS.
+func isWithinWorkspace(p string) bool {
+	if p == "" || path.IsAbs(p) {
+		return false
+	}
+	cleaned := path.Clean(p)
+	return cleaned != ".." && !strings.HasPrefix(cleaned, "../")
+}
+
 // mutateGoMod parses modBytes and returns its bytes with the go directive
 // set to targetVersion. When modBytes already declares a toolchain
 // directive, it is updated to match ("go"+targetVersion) too — a
@@ -325,13 +362,8 @@ func mutateGoMod(modBytes []byte, targetVersion string) ([]byte, error) {
 // mutateGoWork parses workBytes and returns its bytes with go.work's own
 // go directive set to targetVersion, updating an existing toolchain
 // directive the same discovery-driven way mutateGoMod does for go.mod.
-//
-// Not yet wired into GoRuntimeUpgrader.Upgrade — the go.work-referenced
-// multi-module traversal loop that calls this is tasks.md Phase 3
-// (design.md D-7's mutation loop). Built now, unit-tested directly against
-// testdata/runtime fixtures, per design.md's own Testing Strategy table
-// ("mutateGoMod, mutateGoWork" share toolchain.go's pure byte-level TDD
-// mass, no Dagger, no engine needed for either).
+// Wired into GoRuntimeUpgrader.Upgrade's multi-module workspace mutation
+// loop (design.md D-7, tasks.md Phase 3).
 func mutateGoWork(workBytes []byte, targetVersion string) ([]byte, error) {
 	if err := validTargetVersion(targetVersion); err != nil {
 		return nil, err

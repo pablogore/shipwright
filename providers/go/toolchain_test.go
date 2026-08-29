@@ -362,3 +362,122 @@ func TestMutateGoVersion(t *testing.T) {
 		t.Fatalf("mutateGoVersion() = %q, want %q", got, "1.27.0\n")
 	}
 }
+
+// TestDetectConflicts_WorkspacePreMutation proves detectConflicts's
+// existing A1-A3 rules (built in Phase 1) already generalize correctly to
+// the multi-module go.work case when invoked exactly the way
+// GoRuntimeUpgrader.Upgrade invokes it — with a non-empty TargetVersion —
+// so Upgrade's pre-mutation abort path (tasks.md 3.1) needs no new
+// conflict-detection logic, only to stop short-circuiting before this
+// check runs for a go.work workspace. Pure Go, no Dagger.
+func TestDetectConflicts_WorkspacePreMutation(t *testing.T) {
+	tests := []struct {
+		name     string
+		fixture  string
+		wantCode string // "" means no conflict expected
+	}{
+		{
+			name:     "three-module workspace, all sources agree: no conflict",
+			fixture:  "workspace-3-modules",
+			wantCode: "",
+		},
+		{
+			name:     "two modules declare different go directives",
+			fixture:  "divergent-go",
+			wantCode: CodeA1,
+		},
+		{
+			name:     "two modules declare different toolchain directives",
+			fixture:  "divergent-toolchain",
+			wantCode: CodeA2,
+		},
+		{
+			name:     "go.work's go directive disagrees with the unanimous module go",
+			fixture:  "work-go-mismatch",
+			wantCode: CodeA3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := loadFixture(t, tt.fixture)
+
+			ws, err := parseWorkspace(input)
+			if err != nil {
+				t.Fatalf("parseWorkspace(%s) error = %v, want nil", tt.fixture, err)
+			}
+
+			got := detectConflicts(ws, ConflictOptions{TargetVersion: "1.27.0"})
+
+			if tt.wantCode == "" {
+				if got != nil {
+					t.Fatalf("fixture %s: got conflict %v, want none", tt.fixture, got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("fixture %s: got no conflict, want code %s", tt.fixture, tt.wantCode)
+			}
+			if got.Code != tt.wantCode {
+				t.Fatalf("fixture %s: got code %s, want %s (%v)", tt.fixture, got.Code, tt.wantCode, got)
+			}
+		})
+	}
+}
+
+// TestValidateModulePaths is the pure-Go path-escape guard tasks.md
+// 3.2/3.3 requires: design.md's Threat Matrix "Path traversal via go.work
+// use" row — reject absolute paths, and any path escaping the workspace
+// root after path.Clean.
+func TestValidateModulePaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		paths    []string
+		wantCode string // "" means no conflict expected
+	}{
+		{
+			name:     "within workspace: no conflict",
+			paths:    []string{"modA", "modB/nested"},
+			wantCode: "",
+		},
+		{
+			name:     "workspace root itself is fine",
+			paths:    []string{"."},
+			wantCode: "",
+		},
+		{
+			name:     "escapes workspace root via ../../etc (path-escape fixture shape)",
+			paths:    []string{"../../etc"},
+			wantCode: CodeA7,
+		},
+		{
+			name:     "absolute path",
+			paths:    []string{"/etc/passwd"},
+			wantCode: CodeA7,
+		},
+		{
+			name:     "one valid, one escaping: whole call rejected",
+			paths:    []string{"modA", "../evil"},
+			wantCode: CodeA7,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validateModulePaths(tt.paths)
+
+			if tt.wantCode == "" {
+				if got != nil {
+					t.Fatalf("validateModulePaths(%v) = %v, want nil", tt.paths, got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("validateModulePaths(%v) = nil, want code %s", tt.paths, tt.wantCode)
+			}
+			if got.Code != tt.wantCode {
+				t.Fatalf("validateModulePaths(%v) code = %s, want %s", tt.paths, got.Code, tt.wantCode)
+			}
+		})
+	}
+}

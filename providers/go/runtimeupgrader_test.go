@@ -113,12 +113,19 @@ func TestGoRuntimeUpgrader_Upgrade_Malformed_AmbiguousAbort(t *testing.T) {
 	mockDir.AssertNotCalled(t, "WithNewFile", mock.Anything, mock.Anything)
 }
 
-// TestGoRuntimeUpgrader_Upgrade_GoWork_NotYetSupported proves Phase 2's
-// explicit scope boundary: a workspace with a go.work at its root is
-// rejected outright (fail-closed), never partially traversed.
-func TestGoRuntimeUpgrader_Upgrade_GoWork_NotYetSupported(t *testing.T) {
+// TestUpgrade_PathEscape is the RED test tasks.md 3.2 requires: a go.work
+// use directive that resolves outside the workspace root (../../etc) must
+// abort before any WithNewFile call — proven via a mock assertion, not
+// just the returned error (threat matrix: path traversal via go.work
+// use). Placed here rather than toolchain_test.go (tasks.md's literal
+// file assignment) because a mock-based "no WithNewFile call happened"
+// assertion needs daggerkit's mocked DaggerDirectory, which toolchain.go's
+// pure-Go test file deliberately never imports (D-9's read/write seam
+// stays mock-testable only in this package's Dagger-facing test files);
+// see apply-progress deviation notes.
+func TestUpgrade_PathEscape(t *testing.T) {
 	mockClient := &daggerkit.MockDaggerClient{}
-	mockDir := mockDirFromFixture(t, "workspace-3-modules")
+	mockDir := mockDirFromFixture(t, "path-escape")
 	withMockDirectory(t, mockDir)
 
 	upgrader := &GoRuntimeUpgrader{Client: mockClient}
@@ -127,9 +134,91 @@ func TestGoRuntimeUpgrader_Upgrade_GoWork_NotYetSupported(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, out)
-	assert.Contains(t, err.Error(), "not yet supported")
+
+	var ambiguous *AmbiguousToolchainError
+	require.ErrorAs(t, err, &ambiguous)
+	assert.Equal(t, CodeA7, ambiguous.Code)
 
 	mockDir.AssertNotCalled(t, "WithNewFile", mock.Anything, mock.Anything)
+}
+
+// TestUpgrade_Workspace proves the multi-module go.work mutation loop
+// (tasks.md 3.4/3.5): every use'd module's go.mod, plus go.work's own go
+// directive, are mutated, and the report names every module's outcome.
+// This is also the test tasks.md 3.6's regression-guard verification step
+// names explicitly (`go test -run TestUpgrade_Workspace`).
+func TestUpgrade_Workspace(t *testing.T) {
+	mockClient := &daggerkit.MockDaggerClient{}
+	mockDir := mockDirFromFixture(t, "workspace-3-modules")
+	withMockDirectory(t, mockDir)
+
+	afterWork := &daggerkit.MockDaggerDirectory{}
+	afterVersion := &daggerkit.MockDaggerDirectory{}
+	afterA := &daggerkit.MockDaggerDirectory{}
+	afterB := &daggerkit.MockDaggerDirectory{}
+	afterC := &daggerkit.MockDaggerDirectory{}
+	afterReport := &daggerkit.MockDaggerDirectory{}
+	realDir := &dagger.Directory{}
+
+	var capturedWork, capturedVersion, capturedA, capturedB, capturedC, capturedReport string
+
+	mockDir.On("WithNewFile", "go.work", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		capturedWork = args.String(1)
+	}).Return(afterWork)
+	// The fixture also has a root .go-version, mutated the same
+	// discovery-driven way the single-module path does.
+	afterWork.On("WithNewFile", ".go-version", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		capturedVersion = args.String(1)
+	}).Return(afterVersion)
+	afterVersion.On("WithNewFile", "modA/go.mod", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		capturedA = args.String(1)
+	}).Return(afterA)
+	afterA.On("WithNewFile", "modB/go.mod", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		capturedB = args.String(1)
+	}).Return(afterB)
+	afterB.On("WithNewFile", "modC/go.mod", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		capturedC = args.String(1)
+	}).Return(afterC)
+	afterC.On("WithNewFile", ".shipwright/runtime-upgrade-report.json", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		capturedReport = args.String(1)
+	}).Return(afterReport)
+	afterReport.On("GetRealDirectory").Return(realDir)
+
+	upgrader := &GoRuntimeUpgrader{Client: mockClient}
+
+	out, err := upgrader.Upgrade(context.Background(), &dagger.Directory{}, "1.27.0")
+	require.NoError(t, err)
+	assert.Same(t, realDir, out)
+
+	assert.Contains(t, capturedWork, "go 1.27.0")
+	assert.Equal(t, "1.27.0\n", capturedVersion)
+	assert.Contains(t, capturedA, "go 1.27.0")
+	assert.Contains(t, capturedB, "go 1.27.0")
+	assert.Contains(t, capturedC, "go 1.27.0")
+
+	var report shipwright.UpgradeReport
+	require.NoError(t, json.Unmarshal([]byte(capturedReport), &report))
+	assert.Equal(t, "1.27.0", report.TargetVersion)
+	require.Len(t, report.Modules, 3)
+
+	byPath := make(map[string]shipwright.ModuleDrift, len(report.Modules))
+	for _, m := range report.Modules {
+		byPath[m.Path] = m
+	}
+	for _, p := range []string{"modA", "modB", "modC"} {
+		m, ok := byPath[p]
+		require.Truef(t, ok, "report missing module %s", p)
+		assert.Equal(t, "1.26.7", m.PreviousGo)
+		assert.Equal(t, "1.27.0", m.UpdatedGo)
+	}
+
+	mockDir.AssertExpectations(t)
+	afterWork.AssertExpectations(t)
+	afterVersion.AssertExpectations(t)
+	afterA.AssertExpectations(t)
+	afterB.AssertExpectations(t)
+	afterC.AssertExpectations(t)
+	afterReport.AssertExpectations(t)
 }
 
 // TestGoRuntimeUpgrader_Upgrade_WritesUpgradeReport proves the report
