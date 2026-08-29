@@ -59,3 +59,13 @@ type Deployer interface {
 type Runner interface {
 	Run(ctx context.Context, build *dagger.Directory) (*dagger.Container, error)
 }
+
+// RuntimeInspector reports drift across a workspace's declarative
+// toolchain-version sources (e.g. Go's go.mod/go.work/.go-version) without
+// mutating anything, returning a JSON-encoded report (see
+// DriftReport). It never returns a DriftReport directly (design.md D-1): a
+// report struct may never appear in a capability interface signature, only
+// context.Context, error, string, and the four Dagger core types may.
+type RuntimeInspector interface {
+	Inspect(ctx context.Context, source *dagger.Directory) (string, error)
+}

@@ -40,8 +40,10 @@ import (
 
 // defaultGoVersion mirrors the legacy go-service pipeline's own default
 // (internal/pipelines/go-service/pipeline.go), used whenever a caller
-// leaves the Go toolchain version unspecified.
-const defaultGoVersion = "1.25.5"
+// leaves the Go toolchain version unspecified. Kept in lockstep with this
+// module's own go.mod go directive by toolchainpin_test.go's
+// TestDefaultGoVersionMatchesGoMod (design.md D-4 tier-3 substitution).
+const defaultGoVersion = "1.26.7"
 
 // defaultBinaryName mirrors the legacy go-service pipeline's default
 // output binary name (internal/pipelines/go-service/options.go's

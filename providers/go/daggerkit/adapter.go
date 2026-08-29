@@ -47,6 +47,14 @@ func (a *DaggerDirectoryAdapter) GetRealDirectory() *dagger.Directory {
 	return a.directory
 }
 
+func (a *DaggerDirectoryAdapter) File(path string) DaggerFile {
+	return &DaggerFileAdapter{file: a.directory.File(path)}
+}
+
+func (a *DaggerDirectoryAdapter) Entries(ctx context.Context) ([]string, error) {
+	return a.directory.Entries(ctx)
+}
+
 var _ DaggerContainer = (*DaggerContainerAdapter)(nil)
 
 // DaggerContainerAdapter adapts a real *dagger.Container to DaggerContainer.
@@ -144,4 +152,8 @@ type DaggerFileAdapter struct {
 // functions.
 func (a *DaggerFileAdapter) GetRealFile() *dagger.File {
 	return a.file
+}
+
+func (a *DaggerFileAdapter) Contents(ctx context.Context) (string, error) {
+	return a.file.Contents(ctx)
 }

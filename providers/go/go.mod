@@ -6,6 +6,7 @@ require (
 	dagger.io/dagger v0.21.8
 	github.com/pablogore/shipwright v0.0.0-20260828024355-6f9962e67091
 	github.com/stretchr/testify v1.12.1
+	golang.org/x/mod v0.40.0
 )
 
 require (

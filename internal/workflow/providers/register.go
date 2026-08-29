@@ -16,6 +16,19 @@ import (
 	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
+// runtimeInspectWorkspaceRootField/runtimeInspectExpectedVersionField/
+// runtimeInspectFailOnDriftField name the go-runtime provider's with-fields
+// (runtime-toolchain-upgrade, design.md D-4b), bound directly into
+// GoRuntimeInspector's own struct fields by this file's factory closure
+// below — the single source of truth for these three field-name strings,
+// referenced by both this file's WithSchema/factory and
+// internal/workflow/manifest/validate.go's parallel schema declaration.
+const (
+	runtimeInspectWorkspaceRootField   = "workspaceRoot"
+	runtimeInspectExpectedVersionField = "expectedVersion"
+	runtimeInspectFailOnDriftField     = "failOnDrift"
+)
+
 // RegisterDefaults registers Shipwright's five in-repo capability
 // implementations (providers/go, extracted from the former
 // internal/capabilities, WU3) into r under the provider names design.md's
@@ -200,6 +213,25 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	// as golangci-lint/govulncheck above.
 	r.RegisterRunner(Ref{Name: "changelog", Version: "1"}, WithSchema{}, func(_ Values) shipwright.Runner {
 		return &ChangelogRunner{Client: newChangelogDaggerClient(client)}
+	})
+
+	// go-runtime: registered under runtime-inspect only in this phase
+	// (runtime-toolchain-upgrade, design.md D-4b, Open Questions "Provider
+	// name" — confirmed against this file's existing hyphenated naming
+	// convention at apply time). A later phase registers the same provider
+	// name under the mutating runtime-upgrade capability kind too, mirroring
+	// how golang.ContainerPublisher is one type registered under one kind.
+	r.RegisterRuntimeInspector(Ref{Name: "go-runtime", Version: "1"}, WithSchema{
+		runtimeInspectWorkspaceRootField:   interp.KindString,
+		runtimeInspectExpectedVersionField: interp.KindString,
+		runtimeInspectFailOnDriftField:     interp.KindBool,
+	}, func(v Values) shipwright.RuntimeInspector {
+		return &golang.GoRuntimeInspector{
+			Client:          goClient,
+			WorkspaceRoot:   stringField(v, runtimeInspectWorkspaceRootField),
+			ExpectedVersion: stringField(v, runtimeInspectExpectedVersionField),
+			FailOnDrift:     boolField(v, runtimeInspectFailOnDriftField),
+		}
 	})
 }
 

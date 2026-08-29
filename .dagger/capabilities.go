@@ -72,6 +72,20 @@ type Runner interface {
 	Run(ctx context.Context, build *dagger.Directory) *dagger.Container
 }
 
+// RuntimeInspector reports drift across a workspace's declarative
+// toolchain-version sources without mutating anything, returning a
+// JSON-encoded report string. Not wired into Plan (design.md D-3): a
+// toolchain upgrade is not a stage of Plan's fixed five-slot
+// build->test->artifact->deploy->run chain, and Execute bypasses Plan
+// entirely. Inspect keeps `error` (unlike Builder.Build/Tester.Test/
+// Runner.Run above): it returns string, not a lazy-chainable Dagger core
+// type, so the v0.21.8 codegen limitation documented in this file's
+// package doc does not apply.
+type RuntimeInspector interface {
+	dagger.DaggerObject
+	Inspect(ctx context.Context, source *dagger.Directory) (string, error)
+}
+
 // Shipwright is the module's entrypoint Object.
 type Shipwright struct{}
 

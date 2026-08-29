@@ -44,7 +44,7 @@ func TestGoBuilder_Build_Success(t *testing.T) {
 	realOutputDir := &dagger.Directory{}
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golang:1.25.5").Return(mockContainer)
+	mockContainer.On("From", "golang:1.26.7").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/app", mock.MatchedBy(func(d daggerkit.DaggerDirectory) bool {
 		return d.GetRealDirectory() == src
 	})).Return(mockContainer)
@@ -81,7 +81,7 @@ func TestGoBuilder_Build_Failure_Stderr(t *testing.T) {
 	execErr := errors.New("process \"go build\" did not complete successfully: exit code 2: stderr: ./main.go:3:2: undefined: foo")
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golang:1.25.5").Return(mockContainer)
+	mockContainer.On("From", "golang:1.26.7").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/app", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GOPATH", "/go").Return(mockContainer)

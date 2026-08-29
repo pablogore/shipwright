@@ -24,14 +24,21 @@ type DaggerClient interface {
 }
 
 // DaggerDirectory interface abstracts the dagger.Directory to enable
-// mocking. No File(string) method: unlike the root package, nothing here
-// ever calls a method on a DaggerDirectory produced by another
-// DaggerDirectory — it is only ever constructed from a caller-supplied
-// concrete *dagger.Directory and passed opaquely into WithMountedDirectory
-// / WithDirectory.
+// mocking. File and Entries were added for GoRuntimeInspector (design.md
+// D-9): reading a workspace's go.work/go.mod/.go-version content is the
+// first read-side consumer this module has ever had. WithNewFile (the
+// write side) is deferred to the runtime-upgrade slice.
 type DaggerDirectory interface {
 	// GetRealDirectory returns the underlying real Dagger directory (only for adapters)
 	GetRealDirectory() *dagger.Directory
+	// File returns a handle to a file at path within this directory,
+	// without reading it — reading happens via the returned DaggerFile's
+	// Contents.
+	File(path string) DaggerFile
+	// Entries lists the names of files and directories at this
+	// directory's root, used to discover which tier-1 sources
+	// (go.work, .go-version, go.mod) are actually present.
+	Entries(ctx context.Context) ([]string, error)
 }
 
 // DaggerContainerWithExecOpts represents options for container exec
@@ -67,13 +74,16 @@ type DaggerContainer interface {
 
 // DaggerFile interface abstracts the dagger.File to enable mocking.
 //
-// No Contents(context.Context) method: unlike the root package, nothing
-// here ever reads a report File's contents in production code — every
-// capability's public method returns the File to its caller unread. This
-// package instead adds GetRealFile, absent from the root package, because
-// every one of GoLinter / GoUnitTester / GoVulnScanner's Test methods
-// returns a concrete *dagger.File and therefore must unwrap one.
+// Contents(context.Context) was added for GoRuntimeInspector (design.md
+// D-9): it is the first consumer in this module that reads a file's
+// content in production code, rather than only returning the File to its
+// caller unread. This package also keeps GetRealFile, absent from the root
+// package, because every one of GoLinter / GoUnitTester / GoVulnScanner's
+// Test methods returns a concrete *dagger.File and therefore must unwrap
+// one.
 type DaggerFile interface {
 	// GetRealFile returns the underlying real Dagger file (only for adapters)
 	GetRealFile() *dagger.File
+	// Contents reads this file's full content.
+	Contents(ctx context.Context) (string, error)
 }

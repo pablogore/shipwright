@@ -1,0 +1,116 @@
+# SDD DAG state for change: shipwright-runtime-toolchain-upgrade
+change: shipwright-runtime-toolchain-upgrade
+title: Provider-Managed Runtime/Toolchain Upgrade (Go First)
+updated: 2026-08-28
+
+session:
+  execution_mode: auto
+  artifact_store: openspec
+  delivery_strategy: auto-chain
+  chain_strategy: stacked-to-main
+  review_budget_lines: 400
+
+phases:
+  explore: done
+  propose: done
+  spec: done
+  design: done
+  tasks: done
+  apply: partial (slice 1/4 applied -- tasks 1.1-1.24 done, phases 2-4 not started)
+  verify: partial (slice 1/4 verified -- PASS)
+  archive: pending
+
+artifacts:
+  exploration: openspec/changes/shipwright-runtime-toolchain-upgrade/exploration.md
+  proposal: openspec/changes/shipwright-runtime-toolchain-upgrade/proposal.md
+  proposal_es: openspec/changes/shipwright-runtime-toolchain-upgrade/proposal.es.md
+  spec_runtime_toolchain: openspec/changes/shipwright-runtime-toolchain-upgrade/specs/runtime-toolchain/spec.md
+  spec_runtime_toolchain_es: openspec/changes/shipwright-runtime-toolchain-upgrade/specs/runtime-toolchain/spec.es.md
+  spec_workflow_manifest: openspec/changes/shipwright-runtime-toolchain-upgrade/specs/workflow-manifest/spec.md
+  spec_workflow_manifest_es: openspec/changes/shipwright-runtime-toolchain-upgrade/specs/workflow-manifest/spec.es.md
+  spec_public_module_api: openspec/changes/shipwright-runtime-toolchain-upgrade/specs/public-module-api/spec.md
+  spec_public_module_api_es: openspec/changes/shipwright-runtime-toolchain-upgrade/specs/public-module-api/spec.es.md
+  design: openspec/changes/shipwright-runtime-toolchain-upgrade/design.md
+  design_es: openspec/changes/shipwright-runtime-toolchain-upgrade/design.es.md
+  tasks: openspec/changes/shipwright-runtime-toolchain-upgrade/tasks.md
+  tasks_es: openspec/changes/shipwright-runtime-toolchain-upgrade/tasks.es.md
+
+decisions:
+  D1:
+    topic: manual/approval gating
+    resolution: operator-invoked trigger; no blocking primitive added to engine/execute.go
+    spec_impact: none — workflow-execution approval-gate requirement preserved verbatim
+  D2:
+    topic: SCM/PR adapter
+    resolution: fully out of scope; deferred to a follow-up change
+    spec_impact: none — capability returns a mutated directory, no remote-write path exists
+
+next_recommended:
+  - open PR #1 (feature/runtime-inspect-go -> develop) -- slice 1 verify PASSed
+  - sdd-apply (slice 2, phase 2 of tasks.md, after PR #1 merges to develop)
+
+open_risks:
+  - VERIFIED (slice 1/4, 2026-08-28) -- runtime-inspect end-to-end on
+    feature/runtime-inspect-go PASSes: all 24 Phase-1 tasks confirmed against
+    real code (not just checkmarks); spec.md runtime-toolchain scenarios
+    (zero-mutation, ambiguous-reported-not-guessed, missing-location-omitted,
+    failOnDrift fail-closed) each covered by a passing runtime test; design.md
+    D-1/D-2/D-3/D-4/D-4b/D-8/D-9 decisions match implementation; static
+    import-guard (threat_matrix_test.go) plus direct source read confirm no
+    network/git/SCM/os.WriteFile/exec.Command path in toolchain.go or
+    runtimeinspector.go; api.golden/capabilities_test.go correctly carry 6
+    interfaces; no RuntimeUpgrader/mutation code exists yet (correctly
+    deferred to Phase 2). go build ./..., go test -race ./... (root +
+    providers/go), golangci-lint run ./... (root + providers/go) all
+    independently reconfirmed clean (only the 3 known pre-existing
+    staticcheck issues in internalimport_test.go/naming_test.go, both
+    untouched by this diff). Live --list-steps smoke test against a
+    runtime-inspect manifest step succeeded (exit 0). Full report: Engram
+    sdd/shipwright-runtime-toolchain-upgrade/verify-report.
+  - NOTE -- phases.apply was still "pending" in state.yaml despite
+    apply-progress recording all of Phase 1 (tasks 1.1-1.24) complete;
+    corrected to "partial (slice 1/4)" by this verify pass. Phases 2-4 apply
+    work remains genuinely unstarted.
+  - RESOLVED BY TASKS — 4-slice chain confirmed (feature/runtime-inspect-go,
+    feature/runtime-upgrade-single-module, feature/runtime-upgrade-workspace,
+    feature/runtime-upgrade-tidy-validate), each cut from and merged to
+    `develop` in order (this repo's Git Flow trunk), auto-chain requires no
+    further decision before apply. See tasks.md Review Workload Forecast.
+  - RESOLVED BY DESIGN — 400-line budget. Design forecasts ~1,650 authored
+    lines (4.1x budget). delivery_strategy single-pr is NOT achievable; the
+    orchestrator must re-resolve to a chain or grant an explicit
+    size:exception. Design recommends a 4-slice chain (see design.md
+    "Review Budget Forecast"), not the two-slice chain sdd-spec assumed.
+  - Capability allowlist grows 5 -> 7, requiring MODIFIED deltas for
+    workflow-manifest and public-module-api.
+  - RECONCILED — Go interface names updated to RuntimeInspector and
+    RuntimeUpgrader (agent-noun, matching Builder/Tester/Artifactor/
+    Deployer/Runner) throughout public-module-api and workflow-manifest
+    deltas, both language variants. Capability strings
+    runtime-inspect/runtime-upgrade were already correct and unchanged.
+  - RECONCILED — public-module-api/spec.md (+ .es.md) now carries a second
+    MODIFIED requirement, "Composable, Orthogonal Capabilities", enumerating
+    the same seven-value set as the sibling "Versioned Contract Stable"
+    delta, with a scenario asserting RuntimeInspector/RuntimeUpgrader are
+    independently usable.
+  - PROPOSAL GAP found by design — main.go's resolveCapabilityRef is a SIXTH
+    core five-branch capability switch (drives --list-steps) missing from
+    proposal.md's Affected Areas table.
+  - PROPOSAL GAP found by design — providers/go/daggerkit lacks
+    Directory.File/Entries/WithNewFile and File.Contents; ~95 unbudgeted
+    lines are required before any go.mod can be read or written.
+  - LIVE DRIFT is worse than exploration.md recorded: six distinct Go
+    versions, including .go-version=1.26.1 and three release*.yml files at
+    GO_VERSION 1.26.1, neither of which exploration detected. Design adds
+    .go-version as an in-scope tier-1 source (D-4).
+  - RECONCILED — specs/runtime-toolchain/spec.md (+ .es.md) validation
+    scenario now cites only "go build ./..." per design D-6; the "go vet"
+    mention was trimmed.
+  - RECONCILED — specs/runtime-toolchain/spec.md (+ .es.md) abort scenario
+    now reads "no file in the workspace was mutated — the returned error
+    carries no directory, so the caller receives no output to consume",
+    matching Upgrade's (nil, err) fail-closed return.
+  - REQUIRED task step for sdd-tasks: regenerate pkg/shipwright/testdata/
+    api.golden with -update (reviewed diff), and add both new interfaces to
+    pkg/shipwright/capabilities_test.go's interface map. CI fails the moment
+    the two interfaces compile otherwise.

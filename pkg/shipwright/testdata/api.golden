@@ -60,16 +60,64 @@ type Builder interface {
 	Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error)
 }
 
+type ConflictState struct {
+	// Ambiguous is true when two or more declarative locations disagree
+	// with no resolvable precedence.
+	Ambiguous	bool	`json:"ambiguous"`
+	// Code is the ambiguity rule that fired (design.md D-5: A1-A6), empty
+	// when Ambiguous is false.
+	Code	string	`json:"code,omitempty"`
+	// Sites names every conflicting source and the version it declares,
+	// empty when Ambiguous is false.
+	Sites	[]string	`json:"sites,omitempty"`
+}
+
 type DeployConfig struct{}
 
 type Deployer interface {
 	Deploy(ctx context.Context, artifactRef, environment string, creds *dagger.Secret) (string, error)
 }
 
+type DriftReport struct {
+	// WorkspaceRoot is the inspected workspace-relative root ("." by
+	// default).
+	WorkspaceRoot	string	`json:"workspaceRoot"`
+	// ExpectedVersion echoes the caller-configured expected version, if
+	// any ("" when not configured). It is informational only: Inspect
+	// does not compare it against the discovered sources itself, leaving
+	// that judgment to the report's consumer.
+	ExpectedVersion	string	`json:"expectedVersion,omitempty"`
+	// Sources maps each present tier-1 declarative location's fixed name
+	// ("go.work", ".go-version") to the version it declares. A location
+	// that does not exist in the workspace has no entry here.
+	Sources	map[string]string	`json:"sources"`
+	// Modules lists every discovered module's own go.mod version
+	// directives. A single-module workspace (no go.work) has exactly one
+	// entry with Path ".".
+	Modules	[]ModuleVersion	`json:"modules,omitempty"`
+	// Conflict is the explicit ambiguity state (spec: "the report marks
+	// the conflict state explicitly, naming both sources and versions").
+	Conflict	ConflictState	`json:"conflict"`
+}
+
+type ModuleVersion struct {
+	// Path is the module's directory relative to the workspace root ("."
+	// for a single go.mod at the workspace root itself).
+	Path	string	`json:"path"`
+	// Go is the module's go directive value ("" if absent).
+	Go	string	`json:"go,omitempty"`
+	// Toolchain is the module's toolchain directive value ("" if absent).
+	Toolchain	string	`json:"toolchain,omitempty"`
+}
+
 type RunConfig struct{}
 
 type Runner interface {
 	Run(ctx context.Context, build *dagger.Directory) (*dagger.Container, error)
+}
+
+type RuntimeInspector interface {
+	Inspect(ctx context.Context, source *dagger.Directory) (string, error)
 }
 
 type SourceConfig struct {

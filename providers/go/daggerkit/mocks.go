@@ -37,6 +37,23 @@ func (m *MockDaggerDirectory) GetRealDirectory() *dagger.Directory {
 	return nil
 }
 
+func (m *MockDaggerDirectory) File(path string) DaggerFile {
+	args := m.Called(path)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerFile)
+	}
+	return nil
+}
+
+func (m *MockDaggerDirectory) Entries(ctx context.Context) ([]string, error) {
+	args := m.Called(ctx)
+	var entries []string
+	if v := args.Get(0); v != nil {
+		entries = v.([]string)
+	}
+	return entries, args.Error(1)
+}
+
 var _ DaggerContainer = (*MockDaggerContainer)(nil)
 
 // MockDaggerContainer implements DaggerContainer using testify's mock package.
@@ -172,4 +189,9 @@ func (m *MockDaggerFile) GetRealFile() *dagger.File {
 		return v.(*dagger.File)
 	}
 	return nil
+}
+
+func (m *MockDaggerFile) Contents(ctx context.Context) (string, error) {
+	args := m.Called(ctx)
+	return args.String(0), args.Error(1)
 }

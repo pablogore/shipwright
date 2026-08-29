@@ -49,15 +49,22 @@ func (stubRunner) Run(_ context.Context, _ *dagger.Directory) (*dagger.Container
 	return nil, nil
 }
 
+type stubRuntimeInspector struct{}
+
+func (stubRuntimeInspector) Inspect(_ context.Context, _ *dagger.Directory) (string, error) {
+	return "", nil
+}
+
 // Compile-time proof: each capability interface is satisfied by a concrete,
 // non-generic type — referencing "shipwright.Builder" (etc.) with no type
 // argument would itself fail to compile if the interface declared one.
 var (
-	_ shipwright.Builder    = stubBuilder{}
-	_ shipwright.Tester     = stubTester{}
-	_ shipwright.Artifactor = stubArtifactor{}
-	_ shipwright.Deployer   = stubDeployer{}
-	_ shipwright.Runner     = stubRunner{}
+	_ shipwright.Builder          = stubBuilder{}
+	_ shipwright.Tester           = stubTester{}
+	_ shipwright.Artifactor       = stubArtifactor{}
+	_ shipwright.Deployer         = stubDeployer{}
+	_ shipwright.Runner           = stubRunner{}
+	_ shipwright.RuntimeInspector = stubRuntimeInspector{}
 )
 
 // allowedSignatureType reports whether t is one of the types design.md D-A
@@ -87,11 +94,12 @@ func TestCapabilityInterfaces_NoGenericTypeParametersAndDaggerOnlySignatures(t *
 	t.Parallel()
 
 	interfaces := map[string]reflect.Type{
-		"Builder":    reflect.TypeFor[shipwright.Builder](),
-		"Tester":     reflect.TypeFor[shipwright.Tester](),
-		"Artifactor": reflect.TypeFor[shipwright.Artifactor](),
-		"Deployer":   reflect.TypeFor[shipwright.Deployer](),
-		"Runner":     reflect.TypeFor[shipwright.Runner](),
+		"Builder":          reflect.TypeFor[shipwright.Builder](),
+		"Tester":           reflect.TypeFor[shipwright.Tester](),
+		"Artifactor":       reflect.TypeFor[shipwright.Artifactor](),
+		"Deployer":         reflect.TypeFor[shipwright.Deployer](),
+		"Runner":           reflect.TypeFor[shipwright.Runner](),
+		"RuntimeInspector": reflect.TypeFor[shipwright.RuntimeInspector](),
 	}
 
 	for name, ifaceType := range interfaces {

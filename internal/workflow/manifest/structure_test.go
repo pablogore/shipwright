@@ -73,6 +73,27 @@ func TestParse_CapabilityOutsideFiveFailsValidation(t *testing.T) {
 	}
 }
 
+// TestParse_RuntimeInspectCapabilityValidates guards the
+// runtime-toolchain-upgrade allowlist addition (design.md D-4b): the
+// runtime-inspect capability string, distinct from the original five, must
+// be accepted by structure validation.
+func TestParse_RuntimeInspectCapabilityValidates(t *testing.T) {
+	src := identityHeader + `
+  steps:
+    - id: inspect
+      capability: runtime-inspect
+      uses: {provider: go-runtime, version: "1"}
+      with: {failOnDrift: true}
+`
+	m, err := manifest.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil for the runtime-inspect capability", err)
+	}
+	if len(m.Spec.Steps) != 1 || m.Spec.Steps[0].Capability != "runtime-inspect" {
+		t.Fatalf("Spec.Steps = %+v, want one step with capability runtime-inspect", m.Spec.Steps)
+	}
+}
+
 func TestParse_MissingUsesFailsValidation(t *testing.T) {
 	src := identityHeader + `
   steps:

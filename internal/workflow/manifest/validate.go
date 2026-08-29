@@ -19,15 +19,20 @@ var allowedAPIVersions = map[string]bool{
 const workflowKind = "Workflow"
 
 // validCapabilities is the manifest's capability allowlist — the five
-// contract types public-module-api defines (pkg/shipwright.{Builder,
-// Tester, Artifactor, Deployer, Runner}), named as their manifest-facing
-// lowercase strings.
+// original contract types public-module-api defines (pkg/shipwright.
+// {Builder, Tester, Artifactor, Deployer, Runner}), named as their
+// manifest-facing lowercase strings, plus runtime-inspect
+// (pkg/shipwright.RuntimeInspector, design.md D-4b of the
+// shipwright-runtime-toolchain-upgrade change) — hyphenated, matching this
+// repo's existing hyphenated provider-name convention rather than the
+// original five's single-word style.
 var validCapabilities = map[string]bool{
-	"build":    true,
-	"test":     true,
-	"artifact": true,
-	"deploy":   true,
-	"run":      true,
+	"build":           true,
+	"test":            true,
+	"artifact":        true,
+	"deploy":          true,
+	"run":             true,
+	"runtime-inspect": true,
 }
 
 // ValidateIdentity implements stage 2 of the fixed seven-stage validation
@@ -96,7 +101,7 @@ func validateStep(index int, step Step, seen map[string]bool) error {
 
 	if !validCapabilities[step.Capability] {
 		return fmt.Errorf(
-			"manifest: step %q has unsupported capability %q (must be one of build, test, artifact, deploy, run)",
+			"manifest: step %q has unsupported capability %q (must be one of build, test, artifact, deploy, run, runtime-inspect)",
 			step.ID, step.Capability,
 		)
 	}
