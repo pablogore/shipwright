@@ -1,14 +1,17 @@
 package golang
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
 	"sort"
+	"strings"
 
 	"dagger.io/dagger"
+	"golang.org/x/mod/modfile"
 
 	"github.com/pablogore/shipwright/pkg/shipwright"
 	"github.com/pablogore/shipwright/providers/go/daggerkit"
@@ -17,6 +20,20 @@ import (
 // runtimeUpgradeReportPath is where Upgrade writes its JSON report inside
 // the returned Directory (design.md D-2).
 const runtimeUpgradeReportPath = ".shipwright/runtime-upgrade-report.json"
+
+// runtimeUpgradeContainerRoot is where the mutated workspace Directory is
+// mounted for post-mutation validation (design.md D-7 steps 3-6): building
+// a "golang:"+targetVersion container, running `go mod tidy` (when
+// u.Tidy) and `go build ./...` (D-6 — go vet is explicitly rejected) per
+// module, then exporting the container's own workdir back out as the
+// returned Directory, carrying tidy's go.sum.
+const runtimeUpgradeContainerRoot = "/workspace"
+
+// runtimeValidationKind is recorded in UpgradeReport.Validation (design.md
+// D-6): "go build ./..." is the only claim Upgrade proves, and the report
+// says so explicitly rather than letting a consumer assume `go vet` also
+// ran.
+const runtimeValidationKind = "build"
 
 // GoRuntimeUpgrader mutates a Go workspace's declarative toolchain-version
 // sources (go.mod's go/toolchain directives, go.work's own go directive,
@@ -65,10 +82,17 @@ var _ shipwright.RuntimeUpgrader = (*GoRuntimeUpgrader)(nil)
 // and the workspace's own internal consistency against the A1-A7 ambiguity
 // rules (design.md D-5, plus the A7 path-escape guard), then mutates every
 // present declarative location (go.work and every use'd module's go.mod
-// for a workspace, or a single go.mod; .go-version when present) and
-// writes a shipwright.UpgradeReport to runtimeUpgradeReportPath in the
-// returned Directory. Any detected ambiguity or path-escape aborts before
-// the first WithNewFile: (nil, err), never a partially mutated Directory.
+// for a workspace, or a single go.mod; .go-version when present),
+// validates the mutation in a "golang:"+targetVersion container via `go
+// mod tidy` + `go build ./...` per module (design.md D-6/D-7, tasks.md
+// Phase 4), and writes a shipwright.UpgradeReport to
+// runtimeUpgradeReportPath in the returned Directory. Any detected
+// ambiguity or path-escape aborts before the first WithNewFile: (nil,
+// err), never a partially mutated Directory. A post-mutation validation
+// failure also returns (nil, err) — a *ValidationError naming which module
+// failed and which already succeeded — never a directory presented as
+// upgraded (spec: "Post-mutation validation failure is not silently
+// returned").
 func (u *GoRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) {
 	if u.Client == nil {
 		return nil, errors.New("runtimeupgrader: dagger client is not configured")
@@ -107,7 +131,7 @@ func (u *GoRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Director
 	}
 
 	if len(input.GoWork) > 0 {
-		return u.upgradeWorkspace(dir, input, ws, targetVersion, root)
+		return u.upgradeWorkspace(ctx, dir, input, ws, targetVersion, root)
 	}
 
 	modBytes, ok := input.Modules["."]
@@ -140,7 +164,7 @@ func (u *GoRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Director
 		result = result.WithNewFile(".go-version", string(mutateGoVersion(targetVersion)))
 	}
 
-	return writeUpgradeReport(result, root, targetVersion, []shipwright.ModuleDrift{drift})
+	return u.validateAndFinalize(ctx, result, dir, root, targetVersion, []string{"."}, map[string][]byte{".": mutatedMod}, []shipwright.ModuleDrift{drift})
 }
 
 // validateWorkspaceModulePaths guards design.md's Threat Matrix "Path
@@ -194,7 +218,7 @@ func validateWorkspaceModulePaths(ctx context.Context, dir daggerkit.DaggerDirec
 // Called only after validateWorkspaceModulePaths and detectConflicts have
 // both already passed: every module path here is known to stay within the
 // workspace root, and the workspace's tier-1 sources are known consistent.
-func (u *GoRuntimeUpgrader) upgradeWorkspace(dir daggerkit.DaggerDirectory, input WorkspaceInput, ws *Workspace, targetVersion, root string) (*dagger.Directory, error) {
+func (u *GoRuntimeUpgrader) upgradeWorkspace(ctx context.Context, dir daggerkit.DaggerDirectory, input WorkspaceInput, ws *Workspace, targetVersion, root string) (*dagger.Directory, error) {
 	mutatedWork, err := mutateGoWork(input.GoWork, targetVersion)
 	if err != nil {
 		return nil, err
@@ -217,11 +241,13 @@ func (u *GoRuntimeUpgrader) upgradeWorkspace(dir daggerkit.DaggerDirectory, inpu
 	}
 
 	drifts := make([]shipwright.ModuleDrift, 0, len(modulePaths))
+	mutatedByPath := make(map[string][]byte, len(modulePaths))
 	for _, modPath := range modulePaths {
 		mutatedMod, err := mutateGoMod(input.Modules[modPath], targetVersion)
 		if err != nil {
 			return nil, err
 		}
+		mutatedByPath[modPath] = mutatedMod
 
 		drift := shipwright.ModuleDrift{Path: modPath, UpdatedGo: targetVersion}
 		if mf, ok := previous[modPath]; ok {
@@ -236,21 +262,213 @@ func (u *GoRuntimeUpgrader) upgradeWorkspace(dir daggerkit.DaggerDirectory, inpu
 		result = result.WithNewFile(path.Join(modPath, "go.mod"), string(mutatedMod))
 	}
 
-	return writeUpgradeReport(result, root, targetVersion, drifts)
+	return u.validateAndFinalize(ctx, result, dir, root, targetVersion, modulePaths, mutatedByPath, drifts)
 }
 
-// writeUpgradeReport marshals a shipwright.UpgradeReport and writes it to
-// runtimeUpgradeReportPath inside dir, shared by both the single-module and
-// go.work workspace mutation paths.
-func writeUpgradeReport(dir daggerkit.DaggerDirectory, root, targetVersion string, modules []shipwright.ModuleDrift) (*dagger.Directory, error) {
+// ValidationError is returned by GoRuntimeUpgrader.Upgrade when
+// post-mutation validation (design.md D-6: `go build ./...`, never `go
+// vet`) fails for a module. It names Validation (the stage that was run),
+// Failed (the module whose build failed), and Succeeded (every module
+// already validated before the failure), so a caller never has to guess
+// which module broke the workspace — spec: "the report names which module
+// failed and which succeeded". Upgrade returns (nil, err) alongside it:
+// no directory is ever presented as a successfully upgraded workspace
+// (spec: "Post-mutation validation failure is not silently returned").
+type ValidationError struct {
+	Validation string
+	Failed     string
+	Succeeded  []string
+	Err        error
+}
+
+func (e *ValidationError) Error() string {
+	succeeded := "none"
+	if len(e.Succeeded) > 0 {
+		succeeded = strings.Join(e.Succeeded, ", ")
+	}
+	return fmt.Sprintf("runtimeupgrader: %s validation failed for module %q (already succeeded: %s): %v", e.Validation, e.Failed, succeeded, e.Err)
+}
+
+// Unwrap exposes the underlying container error (e.g. Dagger's own
+// ExecError, carrying the failing command's stderr), matching the wrap
+// convention every other capability in this package already uses.
+func (e *ValidationError) Unwrap() error { return e.Err }
+
+// validateAndFinalize is design.md D-7 steps 3-6, shared by both the
+// single-module and go.work workspace mutation paths: mount dir (already
+// fully mutated by the caller) into a "golang:"+targetVersion container,
+// run `go mod tidy` (when u.Tidy) then `go build ./...` per module in
+// modulePaths order, and export the container's own workdir as the
+// returned Directory once every module has validated cleanly. Sync runs
+// once per module (not once for the whole chain) specifically so a
+// failure names the exact module that broke and every module already
+// proven to build (tasks.md 4.1/4.2) — a single trailing Sync could only
+// report "something failed somewhere". mutatedByPath carries each
+// module's already-mutated go.mod bytes (no extra read needed) as the
+// "before" side of the per-module require-list delta recorded in the
+// final report (design.md D-7's require-list delta fields, tasks.md 4.4).
+// originalDir is the untouched pre-mutation source Directory (Upgrade
+// itself never writes go.sum), used by recordModuleDelta as the "before"
+// side of each module's go.sum byte comparison.
+func (u *GoRuntimeUpgrader) validateAndFinalize(ctx context.Context, dir, originalDir daggerkit.DaggerDirectory, root, targetVersion string, modulePaths []string, mutatedByPath map[string][]byte, drifts []shipwright.ModuleDrift) (*dagger.Directory, error) {
+	driftByPath := make(map[string]*shipwright.ModuleDrift, len(drifts))
+	for i := range drifts {
+		driftByPath[drifts[i].Path] = &drifts[i]
+	}
+
+	container := u.Client.Container().From("golang:"+targetVersion).WithMountedDirectory(runtimeUpgradeContainerRoot, dir)
+
+	succeeded := make([]string, 0, len(modulePaths))
+	for _, modPath := range modulePaths {
+		workdir := moduleContainerWorkdir(modPath)
+		container = container.WithWorkdir(workdir)
+		if u.Tidy {
+			container = container.WithExec([]string{"go", "mod", "tidy"}, daggerkit.DaggerContainerWithExecOpts{})
+		}
+		container = container.WithExec([]string{"go", "build", "./..."}, daggerkit.DaggerContainerWithExecOpts{})
+
+		synced, err := container.Sync(ctx)
+		if err != nil {
+			return nil, &ValidationError{Validation: runtimeValidationKind, Failed: modPath, Succeeded: succeeded, Err: err}
+		}
+		container = synced
+
+		if err := recordModuleDelta(ctx, container, originalDir, workdir, modPath, mutatedByPath[modPath], driftByPath[modPath]); err != nil {
+			return nil, err
+		}
+
+		succeeded = append(succeeded, modPath)
+	}
+
 	report := shipwright.UpgradeReport{
 		WorkspaceRoot: root,
 		TargetVersion: targetVersion,
-		Modules:       modules,
+		Validation:    runtimeValidationKind,
+		Modules:       drifts,
 	}
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("runtimeupgrader: failed to marshal upgrade report: %w", err)
 	}
-	return dir.WithNewFile(runtimeUpgradeReportPath, string(data)).GetRealDirectory(), nil
+
+	finalDir := container.Directory(runtimeUpgradeContainerRoot)
+	return finalDir.WithNewFile(runtimeUpgradeReportPath, string(data)).GetRealDirectory(), nil
+}
+
+// moduleContainerWorkdir returns modPath's absolute path inside the
+// validation container: the mount root itself for the single-module "."
+// case, or a subdirectory of it for a go.work-referenced module.
+func moduleContainerWorkdir(modPath string) string {
+	if modPath == "." {
+		return runtimeUpgradeContainerRoot
+	}
+	return path.Join(runtimeUpgradeContainerRoot, modPath)
+}
+
+// recordModuleDelta fills in drift's AddedModules/RemovedModules fields
+// (design.md D-7) by diffing beforeModBytes' require directives (already
+// in memory — the bytes Upgrade itself wrote into the container, before
+// `go mod tidy` ran) against workdir/go.mod's require directives as `go
+// mod tidy` left them inside the container. Reports only the added/
+// removed require module paths — never the raw go.sum diff, which can run
+// to thousands of unreviewable lines (design.md D-7).
+//
+// GoSumChanged is computed independently of that require-list delta: a
+// literal byte comparison of modPath's go.sum content in originalDir (the
+// untouched pre-mutation source — Upgrade itself never writes go.sum)
+// against workdir/go.sum as `go mod tidy` left it inside the container.
+// A require-path diff alone misses `go mod tidy` bumping an *existing*
+// dependency's version, which changes go.sum's hash entries (and the
+// require directive's version) without changing the require path set —
+// the byte comparison catches that case where the old path-diff proxy
+// silently reported no change. go.sum absent on either side (e.g. a
+// module with zero external dependencies) is treated as empty for
+// comparison purposes, never a hard failure.
+func recordModuleDelta(ctx context.Context, container daggerkit.DaggerContainer, originalDir daggerkit.DaggerDirectory, workdir, modPath string, beforeModBytes []byte, drift *shipwright.ModuleDrift) error {
+	if drift == nil {
+		return fmt.Errorf("runtimeupgrader: no drift entry recorded for module %s", modPath)
+	}
+
+	before, err := requireModulePaths(beforeModBytes, path.Join(modPath, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("runtimeupgrader: failed to parse pre-validation %s/go.mod: %w", modPath, err)
+	}
+
+	afterContents, err := container.File(path.Join(workdir, "go.mod")).Contents(ctx)
+	if err != nil {
+		return fmt.Errorf("runtimeupgrader: failed to read post-validation %s/go.mod: %w", modPath, err)
+	}
+	after, err := requireModulePaths([]byte(afterContents), path.Join(modPath, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("runtimeupgrader: failed to parse post-validation %s/go.mod: %w", modPath, err)
+	}
+
+	var added, removed []string
+	for p := range after {
+		if !before[p] {
+			added = append(added, p)
+		}
+	}
+	for p := range before {
+		if !after[p] {
+			removed = append(removed, p)
+		}
+	}
+	sort.Strings(added)
+	sort.Strings(removed)
+
+	drift.AddedModules = added
+	drift.RemovedModules = removed
+
+	beforeSum, err := readOptionalFileContents(ctx, originalDir.File(path.Join(modPath, "go.sum")))
+	if err != nil {
+		return fmt.Errorf("runtimeupgrader: failed to read pre-validation %s/go.sum: %w", modPath, err)
+	}
+	afterSum, err := readOptionalFileContents(ctx, container.File(path.Join(workdir, "go.sum")))
+	if err != nil {
+		return fmt.Errorf("runtimeupgrader: failed to read post-validation %s/go.sum: %w", modPath, err)
+	}
+	drift.GoSumChanged = !bytes.Equal(beforeSum, afterSum)
+
+	return nil
+}
+
+// readOptionalFileContents reads f's full content, treating a "file does
+// not exist" error as a legitimate absent state ((nil, nil), equivalent to
+// empty for a later byte comparison) rather than a hard failure — go.sum
+// is not guaranteed to exist either before or after `go mod tidy` runs
+// (e.g. a module with zero external dependencies never has one). Any
+// other error is propagated unchanged.
+func readOptionalFileContents(ctx context.Context, f daggerkit.DaggerFile) ([]byte, error) {
+	contents, err := f.Contents(ctx)
+	if err != nil {
+		if isFileNotFoundError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return []byte(contents), nil
+}
+
+// isFileNotFoundError reports whether err represents a missing file rather
+// than some other read failure. Dagger's SDK has no typed "not exist"
+// sentinel for File.Contents (unlike os.IsNotExist), so this matches the
+// engine's own "no such file or directory" message — the same substring a
+// missing-path read surfaces through buildkit.
+func isFileNotFoundError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no such file or directory")
+}
+
+// requireModulePaths parses modBytes and returns the set of module paths
+// named by its require directives.
+func requireModulePaths(modBytes []byte, fileName string) (map[string]bool, error) {
+	mf, err := modfile.Parse(fileName, modBytes, nil)
+	if err != nil {
+		return nil, err
+	}
+	paths := make(map[string]bool, len(mf.Require))
+	for _, r := range mf.Require {
+		paths[r.Mod.Path] = true
+	}
+	return paths, nil
 }

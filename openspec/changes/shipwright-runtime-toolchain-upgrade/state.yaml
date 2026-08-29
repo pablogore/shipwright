@@ -1,7 +1,7 @@
 # SDD DAG state for change: shipwright-runtime-toolchain-upgrade
 change: shipwright-runtime-toolchain-upgrade
 title: Provider-Managed Runtime/Toolchain Upgrade (Go First)
-updated: 2026-08-29 (slice 3 verify)
+updated: 2026-08-29 (slice 4 verify)
 
 session:
   execution_mode: auto
@@ -16,8 +16,8 @@ phases:
   spec: done
   design: done
   tasks: done
-  apply: partial (slice 3/4 applied -- tasks 1.1-1.24, 2.1-2.17, and 3.1-3.6 done, phase 4 not started)
-  verify: partial (slice 3/4 verified -- PASS WITH WARNINGS; slice 4 not yet applied/verified)
+  apply: done (4/4 slices applied -- tasks 1.1-1.24, 2.1-2.17, 3.1-3.6, 4.1-4.7 all done; no unchecked task remains in tasks.md)
+  verify: done (4/4 slices verified -- slice 1 PASS, slice 2 PASS WITH WARNINGS, slice 3 PASS WITH WARNINGS, slice 4 PASS; whole-change verify/archive still pending after PR #4 merges)
   archive: pending
 
 artifacts:
@@ -49,9 +49,114 @@ next_recommended:
   - open PR #1 (feature/runtime-inspect-go -> develop) -- slice 1 verify PASSed
   - open PR #2 (feature/runtime-upgrade-single-module -> feature/runtime-inspect-go) -- slice 2 verify PASS WITH WARNINGS
   - open PR #3 (feature/runtime-upgrade-workspace -> feature/runtime-upgrade-single-module) -- slice 3 verify PASS WITH WARNINGS
-  - sdd-apply (slice 4, phase 4 of tasks.md, after PR #3 merges to develop)
+  - open PR #4 (feature/runtime-upgrade-tidy-validate -> feature/runtime-upgrade-workspace) -- slice 4 verify PASS
+  - after PR #4 is reviewed and merged (through the full stack to develop), run
+    a whole-change sdd-verify pass over the merged result, then sdd-archive
 
 open_risks:
+  - VERIFIED (slice 4/4, 2026-08-29, final slice) -- post-mutation tidy+build
+    validation on feature/runtime-upgrade-tidy-validate (commit 5ff7718) PASS,
+    zero CRITICALs, zero WARNINGs: all 7 Phase-4 tasks (4.1-4.7) confirmed
+    against real code, not just checkmarks, and tasks.md now shows every task
+    in all 4 phases checked [x] -- nothing unchecked anywhere in the file.
+    Container validation chain (runtimeupgrader.go's validateAndFinalize)
+    matches design.md D-7 exactly by direct source read:
+    Client.Container().From("golang:"+targetVersion).WithMountedDirectory(...),
+    then per module (in modulePaths order) a conditional `go mod tidy`
+    (u.Tidy, bound from the `tidy` with-field, default true) followed
+    unconditionally by `go build ./...`; `go vet` is never invoked anywhere
+    in providers/go (confirmed by direct grep across
+    runtimeupgrader.go/toolchain.go/gobuilder.go plus threat_matrix_test.go's
+    static import guard, which already lists runtimeupgrader.go and was not
+    modified this slice because it needed no extension). Post-mutation
+    failure semantics read directly from the test bodies, not inferred from
+    names: TestGoRuntimeUpgrader_Upgrade_ValidationFailure_ReturnsNilDirectory
+    asserts require.Error + assert.Nil(out) + ErrorAs to *ValidationError +
+    AssertNotCalled(mockContainer, "Directory"/"File") -- the failing module
+    truly returns no directory a caller could mistake for success.
+    TestGoRuntimeUpgrader_Upgrade_OneModuleFailsValidation_FailsWholeOperation
+    drives a 3-module go.work workspace where modA's Sync succeeds and modB's
+    Sync fails, then asserts the overall call returns (nil, err) with
+    Succeeded=["modA"] and AssertNotCalled(mockContainer, "WithWorkdir",
+    "/workspace/modC") -- modC is provably never even attempted, proving one
+    module's failure aborts the *whole* operation, not just that module.
+    UpgradeReport/ModuleDrift's new GoSumChanged/AddedModules/RemovedModules
+    fields (pkg/shipwright/runtime.go) are genuinely populated by
+    recordModuleDelta. AddedModules/RemovedModules diff the pre-mutation
+    go.mod bytes Upgrade itself wrote against the post-`go mod tidy` go.mod
+    read back from the container via daggerkit's real File(...).Contents(ctx)
+    -- not stubbed -- confirmed by TestGoRuntimeUpgrader_Upgrade_WritesUpgradeReport
+    asserting AddedModules=["example.com/dep"], RemovedModules empty, against
+    a mocked post-tidy go.mod carrying one require line absent from the
+    pre-mutation fixture. GoSumChanged is computed independently (post-slice
+    fix, PR #197 review feedback): a literal byte comparison of go.sum read
+    from the original pre-mutation source Directory against go.sum read back
+    from the container after tidy, via the same real File(...).Contents(ctx)
+    path -- not derived from the go.mod require-list diff above, which
+    misses `go mod tidy` bumping an already-required dependency's version
+    (same require path, different pinned version and go.sum hash). A go.sum
+    absent on either side is treated as empty, never a hard failure.
+    `validation: "build"` is recorded in the report
+    (runtimeValidationKind = "build", assigned to UpgradeReport.Validation),
+    confirmed by the same WritesUpgradeReport test's
+    assert.Equal(t, "build", report.Validation) and independently by both
+    ValidationFailure tests asserting validationErr.Validation == "build".
+    Integration test 4.6
+    (testing/integration/go/integration_test.go::TestGoRuntimeUpgrader_Upgrade_ValidationFailure_RealEngine)
+    genuinely connects a real Dagger engine (dagger.Connect(ctx), no mocks)
+    and writes a workspace whose main.go calls an undefined symbol -- a
+    passing-build fixture could not distinguish "go build ran and passed"
+    from "go build never ran", so this is the correct proof; both it and the
+    sibling TestGoRuntimeUpgrader_Upgrade_Workspace_RealEngine (extended this
+    slice to also assert report.Validation == "build") PASSed against the
+    real engine via `make test-integration` (Docker available in this
+    sandbox). D2 structural safety preserved: providers/go/toolchain.go
+    imports only fmt/path/sort/strings/modfile/semver, and
+    providers/go/runtimeupgrader.go imports only
+    context/encoding-json/errors/fmt/path/sort/strings/dagger/modfile/
+    shipwright/daggerkit -- no os, os/exec, net, or git-library import in
+    either file, confirmed both by direct read and by
+    TestRuntimeInspectFiles_NoHostWriteExecNetworkOrGitImports (unmodified
+    this slice; it already covered runtimeupgrader.go since Phase 2's task
+    2.16). Regression: Phase 2 (SingleModule_HappyPath,
+    Downgrade_AmbiguousAbort, Malformed_AmbiguousAbort) and Phase 3
+    (TestUpgrade_PathEscape, TestUpgrade_Workspace) tests all still PASS,
+    confirmed by an explicit named -run of all five plus the full package
+    suite; toolchain_test.go was not touched by this diff (0 lines changed).
+    Scope discipline: commit 5ff7718 alone touches exactly 6 files (tasks.md,
+    pkg/shipwright/runtime.go, pkg/shipwright/testdata/api.golden,
+    providers/go/runtimeupgrader.go, providers/go/runtimeupgrader_test.go,
+    testing/integration/go/integration_test.go) -- all in-scope for Phase 4,
+    no new capability, no phase-5-shaped work (there is no phase 5).
+    Independently reconfirmed clean: go build ./... (root + providers/go),
+    go test -race -count=1 ./... (root: all packages ok; providers/go: both
+    packages ok), gofmt -l on every touched .go file (zero output, confirmed
+    clean -- the one violation the apply session found and fixed before
+    committing is genuinely gone), golangci-lint run ./... at root (97
+    issues: testifylint 8 + thelper 3 + unparam 5 + unused 6 + usetesting 12
+    -- exactly the documented pre-existing baseline, zero in this diff's
+    files), golangci-lint run ./... in providers/go (3 staticcheck issues,
+    all in internalimport_test.go/naming_test.go, zero in
+    runtimeupgrader.go/toolchain.go), and `make test-integration` (both
+    TestGoRuntimeUpgrader_Upgrade_Workspace_RealEngine and
+    TestGoRuntimeUpgrader_Upgrade_ValidationFailure_RealEngine PASS, plus
+    every other real-engine test in the suite). Coverage framing
+    independently verified, not trusted blindly: `make coverage` on this
+    slice's tip is 74.6%, and checking out the prior slice-3 tip (5df1a98)
+    and re-running `make coverage` there reproduces the exact same 74.6% --
+    proving the gap is byte-identical pre-existing debt from the concurrent
+    fix/186-lint-debt-ci-final branch, not something this slice introduced or
+    could have moved (pkg/shipwright/runtime.go is struct-only with zero
+    executable statements to cover; providers/go/runtimeupgrader.go lives in
+    a separate go.work module structurally excluded from root's `go test
+    ./...` coverage run). providers/go's own coverage independently measured
+    at 89.4% (go test -coverprofile), matching the claim; its exclusion from
+    root's 90% floor is confirmed by .github/workflows/ci.yml's own comment,
+    "independently-published module (design.md D2/D4) whose coverage is not
+    part of root's calibrated threshold." ZERO CRITICALs, ZERO WARNINGs for
+    this slice. Verdict: PASS. This closes out apply/verify for all 4 slices
+    of shipwright-runtime-toolchain-upgrade; only PR #4's review/merge and a
+    subsequent whole-change verify + archive remain.
   - VERIFIED (slice 1/4, 2026-08-28) -- runtime-inspect end-to-end on
     feature/runtime-inspect-go PASSes: all 24 Phase-1 tasks confirmed against
     real code (not just checkmarks); spec.md runtime-toolchain scenarios

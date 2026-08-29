@@ -5,6 +5,7 @@ package golang_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -306,7 +307,65 @@ func assertWorkspaceUpgraded(ctx context.Context, t *testing.T, outDir daggerkit
 	if report.TargetVersion != "1.27.0" {
 		t.Fatalf("report.TargetVersion = %q, want %q", report.TargetVersion, "1.27.0")
 	}
+	if report.Validation != "build" {
+		t.Fatalf("report.Validation = %q, want %q", report.Validation, "build")
+	}
 	if len(report.Modules) != 2 {
 		t.Fatalf("report.Modules = %v, want exactly 2 entries", report.Modules)
+	}
+}
+
+// TestGoRuntimeUpgrader_Upgrade_ValidationFailure_RealEngine is tasks.md
+// 4.6's integration test: a real, connected Dagger engine actually runs
+// `go build ./...` inside a "golang:"+targetVersion container after
+// mutating the workspace's toolchain directives (design.md D-6/D-7). A
+// workspace whose source compiles cleanly cannot, on its own, distinguish
+// "go build ran and passed" from "go build never ran at all" — only a
+// fixture whose source is guaranteed to fail `go build ./...` can prove the
+// validation step actually executes against a real engine, per spec:
+// "Post-mutation validation failure is not silently returned".
+func TestGoRuntimeUpgrader_Upgrade_ValidationFailure_RealEngine(t *testing.T) {
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		t.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	tmpDir := t.TempDir()
+	brokenGo := `package main
+
+func main() {
+	undefinedSymbol()
+}
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte(brokenGo), 0o644); err != nil {
+		t.Fatalf("failed to write main.go: %v", err)
+	}
+	goMod := "module example.com/upgradebrokentest\n\ngo 1.26.7\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("failed to write go.mod: %v", err)
+	}
+
+	src := client.Host().Directory(tmpDir)
+	upgrader := &golang.GoRuntimeUpgrader{Client: daggerkit.NewDaggerAdapter(client)}
+
+	out, err := upgrader.Upgrade(ctx, src, "1.27.0")
+	if err == nil {
+		t.Fatal("GoRuntimeUpgrader.Upgrade() error = nil, want a post-mutation build validation failure")
+	}
+	if out != nil {
+		t.Fatalf("GoRuntimeUpgrader.Upgrade() directory = %v, want nil on validation failure", out)
+	}
+
+	var validationErr *golang.ValidationError
+	if !errors.As(err, &validationErr) {
+		t.Fatalf("GoRuntimeUpgrader.Upgrade() error = %v, want a *golang.ValidationError", err)
+	}
+	if validationErr.Validation != "build" {
+		t.Fatalf("ValidationError.Validation = %q, want %q", validationErr.Validation, "build")
+	}
+	if validationErr.Failed != "." {
+		t.Fatalf("ValidationError.Failed = %q, want %q", validationErr.Failed, ".")
 	}
 }
