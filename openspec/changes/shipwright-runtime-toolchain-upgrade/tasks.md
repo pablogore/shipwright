@@ -62,23 +62,23 @@ Every slice independently passes `go build ./...`, `go test -race ./...`, `golan
 
 ## Phase 2 (Slice 2 — PR2 `feature/runtime-upgrade-single-module`): single-module `runtime-upgrade`
 
-- [ ] 2.1 RED `providers/go/toolchain_test.go` — extend with `mutateGoMod`/`mutateGoWork`/`.go-version` mutation over `single-module`, `downgrade` (A4), `malformed` (A5) fixtures.
-- [ ] 2.2 GREEN `providers/go/toolchain.go` — `mutateGoMod`, mutate `.go-version`; `targetVersion` validated via `modfile.GoVersionRE` **before** any write (threat matrix: command construction from config) — RED test: `"1.26.7; rm -rf /"`, `"--flag"` rejected at parse.
-- [ ] 2.3 RED `providers/go/daggerkit/adapter_test.go` — mocked `DaggerDirectory.WithNewFile`.
-- [ ] 2.4 GREEN `providers/go/daggerkit/{interfaces,adapter,mocks}.go` — add `DaggerDirectory.WithNewFile(path, contents string) DaggerDirectory` (D-9 write-side).
-- [ ] 2.5 RED `pkg/shipwright/capabilities_test.go` reflection map — add `RuntimeUpgrader`.
-- [ ] 2.6 GREEN `pkg/shipwright/capabilities.go` — `RuntimeUpgrader interface { Upgrade(ctx, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) }`.
-- [ ] 2.7 GREEN `.dagger/capabilities.go` — Layer 2 `RuntimeUpgrader` projection; `Upgrade` **drops `error`** (D-3, matches `Builder.Build`).
-- [ ] 2.8 REQUIRED regenerate `pkg/shipwright/testdata/api.golden` (`-update`, reviewed diff) — interface count 6→7.
-- [ ] 2.9 RED `providers/go/runtimeupgrader_test.go` — single-module happy path, ambiguous-abort (`(nil, err)`, no directory), missing-location-skipped — spec req: Discovery-Driven Upgrade scenarios.
-- [ ] 2.10 GREEN `providers/go/runtimeupgrader.go` — `GoRuntimeUpgrader.Upgrade`; single-module `go.mod` path only (no `go.work` traversal yet); writes `.shipwright/runtime-upgrade-report.json` into returned Directory (D-2); create `pkg/shipwright/runtime.go` additions: `UpgradeReport`, `ModuleDrift`.
-- [ ] 2.11 RED/GREEN `internal/workflow/manifest/validate.go` + `validate_test.go` — allowlist 6→7, `runtime-upgrade` `with` schema (`targetVersion` required, `workspaceRoot`, `tidy`, `allowDowngrade`).
-- [ ] 2.12 RED/GREEN `internal/workflow/providers/registry.go` + `registry_test.go` — `upgraders` table + Register/Resolve pair.
-- [ ] 2.13 GREEN `internal/workflow/providers/register.go` — register `go-runtime` under `runtime-upgrade`.
-- [ ] 2.14 RED/GREEN `internal/workflow/engine/execute.go` + `dispatch_test.go` — `dispatchRuntimeUpgrade` case, no blocking logic (D1).
-- [ ] 2.15 RED/GREEN `main.go::resolveCapabilityRef` + `main_test.go` — add `case "runtime-upgrade"` (D-8's second case).
-- [ ] 2.16 Threat-matrix RED: static import guard extended to `runtimeupgrader.go` (no host writes; only `Directory.WithNewFile`).
-- [ ] 2.17 Verify: `go build ./...`, `go test -race ./providers/go/... ./internal/workflow/...`, `golangci-lint run` green; `--list-steps` lists both capabilities.
+- [x] 2.1 RED `providers/go/toolchain_test.go` — extend with `mutateGoMod`/`mutateGoWork`/`.go-version` mutation over `single-module`, `downgrade` (A4), `malformed` (A5) fixtures.
+- [x] 2.2 GREEN `providers/go/toolchain.go` — `mutateGoMod`, mutate `.go-version`; `targetVersion` validated via `modfile.GoVersionRE` **before** any write (threat matrix: command construction from config) — RED test: `"1.26.7; rm -rf /"`, `"--flag"` rejected at parse.
+- [x] 2.3 RED `providers/go/daggerkit/adapter_test.go` — mocked `DaggerDirectory.WithNewFile`.
+- [x] 2.4 GREEN `providers/go/daggerkit/{interfaces,adapter,mocks}.go` — add `DaggerDirectory.WithNewFile(path, contents string) DaggerDirectory` (D-9 write-side).
+- [x] 2.5 RED `pkg/shipwright/capabilities_test.go` reflection map — add `RuntimeUpgrader`.
+- [x] 2.6 GREEN `pkg/shipwright/capabilities.go` — `RuntimeUpgrader interface { Upgrade(ctx, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) }`.
+- [x] 2.7 GREEN `.dagger/capabilities.go` — Layer 2 `RuntimeUpgrader` projection; `Upgrade` **drops `error`** (D-3, matches `Builder.Build`).
+- [x] 2.8 REQUIRED regenerate `pkg/shipwright/testdata/api.golden` (`-update`, reviewed diff) — interface count 6→7.
+- [x] 2.9 RED `providers/go/runtimeupgrader_test.go` — single-module happy path, ambiguous-abort (`(nil, err)`, no directory), missing-location-skipped — spec req: Discovery-Driven Upgrade scenarios.
+- [x] 2.10 GREEN `providers/go/runtimeupgrader.go` — `GoRuntimeUpgrader.Upgrade`; single-module `go.mod` path only (no `go.work` traversal yet); writes `.shipwright/runtime-upgrade-report.json` into returned Directory (D-2); create `pkg/shipwright/runtime.go` additions: `UpgradeReport`, `ModuleDrift`.
+- [x] 2.11 RED/GREEN `internal/workflow/manifest/validate.go` + `validate_test.go` — allowlist 6→7, `runtime-upgrade` `with` schema (`targetVersion` required, `workspaceRoot`, `tidy`, `allowDowngrade`).
+- [x] 2.12 RED/GREEN `internal/workflow/providers/registry.go` + `registry_test.go` — `upgraders` table + Register/Resolve pair.
+- [x] 2.13 GREEN `internal/workflow/providers/register.go` — register `go-runtime` under `runtime-upgrade`.
+- [x] 2.14 RED/GREEN `internal/workflow/engine/execute.go` + `dispatch_test.go` — `dispatchRuntimeUpgrade` case, no blocking logic (D1).
+- [x] 2.15 RED/GREEN `main.go::resolveCapabilityRef` + `main_test.go` — add `case "runtime-upgrade"` (D-8's second case).
+- [x] 2.16 Threat-matrix RED: static import guard extended to `runtimeupgrader.go` (no host writes; only `Directory.WithNewFile`).
+- [x] 2.17 Verify: `go build ./...`, `go test -race ./providers/go/... ./internal/workflow/...`, `golangci-lint run` green; `--list-steps` lists both capabilities.
 
 ## Phase 3 (Slice 3 — PR3 `feature/runtime-upgrade-workspace`): multi-module `go.work` upgrade
 

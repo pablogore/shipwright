@@ -26,8 +26,12 @@ type DaggerClient interface {
 // DaggerDirectory interface abstracts the dagger.Directory to enable
 // mocking. File and Entries were added for GoRuntimeInspector (design.md
 // D-9): reading a workspace's go.work/go.mod/.go-version content is the
-// first read-side consumer this module has ever had. WithNewFile (the
-// write side) is deferred to the runtime-upgrade slice.
+// first read-side consumer this module has ever had. WithNewFile is the
+// write side (design.md D-9), added for GoRuntimeUpgrader: since
+// dagger.Directory is an immutable value, WithNewFile returns a new
+// DaggerDirectory rather than mutating in place, which is what gives the
+// no-partial-mutation guarantee (analysis completes before the first
+// WithNewFile call; a failed run never returns a directory).
 type DaggerDirectory interface {
 	// GetRealDirectory returns the underlying real Dagger directory (only for adapters)
 	GetRealDirectory() *dagger.Directory
@@ -39,6 +43,10 @@ type DaggerDirectory interface {
 	// directory's root, used to discover which tier-1 sources
 	// (go.work, .go-version, go.mod) are actually present.
 	Entries(ctx context.Context) ([]string, error)
+	// WithNewFile returns a new DaggerDirectory with the file at path
+	// replaced by contents (or created, if absent). The receiver is left
+	// unmodified.
+	WithNewFile(path, contents string) DaggerDirectory
 }
 
 // DaggerContainerWithExecOpts represents options for container exec

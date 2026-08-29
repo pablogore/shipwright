@@ -54,6 +54,14 @@ func (m *MockDaggerDirectory) Entries(ctx context.Context) ([]string, error) {
 	return entries, args.Error(1)
 }
 
+func (m *MockDaggerDirectory) WithNewFile(path, contents string) DaggerDirectory {
+	args := m.Called(path, contents)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerDirectory)
+	}
+	return nil
+}
+
 var _ DaggerContainer = (*MockDaggerContainer)(nil)
 
 // MockDaggerContainer implements DaggerContainer using testify's mock package.

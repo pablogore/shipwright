@@ -1,12 +1,14 @@
-// SECURITY test — tasks.md 1.23, design.md's Threat Matrix rows "Arbitrary
-// file write outside returned dir" and "Host subprocess": a static
-// assertion (not a documentation comment) that toolchain.go and
-// runtimeinspector.go — the two files implementing GoRuntimeInspector's
-// read-only drift detection — never import a package capable of a host
-// filesystem write, a host subprocess, an HTTP client, or a VCS/git
-// invocation. Mirrors internal/workflow/providers/security_test.go's own
-// "prove it, don't just assert it" static-import-guard style, scoped to
-// these two specific files (parser.ImportsOnly, no `go list` subprocess).
+// SECURITY test — tasks.md 1.23/2.16, design.md's Threat Matrix rows
+// "Arbitrary file write outside returned dir" and "Host subprocess": a
+// static assertion (not a documentation comment) that toolchain.go,
+// runtimeinspector.go, and runtimeupgrader.go — the files implementing
+// GoRuntimeInspector's read-only drift detection and GoRuntimeUpgrader's
+// mutation (writes only ever go through Directory.WithNewFile on an
+// immutable value, never a host primitive) — never import a package
+// capable of a host filesystem write, a host subprocess, an HTTP client, or
+// a VCS/git invocation. Mirrors internal/workflow/providers/security_test.go's
+// own "prove it, don't just assert it" static-import-guard style, scoped to
+// these specific files (parser.ImportsOnly, no `go list` subprocess).
 package golang_test
 
 import (
@@ -17,13 +19,16 @@ import (
 )
 
 // runtimeInspectFiles are the exact source files design.md's Threat Matrix
-// names: toolchain.go (pure-Go parse/conflict core) and runtimeinspector.go
-// (the Dagger-facing capability that calls it). Both are production code
-// only — test fixture files (toolchain_test.go etc.) legitimately import
-// "os" to read testdata from the host and are deliberately excluded.
+// names: toolchain.go (pure-Go parse/conflict core), runtimeinspector.go
+// (the Dagger-facing read-only capability), and runtimeupgrader.go (the
+// Dagger-facing mutating capability, added tasks.md 2.16). All three are
+// production code only — test fixture files (toolchain_test.go etc.)
+// legitimately import "os" to read testdata from the host and are
+// deliberately excluded.
 var runtimeInspectFiles = []string{
 	"toolchain.go",
 	"runtimeinspector.go",
+	"runtimeupgrader.go",
 }
 
 // forbiddenImports maps each disallowed import path to the Threat Matrix

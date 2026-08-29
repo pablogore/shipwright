@@ -120,6 +120,90 @@ func TestExecute_DispatchesRuntimeInspector(t *testing.T) {
 	}
 }
 
+// TestExecute_DispatchesRuntimeUpgrader guards dispatchRuntimeUpgrade's
+// straight-line resolve->call->wrap shape (runtime-toolchain-upgrade,
+// design.md D-9): no blocking code, the required targetVersion with-field
+// is extracted via stringWith and forwarded to Upgrade as its own method
+// parameter (not baked into the provider factory, unlike
+// workspaceRoot/tidy/allowDowngrade), and a missing targetVersion fails the
+// step instead of silently defaulting.
+func TestExecute_DispatchesRuntimeUpgrader(t *testing.T) {
+	t.Parallel()
+
+	rec := &recorder{}
+	reg := providers.NewRegistry()
+	var gotTargetVersion string
+	reg.RegisterRuntimeUpgrader(providers.Ref{Name: "go-runtime", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeUpgrader {
+		return fakeRuntimeUpgrader{UpgradeFunc: func(_ context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) {
+			rec.record("upgrade")
+			gotTargetVersion = targetVersion
+			return source, nil
+		}}
+	})
+
+	steps := []manifest.Step{{
+		ID: "upgrade", Capability: "runtime-upgrade",
+		Uses: manifest.UsesSpec{Provider: "go-runtime", Version: "1"},
+		With: map[string]any{"targetVersion": "1.27.0"},
+	}}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	cfg := engine.Config{Steps: steps, Graph: g, Registry: reg}
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+	if res.Failed() {
+		t.Fatalf("Execute() Failures = %v, want none", res.Failures)
+	}
+	if got := rec.snapshot(); len(got) != 1 || got[0] != "upgrade" {
+		t.Fatalf("invocation order = %v, want [upgrade]", got)
+	}
+	if gotTargetVersion != "1.27.0" {
+		t.Fatalf("Upgrade() targetVersion = %q, want %q", gotTargetVersion, "1.27.0")
+	}
+}
+
+// TestExecute_RuntimeUpgraderMissingTargetVersionFieldRejected proves
+// targetVersion's requiredness (design.md D-9's with-schema table) is
+// actually enforced at dispatch time, not merely documented: a
+// runtime-upgrade step with no targetVersion with-field fails the step
+// rather than calling Upgrade with an empty string. Mirrors
+// TestExecute_ArtifactorMissingRefFieldRejected's exact assertion shape.
+func TestExecute_RuntimeUpgraderMissingTargetVersionFieldRejected(t *testing.T) {
+	t.Parallel()
+
+	reg := providers.NewRegistry()
+	reg.RegisterRuntimeUpgrader(providers.Ref{Name: "go-runtime", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeUpgrader {
+		return fakeRuntimeUpgrader{}
+	})
+	steps := []manifest.Step{{ID: "upgrade", Capability: "runtime-upgrade", Uses: manifest.UsesSpec{Provider: "go-runtime", Version: "1"}}}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	cfg := engine.Config{Steps: steps, Graph: g, Registry: reg}
+
+	_, err = engine.Execute(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Execute() error = nil, want *engine.MissingWithFieldError")
+	}
+	var stepFailed *engine.StepFailedError
+	if !errors.As(err, &stepFailed) {
+		t.Fatalf("Execute() error = %v (%T), want *engine.StepFailedError", err, err)
+	}
+	var missing *engine.MissingWithFieldError
+	if !errors.As(stepFailed.Err, &missing) {
+		t.Fatalf("StepFailedError.Err = %v (%T), want *engine.MissingWithFieldError", stepFailed.Err, stepFailed.Err)
+	}
+	if missing.Field != "targetVersion" {
+		t.Fatalf("MissingWithFieldError.Field = %q, want %q", missing.Field, "targetVersion")
+	}
+}
+
 func TestExecute_UnknownCapabilityRejected(t *testing.T) {
 	t.Parallel()
 

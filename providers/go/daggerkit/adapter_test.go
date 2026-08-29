@@ -51,3 +51,17 @@ func TestMockDaggerFile_Contents(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "module example.com/x\n\ngo 1.26.7\n", contents)
 }
+
+// TestMockDaggerDirectory_WithNewFile proves the write-side mock method
+// (design.md D-9) is correctly wired to testify's mock.Mock plumbing —
+// GoRuntimeUpgrader depends on this to write mutated go.mod/go.work/
+// .go-version content and the report file into a returned Directory.
+func TestMockDaggerDirectory_WithNewFile(t *testing.T) {
+	mockDir := &MockDaggerDirectory{}
+	mockUpdatedDir := &MockDaggerDirectory{}
+
+	mockDir.On("WithNewFile", "go.mod", "module example.com/x\n\ngo 1.27.0\n").Return(mockUpdatedDir)
+
+	got := mockDir.WithNewFile("go.mod", "module example.com/x\n\ngo 1.27.0\n")
+	assert.Same(t, mockUpdatedDir, got)
+}

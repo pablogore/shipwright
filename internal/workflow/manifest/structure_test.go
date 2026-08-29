@@ -94,6 +94,27 @@ func TestParse_RuntimeInspectCapabilityValidates(t *testing.T) {
 	}
 }
 
+// TestParse_RuntimeUpgradeCapabilityValidates guards the
+// runtime-toolchain-upgrade allowlist addition (design.md D-9's
+// runtime-upgrade capability): the runtime-upgrade capability string must
+// be accepted by structure validation.
+func TestParse_RuntimeUpgradeCapabilityValidates(t *testing.T) {
+	src := identityHeader + `
+  steps:
+    - id: upgrade
+      capability: runtime-upgrade
+      uses: {provider: go-runtime, version: "1"}
+      with: {targetVersion: "1.27.0"}
+`
+	m, err := manifest.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil for the runtime-upgrade capability", err)
+	}
+	if len(m.Spec.Steps) != 1 || m.Spec.Steps[0].Capability != "runtime-upgrade" {
+		t.Fatalf("Spec.Steps = %+v, want one step with capability runtime-upgrade", m.Spec.Steps)
+	}
+}
+
 func TestParse_MissingUsesFailsValidation(t *testing.T) {
 	src := identityHeader + `
   steps:

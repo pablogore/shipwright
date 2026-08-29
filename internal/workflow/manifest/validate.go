@@ -22,8 +22,9 @@ const workflowKind = "Workflow"
 // original contract types public-module-api defines (pkg/shipwright.
 // {Builder, Tester, Artifactor, Deployer, Runner}), named as their
 // manifest-facing lowercase strings, plus runtime-inspect
-// (pkg/shipwright.RuntimeInspector, design.md D-4b of the
-// shipwright-runtime-toolchain-upgrade change) — hyphenated, matching this
+// (pkg/shipwright.RuntimeInspector, design.md D-4b) and runtime-upgrade
+// (pkg/shipwright.RuntimeUpgrader, design.md D-9) — both from the
+// shipwright-runtime-toolchain-upgrade change, hyphenated, matching this
 // repo's existing hyphenated provider-name convention rather than the
 // original five's single-word style.
 var validCapabilities = map[string]bool{
@@ -33,6 +34,7 @@ var validCapabilities = map[string]bool{
 	"deploy":          true,
 	"run":             true,
 	"runtime-inspect": true,
+	"runtime-upgrade": true,
 }
 
 // ValidateIdentity implements stage 2 of the fixed seven-stage validation
@@ -101,7 +103,7 @@ func validateStep(index int, step Step, seen map[string]bool) error {
 
 	if !validCapabilities[step.Capability] {
 		return fmt.Errorf(
-			"manifest: step %q has unsupported capability %q (must be one of build, test, artifact, deploy, run, runtime-inspect)",
+			"manifest: step %q has unsupported capability %q (must be one of build, test, artifact, deploy, run, runtime-inspect, runtime-upgrade)",
 			step.ID, step.Capability,
 		)
 	}

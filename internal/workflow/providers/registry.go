@@ -244,6 +244,7 @@ type Registry struct {
 	deployers   *table[shipwright.Deployer]
 	runners     *table[shipwright.Runner]
 	inspectors  *table[shipwright.RuntimeInspector]
+	upgraders   *table[shipwright.RuntimeUpgrader]
 }
 
 // NewRegistry constructs an empty Registry. Register the in-repo WU3
@@ -256,6 +257,7 @@ func NewRegistry() *Registry {
 		deployers:   newTable[shipwright.Deployer](),
 		runners:     newTable[shipwright.Runner](),
 		inspectors:  newTable[shipwright.RuntimeInspector](),
+		upgraders:   newTable[shipwright.RuntimeUpgrader](),
 	}
 }
 
@@ -336,4 +338,17 @@ func (r *Registry) RegisterRuntimeInspector(ref Ref, schema WithSchema, f func(V
 // declared WithSchema) to a concrete shipwright.RuntimeInspector.
 func (r *Registry) ResolveRuntimeInspector(ref Ref, v Values) (shipwright.RuntimeInspector, error) {
 	return r.inspectors.resolve("runtime-inspect", ref, v)
+}
+
+// RegisterRuntimeUpgrader registers a RuntimeUpgrader provider factory
+// under ref (runtime-toolchain-upgrade, design.md D-9). Seventh typed pair,
+// same shape as RegisterRuntimeInspector above.
+func (r *Registry) RegisterRuntimeUpgrader(ref Ref, schema WithSchema, f func(Values) shipwright.RuntimeUpgrader) {
+	r.upgraders.register(ref, schema, f)
+}
+
+// ResolveRuntimeUpgrader resolves ref (and validates v against its
+// declared WithSchema) to a concrete shipwright.RuntimeUpgrader.
+func (r *Registry) ResolveRuntimeUpgrader(ref Ref, v Values) (shipwright.RuntimeUpgrader, error) {
+	return r.upgraders.resolve("runtime-upgrade", ref, v)
 }

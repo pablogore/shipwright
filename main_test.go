@@ -333,17 +333,18 @@ func TestResolveStepInfos_DiamondExample(t *testing.T) {
 	assert.Equal(t, workflowStepInfo{StepID: "publish", Capability: "artifact", ProviderName: "container", ProviderVersion: "1"}, infos[3])
 }
 
-// TestResolveCapabilityRef_AllSixCapabilities covers every one of
-// resolveCapabilityRef's six capability branches (runtime-toolchain-upgrade,
-// design.md D-4b/D-8 adds runtime-inspect as the sixth) — the diamond
-// example only exercises build/test/artifact, so deploy/run need their own
-// registered fixtures (no in-repo Deployer/Runner provider exists yet,
-// WU3/WU7 — see providers/register.go's own doc comment — so this test
-// registers a bare fake for each, exactly to prove the dispatch branch
-// itself, not any concrete provider). runtime-inspect uses the real
+// TestResolveCapabilityRef_AllSevenCapabilities covers every one of
+// resolveCapabilityRef's seven capability branches (runtime-toolchain-upgrade,
+// design.md D-4b/D-8 adds runtime-inspect as the sixth, D-9 adds
+// runtime-upgrade as the seventh) — the diamond example only exercises
+// build/test/artifact, so deploy/run need their own registered fixtures (no
+// in-repo Deployer/Runner provider exists yet, WU3/WU7 — see
+// providers/register.go's own doc comment — so this test registers a bare
+// fake for each, exactly to prove the dispatch branch itself, not any
+// concrete provider). runtime-inspect/runtime-upgrade both use the real
 // go-runtime provider RegisterDefaults already registers
 // (providersRegistryForTest), same as build/test/artifact above.
-func TestResolveCapabilityRef_AllSixCapabilities(t *testing.T) {
+func TestResolveCapabilityRef_AllSevenCapabilities(t *testing.T) {
 	reg := providersRegistryForTest(t)
 	reg.RegisterDeployer(providers.Ref{Name: "fake-deploy", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Deployer {
 		return fakeDeployer{}
@@ -362,6 +363,7 @@ func TestResolveCapabilityRef_AllSixCapabilities(t *testing.T) {
 		{"deploy", providers.Ref{Name: "fake-deploy", Version: "1"}},
 		{"run", providers.Ref{Name: "fake-run", Version: "1"}},
 		{"runtime-inspect", providers.Ref{Name: "go-runtime", Version: "1"}},
+		{"runtime-upgrade", providers.Ref{Name: "go-runtime", Version: "1"}},
 	}
 
 	for _, tt := range tests {

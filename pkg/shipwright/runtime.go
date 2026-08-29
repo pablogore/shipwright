@@ -46,6 +46,44 @@ type ModuleVersion struct {
 	Toolchain string `json:"toolchain,omitempty"`
 }
 
+// UpgradeReport is the JSON payload RuntimeUpgrader.Upgrade writes to
+// .shipwright/runtime-upgrade-report.json inside the returned Directory
+// (design.md D-2). Like DriftReport, it never appears directly in a
+// capability interface signature (design.md D-1).
+type UpgradeReport struct {
+	// WorkspaceRoot is the upgraded workspace-relative root ("." by
+	// default).
+	WorkspaceRoot string `json:"workspaceRoot"`
+	// TargetVersion is the version every mutated directive was set to.
+	TargetVersion string `json:"targetVersion"`
+	// Modules lists every module actually mutated. Phase 2 (single-module
+	// only, no go.work traversal) always reports exactly one entry with
+	// Path ".".
+	Modules []ModuleDrift `json:"modules"`
+}
+
+// ModuleDrift is one module's before/after toolchain-version directives, as
+// reported by RuntimeUpgrader.Upgrade. A directive absent both before and
+// after is omitted (discovery-driven: never fabricate a directive that
+// wasn't there).
+type ModuleDrift struct {
+	// Path is the module's directory relative to the workspace root ("."
+	// for a single go.mod at the workspace root itself).
+	Path string `json:"path"`
+	// PreviousGo is the module's go directive value before mutation ("" if
+	// absent).
+	PreviousGo string `json:"previousGo,omitempty"`
+	// UpdatedGo is the module's go directive value after mutation.
+	UpdatedGo string `json:"updatedGo,omitempty"`
+	// PreviousToolchain is the module's toolchain directive value before
+	// mutation ("" if it had none — a toolchain directive is never added
+	// where none existed before).
+	PreviousToolchain string `json:"previousToolchain,omitempty"`
+	// UpdatedToolchain is the module's toolchain directive value after
+	// mutation ("" if it had none before, and therefore was left absent).
+	UpdatedToolchain string `json:"updatedToolchain,omitempty"`
+}
+
 // ConflictState is DriftReport's explicit ambiguity marker. Ambiguous is
 // false and Code/Sites are empty whenever every present tier-1 source
 // agrees; no single "winning" version is ever inferred when they do not

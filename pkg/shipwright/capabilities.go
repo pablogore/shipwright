@@ -69,3 +69,15 @@ type Runner interface {
 type RuntimeInspector interface {
 	Inspect(ctx context.Context, source *dagger.Directory) (string, error)
 }
+
+// RuntimeUpgrader mutates a workspace's declarative toolchain-version
+// sources (go.mod's go/toolchain directives, .go-version) to targetVersion
+// and returns the mutated Directory. Discovery-driven: it only mutates
+// locations that actually exist in source, never fabricating one that
+// wasn't there (design.md's Discovery-Driven Upgrade requirement). Because
+// *dagger.Directory is an immutable value, a failed run (ambiguity
+// detected, malformed input) returns (nil, err) — never a partially
+// mutated directory (no-partial-mutation guarantee).
+type RuntimeUpgrader interface {
+	Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error)
+}

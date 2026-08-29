@@ -251,11 +251,8 @@ func detectSourceMismatch(ws *Workspace, unanimousGo string) *AmbiguousToolchain
 // is non-empty (they cannot disagree here — detectSourceMismatch already
 // ran and returned nil).
 func validateTarget(target, unanimousGo, goWorkGo string, allowDowngrade bool) *AmbiguousToolchainError {
-	if !modfile.GoVersionRE.MatchString(target) {
-		return &AmbiguousToolchainError{
-			Code:  CodeA5,
-			Sites: []string{fmt.Sprintf("targetVersion %q is not a valid go directive value", target)},
-		}
+	if err := validTargetVersion(target); err != nil {
+		return err
 	}
 
 	current := unanimousGo
@@ -276,4 +273,94 @@ func validateTarget(target, unanimousGo, goWorkGo string, allowDowngrade bool) *
 	}
 
 	return nil
+}
+
+// validTargetVersion reports whether target is a well-formed go directive
+// value (the same format modfile.AddGoStmt itself enforces). Both
+// mutateGoMod and mutateGoWork call this before touching any byte (threat
+// matrix: command construction from config — "1.26.7; rm -rf /" and
+// "--flag" are rejected here, at parse, never reaching "golang:"+v or an
+// argv slice). This is defense in depth alongside validateTarget's own A5
+// check above: mutateGoMod/mutateGoWork may be called directly (unit
+// tests) without ever going through detectConflicts first.
+func validTargetVersion(target string) *AmbiguousToolchainError {
+	if !modfile.GoVersionRE.MatchString(target) {
+		return &AmbiguousToolchainError{
+			Code:  CodeA5,
+			Sites: []string{fmt.Sprintf("targetVersion %q is not a valid go directive value", target)},
+		}
+	}
+	return nil
+}
+
+// mutateGoMod parses modBytes and returns its bytes with the go directive
+// set to targetVersion. When modBytes already declares a toolchain
+// directive, it is updated to match ("go"+targetVersion) too — a
+// toolchain directive is never added where none existed before
+// (discovery-driven: mutate only what already exists, design.md D-4/D-9).
+func mutateGoMod(modBytes []byte, targetVersion string) ([]byte, error) {
+	if err := validTargetVersion(targetVersion); err != nil {
+		return nil, err
+	}
+
+	mf, err := modfile.Parse("go.mod", modBytes, nil)
+	if err != nil {
+		return nil, &AmbiguousToolchainError{Code: CodeA5, Sites: []string{fmt.Sprintf("go.mod: malformed: %v", err)}}
+	}
+
+	if err := mf.AddGoStmt(targetVersion); err != nil {
+		return nil, &AmbiguousToolchainError{Code: CodeA5, Sites: []string{fmt.Sprintf("go.mod: failed to set go directive: %v", err)}}
+	}
+
+	if mf.Toolchain != nil {
+		if err := mf.AddToolchainStmt("go" + targetVersion); err != nil {
+			return nil, &AmbiguousToolchainError{Code: CodeA5, Sites: []string{fmt.Sprintf("go.mod: failed to set toolchain directive: %v", err)}}
+		}
+	}
+
+	mf.Cleanup()
+	return mf.Format()
+}
+
+// mutateGoWork parses workBytes and returns its bytes with go.work's own
+// go directive set to targetVersion, updating an existing toolchain
+// directive the same discovery-driven way mutateGoMod does for go.mod.
+//
+// Not yet wired into GoRuntimeUpgrader.Upgrade — the go.work-referenced
+// multi-module traversal loop that calls this is tasks.md Phase 3
+// (design.md D-7's mutation loop). Built now, unit-tested directly against
+// testdata/runtime fixtures, per design.md's own Testing Strategy table
+// ("mutateGoMod, mutateGoWork" share toolchain.go's pure byte-level TDD
+// mass, no Dagger, no engine needed for either).
+func mutateGoWork(workBytes []byte, targetVersion string) ([]byte, error) {
+	if err := validTargetVersion(targetVersion); err != nil {
+		return nil, err
+	}
+
+	wf, err := modfile.ParseWork("go.work", workBytes, nil)
+	if err != nil {
+		return nil, &AmbiguousToolchainError{Code: CodeA5, Sites: []string{fmt.Sprintf("go.work: malformed: %v", err)}}
+	}
+
+	if err := wf.AddGoStmt(targetVersion); err != nil {
+		return nil, &AmbiguousToolchainError{Code: CodeA5, Sites: []string{fmt.Sprintf("go.work: failed to set go directive: %v", err)}}
+	}
+
+	if wf.Toolchain != nil {
+		if err := wf.AddToolchainStmt("go" + targetVersion); err != nil {
+			return nil, &AmbiguousToolchainError{Code: CodeA5, Sites: []string{fmt.Sprintf("go.work: failed to set toolchain directive: %v", err)}}
+		}
+	}
+
+	wf.Cleanup()
+	return modfile.Format(wf.Syntax), nil
+}
+
+// mutateGoVersion returns .go-version's new content for targetVersion — a
+// single line, the same tool-agnostic format goenv/asdf/mise use. No
+// parsing of the previous content is needed: the file's only content is
+// the version string itself, unlike go.mod/go.work's structured
+// directives.
+func mutateGoVersion(targetVersion string) []byte {
+	return []byte(targetVersion + "\n")
 }
