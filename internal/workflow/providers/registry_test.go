@@ -75,7 +75,7 @@ func (fakeRuntimeInspector) Inspect(ctx context.Context, source *dagger.Director
 // not any concrete provider's own behavior.
 type fakeRuntimeUpgrader struct{}
 
-func (fakeRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) {
+func (fakeRuntimeUpgrader) Upgrade(_ context.Context, source *dagger.Directory, _ string) (*dagger.Directory, error) {
 	return source, nil
 }
 

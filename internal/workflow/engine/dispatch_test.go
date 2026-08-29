@@ -134,7 +134,7 @@ func TestExecute_DispatchesRuntimeUpgrader(t *testing.T) {
 	reg := providers.NewRegistry()
 	var gotTargetVersion string
 	reg.RegisterRuntimeUpgrader(providers.Ref{Name: "go-runtime", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeUpgrader {
-		return fakeRuntimeUpgrader{UpgradeFunc: func(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) {
+		return fakeRuntimeUpgrader{UpgradeFunc: func(_ context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error) {
 			rec.record("upgrade")
 			gotTargetVersion = targetVersion
 			return source, nil
