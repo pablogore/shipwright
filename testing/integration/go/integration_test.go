@@ -4,6 +4,7 @@ package golang_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,5 +198,115 @@ func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) 
 	}
 	if !strings.Contains(err.Error(), "expected binary at") || !strings.Contains(err.Error(), "not found in container") {
 		t.Fatalf("ContainerPublisher.Publish() error = %v, want it to name the missing entrypoint path", err)
+	}
+}
+
+// TestGoRuntimeUpgrader_Upgrade_Workspace_RealEngine is the integration-
+// tagged real-engine variant tasks.md 3.5 requires: a real, connected
+// Dagger client reading and mutating a go.work multi-module workspace end
+// to end, proving daggerkit's real adapter — not the mocks every other
+// runtimeupgrader_test.go case uses — round-trips Entries/File/WithNewFile
+// correctly for the Phase 3 traversal loop (go.work itself, every use'd
+// module's go.mod, and .go-version).
+func TestGoRuntimeUpgrader_Upgrade_Workspace_RealEngine(t *testing.T) {
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		t.Fatalf("failed to connect to dagger: %v", err)
+	}
+	defer client.Close()
+
+	tmpDir := writeWorkspaceFixture(t)
+
+	src := client.Host().Directory(tmpDir)
+	upgrader := &golang.GoRuntimeUpgrader{Client: daggerkit.NewDaggerAdapter(client)}
+
+	out, err := upgrader.Upgrade(ctx, src, "1.27.0")
+	if err != nil {
+		t.Fatalf("GoRuntimeUpgrader.Upgrade() error = %v, want nil", err)
+	}
+	if out == nil {
+		t.Fatal("GoRuntimeUpgrader.Upgrade() returned a nil Directory on success")
+	}
+
+	assertWorkspaceUpgraded(ctx, t, daggerkit.NewDaggerDirectoryAdapter(out))
+}
+
+// writeWorkspaceFixture writes a minimal go.work workspace (two modules
+// plus a root .go-version) to a fresh temp directory and returns its path.
+func writeWorkspaceFixture(t *testing.T) string {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+
+	goWork := "go 1.26.7\n\nuse (\n\t./modA\n\t./modB\n)\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.work"), []byte(goWork), 0o644); err != nil {
+		t.Fatalf("failed to write go.work: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, ".go-version"), []byte("1.26.7\n"), 0o644); err != nil {
+		t.Fatalf("failed to write .go-version: %v", err)
+	}
+
+	for _, mod := range []string{"modA", "modB"} {
+		modDir := filepath.Join(tmpDir, mod)
+		if err := os.MkdirAll(modDir, 0o755); err != nil {
+			t.Fatalf("failed to create %s: %v", mod, err)
+		}
+		goMod := "module example.com/workspacetest/" + mod + "\n\ngo 1.26.7\n"
+		if err := os.WriteFile(filepath.Join(modDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+			t.Fatalf("failed to write %s/go.mod: %v", mod, err)
+		}
+	}
+
+	return tmpDir
+}
+
+// assertWorkspaceUpgraded reads outDir's mutated go.work, .go-version,
+// every module's go.mod, and the upgrade report back through daggerkit,
+// proving Upgrade's multi-module traversal loop actually ran against a
+// real Dagger engine (mocks cover this logic elsewhere; this is the
+// engine-fidelity proof tasks.md 3.5 requires).
+func assertWorkspaceUpgraded(ctx context.Context, t *testing.T, outDir daggerkit.DaggerDirectory) {
+	t.Helper()
+
+	workContents, err := outDir.File("go.work").Contents(ctx)
+	if err != nil {
+		t.Fatalf("failed to read mutated go.work: %v", err)
+	}
+	if !strings.Contains(workContents, "go 1.27.0") {
+		t.Fatalf("mutated go.work = %q, want it to contain %q", workContents, "go 1.27.0")
+	}
+
+	versionContents, err := outDir.File(".go-version").Contents(ctx)
+	if err != nil {
+		t.Fatalf("failed to read mutated .go-version: %v", err)
+	}
+	if strings.TrimSpace(versionContents) != "1.27.0" {
+		t.Fatalf("mutated .go-version = %q, want %q", versionContents, "1.27.0")
+	}
+
+	for _, mod := range []string{"modA", "modB"} {
+		modContents, err := outDir.File(mod + "/go.mod").Contents(ctx)
+		if err != nil {
+			t.Fatalf("failed to read mutated %s/go.mod: %v", mod, err)
+		}
+		if !strings.Contains(modContents, "go 1.27.0") {
+			t.Fatalf("mutated %s/go.mod = %q, want it to contain %q", mod, modContents, "go 1.27.0")
+		}
+	}
+
+	reportContents, err := outDir.File(".shipwright/runtime-upgrade-report.json").Contents(ctx)
+	if err != nil {
+		t.Fatalf("failed to read runtime-upgrade-report.json: %v", err)
+	}
+	var report shipwright.UpgradeReport
+	if err := json.Unmarshal([]byte(reportContents), &report); err != nil {
+		t.Fatalf("failed to unmarshal runtime-upgrade-report.json: %v\n%s", err, reportContents)
+	}
+	if report.TargetVersion != "1.27.0" {
+		t.Fatalf("report.TargetVersion = %q, want %q", report.TargetVersion, "1.27.0")
+	}
+	if len(report.Modules) != 2 {
+		t.Fatalf("report.Modules = %v, want exactly 2 entries", report.Modules)
 	}
 }

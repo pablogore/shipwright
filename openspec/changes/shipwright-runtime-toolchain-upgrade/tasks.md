@@ -82,12 +82,12 @@ Every slice independently passes `go build ./...`, `go test -race ./...`, `golan
 
 ## Phase 3 (Slice 3 — PR3 `feature/runtime-upgrade-workspace`): multi-module `go.work` upgrade
 
-- [ ] 3.1 RED `providers/go/toolchain_test.go` — wire A1/A2/A3 `detectConflicts` results (built in Phase 1) into `Upgrade`'s pre-mutation abort path, over `workspace-3-modules`, `divergent-go`, `divergent-toolchain`, `work-go-mismatch` fixtures — spec req: Multi-Module Workspace Consistency.
-- [ ] 3.2 RED `providers/go/toolchain_test.go::TestUpgrade_PathEscape` — `use ../../etc` fixture aborts before any `WithNewFile` (threat matrix: path traversal via `go.work` `use`) — reject absolute paths and any path escaping workspace root after `filepath.Clean`.
-- [ ] 3.3 GREEN `providers/go/toolchain.go` — path-escape guard function used by the mutation loop.
-- [ ] 3.4 GREEN `providers/go/runtimeupgrader.go` — extend `Upgrade` to loop over every `go.work`-referenced module, mutate each, and record a per-module outcome in `UpgradeReport.Modules []ModuleDrift`.
-- [ ] 3.5 RED `providers/go/runtimeupgrader_test.go::TestUpgrade_Workspace` — all-three-modules-updated scenario; integration-tagged real-engine variant added under `testing/integration/` (`integration` build tag).
-- [ ] 3.6 Verify: `go test -run TestUpgrade_Workspace ./providers/go/...`, `go test -race ./...`, `golangci-lint run` green; single-module path (Phase 2) still passes unmodified.
+- [x] 3.1 RED `providers/go/toolchain_test.go` — wire A1/A2/A3 `detectConflicts` results (built in Phase 1) into `Upgrade`'s pre-mutation abort path, over `workspace-3-modules`, `divergent-go`, `divergent-toolchain`, `work-go-mismatch` fixtures — spec req: Multi-Module Workspace Consistency.
+- [x] 3.2 RED `providers/go/runtimeupgrader_test.go::TestUpgrade_PathEscape` (placed here, not `toolchain_test.go`, because it needs a mock-based "no `WithNewFile` call happened" assertion via daggerkit's mocked `DaggerDirectory` — see the test's own doc comment) — `use ../../etc` fixture aborts before any `WithNewFile` (threat matrix: path traversal via `go.work` `use`) — reject absolute paths and any path escaping workspace root after `filepath.Clean`.
+- [x] 3.3 GREEN `providers/go/toolchain.go` — path-escape guard function used by the mutation loop.
+- [x] 3.4 GREEN `providers/go/runtimeupgrader.go` — extend `Upgrade` to loop over every `go.work`-referenced module, mutate each, and record a per-module outcome in `UpgradeReport.Modules []ModuleDrift`.
+- [x] 3.5 RED `providers/go/runtimeupgrader_test.go::TestUpgrade_Workspace` — all-three-modules-updated scenario; integration-tagged real-engine variant added under `testing/integration/` (`integration` build tag).
+- [x] 3.6 Verify: `go test -run TestUpgrade_Workspace ./providers/go/...`, `go test -race ./...`, `golangci-lint run` green; single-module path (Phase 2) still passes unmodified.
 
 ## Phase 4 (Slice 4 — PR4 `feature/runtime-upgrade-tidy-validate`): tidy + build validation
 
