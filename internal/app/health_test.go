@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 func TestCheckDaggerEngine(t *testing.T) {
@@ -41,11 +42,9 @@ func TestCheckDaggerEngine(t *testing.T) {
 			err = CheckDaggerEngine(ctx, client)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
+			} else if err != nil {
 				// If Dagger is not available, the error is acceptable
-				if err != nil {
-					t.Logf("Dagger engine check failed (may be expected in test environment): %v", err)
-				}
+				t.Logf("Dagger engine check failed (may be expected in test environment): %v", err)
 			}
 		})
 	}
@@ -89,7 +88,7 @@ func TestCheckRegistry(t *testing.T) {
 			pass:        "pass",
 			wantErr:     false, // May fail on actual connection, but format is valid
 			mockSetup: func(m *MockHTTPClient) {
-				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil)
+				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil) //nolint:bodyclose // mock response body is io.NopCloser and is closed by production code (health.go) via HTTPClient.Do(); nothing to leak here
 			},
 		},
 	}
@@ -107,11 +106,9 @@ func TestCheckRegistry(t *testing.T) {
 			err := checkRegistry(ctx, mockClient, tt.registryURL, tt.user, tt.pass)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
+			} else if err != nil {
 				// Connection errors are acceptable in test environment
-				if err != nil {
-					t.Logf("Registry check failed (may be expected in test environment): %v", err)
-				}
+				t.Logf("Registry check failed (may be expected in test environment): %v", err)
 			}
 
 			mockClient.AssertExpectations(t)
@@ -143,7 +140,7 @@ func TestCheckGitRepo(t *testing.T) {
 			repoURL: "https://github.com/pablogore/shipwright",
 			wantErr: false, // May fail on actual connection, but format is valid
 			mockSetup: func(m *MockHTTPClient) {
-				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil)
+				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil) //nolint:bodyclose // mock response body is io.NopCloser and is closed by production code (health.go) via HTTPClient.Do(); nothing to leak here
 			},
 		},
 		{
@@ -167,11 +164,9 @@ func TestCheckGitRepo(t *testing.T) {
 			err := checkGitRepo(ctx, mockClient, tt.repoURL)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
+			} else if err != nil {
 				// Connection errors are acceptable in test environment
-				if err != nil {
-					t.Logf("Git repo check failed (may be expected in test environment): %v", err)
-				}
+				t.Logf("Git repo check failed (may be expected in test environment): %v", err)
 			}
 
 			mockClient.AssertExpectations(t)
@@ -210,14 +205,14 @@ func TestRunHealthChecks(t *testing.T) {
 			mockSetup: func(m *MockHTTPClient) {
 				// A single generic expectation covers both the registry GET and
 				// the git HEAD calls.
-				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil)
+				m.On("Do", mock.Anything).Return(NewMockHTTPResponse(http.StatusOK, ""), nil) //nolint:bodyclose // mock response body is io.NopCloser and is closed by production code (health.go) via HTTPClient.Do(); nothing to leak here
 			},
 		},
 		{
 			name: "missing registry config",
 			setup: func() interfaces.Configuration {
 				mockConfig := NewMockConfiguration()
-				mockConfig.GetStringFunc = func(key string) string {
+				mockConfig.GetStringFunc = func(_ string) string {
 					return ""
 				}
 				return mockConfig
@@ -242,11 +237,9 @@ func TestRunHealthChecks(t *testing.T) {
 			err := runHealthChecks(ctx, mockClient, cfg)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
+			} else if err != nil {
 				// Connection errors are acceptable in test environment
-				if err != nil {
-					t.Logf("Health checks failed (may be expected in test environment): %v", err)
-				}
+				t.Logf("Health checks failed (may be expected in test environment): %v", err)
 			}
 
 			mockClient.AssertExpectations(t)

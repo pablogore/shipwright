@@ -186,6 +186,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "push operation requires credentials",
 			operation: "push",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				// No credentials set - use empty strings
 				t.Setenv("GITHUB_TOKEN", "")
 				t.Setenv("CI_JOB_TOKEN", "")
@@ -201,6 +202,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "push operation with GitHub token",
 			operation: "push",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				t.Setenv("GITHUB_TOKEN", "test-token")
 			},
 			wantErr: false,
@@ -209,6 +211,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "push operation with GitLab CI token",
 			operation: "push",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				t.Setenv("CI", "true")
 				t.Setenv("CI_JOB_TOKEN", "test-token")
 			},
@@ -218,6 +221,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "clone operation does not require credentials",
 			operation: "clone",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				// No credentials set - use empty strings
 				t.Setenv("GITHUB_TOKEN", "")
 				t.Setenv("CI_JOB_TOKEN", "")
@@ -231,6 +235,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "unknown operation does not require credentials",
 			operation: "unknown",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				// No credentials set - use empty strings
 				t.Setenv("GITHUB_TOKEN", "")
 				t.Setenv("CI_JOB_TOKEN", "")
@@ -248,7 +253,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 
 			err := ValidateRequiredSecrets(tt.operation)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), "credentials required")
 			} else {
 				assert.NoError(t, err)

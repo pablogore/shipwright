@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -70,22 +69,14 @@ func TestGitHubActionsCache_Invalidate(t *testing.T) {
 }
 
 func TestIsGitHubActions_NotInGitHub(t *testing.T) {
-	// Save original value
-	original := os.Getenv("GITHUB_ACTIONS")
-	defer os.Setenv("GITHUB_ACTIONS", original)
-
-	os.Unsetenv("GITHUB_ACTIONS")
+	t.Setenv("GITHUB_ACTIONS", "")
 
 	result := IsGitHubActions()
 	assert.False(t, result)
 }
 
 func TestIsGitHubActions_InGitHub(t *testing.T) {
-	// Save original value
-	original := os.Getenv("GITHUB_ACTIONS")
-	defer os.Setenv("GITHUB_ACTIONS", original)
-
-	os.Setenv("GITHUB_ACTIONS", "true")
+	t.Setenv("GITHUB_ACTIONS", "true")
 
 	result := IsGitHubActions()
 	assert.True(t, result)

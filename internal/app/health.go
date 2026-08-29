@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 
 	"dagger.io/dagger"
 	"github.com/pablogore/kit-logger/pkg/logger"
+
 	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
@@ -26,7 +28,7 @@ func defaultHTTPClient() HTTPClient {
 // CheckDaggerEngine verifies that the Dagger engine is accessible and responsive.
 func CheckDaggerEngine(ctx context.Context, client *dagger.Client) error {
 	if client == nil {
-		return fmt.Errorf("Dagger client is nil")
+		return errors.New("dagger client is nil")
 	}
 
 	// Try to get the Dagger version to verify connectivity
@@ -47,7 +49,7 @@ func CheckRegistry(ctx context.Context, registryURL, user, pass string) error {
 
 func checkRegistry(ctx context.Context, client HTTPClient, registryURL, user, pass string) error {
 	if registryURL == "" {
-		return fmt.Errorf("registry URL is empty")
+		return errors.New("registry URL is empty")
 	}
 
 	// Normalize URL by adding https:// scheme if missing (for backward compatibility)
@@ -70,7 +72,7 @@ func checkRegistry(ctx context.Context, client HTTPClient, registryURL, user, pa
 	registryURL = normalizedURL
 
 	// Try to connect to the registry (v2 API endpoint)
-	healthURL := fmt.Sprintf("%s/v2/", registryURL)
+	healthURL := registryURL + "/v2/"
 	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create registry request: %w", err)
@@ -103,7 +105,7 @@ func CheckGitRepo(ctx context.Context, repoURL string) error {
 
 func checkGitRepo(ctx context.Context, client HTTPClient, repoURL string) error {
 	if repoURL == "" {
-		return fmt.Errorf("Git repository URL is empty")
+		return errors.New("git repository URL is empty")
 	}
 
 	// Validate URL format
@@ -115,10 +117,10 @@ func checkGitRepo(ctx context.Context, client HTTPClient, repoURL string) error 
 		}
 		host := strings.TrimPrefix(parts[0], "git@")
 		if host == "" {
-			return fmt.Errorf("invalid SSH Git URL: host cannot be empty")
+			return errors.New("invalid SSH Git URL: host cannot be empty")
 		}
 		if parts[1] == "" {
-			return fmt.Errorf("invalid SSH Git URL: path cannot be empty")
+			return errors.New("invalid SSH Git URL: path cannot be empty")
 		}
 		// SSH URLs are validated by format only (actual connectivity requires SSH setup)
 		return nil
@@ -131,11 +133,11 @@ func checkGitRepo(ctx context.Context, client HTTPClient, repoURL string) error 
 	}
 
 	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
-		return fmt.Errorf("Git repository URL must use https:// or http:// scheme, got: %s", parsedURL.Scheme)
+		return fmt.Errorf("git repository URL must use https:// or http:// scheme, got: %s", parsedURL.Scheme)
 	}
 
 	if parsedURL.Host == "" {
-		return fmt.Errorf("Git repository URL must include host")
+		return errors.New("git repository URL must include host")
 	}
 
 	// For HTTPS URLs, we can try a lightweight HTTP HEAD request
@@ -177,7 +179,7 @@ func runHealthChecks(ctx context.Context, client HTTPClient, cfg interfaces.Conf
 		errors = append(errors, fmt.Errorf("failed to get Dagger client: %w", err))
 	} else {
 		if err := CheckDaggerEngine(ctx, daggerClient); err != nil {
-			errors = append(errors, fmt.Errorf("Dagger engine check failed: %w", err))
+			errors = append(errors, fmt.Errorf("dagger engine check failed: %w", err))
 		} else {
 			logger.L().InfoContext(ctx, "Dagger engine is accessible")
 		}
@@ -201,7 +203,7 @@ func runHealthChecks(ctx context.Context, client HTTPClient, cfg interfaces.Conf
 	gitRepo := cfg.GetString("git.repo")
 	if gitRepo != "" {
 		if err := checkGitRepo(ctx, client, gitRepo); err != nil {
-			errors = append(errors, fmt.Errorf("Git repository check failed: %w", err))
+			errors = append(errors, fmt.Errorf("git repository check failed: %w", err))
 		} else {
 			logger.L().InfoContext(ctx, "Git repository is accessible", "git_repo", gitRepo)
 		}
@@ -218,7 +220,7 @@ func runHealthChecks(ctx context.Context, client HTTPClient, cfg interfaces.Conf
 
 // GetDaggerClientFromConfig creates a Dagger client from configuration.
 // This is a helper function for health checks.
-func GetDaggerClientFromConfig(ctx context.Context, cfg interfaces.Configuration) (*dagger.Client, error) {
+func GetDaggerClientFromConfig(ctx context.Context, _ interfaces.Configuration) (*dagger.Client, error) {
 	client, err := dagger.Connect(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Dagger engine: %w", err)

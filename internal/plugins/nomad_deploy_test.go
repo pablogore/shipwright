@@ -60,7 +60,7 @@ func TestNomadDeployPlugin_Initialize(t *testing.T) {
 
 		pluginCtx := NewMockPluginContext()
 		pluginCtx.GetConfigurationFunc = func() interfaces.Configuration { return cfg }
-		pluginCtx.GetProviderRegistryFunc = func() *providers.Registry { return providers.NewRegistry() }
+		pluginCtx.GetProviderRegistryFunc = providers.NewRegistry
 
 		// Act
 		err := plugin.Initialize(ctx, pluginCtx)
@@ -88,7 +88,7 @@ func TestNomadDeployPlugin_Initialize(t *testing.T) {
 
 		pluginCtx := NewMockPluginContext()
 		pluginCtx.GetConfigurationFunc = func() interfaces.Configuration { return cfg }
-		pluginCtx.GetProviderRegistryFunc = func() *providers.Registry { return providers.NewRegistry() }
+		pluginCtx.GetProviderRegistryFunc = providers.NewRegistry
 
 		// Act
 		err := plugin.Initialize(ctx, pluginCtx)
@@ -133,7 +133,7 @@ func TestNomadDeployPlugin_Initialize(t *testing.T) {
 		// Arrange
 		pluginCtx := NewMockPluginContext()
 		pluginCtx.GetConfigurationFunc = func() interfaces.Configuration { return nil }
-		pluginCtx.GetProviderRegistryFunc = func() *providers.Registry { return providers.NewRegistry() }
+		pluginCtx.GetProviderRegistryFunc = providers.NewRegistry
 
 		// Act / Assert
 		assert.NoError(t, NewNomadDeployPlugin().Initialize(context.Background(), pluginCtx))

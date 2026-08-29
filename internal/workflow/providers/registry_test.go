@@ -31,31 +31,31 @@ import (
 // hand-rolled stub is appropriate over pulling in gomock).
 type fakeBuilder struct{}
 
-func (fakeBuilder) Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+func (fakeBuilder) Build(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	return source, nil
 }
 
 type fakeTester struct{}
 
-func (fakeTester) Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+func (fakeTester) Test(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 	return nil, nil
 }
 
 type fakeArtifactor struct{}
 
-func (fakeArtifactor) Publish(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error) {
+func (fakeArtifactor) Publish(_ context.Context, _ *dagger.Directory, ref string, _ *dagger.Secret) (string, error) {
 	return ref, nil
 }
 
 type fakeDeployer struct{}
 
-func (fakeDeployer) Deploy(ctx context.Context, artifactRef, environment string, creds *dagger.Secret) (string, error) {
+func (fakeDeployer) Deploy(_ context.Context, artifactRef, _ string, _ *dagger.Secret) (string, error) {
 	return artifactRef, nil
 }
 
 type fakeRunner struct{}
 
-func (fakeRunner) Run(ctx context.Context, build *dagger.Directory) (*dagger.Container, error) {
+func (fakeRunner) Run(_ context.Context, _ *dagger.Directory) (*dagger.Container, error) {
 	return nil, nil
 }
 

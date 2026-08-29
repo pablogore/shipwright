@@ -30,7 +30,7 @@ func TestSelector_SelectExecutor_PreferredExecutor(t *testing.T) {
 	ctx := context.Background()
 	selector := NewSelector()
 	mockExecutor := NewMockExecutor()
-	mockExecutor.CanExecuteFunc = func(ctx context.Context) bool {
+	mockExecutor.CanExecuteFunc = func(_ context.Context) bool {
 		return true
 	}
 

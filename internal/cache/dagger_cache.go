@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -49,7 +50,7 @@ func (d *DaggerCacheManager) GetCacheVolume(key string) *dagger.CacheVolume {
 
 // GetCacheKeyForModules generates a cache key for Go modules.
 func GetCacheKeyForModules(goVersion string) string {
-	return fmt.Sprintf("go-modules-%s", goVersion)
+	return "go-modules-" + goVersion
 }
 
 // GetCacheKeyForBuild generates a cache key for build artifacts.
@@ -57,7 +58,7 @@ func GetCacheKeyForBuild(goVersion string, buildTags string) string {
 	if buildTags != "" {
 		return fmt.Sprintf("go-build-%s-%s", goVersion, buildTags)
 	}
-	return fmt.Sprintf("go-build-%s", goVersion)
+	return "go-build-" + goVersion
 }
 
 // GetCacheKeyForDockerLayers generates a cache key for Docker image layers.
@@ -85,39 +86,39 @@ func MountCacheVolume(container *dagger.Container, cacheKey string, mountPath st
 
 // Get is not directly applicable to Dagger cache volumes.
 // Dagger handles cache automatically through mounted volumes.
-func (d *DaggerCacheManager) Get(ctx context.Context, key string) ([]byte, error) {
+func (d *DaggerCacheManager) Get(_ context.Context, _ string) ([]byte, error) {
 	// Dagger cache is handled through mounted volumes, not direct get/set
 	// This method is for interface compliance
-	return nil, fmt.Errorf("Dagger cache does not support direct Get operations - use mounted volumes")
+	return nil, errors.New("dagger cache does not support direct Get operations - use mounted volumes")
 }
 
 // Set is not directly applicable to Dagger cache volumes.
 // Dagger handles cache automatically through mounted volumes.
-func (d *DaggerCacheManager) Set(ctx context.Context, key string, data []byte, ttl time.Duration) error {
+func (d *DaggerCacheManager) Set(_ context.Context, _ string, _ []byte, _ time.Duration) error {
 	// Dagger cache is handled through mounted volumes, not direct get/set
 	// This method is for interface compliance
-	return fmt.Errorf("Dagger cache does not support direct Set operations - use mounted volumes")
+	return errors.New("dagger cache does not support direct Set operations - use mounted volumes")
 }
 
 // Invalidate removes a cache volume (clears the cache).
-func (d *DaggerCacheManager) Invalidate(ctx context.Context, key string) error {
+func (d *DaggerCacheManager) Invalidate(_ context.Context, key string) error {
 	// Remove from map - Dagger will create new volume on next use
 	delete(d.cacheVolumes, key)
 	return nil
 }
 
 // GetWithFallback is not directly applicable to Dagger cache.
-func (d *DaggerCacheManager) GetWithFallback(ctx context.Context, key string, ttl time.Duration, fallback func() ([]byte, error)) ([]byte, error) {
+func (d *DaggerCacheManager) GetWithFallback(_ context.Context, _ string, _ time.Duration, fallback func() ([]byte, error)) ([]byte, error) {
 	// Dagger cache works differently - use fallback directly
 	return fallback()
 }
 
 // WarmUp pre-warms Dagger cache by creating volumes.
-func (d *DaggerCacheManager) WarmUp(ctx context.Context, keys []string, generator func(string) ([]byte, error)) error {
+func (d *DaggerCacheManager) WarmUp(_ context.Context, keys []string, _ func(string) ([]byte, error)) error {
 	// Pre-create cache volumes
 	// Note: This requires a valid Dagger client
 	if d.client == nil {
-		return fmt.Errorf("Dagger client is required for cache operations")
+		return errors.New("dagger client is required for cache operations")
 	}
 	for _, key := range keys {
 		d.GetCacheVolume(key)

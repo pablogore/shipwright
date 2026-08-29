@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 func TestNewContainer(t *testing.T) {
@@ -430,7 +431,7 @@ func TestVulnChecker_GetReport(t *testing.T) {
 	// Test GetReport (currently returns empty string)
 	report, err := checker.GetReport(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, "", report)
+	assert.Empty(t, report)
 }
 
 func TestNewLinter(t *testing.T) {
@@ -460,7 +461,7 @@ func TestLinter_GetReport(t *testing.T) {
 	// Test GetReport (currently returns empty string)
 	report, err := linter.GetReport(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, "", report)
+	assert.Empty(t, report)
 }
 
 func TestNewLogger(t *testing.T) {
@@ -783,7 +784,7 @@ func TestContainer_registerHookComponents_Execution(t *testing.T) {
 // Helper function to setup mock configuration expectations for convertConfig
 func setupMockConfigForConvertConfig(mockConfig *MockConfiguration) {
 	mockConfig.EnvironmentFunc = func() string { return "dev" }
-	mockConfig.GetBoolFunc = func(key string) bool { return false }
+	mockConfig.GetBoolFunc = func(_ string) bool { return false }
 	mockConfig.GetStringFunc = func(key string) string {
 		// Return appropriate default values based on the key
 		switch key {
@@ -797,5 +798,5 @@ func setupMockConfigForConvertConfig(mockConfig *MockConfiguration) {
 			return ""
 		}
 	}
-	mockConfig.GetFloatFunc = func(key string) float64 { return 90.0 }
+	mockConfig.GetFloatFunc = func(_ string) float64 { return 90.0 }
 }

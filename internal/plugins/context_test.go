@@ -42,7 +42,7 @@ func TestPluginContext_GetDaggerClient(t *testing.T) {
 		client, err := ctx.GetDaggerClient()
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, client)
 		assert.Contains(t, err.Error(), "dagger client not available")
 	})
@@ -59,7 +59,7 @@ func TestPluginContext_GetDaggerClient(t *testing.T) {
 
 		// Assert
 		// Should return the client without error (covers line 49)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, client)
 		assert.Equal(t, daggerClient, client)
 	})

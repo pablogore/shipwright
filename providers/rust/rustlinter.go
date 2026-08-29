@@ -14,6 +14,7 @@ import (
 // output as the report File. Structural mirror of providers/go's GoLinter —
 // one of three independent Tester implementations, none privileged, for
 // the Rust toolchain.
+//nolint:revive // stutters with package rust by design: this is a deliberate structural mirror of providers/go's GoLinter (see doc comment above), and every rust.Rust* type follows the same cross-provider naming symmetry
 type RustLinter struct {
 	// Client is the Dagger client used to construct the lint container.
 	Client daggerkit.DaggerClient

@@ -25,7 +25,7 @@ func TestStrategyInterface(t *testing.T) {
 func TestStrategy_GetWithFallback_NotInCache(t *testing.T) {
 	ctx := context.Background()
 	mockStrategy := NewMockStrategy()
-	mockStrategy.GetFunc = func(ctx context.Context, key string) ([]byte, error) {
+	mockStrategy.GetFunc = func(_ context.Context, _ string) ([]byte, error) {
 		return nil, errors.New("not found")
 	}
 
@@ -45,7 +45,7 @@ func TestStrategy_GetWithFallback_NotInCache(t *testing.T) {
 func TestStrategy_GetWithFallback_InCache(t *testing.T) {
 	ctx := context.Background()
 	mockStrategy := NewMockStrategy()
-	mockStrategy.GetFunc = func(ctx context.Context, key string) ([]byte, error) {
+	mockStrategy.GetFunc = func(_ context.Context, _ string) ([]byte, error) {
 		return []byte("cached-data"), nil
 	}
 

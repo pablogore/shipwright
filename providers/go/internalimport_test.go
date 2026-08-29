@@ -28,7 +28,9 @@ func TestNoImportReachesIntoInternal(t *testing.T) {
 	dir := providersGoDir(t)
 
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, dir, nil, parser.ImportsOnly)
+	// parsePackageDir (parsepkg_test.go) replaces the deprecated
+	// parser.ParseDir/ast.Package pairing (SA1019).
+	pkgs, err := parsePackageDir(fset, dir, nil, parser.ImportsOnly)
 	if err != nil {
 		t.Fatalf("failed to parse package directory %s: %v", dir, err)
 	}

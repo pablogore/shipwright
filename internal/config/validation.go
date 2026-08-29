@@ -44,7 +44,7 @@ func ValidateRegistryURL(registryURL string) error {
 // It supports both HTTPS (https://host/user/repo.git) and SSH (git@host:user/repo.git) formats.
 func ValidateGitRepoURL(repoURL string) error {
 	if repoURL == "" {
-		return errors.New("Git repository URL cannot be empty")
+		return errors.New("git repository URL cannot be empty")
 	}
 
 	// Handle SSH format: git@host:user/repo.git
@@ -70,11 +70,11 @@ func ValidateGitRepoURL(repoURL string) error {
 	}
 
 	if parsed.Scheme != "https" && parsed.Scheme != "http" {
-		return fmt.Errorf("Git repository URL must use https:// or http:// scheme, got: %s", parsed.Scheme)
+		return fmt.Errorf("git repository URL must use https:// or http:// scheme, got: %s", parsed.Scheme)
 	}
 
 	if parsed.Host == "" {
-		return errors.New("Git repository URL must include host")
+		return errors.New("git repository URL must include host")
 	}
 
 	return nil
@@ -84,7 +84,7 @@ func ValidateGitRepoURL(repoURL string) error {
 // It accepts X.Y or X.Y.Z formats (e.g., "1.25" or "1.25.5").
 func ValidateGoVersion(version string) error {
 	if version == "" {
-		return errors.New("Go version cannot be empty")
+		return errors.New("go version cannot be empty")
 	}
 
 	// Validate format: X.Y or X.Y.Z where X, Y, Z are digits

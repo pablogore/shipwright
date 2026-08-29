@@ -67,25 +67,25 @@ func newDiamondRegistry(rec *recorder) *providers.Registry {
 	reg := providers.NewRegistry()
 
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 			rec.record("build")
 			return source, nil
 		}}
 	})
 	reg.RegisterTester(providers.Ref{Name: "govulncheck", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
-		return fakeTester{TestFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 			rec.record("vuln")
 			return nil, nil
 		}}
 	})
 	reg.RegisterTester(providers.Ref{Name: "go-test", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
-		return fakeTester{TestFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 			rec.record("unit")
 			return nil, nil
 		}}
 	})
 	reg.RegisterArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Artifactor {
-		return fakeArtifactor{PublishFunc: func(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error) {
+		return fakeArtifactor{PublishFunc: func(_ context.Context, _ *dagger.Directory, ref string, _ *dagger.Secret) (string, error) {
 			rec.record("publish")
 			return ref, nil
 		}}
@@ -185,25 +185,25 @@ func TestExecute_FailFastStopsLaterWaves(t *testing.T) {
 	rec := &recorder{}
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.Directory, error) {
 			rec.record("build")
 			return nil, errors.New("boom: build failed")
 		}}
 	})
 	reg.RegisterTester(providers.Ref{Name: "go-test", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
-		return fakeTester{TestFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 			rec.record("unit")
 			return nil, nil
 		}}
 	})
 	reg.RegisterTester(providers.Ref{Name: "govulncheck", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
-		return fakeTester{TestFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
 			rec.record("vuln")
 			return nil, nil
 		}}
 	})
 	reg.RegisterArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Artifactor {
-		return fakeArtifactor{PublishFunc: func(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error) {
+		return fakeArtifactor{PublishFunc: func(_ context.Context, _ *dagger.Directory, ref string, _ *dagger.Secret) (string, error) {
 			rec.record("publish")
 			return ref, nil
 		}}
@@ -244,7 +244,7 @@ func TestExecute_PerStepTimeoutFires(t *testing.T) {
 
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(ctx context.Context, _ *dagger.Directory) (*dagger.Directory, error) {
 			<-ctx.Done()
 			return nil, ctx.Err()
 		}}
@@ -291,7 +291,7 @@ func TestExecute_BoundedRetry_SucceedsWithinBudget(t *testing.T) {
 	var calls int32
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 			n := atomic.AddInt32(&calls, 1)
 			if n < 3 {
 				return nil, errors.New("transient failure")
@@ -325,7 +325,7 @@ func TestExecute_BoundedRetry_FailsAfterBudgetExhausted(t *testing.T) {
 	var calls int32
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.Directory, error) {
 			atomic.AddInt32(&calls, 1)
 			return nil, errors.New("permanent failure")
 		}}
@@ -358,7 +358,7 @@ func TestExecute_RetriesZeroMeansOneAttempt(t *testing.T) {
 	var calls int32
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 			atomic.AddInt32(&calls, 1)
 			return source, nil
 		}}
@@ -414,7 +414,7 @@ spec:
 	rec := &recorder{}
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 			rec.record("build")
 			return source, nil
 		}}
@@ -461,7 +461,7 @@ func TestExecute_WhenStructuredPredicateMatch(t *testing.T) {
 			rec := &recorder{}
 			reg := providers.NewRegistry()
 			reg.RegisterArtifactor(providers.Ref{Name: "container", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Artifactor {
-				return fakeArtifactor{PublishFunc: func(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error) {
+				return fakeArtifactor{PublishFunc: func(_ context.Context, _ *dagger.Directory, ref string, _ *dagger.Secret) (string, error) {
 					rec.record("publish")
 					return ref, nil
 				}}
@@ -688,7 +688,7 @@ func TestExecute_PerStepAttempts_OverridesWorkflowDefault(t *testing.T) {
 	var calls int32
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 			n := atomic.AddInt32(&calls, 1)
 			if n < 3 {
 				return nil, errors.New("transient failure")
@@ -726,7 +726,7 @@ func TestExecute_PerStepAttempts_ZeroOverridesWorkflowDefault(t *testing.T) {
 	var calls int32
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.Directory, error) {
 			atomic.AddInt32(&calls, 1)
 			return nil, errors.New("permanent failure")
 		}}
@@ -757,7 +757,7 @@ func TestExecute_PerStepAttempts_NilFallsBackToWorkflowDefault(t *testing.T) {
 	var calls int32
 	reg := providers.NewRegistry()
 	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 			n := atomic.AddInt32(&calls, 1)
 			if n < 3 {
 				return nil, errors.New("transient failure")

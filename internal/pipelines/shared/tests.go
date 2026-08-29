@@ -45,11 +45,10 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 		WithEnvVariable("GO111MODULE", "on").
 		WithEnvVariable("CGO_ENABLED", "0")
 
-	// Run tests with coverage and race detection
-	// Add retry logic for connection errors with exponential backoff
-	maxRetries := 5
-	retryDelay := 3 * time.Second
-	var output string
+	const (
+		maxRetries = 5
+		retryDelay = 3 * time.Second
+	)
 
 	// Give daemon a moment to be ready before first attempt
 	select {
@@ -59,59 +58,35 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 		// Continue with first attempt
 	}
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Wait before retrying (exponential backoff)
-			waitTime := retryDelay * time.Duration(1<<uint(attempt-1))
-			if waitTime > 15*time.Second {
-				waitTime = 15 * time.Second // Cap at 15 seconds
-			}
-
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("context cancelled during test retry: %w", ctx.Err())
-			case <-time.After(waitTime):
-				// Continue with retry
-			}
-		}
-
-		var testErr error
-		output, testErr = container.
+	output, err := runWithRetry(ctx, maxRetries, retryDelay, "test", func() (string, error) {
+		return container.
 			WithExec([]string{"go", "test", "-v", "-race", "-coverprofile=/tmp/coverage.out", "./..."}).
 			Stdout(ctx)
-		err = testErr
-
-		if err == nil {
-			break // Success
-		}
-
-		// Check if error is a connection error that should be retried
-		errStr := err.Error()
-		isConnectionError := strings.Contains(errStr, "connection refused") ||
-			strings.Contains(errStr, "dial tcp") ||
-			strings.Contains(errStr, "connection reset") ||
-			strings.Contains(errStr, "no connection could be made") ||
-			strings.Contains(errStr, "context canceled")
-
-		if !isConnectionError || attempt >= maxRetries {
-			// Not a connection error or max retries reached
-			return fmt.Errorf("failed to run tests: %w\nOutput: %s", err, output)
-		}
-
-		// Log retry attempt
-		logger.L().WarnContext(ctx, "Test connection attempt failed, retrying",
-			"attempt", attempt+1,
-			"max_retries", maxRetries+1,
-			"error", err)
-	}
-
+	})
 	if err != nil {
-		return fmt.Errorf("failed to run tests after %d attempts: %w\nOutput: %s", maxRetries+1, err, output)
+		return fmt.Errorf("failed to run tests: %w\nOutput: %s", err, output)
 	}
 
-	// Parse coverage from the output
-	// Add retry logic for connection errors during coverage retrieval
-	var coverageOutput string
+	coverageOutput, err := runWithRetry(ctx, maxRetries, retryDelay, "coverage", func() (string, error) {
+		return container.
+			WithExec([]string{"go", "tool", "cover", "-func=/tmp/coverage.out"}).
+			Stdout(ctx)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get coverage: %w", err)
+	}
+
+	return checkCoverageThreshold(ctx, coverageOutput, coverage)
+}
+
+// runWithRetry runs execFn against the test container, retrying with
+// exponential backoff (capped at 15s) when the failure looks like a
+// transient Dagger daemon connection error. label identifies the operation
+// in retry logs and the context-cancellation error.
+func runWithRetry(ctx context.Context, maxRetries int, retryDelay time.Duration, label string, execFn func() (string, error)) (string, error) {
+	var output string
+	var err error
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			// Wait before retrying (exponential backoff)
@@ -122,20 +97,15 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 
 			select {
 			case <-ctx.Done():
-				return fmt.Errorf("context cancelled during coverage retry: %w", ctx.Err())
+				return "", fmt.Errorf("context cancelled during %s retry: %w", label, ctx.Err())
 			case <-time.After(waitTime):
 				// Continue with retry
 			}
 		}
 
-		var coverageErr error
-		coverageOutput, coverageErr = container.
-			WithExec([]string{"go", "tool", "cover", "-func=/tmp/coverage.out"}).
-			Stdout(ctx)
-		err = coverageErr
-
+		output, err = execFn()
 		if err == nil {
-			break // Success
+			return output, nil
 		}
 
 		// Check if error is a connection error that should be retried
@@ -148,21 +118,22 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 
 		if !isConnectionError || attempt >= maxRetries {
 			// Not a connection error or max retries reached
-			return fmt.Errorf("failed to get coverage: %w", err)
+			return output, err
 		}
 
 		// Log retry attempt
-		logger.L().WarnContext(ctx, "Coverage connection attempt failed, retrying",
+		logger.L().WarnContext(ctx, label+" connection attempt failed, retrying",
 			"attempt", attempt+1,
 			"max_retries", maxRetries+1,
 			"error", err)
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to get coverage after %d attempts: %w", maxRetries+1, err)
-	}
+	return output, err
+}
 
-	// Extract the coverage percentage
+// checkCoverageThreshold extracts the total coverage percentage from
+// `go tool cover`'s output and verifies it meets the required threshold.
+func checkCoverageThreshold(ctx context.Context, coverageOutput string, threshold float64) error {
 	coverageRegex := regexp.MustCompile(`total:\s+\(statements\)\s+(\d+\.\d+)%`)
 	matches := coverageRegex.FindStringSubmatch(coverageOutput)
 	if len(matches) < 2 {
@@ -175,8 +146,8 @@ func RunTestsWithCoverage(ctx context.Context, client *dagger.Client, src *dagge
 	}
 
 	// Check if the coverage meets the threshold
-	if coverageValue < coverage {
-		return fmt.Errorf("coverage %.2f%% is below the required threshold of %.2f%%", coverageValue, coverage)
+	if coverageValue < threshold {
+		return fmt.Errorf("coverage %.2f%% is below the required threshold of %.2f%%", coverageValue, threshold)
 	}
 
 	logger.L().InfoContext(ctx, "Test coverage", "coverage", coverageValue)

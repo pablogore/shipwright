@@ -38,7 +38,7 @@ func TestRegistry_RegisterPlugin(t *testing.T) {
 		err := registry.RegisterPlugin(plugin)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		plugins := registry.ListPlugins()
 		assert.Contains(t, plugins, "test-plugin")
 	})
@@ -52,7 +52,7 @@ func TestRegistry_RegisterPlugin(t *testing.T) {
 		err := registry.RegisterPlugin(nil)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "plugin cannot be nil")
 	})
 
@@ -67,7 +67,7 @@ func TestRegistry_RegisterPlugin(t *testing.T) {
 		err := registry.RegisterPlugin(plugin)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "plugin name cannot be empty")
 	})
 
@@ -85,8 +85,8 @@ func TestRegistry_RegisterPlugin(t *testing.T) {
 		err2 := registry.RegisterPlugin(plugin2)
 
 		// Assert
-		assert.NoError(t, err1)
-		assert.Error(t, err2)
+		require.NoError(t, err1)
+		require.Error(t, err2)
 		assert.Contains(t, err2.Error(), "already registered")
 	})
 }
@@ -104,7 +104,7 @@ func TestRegistry_GetPlugin(t *testing.T) {
 		result, err := registry.GetPlugin("test-plugin")
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, plugin, result)
 	})
 
@@ -117,7 +117,7 @@ func TestRegistry_GetPlugin(t *testing.T) {
 		result, err := registry.GetPlugin("non-existent")
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -180,7 +180,7 @@ func TestRegistry_LoadPlugin(t *testing.T) {
 		err := registry.LoadPlugin(ctx, "test-plugin", pluginCtx)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		plugins := registry.ListPlugins()
 		assert.Contains(t, plugins, "test-plugin")
 	})
@@ -195,7 +195,7 @@ func TestRegistry_LoadPlugin(t *testing.T) {
 		err := registry.LoadPlugin(context.Background(), "", pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "plugin name cannot be empty")
 	})
 
@@ -212,7 +212,7 @@ func TestRegistry_LoadPlugin(t *testing.T) {
 		err := registry.LoadPlugin(context.Background(), "test-plugin", pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already loaded")
 	})
 
@@ -237,7 +237,7 @@ func TestRegistry_LoadPlugin(t *testing.T) {
 		err := registry.LoadPlugin(context.Background(), "non-existent", pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
@@ -276,7 +276,7 @@ func TestRegistry_LoadPlugin(t *testing.T) {
 		err := registry.LoadPlugin(ctx, "config-plugin", pluginCtx)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		plugins := registry.ListPlugins()
 		assert.Contains(t, plugins, "config-plugin")
 	})
@@ -315,7 +315,7 @@ func TestRegistry_LoadPluginsFromConfig(t *testing.T) {
 		err := registry.LoadPluginsFromConfig(ctx, pluginCtx)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		plugins := registry.ListPlugins()
 		assert.Contains(t, plugins, "test-plugin")
 	})
@@ -351,7 +351,7 @@ func TestRegistry_LoadPluginsFromConfig(t *testing.T) {
 		err := registry.LoadPluginsFromConfig(context.Background(), nil)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "plugin context cannot be nil")
 	})
 
@@ -374,7 +374,7 @@ func TestRegistry_LoadPluginsFromConfig(t *testing.T) {
 		err := registry.LoadPluginsFromConfig(ctx, pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid plugins configuration format")
 	})
 
@@ -409,7 +409,7 @@ func TestRegistry_LoadPluginsFromConfig(t *testing.T) {
 		err := registry.LoadPluginsFromConfig(ctx, pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load some plugins")
 	})
 }
@@ -454,7 +454,7 @@ func TestRegistry_InitializeAll(t *testing.T) {
 		err := registry.InitializeAll(ctx, pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to initialize")
 	})
 }
@@ -497,7 +497,7 @@ func TestRegistry_CleanupAll(t *testing.T) {
 		err := registry.CleanupAll(ctx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to cleanup")
 	})
 }
@@ -518,7 +518,7 @@ func TestRegistry_registerAndInitialize(t *testing.T) {
 		err := registry.registerAndInitialize(ctx, plugin, pluginCtx)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		plugins := registry.ListPlugins()
 		assert.Contains(t, plugins, "test-plugin")
 	})
@@ -540,7 +540,7 @@ func TestRegistry_registerAndInitialize(t *testing.T) {
 		err := registry.registerAndInitialize(ctx, plugin, pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to initialize")
 		// Plugin should not be registered if initialization fails
 		plugins := registry.ListPlugins()
@@ -570,7 +570,7 @@ func TestRegistry_registerAndInitialize(t *testing.T) {
 		err = registry.registerAndInitialize(ctx, duplicatePlugin, pluginCtx)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to register plugin")
 	})
 }

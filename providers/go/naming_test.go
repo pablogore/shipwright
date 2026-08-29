@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -63,7 +62,7 @@ func assertNotBundleName(t *testing.T, name string) {
 // (package golang). Deliberately fails closed (t.Fatal) if the package does
 // not exist yet — that was the expected RED state before the extraction's
 // tasks.md 2.1-2.9 added production files here.
-func parseGolangPackage(t *testing.T) *ast.Package {
+func parseGolangPackage(t *testing.T) *parsedPackage {
 	t.Helper()
 
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -73,7 +72,9 @@ func parseGolangPackage(t *testing.T) *ast.Package {
 	pkgDir := filepath.Dir(thisFile)
 
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, pkgDir, nonTestGoFile, parser.ParseComments)
+	// parsePackageDir and nonTestGoFile (parsepkg_test.go) replace the
+	// deprecated parser.ParseDir/ast.Package pairing (SA1019).
+	pkgs, err := parsePackageDir(fset, pkgDir, nonTestGoFile, parser.ParseComments)
 	if err != nil {
 		t.Fatalf("failed to parse package directory %s: %v", pkgDir, err)
 	}
@@ -87,13 +88,6 @@ func parseGolangPackage(t *testing.T) *ast.Package {
 		)
 	}
 	return pkg
-}
-
-// nonTestGoFile is a parser.ParseDir filter that excludes _test.go files,
-// so this golden test reflects only the package's public production
-// source, mirroring pkg/shipwright/api_golden_test.go's own filter.
-func nonTestGoFile(info os.FileInfo) bool {
-	return !strings.HasSuffix(info.Name(), "_test.go")
 }
 
 // exportedDeclNames extracts every exported top-level identifier

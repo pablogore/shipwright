@@ -2,17 +2,29 @@ package executors
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// clearCICDEnv resets every CI/CD signal DetectCICD checks, via t.Setenv so
+// each is restored automatically after the test. Real CI runners (e.g.
+// GITHUB_ACTIONS on the GitHub Actions runner itself) already have some of
+// these set, so every test below must start from a known-clean slate before
+// setting the one signal it means to simulate.
+func clearCICDEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("JENKINS_URL", "")
+	t.Setenv("CIRCLECI", "")
+}
+
 func TestDetectCICD_GitHubActions(t *testing.T) {
 	// Arrange
-	os.Setenv("GITHUB_ACTIONS", "true")
-	defer os.Unsetenv("GITHUB_ACTIONS")
+	clearCICDEnv(t)
+	t.Setenv("GITHUB_ACTIONS", "true")
 
 	ctx := context.Background()
 
@@ -25,8 +37,8 @@ func TestDetectCICD_GitHubActions(t *testing.T) {
 
 func TestDetectCICD_GitLabCI(t *testing.T) {
 	// Arrange
-	os.Setenv("GITLAB_CI", "true")
-	defer os.Unsetenv("GITLAB_CI")
+	clearCICDEnv(t)
+	t.Setenv("GITLAB_CI", "true")
 
 	ctx := context.Background()
 
@@ -39,8 +51,8 @@ func TestDetectCICD_GitLabCI(t *testing.T) {
 
 func TestDetectCICD_Jenkins(t *testing.T) {
 	// Arrange
-	os.Setenv("JENKINS_URL", "http://jenkins.example.com")
-	defer os.Unsetenv("JENKINS_URL")
+	clearCICDEnv(t)
+	t.Setenv("JENKINS_URL", "http://jenkins.example.com")
 
 	ctx := context.Background()
 
@@ -53,8 +65,8 @@ func TestDetectCICD_Jenkins(t *testing.T) {
 
 func TestDetectCICD_CircleCI(t *testing.T) {
 	// Arrange
-	os.Setenv("CIRCLECI", "true")
-	defer os.Unsetenv("CIRCLECI")
+	clearCICDEnv(t)
+	t.Setenv("CIRCLECI", "true")
 
 	ctx := context.Background()
 
@@ -67,10 +79,7 @@ func TestDetectCICD_CircleCI(t *testing.T) {
 
 func TestDetectCICD_Local(t *testing.T) {
 	// Arrange - ensure no CI environment variables are set
-	os.Unsetenv("GITHUB_ACTIONS")
-	os.Unsetenv("GITLAB_CI")
-	os.Unsetenv("JENKINS_URL")
-	os.Unsetenv("CIRCLECI")
+	clearCICDEnv(t)
 
 	ctx := context.Background()
 
@@ -83,10 +92,7 @@ func TestDetectCICD_Local(t *testing.T) {
 
 func TestNewCICDExecutor(t *testing.T) {
 	// Arrange
-	os.Unsetenv("GITHUB_ACTIONS")
-	os.Unsetenv("GITLAB_CI")
-	os.Unsetenv("JENKINS_URL")
-	os.Unsetenv("CIRCLECI")
+	clearCICDEnv(t)
 
 	// Act
 	executor := NewCICDExecutor()
@@ -99,8 +105,7 @@ func TestNewCICDExecutor(t *testing.T) {
 
 func TestCICDExecutor_IsCIEnvironment_True(t *testing.T) {
 	// Arrange
-	os.Setenv("GITHUB_ACTIONS", "true")
-	defer os.Unsetenv("GITHUB_ACTIONS")
+	t.Setenv("GITHUB_ACTIONS", "true")
 
 	// Act
 	executor := NewCICDExecutor()
@@ -111,10 +116,7 @@ func TestCICDExecutor_IsCIEnvironment_True(t *testing.T) {
 
 func TestCICDExecutor_IsCIEnvironment_False(t *testing.T) {
 	// Arrange
-	os.Unsetenv("GITHUB_ACTIONS")
-	os.Unsetenv("GITLAB_CI")
-	os.Unsetenv("JENKINS_URL")
-	os.Unsetenv("CIRCLECI")
+	clearCICDEnv(t)
 
 	// Act
 	executor := NewCICDExecutor()

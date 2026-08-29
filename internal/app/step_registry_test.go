@@ -35,7 +35,7 @@ func TestStepRegistry_RegisterStep(t *testing.T) {
 			setup: func() interfaces.StepHandler {
 				mockHandler := NewMockStepHandler()
 				mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-				mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+				mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 					return interfaces.StepConfig{
 						Name:        "test-step",
 						Description: "Test step",
@@ -43,7 +43,7 @@ func TestStepRegistry_RegisterStep(t *testing.T) {
 						Timeout:     5 * time.Minute,
 					}
 				}
-				mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+				mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 				return mockHandler
 			},
 		},
@@ -68,7 +68,7 @@ func TestStepRegistry_RegisterStep(t *testing.T) {
 			errContains: "handler cannot handle step",
 			setup: func() interfaces.StepHandler {
 				mockHandler := NewMockStepHandler()
-				mockHandler.CanHandleFunc = func(stepName string) bool { return false }
+				mockHandler.CanHandleFunc = func(_ string) bool { return false }
 				return mockHandler
 			},
 		},
@@ -80,7 +80,7 @@ func TestStepRegistry_RegisterStep(t *testing.T) {
 			setup: func() interfaces.StepHandler {
 				mockHandler := NewMockStepHandler()
 				mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-				mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+				mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 					return interfaces.StepConfig{
 						Name:        "test-step",
 						Description: "Test step",
@@ -88,7 +88,7 @@ func TestStepRegistry_RegisterStep(t *testing.T) {
 						Timeout:     5 * time.Minute,
 					}
 				}
-				mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error {
+				mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error {
 					return errors.New("validation error")
 				}
 				return mockHandler
@@ -127,7 +127,7 @@ func TestStepRegistry_RegisterStep(t *testing.T) {
 func TestStepRegistry_GetStepHandler(t *testing.T) {
 	mockHandler := NewMockStepHandler()
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:        "test-step",
 			Description: "Test step",
@@ -135,7 +135,7 @@ func TestStepRegistry_GetStepHandler(t *testing.T) {
 			Timeout:     5 * time.Minute,
 		}
 	}
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	registry := NewStepRegistry().(*StepRegistry)
 
@@ -183,17 +183,17 @@ func TestStepRegistry_GetStepHandler(t *testing.T) {
 func TestStepRegistry_ListSteps(t *testing.T) {
 	mockHandler1 := NewMockStepHandler()
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "step1" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{Name: "step1"}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2 := NewMockStepHandler()
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "step2" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{Name: "step2"}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	registry := NewStepRegistry().(*StepRegistry)
 
@@ -235,8 +235,8 @@ func TestStepRegistry_GetStepConfig(t *testing.T) {
 
 	// Register a step
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig { return expectedConfig }
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig { return expectedConfig }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("test-step", mockHandler)
 	require.NoError(t, err)
@@ -284,7 +284,7 @@ func TestStepRegistry_ValidateStep(t *testing.T) {
 
 	// Register a step
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:        "test-step",
 			Description: "Test step",
@@ -292,7 +292,7 @@ func TestStepRegistry_ValidateStep(t *testing.T) {
 			Timeout:     5 * time.Minute,
 		}
 	}
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("test-step", mockHandler)
 	require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestStepRegistry_ExecuteStep(t *testing.T) {
 
 	// Register a step
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:        "test-step",
 			Description: "Test step",
@@ -363,8 +363,8 @@ func TestStepRegistry_ExecuteStep(t *testing.T) {
 			Retries:     1,
 		}
 	}
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
-	mockHandler.ExecuteFunc = func(ctx context.Context, stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
+	mockHandler.ExecuteFunc = func(_ context.Context, _ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("test-step", mockHandler)
 	require.NoError(t, err)
@@ -437,7 +437,7 @@ func TestStepRegistry_ExecuteStep_WithTimeout(t *testing.T) {
 
 	// Register a step with timeout
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:        "test-step",
 			Description: "Test step",
@@ -446,12 +446,13 @@ func TestStepRegistry_ExecuteStep_WithTimeout(t *testing.T) {
 			Retries:     0,
 		}
 	}
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("test-step", mockHandler)
 	require.NoError(t, err)
 
 	// Mock handler to take longer than timeout
+	//nolint:unparam // signature fixed by MockStepHandler.ExecuteFunc's field type (internal/app/mocks.go); this particular mock always succeeds, but the field itself must return error
 	mockHandler.ExecuteFunc = func(_ context.Context, _ string, _ interfaces.StepConfig) error {
 		// Simulate work that takes longer than timeout
 		time.Sleep(200 * time.Millisecond)
@@ -483,8 +484,8 @@ func TestStepRegistry_GetStepInfo(t *testing.T) {
 
 	// Register a step
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig { return expectedConfig }
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig { return expectedConfig }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("test-step", mockHandler)
 	require.NoError(t, err)
@@ -542,10 +543,10 @@ func TestStepRegistry_UnregisterStep(t *testing.T) {
 
 	// Register a step
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "test-step" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{Name: "test-step"}
 	}
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("test-step", mockHandler)
 	require.NoError(t, err)
@@ -580,16 +581,16 @@ func TestStepRegistry_ClearAllSteps(t *testing.T) {
 
 	// Register multiple steps
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "step1" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{Name: "step1"}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "step2" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{Name: "step2"}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("step1", mockHandler1)
 	require.NoError(t, err)
@@ -619,16 +620,16 @@ func TestStepRegistry_GetStepCount(t *testing.T) {
 
 	// Register steps
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "step1" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{Name: "step1"}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "step2" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{Name: "step2"}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("step1", mockHandler1)
 	require.NoError(t, err)
@@ -647,22 +648,22 @@ func TestStepRegistry_GetRequiredSteps(t *testing.T) {
 
 	// Register required and optional steps
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "required-step" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:     "required-step",
 			Required: true,
 		}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "optional-step" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:     "optional-step",
 			Required: false,
 		}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("required-step", mockHandler1)
 	require.NoError(t, err)
@@ -678,23 +679,23 @@ func TestStepRegistry_GetRequiredSteps(t *testing.T) {
 func TestStepRegistry_GetOptionalSteps(t *testing.T) {
 	mockHandler1 := NewMockStepHandler()
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "required-step" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:     "required-step",
 			Required: true,
 		}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2 := NewMockStepHandler()
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "optional-step" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:     "optional-step",
 			Required: false,
 		}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	registry := NewStepRegistry().(*StepRegistry)
 
@@ -712,23 +713,23 @@ func TestStepRegistry_GetOptionalSteps(t *testing.T) {
 func TestStepRegistry_GetParallelSteps(t *testing.T) {
 	mockHandler1 := NewMockStepHandler()
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "parallel-step" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:     "parallel-step",
 			Parallel: true,
 		}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2 := NewMockStepHandler()
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "sequential-step" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:     "sequential-step",
 			Parallel: false,
 		}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	registry := NewStepRegistry().(*StepRegistry)
 
@@ -746,23 +747,23 @@ func TestStepRegistry_GetParallelSteps(t *testing.T) {
 func TestStepRegistry_ValidateDependencies(t *testing.T) {
 	mockHandler1 := NewMockStepHandler()
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "step1" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step1",
 			DependsOn: []string{},
 		}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2 := NewMockStepHandler()
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "step2" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step2",
 			DependsOn: []string{"step1"},
 		}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	registry := NewStepRegistry().(*StepRegistry)
 
@@ -778,13 +779,13 @@ func TestStepRegistry_ValidateDependencies(t *testing.T) {
 	// Test with invalid dependency - register a new step with invalid dependency
 	mockHandler3 := NewMockStepHandler()
 	mockHandler3.CanHandleFunc = func(stepName string) bool { return stepName == "step3" }
-	mockHandler3.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler3.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step3",
 			DependsOn: []string{"non-existent"},
 		}
 	}
-	mockHandler3.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler3.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err = registry.RegisterStep("step3", mockHandler3)
 	require.NoError(t, err)
@@ -797,33 +798,33 @@ func TestStepRegistry_ValidateDependencies(t *testing.T) {
 func TestStepRegistry_GetExecutionOrder(t *testing.T) {
 	mockHandler1 := NewMockStepHandler()
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "step1" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step1",
 			DependsOn: []string{},
 		}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2 := NewMockStepHandler()
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "step2" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step2",
 			DependsOn: []string{"step1"},
 		}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler3 := NewMockStepHandler()
 	mockHandler3.CanHandleFunc = func(stepName string) bool { return stepName == "step3" }
-	mockHandler3.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler3.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step3",
 			DependsOn: []string{"step2"},
 		}
 	}
-	mockHandler3.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler3.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	registry := NewStepRegistry().(*StepRegistry)
 
@@ -848,22 +849,22 @@ func TestStepRegistry_GetExecutionOrder_CircularDependency(t *testing.T) {
 
 	// Register steps with circular dependency
 	mockHandler1.CanHandleFunc = func(stepName string) bool { return stepName == "step1" }
-	mockHandler1.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler1.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step1",
 			DependsOn: []string{"step2"},
 		}
 	}
-	mockHandler1.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler1.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	mockHandler2.CanHandleFunc = func(stepName string) bool { return stepName == "step2" }
-	mockHandler2.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler2.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step2",
 			DependsOn: []string{"step1"},
 		}
 	}
-	mockHandler2.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler2.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("step1", mockHandler1)
 	require.NoError(t, err)
@@ -884,13 +885,13 @@ func TestStepRegistry_GetExecutionOrder_InvalidDependency(t *testing.T) {
 
 	// Register step with invalid dependency
 	mockHandler.CanHandleFunc = func(stepName string) bool { return stepName == "step1" }
-	mockHandler.GetStepInfoFunc = func(stepName string) interfaces.StepConfig {
+	mockHandler.GetStepInfoFunc = func(_ string) interfaces.StepConfig {
 		return interfaces.StepConfig{
 			Name:      "step1",
 			DependsOn: []string{"non-existent"},
 		}
 	}
-	mockHandler.ValidateFunc = func(stepName string, config interfaces.StepConfig) error { return nil }
+	mockHandler.ValidateFunc = func(_ string, _ interfaces.StepConfig) error { return nil }
 
 	err := registry.RegisterStep("step1", mockHandler)
 	require.NoError(t, err)

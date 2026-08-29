@@ -33,7 +33,7 @@ func NewLocalFileCache(baseDir string) *LocalFileCache {
 }
 
 // Get retrieves a value from cache by key.
-func (c *LocalFileCache) Get(ctx context.Context, key string) ([]byte, error) {
+func (c *LocalFileCache) Get(_ context.Context, key string) ([]byte, error) {
 	cachePath := c.getCachePath(key)
 
 	// Check if file exists
@@ -63,7 +63,7 @@ func (c *LocalFileCache) Get(ctx context.Context, key string) ([]byte, error) {
 }
 
 // Set stores a value in cache with the specified key and TTL.
-func (c *LocalFileCache) Set(ctx context.Context, key string, data []byte, ttl time.Duration) error {
+func (c *LocalFileCache) Set(_ context.Context, key string, data []byte, ttl time.Duration) error {
 	cachePath := c.getCachePath(key)
 
 	// Ensure cache directory exists
@@ -87,7 +87,7 @@ func (c *LocalFileCache) Set(ctx context.Context, key string, data []byte, ttl t
 }
 
 // Invalidate removes a value from cache by key.
-func (c *LocalFileCache) Invalidate(ctx context.Context, key string) error {
+func (c *LocalFileCache) Invalidate(_ context.Context, key string) error {
 	cachePath := c.getCachePath(key)
 	if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove cache file: %w", err)

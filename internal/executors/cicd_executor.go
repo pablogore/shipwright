@@ -40,7 +40,7 @@ func NewCICDExecutor() *CICDExecutor {
 //
 // Returns:
 //   - The detected CICDType, or CICDTypeLocal if no CI/CD is detected.
-func DetectCICD(ctx context.Context) CICDType {
+func DetectCICD(_ context.Context) CICDType {
 	// Check for GitHub Actions
 	if os.Getenv("GITHUB_ACTIONS") != "" {
 		return CICDTypeGitHubActions

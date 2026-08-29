@@ -103,10 +103,10 @@ func TestCLI_parseFlags_ErrorHandling(t *testing.T) {
 			flags, err := cli.parseFlags(tt.args)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, flags)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, flags)
 			}
 		})
@@ -114,20 +114,20 @@ func TestCLI_parseFlags_ErrorHandling(t *testing.T) {
 }
 
 func TestMain_ErrorOutput(t *testing.T) {
-	// Test that main properly handles errors
-	// This is a smoke test to ensure main doesn't panic
+	// Test that main properly handles errors without panicking.
+	// We can't call main() itself in a test (it calls os.Exit), so this
+	// exercises the same flag-parsing path main() drives, with invalid args.
 	oldArgs := os.Args
 	defer func() {
 		os.Args = oldArgs
 	}()
 
-	// Test with invalid args that should cause an error
 	os.Args = []string{cliName, "-invalid-flag"}
 
-	// We can't actually call main() in a test easily, but we can verify
-	// that the error handling code path exists and doesn't use log.Fatalf
-	// This is verified by checking the source code structure
-	require.True(t, true, "Error handling structure verified")
+	cli := NewCLI()
+	flags, err := cli.parseFlags(os.Args[1:])
+	require.Error(t, err)
+	assert.Nil(t, flags)
 }
 
 func TestCLIIdentityConstants(t *testing.T) {
@@ -394,13 +394,14 @@ type cloneCall struct {
 }
 
 // mockCloneFunc returns a cloneRepoFunc that records every call and
-// returns dir, err. No Dagger client or network access is needed.
-func mockCloneFunc(dir *dagger.Directory, err error, out *[]cloneCall) cloneRepoFunc {
+// returns (nil, nil) — no caller needs a non-nil directory or error result.
+// No Dagger client or network access is needed.
+func mockCloneFunc(out *[]cloneCall) cloneRepoFunc {
 	return func(_ context.Context, _ *dagger.Client, opts shared.GitCloneOpts, protocol string) (*dagger.Directory, error) {
 		if out != nil {
 			*out = append(*out, cloneCall{opts: opts, protocol: protocol})
 		}
-		return dir, err
+		return nil, nil
 	}
 }
 
@@ -408,7 +409,7 @@ func mockCloneFunc(dir *dagger.Directory, err error, out *[]cloneCall) cloneRepo
 // URL not starting with "git@" or "ssh://" selects protocol "https".
 func TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS(t *testing.T) {
 	var calls []cloneCall
-	cloneFn := mockCloneFunc(nil, nil, &calls)
+	cloneFn := mockCloneFunc(&calls)
 
 	spec := manifest.SourceSpec{
 		Repo: "https://github.com/org/repo.git",
@@ -426,7 +427,7 @@ func TestResolveWorkflowSource_HTTPSProtocolSelectsHTTPS(t *testing.T) {
 // starting with "git@" selects protocol "ssh".
 func TestResolveWorkflowSource_SSHProtocolSelectsSSH(t *testing.T) {
 	var calls []cloneCall
-	cloneFn := mockCloneFunc(nil, nil, &calls)
+	cloneFn := mockCloneFunc(&calls)
 
 	spec := manifest.SourceSpec{
 		Repo: "git@github.com:org/repo.git",
@@ -444,7 +445,7 @@ func TestResolveWorkflowSource_SSHProtocolSelectsSSH(t *testing.T) {
 // using the ssh:// scheme selects protocol "ssh", not "https".
 func TestResolveWorkflowSource_SSHSchemeSelectsSSH(t *testing.T) {
 	var calls []cloneCall
-	cloneFn := mockCloneFunc(nil, nil, &calls)
+	cloneFn := mockCloneFunc(&calls)
 
 	spec := manifest.SourceSpec{
 		Repo: "ssh://git@github.com/org/repo.git",
@@ -462,7 +463,7 @@ func TestResolveWorkflowSource_SSHSchemeSelectsSSH(t *testing.T) {
 // is set, it is forwarded as opts.Branch unchanged.
 func TestResolveWorkflowSource_ExplicitRefPreserved(t *testing.T) {
 	var calls []cloneCall
-	cloneFn := mockCloneFunc(nil, nil, &calls)
+	cloneFn := mockCloneFunc(&calls)
 
 	spec := manifest.SourceSpec{
 		Repo: "https://github.com/org/repo.git",
@@ -494,7 +495,7 @@ func TestResolveWorkflowSource_EmptyRefFailsClosed(t *testing.T) {
 // as opts.Repo unchanged.
 func TestResolveWorkflowSource_RepoForwarded(t *testing.T) {
 	var calls []cloneCall
-	cloneFn := mockCloneFunc(nil, nil, &calls)
+	cloneFn := mockCloneFunc(&calls)
 
 	spec := manifest.SourceSpec{
 		Repo: "git@github.com:org/repo.git",

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseStepConfig(t *testing.T) {
@@ -46,7 +47,7 @@ func TestParseStepConfig(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.timeout, duration)
 			}
 		})

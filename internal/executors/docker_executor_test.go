@@ -57,7 +57,7 @@ func TestDockerExecutor_ExecuteStep_NilClient(t *testing.T) {
 	err := executor.ExecuteStep(ctx, "build")
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Docker executor requires Dagger client")
+	assert.Contains(t, err.Error(), "docker executor requires dagger client")
 }
 
 func TestDockerExecutor_ExecuteStep_UnsupportedStep(t *testing.T) {

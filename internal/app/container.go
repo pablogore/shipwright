@@ -13,6 +13,7 @@ import (
 	"dagger.io/dagger"
 
 	"github.com/pablogore/kit-logger/pkg/logger"
+
 	golang "github.com/pablogore/shipwright/providers/go"
 	godaggerkit "github.com/pablogore/shipwright/providers/go/daggerkit"
 
@@ -139,7 +140,7 @@ func (c *Container) registerDaggerComponents() {
 		// Dagger requires Docker to be running
 		if err := c.verifyDockerAvailable(ctx); err != nil {
 			return nil, fmt.Errorf("%w: Docker not available: %v. "+
-				"Dagger requires Docker to be running. In GitHub Actions, ensure Docker service is configured.",
+				"Dagger requires Docker to be running. In GitHub Actions, ensure Docker service is configured",
 				ErrFailedToCreateDaggerClient, err)
 		}
 
@@ -214,7 +215,7 @@ func (c *Container) registerDaggerComponents() {
 		return nil, fmt.Errorf("%w: failed after %d attempts: %v. "+
 			"Ensure Dagger engine is running (try 'dagger run echo test' to verify). "+
 			"In GitHub Actions, ensure Docker service is available. "+
-			"The daemon may take up to 60 seconds to start on first run.",
+			"The daemon may take up to 60 seconds to start on first run",
 			ErrFailedToCreateDaggerClient, maxRetries+1, lastErr)
 	})
 }
@@ -237,7 +238,7 @@ func (c *Container) verifyDockerAvailable(ctx context.Context) error {
 	if err != nil {
 		// Docker might not be available or daemon not running
 		// Return a helpful error message
-		return fmt.Errorf("Docker not available or daemon not running: %v (output: %s). "+
+		return fmt.Errorf("docker not available or daemon not running: %v (output: %s). "+
 			"In GitHub Actions, add 'services: docker:' to your workflow",
 			err, string(output))
 	}
@@ -368,7 +369,7 @@ func (c *Container) GetLinter() (interfaces.Linter, error) {
 // GetLogger is deprecated - use logger.L() directly from go-kit-logger
 // This method is kept for backward compatibility but returns nil
 func (c *Container) GetLogger() (interfaces.Logger, error) {
-	return nil, fmt.Errorf("GetLogger is deprecated - use logger.L() directly from go-kit-logger")
+	return nil, errors.New("GetLogger is deprecated - use logger.L() directly from go-kit-logger")
 }
 
 // GetConfiguration returns the configuration instance.
@@ -522,9 +523,7 @@ func (c *Container) registerPluginComponents() {
 		loader := plugins.NewLoader()
 
 		// Register built-in plugins
-		loader.RegisterBuiltin("nomad-deploy", func() plugins.Plugin {
-			return plugins.NewNomadDeployPlugin()
-		})
+		loader.RegisterBuiltin("nomad-deploy", plugins.NewNomadDeployPlugin)
 
 		return loader, nil
 	})
