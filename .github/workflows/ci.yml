@@ -1662,6 +1662,14 @@ jobs:
           go-mod-
         fail-on-cache-miss: false
 
+    - name: 'Install golangci-lint'
+      run: |
+        go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+
+    - name: 'Install govulncheck'
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+
     - name: 'Run repository-owned Final-SHA validation contract'
       run: |
         echo "🔐 Running 'make ci-final' against $(git rev-parse HEAD)"

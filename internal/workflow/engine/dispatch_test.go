@@ -95,7 +95,7 @@ func TestExecute_DispatchesRuntimeInspector(t *testing.T) {
 	rec := &recorder{}
 	reg := providers.NewRegistry()
 	reg.RegisterRuntimeInspector(providers.Ref{Name: "go-runtime", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeInspector {
-		return fakeRuntimeInspector{InspectFunc: func(ctx context.Context, source *dagger.Directory) (string, error) {
+		return fakeRuntimeInspector{InspectFunc: func(_ context.Context, _ *dagger.Directory) (string, error) {
 			rec.record("inspect")
 			return `{"workspaceRoot":"."}`, nil
 		}}
