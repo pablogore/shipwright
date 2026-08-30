@@ -65,7 +65,7 @@ func (fakeRunner) Run(_ context.Context, _ *dagger.Directory) (*dagger.Container
 // five, not any concrete provider's own behavior.
 type fakeRuntimeInspector struct{}
 
-func (fakeRuntimeInspector) Inspect(ctx context.Context, source *dagger.Directory) (string, error) {
+func (fakeRuntimeInspector) Inspect(_ context.Context, _ *dagger.Directory) (string, error) {
 	return "{}", nil
 }
 
