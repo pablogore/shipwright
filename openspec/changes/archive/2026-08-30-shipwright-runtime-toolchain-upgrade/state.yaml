@@ -1,7 +1,7 @@
 # SDD DAG state for change: shipwright-runtime-toolchain-upgrade
 change: shipwright-runtime-toolchain-upgrade
 title: Provider-Managed Runtime/Toolchain Upgrade (Go First)
-updated: 2026-08-29 (slice 4 verify)
+updated: 2026-08-30 (whole-change verify)
 
 session:
   execution_mode: auto
@@ -17,8 +17,8 @@ phases:
   design: done
   tasks: done
   apply: done (4/4 slices applied -- tasks 1.1-1.24, 2.1-2.17, 3.1-3.6, 4.1-4.7 all done; no unchecked task remains in tasks.md)
-  verify: done (4/4 slices verified -- slice 1 PASS, slice 2 PASS WITH WARNINGS, slice 3 PASS WITH WARNINGS, slice 4 PASS; whole-change verify/archive still pending after PR #4 merges)
-  archive: pending
+  verify: done (WHOLE-CHANGE verify complete, 2026-08-30, against develop HEAD dfc5a15 -- 2 commits past slice-4's tip: PR #198 c231dbe lint/security CI-gate fix + toolchain sync, PR #199 dfc5a15 .dagger/go.mod revert to 1.26.5. Verdict: PASS WITH WARNINGS. Zero CRITICALs; 2 residual WARNINGs carried forward from slices 2/3 (both documented, non-functional, non-blocking). Full independent re-run at dfc5a15: go build/go test -race clean (root+providers/go), golangci-lint 0 issues (root+providers/go, was 97+3 pre-existing at slice-4 tip, PR #198 closed them), make ci-final PASS (lint+build+test+coverage-gate 74.6%+security all clean), govulncheck clean (root+providers/go+providers/rust), all spec scenarios/design D-1..D-9 re-confirmed against current HEAD, zero regressions from PR #198/#199 in files this change owns. Dogfooding confirmed: this repo's own tier-1 Go version sources (go.mod/go.work/.go-version/providers/{go,rust}/go.mod) are now unanimous at 1.26.7 -- A1, not the A3-ambiguous state design.md's D-4 LIVE DRIFT FINDING originally recorded. Full report: Engram sdd/shipwright-runtime-toolchain-upgrade/verify-report.)
+  archive: ready (blocked only on user/orchestrator invoking sdd-archive; no CRITICAL issues remain)
 
 artifacts:
   exploration: openspec/changes/shipwright-runtime-toolchain-upgrade/exploration.md
@@ -46,14 +46,75 @@ decisions:
     spec_impact: none — capability returns a mutated directory, no remote-write path exists
 
 next_recommended:
-  - open PR #1 (feature/runtime-inspect-go -> develop) -- slice 1 verify PASSed
-  - open PR #2 (feature/runtime-upgrade-single-module -> feature/runtime-inspect-go) -- slice 2 verify PASS WITH WARNINGS
-  - open PR #3 (feature/runtime-upgrade-workspace -> feature/runtime-upgrade-single-module) -- slice 3 verify PASS WITH WARNINGS
-  - open PR #4 (feature/runtime-upgrade-tidy-validate -> feature/runtime-upgrade-workspace) -- slice 4 verify PASS
-  - after PR #4 is reviewed and merged (through the full stack to develop), run
-    a whole-change sdd-verify pass over the merged result, then sdd-archive
+  - DONE -- PR #1-#4 all merged to develop (0e97304, c962ec5, 170c315, 7dfc85b),
+    plus follow-up fixes PR #198 (c231dbe) and PR #199 (dfc5a15)
+  - DONE -- whole-change sdd-verify pass complete (2026-08-30), verdict PASS
+    WITH WARNINGS, zero CRITICALs
+  - run sdd-archive next
 
 open_risks:
+  - VERIFIED (WHOLE-CHANGE, 2026-08-30) -- final whole-change sdd-verify pass
+    against develop HEAD dfc5a15, superseding the 4 per-slice reports as the
+    terminal verdict. dfc5a15 is 2 commits past slice-4's verified tip
+    (5ff7718/7dfc85b): PR #198 (c231dbe) closed a real final-sha-validation
+    CI gap (make ci-final ran without golangci-lint/govulncheck installed,
+    silently no-op-ing lint/security since PR #193), fixed 2 real
+    revive:unused-parameter findings in this change's own
+    internal/workflow/engine/dispatch_test.go and
+    internal/workflow/providers/registry_test.go (mechanical ctx/source -> _
+    renames, confirmed by diff read, zero behavior change), and synced
+    .go-version/.dagger/go.mod to 1.26.7 per design.md's own Tier-1/Tier-3
+    drift table. PR #199 (dfc5a15) then correctly reverted .dagger/go.mod
+    back to 1.26.5 after discovering the pinned Dagger engine (v0.21.8) has
+    a hard module-bootstrap ceiling of 1.26.5 -- confirmed this is a real
+    SDK/engine constraint, not drift, and .dagger/go.mod remains outside
+    this change's managed set (design D-4 Tier 3, module-isolation guard,
+    go.work use-list). Fresh command evidence at dfc5a15 (not carried from
+    slice 4): go build ./... clean (root+providers/go); go test -race
+    -count=1 ./... all green (root+providers/go); golangci-lint run ./...
+    0 issues both root and providers/go (was 97+3 pre-existing issues at
+    slice-4 tip -- PR #198 closed them); make ci-final PASS end-to-end
+    (lint+build+test+coverage-gate 74.6%-vs-70%-floor+security, all clean);
+    govulncheck clean in root, providers/go, and providers/rust. Dogfooding
+    claim independently re-verified by direct source-level reasoning over
+    detectConflicts/detectModuleDivergence/detectSourceMismatch
+    (providers/go/toolchain.go) applied to current tier-1 values: go.mod=
+    go.work=.go-version=providers/go/go.mod=providers/rust/go.mod=1.26.7,
+    now genuinely unanimous (A1), not the A3-ambiguous six-version-drift
+    state design.md's D-4 originally recorded -- the frozen
+    testdata/runtime/live-repo-drift fixture (.go-version=1.26.1) correctly
+    remains unchanged as a historical regression snapshot, not a live-state
+    tracker, per design.md's own framing. All 3 delta specs
+    (runtime-toolchain, workflow-manifest, public-module-api, both language
+    variants) re-cross-checked against dfc5a15 source with passing covering
+    tests for every scenario (TestParse_RuntimeInspectCapabilityValidates,
+    TestParse_RuntimeUpgradeCapabilityValidates,
+    TestGuaranteedSurface_MatchesGolden,
+    TestResolveCapabilityRef_AllSevenCapabilities,
+    TestDetectConflicts_WorkspacePreMutation,
+    TestDetectConflicts_A6_NoWorkspaceSources,
+    TestDefaultGoVersionMatchesGoMod, all independently re-run PASS). D-1
+    through D-9 re-confirmed against current source; D-4 Tier 2 (CI YAML
+    GO_VERSION) confirmed still has real, correctly-out-of-scope drift
+    (ci.yml=1.26.7 vs release*.yml=1.26.1) -- unchanged by this pass, not a
+    regression. Zero new CRITICALs and zero new WARNINGs introduced by PR
+    #198/#199; the two residual WARNINGs from slice 2 (TDD-evidence-table
+    documentation gap; slice-2 diff exceeded its own 400-line budget
+    forecast) and slice 3 (A1/A2/A3 tested at detectConflicts level, not
+    Upgrade()-level with an AssertNotCalled mock the way A7/A4/A5 are) carry
+    forward unchanged -- both documented, non-functional, non-blocking.
+    Noted, confirmed still out of scope and not a defect of this change:
+    internal/workflow/engine/execute.go's StepOutcome struct has no
+    output-text field, so the CLI currently has no path to surface a
+    runtime-inspect step's JSON report through normal workflow execution --
+    a real UX gap, correctly outside this change's proposal/spec scope
+    (design's D2 follow-up change is the intended consumer). Working tree
+    confirmed clean; the throwaway cmd/selfinspect dogfooding program used
+    during this pass was correctly never committed and leaves no trace.
+    FINAL VERDICT: PASS WITH WARNINGS. Ready for sdd-archive. Full report:
+    Engram sdd/shipwright-runtime-toolchain-upgrade/verify-report (upserted,
+    whole-change content, supersedes the slice-4 entry as the terminal
+    verdict).
   - VERIFIED (slice 4/4, 2026-08-29, final slice) -- post-mutation tidy+build
     validation on feature/runtime-upgrade-tidy-validate (commit 5ff7718) PASS,
     zero CRITICALs, zero WARNINGs: all 7 Phase-4 tasks (4.1-4.7) confirmed
