@@ -140,6 +140,11 @@ final-sha-gate-check-test: ## Run the final-sha-gate composition logic's own tes
 	./scripts/final-sha-gate-check_test.sh
 	@echo -e "$(GREEN)✅ final-sha-gate composition logic tests completed$(NC)"
 
+action-contract-test: ## Assert the public GitHub composite Action only emits flags the CLI still supports (pure bash/rg, no Dagger required -- included in ci-final)
+	@echo -e "$(BLUE)Running GitHub Action CLI-contract tests...$(NC)"
+	./scripts/action-contract_test.sh
+	@echo -e "$(GREEN)✅ GitHub Action CLI-contract tests completed$(NC)"
+
 deps: ## Download and tidy dependencies
 	@echo -e "$(BLUE)Downloading dependencies...$(NC)"
 	$(GOMOD) download
@@ -348,7 +353,7 @@ provider-go-standalone: ## Validate providers/go builds/tests standalone with GO
 # dagger-test/test-integration structurally cannot be, by the same
 # reproducibility requirement that motivates ci-final's existence.
 .PHONY: ci-final
-ci-final: lint build test coverage-gate security provider-go-standalone final-sha-gate-check-test ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
+ci-final: lint build test coverage-gate security provider-go-standalone final-sha-gate-check-test action-contract-test ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
