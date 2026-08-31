@@ -168,8 +168,7 @@ func buildCloneContainer(client *dagger.Client, opts GitCloneOpts, creds *GitCre
 				Permissions: 0o600,
 			}).
 			WithExec([]string{"chmod", "600", "/root/.netrc"}).
-			WithExec([]string{"git", "config", "--global", "credential.helper", "store"}).
-			WithExec([]string{"git", "config", "--global", "http.sslVerify", "false"})
+			WithExec([]string{"git", "config", "--global", "credential.helper", "store"})
 	}
 
 	// Configure Git user

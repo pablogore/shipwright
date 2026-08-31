@@ -1,18 +1,36 @@
 package shared
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestMain(_ *testing.M) {
-	// Skip all tests in this package as they require Docker daemon to be running
-	os.Exit(0)
+// TestMain skips this package's tests only when no Dagger/Docker engine is
+// actually reachable, instead of unconditionally disabling the whole suite.
+func TestMain(m *testing.M) {
+	os.Exit(runTests(m))
+}
+
+func runTests(m *testing.M) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "skipping shared package tests: no Dagger/Docker engine available:", err)
+		return 0
+	}
+	client.Close()
+
+	return m.Run()
 }
 
 func TestNewDockerDeployer(t *testing.T) {
