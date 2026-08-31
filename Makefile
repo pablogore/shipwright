@@ -40,7 +40,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test test-integration deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone
+.PHONY: all build clean test dagger-test test-integration deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone provider-rust-standalone
 
 # Help target
 .PHONY: help
@@ -270,6 +270,18 @@ provider-go-standalone: ## Validate providers/go builds/tests standalone with GO
 	cd providers/go && GOWORK=off $(GOTEST) -race ./...
 	@echo -e "$(GREEN)✅ providers/go is standalone under GOWORK=off$(NC)"
 
+provider-rust-standalone: ## Validate providers/rust builds/tests standalone with GOWORK=off (no workspace, no replace)
+	@echo -e "$(BLUE)Validating providers/rust is standalone (GOWORK=off)...$(NC)"
+	@if grep -q '^replace' providers/rust/go.mod; then \
+		echo -e "$(RED)❌ providers/rust/go.mod has a replace directive -- module is not independently consumable$(NC)"; \
+		exit 1; \
+	fi
+	cd providers/rust && GOWORK=off $(GOMOD) download
+	cd providers/rust && GOWORK=off $(GOMOD) verify
+	cd providers/rust && GOWORK=off $(GOBUILD) ./...
+	cd providers/rust && GOWORK=off $(GOTEST) -race ./...
+	@echo -e "$(GREEN)✅ providers/rust is standalone under GOWORK=off$(NC)"
+
 # PROD-001: single repository-owned source of truth for "what makes a SHA
 # production-ready", run identically by any CI provider or locally.
 # ci-final = lint + build + test + coverage + security. Three things are
@@ -350,16 +362,27 @@ provider-go-standalone: ## Validate providers/go builds/tests standalone with GO
 #    just a release tag push -- catches this class of drift immediately.
 #    Closes via: already closed by this gate.
 #
+# 6) `provider-rust-standalone` -- INCLUDED, P0 REGRESSION GATE.
+#    Same class of risk as (5), for the other separately versioned,
+#    externally-published module: providers/rust is also a go.work member, so
+#    `build`/`test` alone would silently resolve it against the local
+#    checkout instead of what providers/rust/go.mod actually requires. Only
+#    proven standalone by the release-provider-rust.yml tag workflow before
+#    this gate existed. Included here so every push to develop catches drift
+#    in providers/rust the same way (5) does for providers/go.
+#    Closes via: already closed by this gate.
+#
 # Given the above, ci-final represents the valid minimum production-critical
-# set: lint/build/test/coverage/security/provider-go-standalone are the only
-# checks that (a) can run fail-closed with zero external dependencies and
+# set: lint/build/test/coverage/security/provider-go-standalone/
+# provider-rust-standalone are the only checks that (a) can run fail-closed
+# with zero external dependencies and
 # (b) map directly to "this SHA compiles cleanly, behaves correctly under
 # test, meets its coverage bar, has no known vulnerabilities, and every
 # independently-published module it contains is actually independent."
 # dagger-test/test-integration structurally cannot be, by the same
 # reproducibility requirement that motivates ci-final's existence.
 .PHONY: ci-final
-ci-final: lint build test coverage-gate security provider-go-standalone final-sha-gate-check-test action-contract-test ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
+ci-final: lint build test coverage-gate security provider-go-standalone provider-rust-standalone final-sha-gate-check-test action-contract-test ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
