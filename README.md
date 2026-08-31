@@ -26,18 +26,15 @@ heading. They are marked accordingly — do not assume a "planned" item is
 already usable.
 
 **Available today**
-- A compiled Go CLI/binary (`shipwright`) with a working `go-service`
-  pipeline: setup, test (with coverage), lint, vulnerability scan, build
-  (binary and/or Docker image), package, tag, push.
-- Native (Docker-free) local execution for a subset of steps, and a
-  Docker/Dagger-based execution path for the full pipeline.
-- A declarative workflow manifest engine (`--workflow`, `shipwright.dev/v1`
-  schema) that composes registered providers per step, independently of the
-  `go-service` pipeline above. Providers registered today include the
-  original five Go providers plus a full Rust equivalent set (`rust`,
+- A compiled Go CLI/binary (`shipwright`) whose sole entrypoint is a
+  declarative workflow manifest engine (`--workflow`, `shipwright.dev/v1`
+  schema) that composes registered providers per step. Providers registered
+  today include five Go providers (setup/test, lint, vulnerability scan,
+  build, container publish) plus a full Rust equivalent set (`rust`,
   `rust-test`, `rust-integration-test`, `clippy`, `cargo-audit`,
   `rust-container`) and toolchain-drift `runtime-inspect`/`runtime-upgrade`
   capabilities.
+- A Docker/Dagger-based execution path for workflow steps.
 - Rust provider support (`providers/rust`): a Go-implemented provider
   package — builder, unit/integration testers, linter, vulnerability
   scanner, container publisher — mirroring `providers/go`'s shape and
@@ -52,8 +49,6 @@ already usable.
   via `ContractVersion` (currently `1.0.0`). Two further capabilities,
   `RuntimeInspector`/`RuntimeUpgrader`, are also declared as Dagger
   Interfaces but not yet wired into `Plan`'s composition chain.
-- YAML + environment-variable configuration (`.shipwright.yml`,
-  `SHIPWRIGHT_*`).
 - A GitHub Actions composite action that wraps the CLI.
 - A plugin/hook registration system at the infrastructure level.
 
@@ -77,9 +72,9 @@ detail, and roadmap.
 
 ## How it works today
 
-Shipwright ships as a single binary. It auto-detects whether it's running
-locally or in CI and picks a native (no Docker) or Dagger/Docker-based
-executor accordingly.
+Shipwright ships as a single binary whose only entrypoint is a declarative
+workflow manifest (`shipwright.dev/v1` schema). It executes steps against
+a Dagger-provisioned environment.
 
 ```bash
 # Build from source
@@ -87,56 +82,27 @@ git clone https://github.com/pablogore/shipwright.git
 cd shipwright
 make build
 
-# Run the go-service pipeline (auto-detects local vs CI execution)
-./shipwright --pipeline go-service
+# Run every step in a workflow manifest
+./shipwright --workflow path/to/workflow.yaml
 
-# Run a single step
-./shipwright --pipeline go-service --step test
+# Run a single step (and its needs-transitive dependencies)
+./shipwright --workflow path/to/workflow.yaml --step test
 
-# Force local (native) execution, no Docker required
-./shipwright --pipeline go-service --local
+# List the steps declared in a manifest instead of executing them
+./shipwright --workflow path/to/workflow.yaml --list-steps
 
-# Force the Docker/Dagger executor
-./shipwright --pipeline go-service --executor docker
-
-# List what's available
-./shipwright --list-pipelines
-./shipwright --list-steps --pipeline go-service
+# Select which branch predicate conditional steps evaluate against
+./shipwright --workflow path/to/workflow.yaml --branch main
 ```
 
-Locally, only `setup, build, test, lint, security` run natively; steps that
-need registry/cloud access (`package, tag, push, release`) are skipped in
-local mode rather than run against real infrastructure.
-
-Configuration can come from an optional `.shipwright.yml`:
-
-```yaml
-pipeline:
-  name: go-service
-  environment: dev
-  coverage: 90
-  goVersion: "1.26.1"
-  steps:
-    - setup
-    - build
-    - test
-
-registry:
-  baseUrl: registry.example.com
-  image: my-service
-  user: ${REGISTRY_USERNAME}
-
-security:
-  enableVulnCheck: true
-  enableLinting: true
-
-git:
-  protocol: ssh
-```
-
-or overridden with CLI flags (`--env`, `--coverage`, `--executor`,
-`--skip-push`, `--only-build`, `--only-test`, `--verbose`, and more —
-run `shipwright --help` for the full set).
+A missing or invalid manifest fails closed with an explicit error — there is
+no fallback pipeline to run instead. `--workflow`, `--step`, `--list-steps`,
+and `--branch` are the flags that actually affect a workflow run; see
+`shipwright --help` for the full flag set, but note that several flags in
+that list (`--executor`, `--local`, `--env`, `--coverage`, `--git-ref`,
+`--git-auth`, `--config`/`.shipwright.yml`) are parsed but currently have no
+effect on `--workflow` execution — everything a workflow needs (source,
+secrets, variables, per-step options) is declared in the manifest itself.
 
 ### Building from source
 
@@ -149,8 +115,8 @@ make test    # go test -race ./...
 make lint    # golangci-lint
 ```
 
-Requires Go 1.26 (see `go.mod` / `.go-version`) and Docker if you intend to
-use the Docker/Dagger executor.
+Requires Go 1.26 (see `go.mod` / `.go-version`) and Docker, since workflow
+steps run via Dagger.
 
 Compiled release binaries for Linux/macOS/Windows (amd64/arm64) are
 published on the [GitHub Releases](https://github.com/pablogore/shipwright/releases)
@@ -164,10 +130,9 @@ A composite action wraps the CLI so provider YAML stays a thin trigger:
 - uses: actions/checkout@v4
 - uses: ./.github/actions/shipwright
   with:
-    pipeline: go-service
-    stage: test
-    env: dev
-    coverage: '90'
+    workflow: .shipwright/workflow.yaml
+    step: test
+    branch: develop
 ```
 
 See [examples/github-actions](examples/github-actions/) for complete
@@ -197,34 +162,39 @@ GitHub Actions / GitLab CI / Jenkins / Local
 yet — `Lifecycle` and `Toolchain` are goals of the ongoing architectural
 evolution, not shipped concepts. `Pipeline` exists today but as two
 overlapping internal interfaces rather than one unified model. `Dagger` is
-already the real execution substrate for the `go-service` pipeline's
+already the real execution substrate for the workflow manifest engine's
 container-based steps.
 
 ## Current capabilities
 
 Verified against the repository:
 
-- `go-service` pipeline: test with coverage threshold, `golangci-lint`
-  linting, `govulncheck` vulnerability scanning, binary and/or Docker image
-  build, packaging, tagging, and registry push.
-- `infra` pipeline: registered, but only `Setup`/test-with-coverage is
-  implemented — build/package are no-ops and tag/push are not implemented.
-- Declarative workflow manifests (`--workflow`) composing registered Go and
-  Rust providers per step, independently of the `go-service`/`infra`
-  pipelines above.
+- Declarative workflow manifests (`--workflow`, `shipwright.dev/v1` schema)
+  composing registered Go and Rust providers per step: test with coverage
+  threshold, `golangci-lint`/`clippy` linting, `govulncheck`/`cargo-audit`
+  vulnerability scanning, binary and/or container image build, and
+  toolchain-drift `runtime-inspect`/`runtime-upgrade`.
 - A public, versionable Dagger Module API at the repository root (`dagger
   call`, `.dagger/capabilities.go`) exposing `Builder`/`Tester`/
   `Artifactor`/`Deployer`/`Runner` as chainable Dagger Interfaces via
   `Plan`/`Execute` — see `COMPATIBILITY.md` for the exact guaranteed
   surface.
-- Native local executor and Docker/Dagger executor, auto-selected or
-  forced via `--executor`/`--local`.
-- YAML config file + `SHIPWRIGHT_*` environment variable configuration.
+- Dagger-provisioned execution for workflow steps.
 - Plugin registry/loader and a hook manager at the infrastructure layer
   (one built-in plugin, `nomad-deploy`); pipelines do not yet invoke
   before/after hooks.
 - GitHub Actions composite action and example workflows.
 - GoReleaser-based multi-platform release builds.
+
+## Legacy / internal historical implementation
+
+`internal/pipelines/` still contains the original `go-service` and `infra`
+pipeline implementations (setup/test/lint/scan/build/package/tag/push logic
+predating the workflow manifest engine). **They are not invocable from the
+current CLI** — the `--pipeline` flag and preset registry that used to
+dispatch to them were removed, and `main.go`'s only entrypoint is
+`--workflow`. The code remains in the tree as history/reference, not as a
+supported delivery path.
 
 ## Roadmap
 
@@ -264,7 +234,7 @@ shipwright/
 │   ├── config/             # configuration loading and validation
 │   ├── executors/          # native and Docker/Dagger execution
 │   ├── interfaces/         # shared interfaces
-│   ├── pipelines/          # pipeline implementations (go-service, infra)
+│   ├── pipelines/          # legacy pipeline implementations (go-service, infra) -- not invocable from the CLI
 │   └── plugins/            # plugin/hook system
 ├── examples/                # usage examples (GitHub Actions, Jenkins, local)
 └── docs/                    # documentation
