@@ -130,6 +130,12 @@ dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT p
 	cd .dagger && GOWORK=off dagger run $(GOTEST) -race ./...
 	@echo -e "$(GREEN)✅ .dagger module tests completed$(NC)"
 
+security-dagger: ## Run govulncheck against .dagger's own Go module (requires a running Dagger engine; deliberately NOT part of `security`/`ci-final` -- see dagger-test's isolation note). .dagger imports the Dagger-generated internal/dagger client, which only exists after `dagger` regenerates it, so plain govulncheck can't resolve the module without a live engine (same reason Dependabot can't update .dagger/go.mod on its own).
+	@echo -e "$(BLUE)Running .dagger module security scan...$(NC)"
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	cd .dagger && GOWORK=off dagger run govulncheck ./...
+	@echo -e "$(GREEN)✅ .dagger module security scan completed$(NC)"
+
 test-integration: ## Run real-Dagger-engine tests under testing/integration/ (requires a running Dagger engine; deliberately NOT part of `test`/`check`/`ci-final` — mock tests cover this logic for the default suite)
 	@echo -e "$(BLUE)Running Dagger integration tests...$(NC)"
 	$(GOTEST) -tags integration -v -race ./testing/...

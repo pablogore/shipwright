@@ -1740,6 +1740,11 @@ jobs:
         echo "🔌 Running 'make test-integration' against $(git rev-parse HEAD)"
         make test-integration
 
+    - name: 'Run .dagger module security scan'
+      run: |
+        echo "🔒 Running 'make security-dagger' against $(git rev-parse HEAD)"
+        make security-dagger
+
   # Single, unambiguous aggregator for the Final-SHA verdict. Fail-closed by
   # construction: it only reports VALID when BOTH final-sha-validation and
   # final-sha-dagger-integration succeed for this exact SHA. Any other
