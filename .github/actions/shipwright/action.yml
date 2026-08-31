@@ -1,5 +1,5 @@
 name: 'Shipwright'
-description: 'Execute Shipwright pipeline stages in GitHub Actions'
+description: 'Execute a Shipwright workflow manifest in GitHub Actions'
 branding:
   icon: 'play-circle'
   color: 'blue'
@@ -9,11 +9,24 @@ inputs:
     description: 'Version of shipwright to use (e.g., "latest", "v1.0.0")'
     required: false
     default: 'latest'
-  pipeline:
-    description: 'Pipeline type to execute (e.g., "go-kit", "docker-go", "infra")'
-    required: true
-  stage:
-    description: 'Specific stage to execute (setup, build, test, etc.). Leave empty for full pipeline'
+  workflow:
+    description: 'Path to the declarative workflow manifest'
+    required: false
+    default: '.shipwright/workflow.yaml'
+  step:
+    description: 'Workflow step to execute (the needs-transitive closure of this step id). Leave empty to run every step'
+    required: false
+    default: ''
+  list-steps:
+    description: 'List the workflow steps declared in the manifest instead of executing'
+    required: false
+    default: 'false'
+  branch:
+    description: 'Branch name'
+    required: false
+    default: 'develop'
+  executor:
+    description: 'Executor to use: native, docker (empty for auto-detection)'
     required: false
     default: ''
   config:
@@ -36,18 +49,6 @@ inputs:
     description: 'Enable verbose logging'
     required: false
     default: 'false'
-  only-build:
-    description: 'Execute build step only'
-    required: false
-    default: 'false'
-  only-test:
-    description: 'Execute test step only'
-    required: false
-    default: 'false'
-  skip-push:
-    description: 'Skip image push to registry'
-    required: false
-    default: 'false'
   git-ref:
     description: 'Git reference to use (branch, tag, commit)'
     required: false
@@ -66,7 +67,7 @@ outputs:
     value: '${{ steps.setup.outputs.version }}'
   exit-code:
     description: 'Exit code from shipwright execution'
-    value: '${{ steps.execute.outputs.exit-code || steps.execute-full.outputs.exit-code }}'
+    value: '${{ steps.execute.outputs.exit-code }}'
 
 runs:
   using: 'composite'
@@ -182,34 +183,38 @@ runs:
         # We just need to ensure Docker is available
         echo "✅ Docker is ready - shipwright will handle Dagger daemon startup"
 
-    - name: 'Execute Pipeline Stage'
+    - name: 'Execute Workflow'
       id: 'execute'
-      if: "inputs.stage != ''"
       shell: 'bash'
       run: |
         set +e  # Don't fail immediately, we want to capture exit code
 
-        echo "::group::Executing stage: ${{ inputs.stage }}"
+        echo "::group::Executing workflow: ${{ inputs.workflow }}"
         echo "🌍 Environment: GitHub Actions"
-        echo "📦 Pipeline: ${{ inputs.pipeline }}"
-        echo "🎯 Stage: ${{ inputs.stage }}"
+        echo "📋 Workflow: ${{ inputs.workflow }}"
 
         CMD="${{ steps.setup.outputs.binary-path }}"
-        CMD="$CMD --pipeline=${{ inputs.pipeline }}"
-        CMD="$CMD --step=${{ inputs.stage }}"
+        CMD="$CMD --workflow=${{ inputs.workflow }}"
         CMD="$CMD --config=${{ inputs.config }}"
         CMD="$CMD --env=${{ inputs.env }}"
         CMD="$CMD --coverage=${{ inputs.coverage }}"
+        CMD="$CMD --branch=${{ inputs.branch }}"
 
         # Auto-detect CI environment - don't use --local in CI
         # The binary will automatically detect CI via environment variables
 
-        if [ "${{ inputs.verbose }}" = "true" ]; then
-          CMD="$CMD --verbose"
+        if [ "${{ inputs.list-steps }}" = "true" ]; then
+          CMD="$CMD --list-steps"
+        elif [ -n "${{ inputs.step }}" ]; then
+          CMD="$CMD --step=${{ inputs.step }}"
         fi
 
-        if [ "${{ inputs.skip-push }}" = "true" ]; then
-          CMD="$CMD --skip-push"
+        if [ -n "${{ inputs.executor }}" ]; then
+          CMD="$CMD --executor=${{ inputs.executor }}"
+        fi
+
+        if [ "${{ inputs.verbose }}" = "true" ]; then
+          CMD="$CMD --verbose"
         fi
 
         if [ -n "${{ inputs.git-ref }}" ]; then
@@ -236,70 +241,6 @@ runs:
         echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
 
         if [ $EXIT_CODE -ne 0 ]; then
-          echo "::error::Stage ${{ inputs.stage }} failed with exit code $EXIT_CODE"
-          exit $EXIT_CODE
-        fi
-
-    - name: 'Execute Full Pipeline'
-      id: 'execute-full'
-      if: "inputs.stage == ''"
-      shell: 'bash'
-      run: |
-        set +e  # Don't fail immediately, we want to capture exit code
-
-        echo "::group::Executing full pipeline: ${{ inputs.pipeline }}"
-        echo "🌍 Environment: GitHub Actions"
-        echo "📦 Pipeline: ${{ inputs.pipeline }}"
-
-        CMD="${{ steps.setup.outputs.binary-path }}"
-        CMD="$CMD --pipeline=${{ inputs.pipeline }}"
-        CMD="$CMD --config=${{ inputs.config }}"
-        CMD="$CMD --env=${{ inputs.env }}"
-        CMD="$CMD --coverage=${{ inputs.coverage }}"
-
-        # Auto-detect CI environment - don't use --local in CI
-        # The binary will automatically detect CI via environment variables
-
-        if [ "${{ inputs.verbose }}" = "true" ]; then
-          CMD="$CMD --verbose"
-        fi
-
-        if [ "${{ inputs.only-build }}" = "true" ]; then
-          CMD="$CMD --only-build"
-        fi
-
-        if [ "${{ inputs.only-test }}" = "true" ]; then
-          CMD="$CMD --only-test"
-        fi
-
-        if [ "${{ inputs.skip-push }}" = "true" ]; then
-          CMD="$CMD --skip-push"
-        fi
-
-        if [ -n "${{ inputs.git-ref }}" ]; then
-          CMD="$CMD --git-ref=${{ inputs.git-ref }}"
-        else
-          # Use GitHub ref if available
-          if [ -n "${{ github.ref }}" ]; then
-            CMD="$CMD --git-ref=${{ github.ref_name }}"
-          fi
-        fi
-
-        if [ -n "${{ inputs.git-auth }}" ]; then
-          CMD="$CMD --git-auth=${{ inputs.git-auth }}"
-        else
-          # Default to HTTPS in GitHub Actions
-          CMD="$CMD --git-auth=https"
-        fi
-
-        echo "Running: $CMD"
-        eval "$CMD"
-        EXIT_CODE=$?
-
-        echo "::endgroup::"
-        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
-
-        if [ $EXIT_CODE -ne 0 ]; then
-          echo "::error::Pipeline ${{ inputs.pipeline }} failed with exit code $EXIT_CODE"
+          echo "::error::Workflow ${{ inputs.workflow }} failed with exit code $EXIT_CODE"
           exit $EXIT_CODE
         fi
