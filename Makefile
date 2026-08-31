@@ -130,7 +130,7 @@ dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT p
 	cd .dagger && GOWORK=off dagger run $(GOTEST) -race ./...
 	@echo -e "$(GREEN)✅ .dagger module tests completed$(NC)"
 
-security-dagger: ## Run govulncheck against .dagger's own Go module (requires a running Dagger engine; deliberately NOT part of `security`/`ci-final` -- see dagger-test's isolation note). .dagger imports the Dagger-generated internal/dagger client, which only exists after `dagger` regenerates it, so plain govulncheck can't resolve the module without a live engine (same reason Dependabot can't update .dagger/go.mod on its own).
+security-dagger: ## Run govulncheck against .dagger's own Go module via a live engine, so the scan always sees freshly-regenerated bindings (deliberately NOT part of `security`/`ci-final` -- see dagger-test's isolation note). .dagger's generated internal/dagger client and dagger.gen.go are now committed (regenerate and re-commit them after bumping the Dagger engine/SDK), so plain govulncheck/go tooling -- including Dependabot -- can resolve the module without a live engine too; this target still uses `dagger run` to catch drift against the live engine before it reaches CI.
 	@echo -e "$(BLUE)Running .dagger module security scan...$(NC)"
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	cd .dagger && GOWORK=off dagger run govulncheck ./...
