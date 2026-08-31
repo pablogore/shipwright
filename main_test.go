@@ -583,6 +583,148 @@ func TestResolveWorkflowSource_PathFallback(t *testing.T) {
 	assert.NotNil(t, dir, "path fallback must return a non-nil Directory")
 }
 
+// --- resolveWorkflowSecrets tests (secret-binding-fail-closed) ---
+
+// TestResolveWorkflowSecrets_EmptyMapReturnsNil proves an empty (or absent)
+// spec.secrets map is optional, not an error — resolveWorkflowSecrets never
+// even looks at the environment when there is nothing declared.
+func TestResolveWorkflowSecrets_EmptyMapReturnsNil(t *testing.T) {
+	secrets, err := resolveWorkflowSecrets(nil, map[string]manifest.SecretSpec{})
+	require.NoError(t, err)
+	assert.Nil(t, secrets)
+}
+
+// TestResolveWorkflowSecrets_MissingEnvVarFailsClosed proves an explicit
+// binding whose FromEnv variable is unset is rejected, and that a nil
+// *dagger.Client never panics — proof client.SetSecret was never reached,
+// since validation happens before any secret is created.
+func TestResolveWorkflowSecrets_MissingEnvVarFailsClosed(t *testing.T) {
+	t.Setenv("SBFC_UNSET_VAR", "")
+	require.NoError(t, os.Unsetenv("SBFC_UNSET_VAR"))
+
+	secrets, err := resolveWorkflowSecrets(nil, map[string]manifest.SecretSpec{
+		"registry": {FromEnv: "SBFC_UNSET_VAR"},
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, secrets)
+	assert.Contains(t, err.Error(), "registry")
+	assert.Contains(t, err.Error(), "SBFC_UNSET_VAR")
+	assert.Contains(t, err.Error(), "not set")
+}
+
+// TestResolveWorkflowSecrets_EmptyEnvVarFailsClosed proves an explicit
+// binding whose FromEnv variable is set to "" is rejected — os.LookupEnv
+// distinguishes this from "unset", unlike os.Getenv.
+func TestResolveWorkflowSecrets_EmptyEnvVarFailsClosed(t *testing.T) {
+	t.Setenv("SBFC_EMPTY_VAR", "")
+
+	secrets, err := resolveWorkflowSecrets(nil, map[string]manifest.SecretSpec{
+		"registry": {FromEnv: "SBFC_EMPTY_VAR"},
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, secrets)
+	assert.Contains(t, err.Error(), "registry")
+	assert.Contains(t, err.Error(), "SBFC_EMPTY_VAR")
+	assert.Contains(t, err.Error(), "empty")
+}
+
+// TestResolveWorkflowSecrets_MultipleFailuresDeterministicOrder proves that
+// with more than one invalid binding, every failure is reported in one
+// error, sorted by secret name — never dependent on Go's randomized map
+// iteration order.
+func TestResolveWorkflowSecrets_MultipleFailuresDeterministicOrder(t *testing.T) {
+	require.NoError(t, os.Unsetenv("SBFC_ZZZ_UNSET"))
+	require.NoError(t, os.Unsetenv("SBFC_AAA_UNSET"))
+
+	secrets, err := resolveWorkflowSecrets(nil, map[string]manifest.SecretSpec{
+		"zzz-secret": {FromEnv: "SBFC_ZZZ_UNSET"},
+		"aaa-secret": {FromEnv: "SBFC_AAA_UNSET"},
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, secrets)
+	wantMsg := `workflow: secret binding failed: aaa-secret: environment variable "SBFC_AAA_UNSET" is not set; ` +
+		`zzz-secret: environment variable "SBFC_ZZZ_UNSET" is not set`
+	assert.Equal(t, wantMsg, err.Error(),
+		"failures must be sorted by secret name (aaa- before zzz-), independent of map iteration order")
+}
+
+// TestResolveWorkflowSecrets_ErrorNeverLeaksPlaintext proves that when one
+// binding is valid (a real, distinctive value) and a sibling binding is
+// invalid, the valid binding's plaintext value never appears anywhere in
+// the returned error text — only secret names and FromEnv variable names
+// may appear (design.md D-L: the plaintext must never leave this function
+// as anything but the argument to SetSecret).
+func TestResolveWorkflowSecrets_ErrorNeverLeaksPlaintext(t *testing.T) {
+	const sentinel = "super-secret-plaintext-do-not-leak"
+	t.Setenv("SBFC_REAL_VALUE", sentinel)
+	require.NoError(t, os.Unsetenv("SBFC_MISSING"))
+
+	secrets, err := resolveWorkflowSecrets(nil, map[string]manifest.SecretSpec{
+		"good-secret": {FromEnv: "SBFC_REAL_VALUE"},
+		"bad-secret":  {FromEnv: "SBFC_MISSING"},
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, secrets)
+	assert.NotContains(t, err.Error(), sentinel,
+		"a valid binding's plaintext value must never appear in the error, even when a sibling binding fails")
+}
+
+// TestResolveWorkflowSecrets_ValidBindingsCreateSecrets proves the success
+// path: every declared binding whose FromEnv variable is set and non-empty
+// is bound to a *dagger.Secret under its own name. Needs a real
+// *dagger.Client (client.SetSecret is a genuine Dagger SDK call), guarded
+// by testing.Short() exactly like TestResolveWorkflowSource_PathFallback.
+func TestResolveWorkflowSecrets_ValidBindingsCreateSecrets(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip Dagger integration in short mode")
+	}
+
+	t.Setenv("SBFC_REGISTRY_TOKEN", "a-token-value")
+
+	ctx := context.Background()
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(io.Discard))
+	require.NoError(t, err)
+	defer client.Close()
+
+	secrets, err := resolveWorkflowSecrets(client, map[string]manifest.SecretSpec{
+		"registry": {FromEnv: "SBFC_REGISTRY_TOKEN"},
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, secrets, "registry")
+	assert.NotNil(t, secrets["registry"])
+}
+
+// TestRunWorkflowEngine_InvalidSecretShortCircuitsBeforeSourceResolution
+// proves runWorkflowEngine checks resolveWorkflowSecrets's error and
+// returns immediately, before resolveWorkflowSource ever runs. diamond.yaml
+// (loaded via loadWorkflowManifest) has source.path set (no source.repo),
+// so a reached resolveWorkflowSource would call client.Host() on a nil
+// *dagger.Client and panic — this test passes a nil client and an invalid
+// secrets map, so a panic here would mean the short-circuit is missing.
+func TestRunWorkflowEngine_InvalidSecretShortCircuitsBeforeSourceResolution(t *testing.T) {
+	require.NoError(t, os.Unsetenv("SBFC_RUN_MISSING"))
+
+	m, g, err := loadWorkflowManifest(diamondManifestPath)
+	require.NoError(t, err)
+	m.Spec.Secrets = map[string]manifest.SecretSpec{
+		"registry": {FromEnv: "SBFC_RUN_MISSING"},
+	}
+
+	cli := NewCLI()
+	reg := providersRegistryForTest(t)
+
+	err = cli.runWorkflowEngine(context.Background(), m, g, &Flags{}, reg, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "registry")
+	assert.Contains(t, err.Error(), "SBFC_RUN_MISSING")
+}
+
 // TestCLI_parseFlags_PresetFlagsRemoved is task 11.2's RED test (design.md
 // D-N, tasks.md 11.2): --pipeline, --list-pipelines, --only-build,
 // --only-test, and --skip-push must be absent from main.go's flag set after
