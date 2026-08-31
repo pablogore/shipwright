@@ -1,3 +1,5 @@
+version: 2
+
 # GoReleaser configuration for shipwright
 # https://goreleaser.com/
 
@@ -35,10 +37,10 @@ builds:
     id: default
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
@@ -52,7 +54,7 @@ checksum:
 # This is handled in the release workflow
 
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 
 changelog:
   sort: asc
@@ -97,6 +99,7 @@ release:
     - `shipwright-darwin-amd64` - macOS AMD64
     - `shipwright-darwin-arm64` - macOS ARM64
     - `shipwright-windows-amd64.exe` - Windows AMD64
+    - `shipwright-windows-arm64.exe` - Windows ARM64
     
     ### Archive Download
     
