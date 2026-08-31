@@ -786,6 +786,230 @@ func TestExecute_PerStepAttempts_NilFallsBackToWorkflowDefault(t *testing.T) {
 	}
 }
 
+// StepOutcome.Duration must derive from the injected Config.Now clock seam
+// (design.md D3), not the real wall clock.
+func TestExecute_UsesInjectedNowForDuration(t *testing.T) {
+	t.Parallel()
+
+	reg := providers.NewRegistry()
+	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
+		return fakeBuilder{}
+	})
+
+	steps := []manifest.Step{{ID: "build", Capability: "build", Uses: manifest.UsesSpec{Provider: "go", Version: "1"}}}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+
+	wantDuration := 5 * time.Second
+	fixedStart := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	calls := 0
+	cfg := engine.Config{
+		Steps: steps, Graph: g, Registry: reg,
+		Now: func() time.Time {
+			calls++
+			if calls == 1 {
+				return fixedStart
+			}
+			return fixedStart.Add(wantDuration)
+		},
+	}
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+	if len(res.Outcomes) != 1 || res.Outcomes[0].Duration != wantDuration {
+		t.Fatalf("Outcomes = %+v, want Duration=%s (derived from injected Now, not real wall clock)", res.Outcomes, wantDuration)
+	}
+}
+
+// Provider/Capability identity (design.md D4) must be present on succeeded,
+// failed, AND skipped outcomes since dispatch never runs for the latter two.
+func TestExecute_OutcomeReportsProviderAndCapability(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		buildErr   error
+		predicates map[string]string
+		wantStatus engine.StepStatus
+	}{
+		{name: "succeeded", wantStatus: engine.StatusSucceeded, predicates: map[string]string{"branch": "main"}},
+		{name: "failed", buildErr: errors.New("boom"), wantStatus: engine.StatusFailed, predicates: map[string]string{"branch": "main"}},
+		{name: "skipped", wantStatus: engine.StatusSkipped, predicates: map[string]string{"branch": "develop"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			reg := providers.NewRegistry()
+			reg.RegisterBuilder(providers.Ref{Name: "go", Module: "internal", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
+				return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+					if tt.buildErr != nil {
+						return nil, tt.buildErr
+					}
+					return source, nil
+				}}
+			})
+
+			steps := []manifest.Step{{
+				ID: "build", Capability: "build",
+				Uses: manifest.UsesSpec{Provider: "go", Module: "internal", Version: "1"},
+				When: map[string][]string{"branch": {"main"}},
+			}}
+			g, err := graph.Build(steps)
+			if err != nil {
+				t.Fatalf("graph.Build() error = %v, want nil", err)
+			}
+			cfg := engine.Config{Steps: steps, Graph: g, Registry: reg, Predicates: tt.predicates}
+
+			res, _ := engine.Execute(context.Background(), cfg)
+
+			if len(res.Outcomes) != 1 {
+				t.Fatalf("Outcomes = %+v, want exactly one outcome", res.Outcomes)
+			}
+			got := res.Outcomes[0]
+			wantRef := providers.Ref{Name: "go", Module: "internal", Version: "1"}
+			if got.Status != tt.wantStatus || got.Provider != wantRef || got.Capability != "build" {
+				t.Fatalf("Outcome = %+v, want Status=%v Provider=%+v Capability=build", got, tt.wantStatus, wantRef)
+			}
+		})
+	}
+}
+
+// capabilityStepFixture builds a single-step Config for one of the engine's
+// seven capabilities; textOut is returned by string-returning capabilities.
+func capabilityStepFixture(t *testing.T, capability, textOut string) engine.Config {
+	t.Helper()
+
+	ref := providers.Ref{Name: "p", Version: "1"}
+	reg := providers.NewRegistry()
+	step := manifest.Step{ID: "s", Capability: capability, Uses: manifest.UsesSpec{Provider: "p", Version: "1"}}
+
+	switch capability {
+	case "build":
+		reg.RegisterBuilder(ref, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
+			return fakeBuilder{}
+		})
+	case "test":
+		reg.RegisterTester(ref, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
+			return fakeTester{}
+		})
+	case "artifact":
+		step.With = map[string]any{"ref": "ghcr.io/acme/api"}
+		reg.RegisterArtifactor(ref, providers.WithSchema{}, func(providers.Values) shipwright.Artifactor {
+			return fakeArtifactor{PublishFunc: func(_ context.Context, _ *dagger.Directory, _ string, _ *dagger.Secret) (string, error) {
+				return textOut, nil
+			}}
+		})
+	case "deploy":
+		step.With = map[string]any{"artifactRef": "ghcr.io/acme/api", "environment": "production"}
+		reg.RegisterDeployer(ref, providers.WithSchema{}, func(providers.Values) shipwright.Deployer {
+			return fakeDeployer{DeployFunc: func(_ context.Context, _, _ string, _ *dagger.Secret) (string, error) {
+				return textOut, nil
+			}}
+		})
+	case "run":
+		reg.RegisterRunner(ref, providers.WithSchema{}, func(providers.Values) shipwright.Runner {
+			return fakeRunner{}
+		})
+	case "runtime-inspect":
+		reg.RegisterRuntimeInspector(ref, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeInspector {
+			return fakeRuntimeInspector{InspectFunc: func(_ context.Context, _ *dagger.Directory) (string, error) {
+				return textOut, nil
+			}}
+		})
+	case "runtime-upgrade":
+		step.With = map[string]any{"targetVersion": "1.26.1"}
+		reg.RegisterRuntimeUpgrader(ref, providers.WithSchema{}, func(providers.Values) shipwright.RuntimeUpgrader {
+			return fakeRuntimeUpgrader{}
+		})
+	default:
+		t.Fatalf("capabilityStepFixture: unknown capability %q", capability)
+	}
+
+	steps := []manifest.Step{step}
+	g, err := graph.Build(steps)
+	if err != nil {
+		t.Fatalf("graph.Build() error = %v, want nil", err)
+	}
+	return engine.Config{Steps: steps, Graph: g, Registry: reg}
+}
+
+// String-returning capabilities populate Output with no diagnostics;
+// handle-returning ones leave Output empty with an "output-not-serializable"
+// diagnostic.
+func TestOutcomeOutput_ProjectsPerCapability(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		capability   string
+		stringReturn bool
+	}{
+		{"artifact", true}, {"deploy", true}, {"runtime-inspect", true},
+		{"build", false}, {"test", false}, {"run", false}, {"runtime-upgrade", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.capability, func(t *testing.T) {
+			t.Parallel()
+
+			want := "hello from " + tt.capability
+			cfg := capabilityStepFixture(t, tt.capability, want)
+
+			res, err := engine.Execute(context.Background(), cfg)
+			if err != nil {
+				t.Fatalf("Execute() error = %v, want nil", err)
+			}
+			if len(res.Outcomes) != 1 {
+				t.Fatalf("Outcomes = %+v, want exactly one outcome", res.Outcomes)
+			}
+			got := res.Outcomes[0]
+
+			if tt.stringReturn {
+				if got.Output != want || len(got.Diagnostics) != 0 {
+					t.Fatalf("Outcome = %+v, want Output=%q and no diagnostics", got, want)
+				}
+				return
+			}
+			if got.Output != "" {
+				t.Fatalf("Outcome = %+v, want empty Output", got)
+			}
+			if len(got.Diagnostics) != 1 || got.Diagnostics[0].Code != "output-not-serializable" || got.Diagnostics[0].Severity != engine.SeverityInfo {
+				t.Fatalf("Diagnostics = %+v, want one output-not-serializable/SeverityInfo diagnostic", got.Diagnostics)
+			}
+		})
+	}
+}
+
+// Provider-returned Output is truncated at 4 KiB with an "output-truncated"
+// diagnostic (threat-matrix carve-out: never pass provider text unbounded).
+func TestOutcomeOutput_TruncatesOutputAt4KiBWithDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	const maxOutputBytes = 4096
+	big := strings.Repeat("x", maxOutputBytes+1024)
+	cfg := capabilityStepFixture(t, "artifact", big)
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+	if len(res.Outcomes) != 1 {
+		t.Fatalf("Outcomes = %+v, want exactly one outcome", res.Outcomes)
+	}
+	got := res.Outcomes[0]
+	if got.Output != big[:maxOutputBytes] {
+		t.Fatalf("Output = %d bytes, want exactly %d bytes truncated", len(got.Output), maxOutputBytes)
+	}
+	if len(got.Diagnostics) != 1 || got.Diagnostics[0].Code != "output-truncated" {
+		t.Fatalf("Diagnostics = %+v, want exactly one \"output-truncated\" diagnostic", got.Diagnostics)
+	}
+}
+
 // OptionsFromSpec is where spec.execution.concurrency.maxParallel is
 // "validated and recorded" (tasks.md 8.5) and spec.execution.timeout is
 // parsed into a time.Duration.

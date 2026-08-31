@@ -24,11 +24,16 @@
 // OptionsFromSpec) but is NOT used to widen execution in this work unit;
 // sequential execution is a correct schedule for any MaxParallel >= 1.
 // Concurrent widening within a wave is explicitly deferred (design.md D-K).
+// A manifest declaring MaxParallel > 1 is rejected before execution begins by
+// manifest.ValidateExecutable (design.md D1), a validation-layer contract
+// this package does not itself check.
 //
 // Approval gates (design.md D-M): spec.environments.<name>.approvals is
 // parsed metadata only. This package contains NO blocking, queueing, or
 // "wait for approval" logic anywhere — a manifest declaring approvals
-// executes exactly as if it had none.
+// executes exactly as if it had none; manifest.ValidateExecutable rejects
+// declared approvals before Execute runs, so this is a defense-in-depth
+// invariant for a direct, unvalidated caller.
 package engine
 
 import (
@@ -137,6 +142,17 @@ type Config struct {
 	// Options configures failure strategy, per-step timeout, and
 	// per-step retry.
 	Options Options
+	// Now is the injectable clock seam for StepOutcome.Duration (design.md
+	// D3); nil falls back to time.Now.
+	Now func() time.Time
+}
+
+// now returns cfg.Now() when injected, else the real wall clock.
+func (cfg Config) now() time.Time {
+	if cfg.Now != nil {
+		return cfg.Now()
+	}
+	return time.Now()
 }
 
 // StepStatus is the terminal state of one step in a Result.
@@ -167,6 +183,35 @@ func (s StepStatus) String() string {
 	}
 }
 
+// DiagnosticSeverity classifies a Diagnostic's importance. No SeverityError
+// exists: failure is already Err/StatusFailed (design.md D5).
+type DiagnosticSeverity int
+
+const (
+	SeverityInfo DiagnosticSeverity = iota
+	SeverityWarning
+)
+
+// String renders a DiagnosticSeverity's name for logging.
+func (s DiagnosticSeverity) String() string {
+	switch s {
+	case SeverityInfo:
+		return "info"
+	case SeverityWarning:
+		return "warning"
+	default:
+		return "unknown"
+	}
+}
+
+// Diagnostic is one supplementary, non-fatal observation attached to a
+// StepOutcome (design.md D5). Code gives tests a stable identity.
+type Diagnostic struct {
+	Severity DiagnosticSeverity
+	Code     string
+	Message  string
+}
+
 // StepOutcome records one step's terminal result, in the order it was
 // decided (wave order, manifest-declaration order within a wave).
 type StepOutcome struct {
@@ -174,6 +219,20 @@ type StepOutcome struct {
 	Status   StepStatus
 	Attempts int
 	Err      error
+	// Duration is elapsed time across this step's attempt budget (design.md
+	// D3); a skipped step records zero.
+	Duration time.Duration
+	// Provider/Capability identify this step, sourced from manifest.Step
+	// (design.md D4), since dispatch never runs for a skipped or
+	// fail-before-dispatch step.
+	Provider   providers.Ref
+	Capability string
+	// Output is populated only for text-returning capabilities on success
+	// (design.md D5); empty otherwise.
+	Output string
+	// Diagnostics carries supplementary, non-fatal observations (design.md
+	// D5).
+	Diagnostics []Diagnostic
 }
 
 // Result is Execute's complete report. Outcomes is ordered by execution
@@ -339,15 +398,24 @@ waveLoop:
 			if !ok {
 				return res, fmt.Errorf("engine: graph references step %q not present in cfg.Steps", id)
 			}
+			ref := providers.Ref{Name: s.Uses.Provider, Module: s.Uses.Module, Version: s.Uses.Version}
 
 			if !matchesWhen(s.When, cfg.Predicates) {
-				res.Outcomes = append(res.Outcomes, StepOutcome{StepID: id, Status: StatusSkipped})
+				res.Outcomes = append(res.Outcomes, StepOutcome{
+					StepID: id, Status: StatusSkipped,
+					Provider: ref, Capability: s.Capability,
+				})
 				continue
 			}
 
+			start := cfg.now()
 			out, attempts, err := executeStepWithRetry(ctx, s, outputs, cfg)
+			duration := cfg.now().Sub(start)
 			if err != nil {
-				res.Outcomes = append(res.Outcomes, StepOutcome{StepID: id, Status: StatusFailed, Attempts: attempts, Err: err})
+				res.Outcomes = append(res.Outcomes, StepOutcome{
+					StepID: id, Status: StatusFailed, Attempts: attempts, Err: err,
+					Duration: duration, Provider: ref, Capability: s.Capability,
+				})
 				res.Failures = append(res.Failures, id)
 				if cfg.Options.FailFast {
 					break waveLoop
@@ -356,7 +424,12 @@ waveLoop:
 			}
 
 			outputs[id] = out
-			res.Outcomes = append(res.Outcomes, StepOutcome{StepID: id, Status: StatusSucceeded, Attempts: attempts})
+			output, diagnostics := outcomeOutput(s.Capability, out)
+			res.Outcomes = append(res.Outcomes, StepOutcome{
+				StepID: id, Status: StatusSucceeded, Attempts: attempts,
+				Duration: duration, Provider: ref, Capability: s.Capability,
+				Output: output, Diagnostics: diagnostics,
+			})
 		}
 	}
 
@@ -632,6 +705,34 @@ func makeResolver(stepID string, outputs map[string]result, cfg Config) func(int
 		default:
 			return interp.Value{}, fmt.Errorf("engine: step %q: unknown reference namespace", stepID)
 		}
+	}
+}
+
+// maxOutputBytes caps captured Output — provider-controlled text that can
+// reach operator logs — rather than passing it through unbounded.
+const maxOutputBytes = 4096
+
+// outcomeOutput projects a step's typed result into StepOutcome's
+// serializable Output/Diagnostics (design.md D5) by switching on out.kind.
+func outcomeOutput(capability string, out result) (string, []Diagnostic) {
+	switch out.kind {
+	case outputText:
+		if len(out.text) <= maxOutputBytes {
+			return out.text, nil
+		}
+		return out.text[:maxOutputBytes], []Diagnostic{{
+			Severity: SeverityInfo,
+			Code:     "output-truncated",
+			Message:  fmt.Sprintf("engine: capability %q output truncated at %d bytes", capability, maxOutputBytes),
+		}}
+	case outputDirectory, outputFile, outputContainer:
+		return "", []Diagnostic{{
+			Severity: SeverityInfo,
+			Code:     "output-not-serializable",
+			Message:  fmt.Sprintf("engine: capability %q produced a non-serializable Dagger handle; Output omitted", capability),
+		}}
+	default:
+		return "", nil
 	}
 }
 
