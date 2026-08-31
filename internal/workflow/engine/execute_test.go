@@ -7,14 +7,9 @@
 // testing strategy table ("Fake capability implementations recording
 // invocation order").
 //
-// Approvals-never-block and maxParallel-not-widened coverage moved to
-// internal/workflow/manifest's TestValidateExecutable_* tests
-// (shipwright-production-execution-contract S2): both controls are now
-// rejected before execution begins by manifest.ValidateExecutable, so a
-// manifest declaring either one never reaches this package's Execute on
-// the normal path. TestExecute_RunsWavesSequentiallyInDeclarationOrder
-// below still proves the engine's own sequential-scheduling behavior,
-// independent of that validation-layer gate.
+// Approvals-never-block and maxParallel coverage moved to
+// manifest.TestValidateExecutable_*: both are rejected before execution
+// begins, so they never reach this package's Execute.
 package engine_test
 
 import (
@@ -152,15 +147,11 @@ func TestExecute_WaveOrderIsManifestDeclarationOrder(t *testing.T) {
 	}
 }
 
-// tasks.md 8.5/7.2: the engine executes waves strictly sequentially,
-// regardless of concurrency opportunities among independent steps within a
-// wave — the diamond fixture's "unit" and "vuln" steps are both ready in
-// the same wave, yet still run one at a time in declaration order.
-// (Renamed from TestExecute_MaxParallelDoesNotWidenExecution: a manifest
-// declaring maxParallel > 1 is now rejected before execution by
-// manifest.ValidateExecutable — see internal/workflow/manifest/validate.go
-// — so this test's default Options{} no longer needs to assert against a
-// nonzero MaxParallel to prove the same sequential-ordering behavior.)
+// tasks.md 8.5/7.2 (renamed from TestExecute_MaxParallelDoesNotWidenExecution):
+// the engine executes waves strictly sequentially regardless of
+// concurrency opportunities within a wave — the diamond fixture's "unit"
+// and "vuln" steps are both ready in the same wave, yet still run one at a
+// time in declaration order.
 func TestExecute_RunsWavesSequentiallyInDeclarationOrder(t *testing.T) {
 	t.Parallel()
 

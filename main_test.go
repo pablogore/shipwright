@@ -248,23 +248,20 @@ spec:
 }
 
 // TestRunWorkflowCLI_ListStepsSkipsValidateExecutable proves --list-steps
-// never triggers manifest.ValidateExecutable's fail-close gate (design.md
-// D1): examples/workflow/diamond.yaml declares all three unenforceable
-// controls this gate rejects (approvals, policies.*, maxParallel: 4), yet
-// --list-steps still succeeds because runWorkflowCLI returns from the
-// flags.listSteps branch before ValidateExecutable is ever called.
+// bypasses manifest.ValidateExecutable (design.md D1): diamond.yaml
+// declares approvals, policies.*, and maxParallel: 4, yet --list-steps
+// still succeeds because runWorkflowCLI returns before ValidateExecutable
+// is called.
 func TestRunWorkflowCLI_ListStepsSkipsValidateExecutable(t *testing.T) {
 	cli := NewCLI()
 	err := cli.Run([]string{"-workflow", diamondManifestPath, "-list-steps"})
 	require.NoError(t, err, "--list-steps must not be gated by ValidateExecutable")
 }
 
-// TestRunWorkflowCLI_ExecuteRejectsUnenforceableControls proves the
-// execute path (no --list-steps) fails closed via
-// manifest.ValidateExecutable before any Dagger connection is attempted —
-// examples/workflow/diamond.yaml declares maxParallel: 4, so the run must
-// fail with an UnenforceableControlError naming the field, never reaching
-// workflowDaggerClient (no live Dagger engine is available in this test).
+// TestRunWorkflowCLI_ExecuteRejectsUnenforceableControls proves the execute
+// path fails closed via ValidateExecutable before any Dagger connection:
+// diamond.yaml declares maxParallel: 4, so the run must return an
+// UnenforceableControlError, never a Dagger connection failure.
 func TestRunWorkflowCLI_ExecuteRejectsUnenforceableControls(t *testing.T) {
 	cli := NewCLI()
 	err := cli.Run([]string{"-workflow", diamondManifestPath})

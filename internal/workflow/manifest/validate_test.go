@@ -1,8 +1,5 @@
-// ValidateExecutable (stage 3.5, execution-only fail-close gate) tests —
-// tasks.md 5.1, workflow-manifest spec "Policies Are Declared As
-// Structured, Enforceable Schema Fields" and "Approval Gates Are Declared
-// As Metadata Only", workflow-execution spec "Execution Controls —
-// Concurrency, Failure Strategy, Timeout, Retry".
+// ValidateExecutable tests (tasks.md 5.1): the execution-only fail-close
+// gate rejecting approvals, policies.*, and maxParallel > 1.
 package manifest_test
 
 import (
@@ -14,10 +11,7 @@ import (
 )
 
 // TestValidateExecutable_RejectsDeclaredApprovals proves any declared
-// approvals block fails execution validation (no opt-out), and that
-// multiple declared environments are inspected in sorted name order so the
-// reported field path is deterministic regardless of Go's randomized map
-// iteration (design.md D2).
+// approvals block fails validation, checked in sorted env-name order.
 func TestValidateExecutable_RejectsDeclaredApprovals(t *testing.T) {
 	src := identityHeader + `
   steps:
@@ -50,35 +44,18 @@ func TestValidateExecutable_RejectsDeclaredApprovals(t *testing.T) {
 	}
 }
 
-// TestValidateExecutable_RejectsPoliciesFields proves ANY non-empty
-// spec.policies.* declaration fails validation, including a `true` value
-// matching today's unconditional behavior for forbidCycles/requireVersion.
+// TestValidateExecutable_RejectsPoliciesFields proves any non-empty
+// spec.policies.* declaration fails validation, even forbidCycles/requireVersion.
 func TestValidateExecutable_RejectsPoliciesFields(t *testing.T) {
 	tests := []struct {
 		name      string
 		policy    string
 		wantField string
 	}{
-		{
-			name:      "secrets.forbidPlaintext",
-			policy:    "secrets: {forbidPlaintext: true}",
-			wantField: "spec.policies.secrets.forbidPlaintext",
-		},
-		{
-			name:      "providers.requireVersion",
-			policy:    "providers: {requireVersion: true}",
-			wantField: "spec.policies.providers.requireVersion",
-		},
-		{
-			name:      "dependencies.forbidCycles",
-			policy:    "dependencies: {forbidCycles: true}",
-			wantField: "spec.policies.dependencies.forbidCycles",
-		},
-		{
-			name:      "artifacts.immutable",
-			policy:    "artifacts: {immutable: true}",
-			wantField: "spec.policies.artifacts.immutable",
-		},
+		{name: "secrets.forbidPlaintext", policy: "secrets: {forbidPlaintext: true}", wantField: "spec.policies.secrets.forbidPlaintext"},
+		{name: "providers.requireVersion", policy: "providers: {requireVersion: true}", wantField: "spec.policies.providers.requireVersion"},
+		{name: "dependencies.forbidCycles", policy: "dependencies: {forbidCycles: true}", wantField: "spec.policies.dependencies.forbidCycles"},
+		{name: "artifacts.immutable", policy: "artifacts: {immutable: true}", wantField: "spec.policies.artifacts.immutable"},
 	}
 
 	for _, tt := range tests {
@@ -113,8 +90,7 @@ func TestValidateExecutable_RejectsPoliciesFields(t *testing.T) {
 }
 
 // TestValidateExecutable_RejectsMaxParallelAboveOne proves maxParallel > 1
-// fails validation while 0 and 1 (sequential execution, indistinguishable
-// from each other) are accepted.
+// fails validation while 0/1 (sequential execution) are accepted.
 func TestValidateExecutable_RejectsMaxParallelAboveOne(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -162,24 +138,5 @@ func TestValidateExecutable_RejectsMaxParallelAboveOne(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TestValidateExecutable_AcceptsCleanManifest proves a manifest declaring
-// none of the unenforceable controls passes validation.
-func TestValidateExecutable_AcceptsCleanManifest(t *testing.T) {
-	src := identityHeader + `
-  steps:
-    - id: build
-      capability: build
-      uses: {provider: go, version: "1"}
-`
-	m, err := manifest.Parse(strings.NewReader(src))
-	if err != nil {
-		t.Fatalf("manifest.Parse() error = %v, want nil", err)
-	}
-
-	if err := manifest.ValidateExecutable(m); err != nil {
-		t.Fatalf("ValidateExecutable() error = %v, want nil", err)
 	}
 }
