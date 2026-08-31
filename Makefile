@@ -40,7 +40,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test test-integration deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final
+.PHONY: all build clean test dagger-test test-integration deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone
 
 # Help target
 .PHONY: help
@@ -226,6 +226,30 @@ security: ## Run security vulnerability check
 # Run all code quality checks
 quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, security)
 
+# P0 production-readiness gate: providers/go must be independently
+# consumable/buildable outside this workspace/monorepo. `build`/`test` above
+# also `cd providers/go`, but go's workspace-mode auto-detection walks up
+# parent directories looking for go.work, so those targets still silently
+# benefit from go.work resolving github.com/pablogore/shipwright against the
+# local checkout -- exactly what let providers/go/go.mod pin a stale
+# pseudo-version (predating RuntimeInspector/RuntimeUpgrader/DriftReport)
+# without any in-workspace build or test ever catching it. GOWORK=off is the
+# only way to prove providers/go/go.mod's own require directives are
+# sufficient on their own, the way an external consumer or the module proxy
+# would resolve them. A `replace` directive would defeat the same proof by
+# a different route, so it's rejected here too.
+provider-go-standalone: ## Validate providers/go builds/tests standalone with GOWORK=off (no workspace, no replace)
+	@echo -e "$(BLUE)Validating providers/go is standalone (GOWORK=off)...$(NC)"
+	@if grep -q '^replace' providers/go/go.mod; then \
+		echo -e "$(RED)❌ providers/go/go.mod has a replace directive -- module is not independently consumable$(NC)"; \
+		exit 1; \
+	fi
+	cd providers/go && GOWORK=off $(GOMOD) download
+	cd providers/go && GOWORK=off $(GOMOD) verify
+	cd providers/go && GOWORK=off $(GOBUILD) ./...
+	cd providers/go && GOWORK=off $(GOTEST) -race ./...
+	@echo -e "$(GREEN)✅ providers/go is standalone under GOWORK=off$(NC)"
+
 # PROD-001: single repository-owned source of truth for "what makes a SHA
 # production-ready", run identically by any CI provider or locally.
 # ci-final = lint + build + test + coverage + security. Three things are
@@ -294,15 +318,28 @@ quality: fmt vet test security ## Run all code quality checks (fmt, vet, test, s
 #    aspirational use, `coverage-ci` stays as-is for its existing callers.
 #    Closes via: already closed by this correction.
 #
+# 5) `provider-go-standalone` -- INCLUDED, P0 REGRESSION GATE.
+#    `build`/`test` above compile-check and run providers/go's own tests, but
+#    both do so with go.work in effect (workspace-mode auto-detection walks
+#    up from providers/go and finds it), which resolves github.com/pablogore/
+#    shipwright against the local checkout regardless of what providers/go/
+#    go.mod actually requires. That's exactly how a stale pseudo-version
+#    (predating RuntimeInspector/RuntimeUpgrader/DriftReport) shipped
+#    undetected until the release-provider-go.yml tag workflow broke on a
+#    real GOWORK=off build. Included here so every push to develop -- not
+#    just a release tag push -- catches this class of drift immediately.
+#    Closes via: already closed by this gate.
+#
 # Given the above, ci-final represents the valid minimum production-critical
-# set: lint/build/test/coverage/security are the only checks that (a) can run
-# fail-closed with zero external dependencies and (b) map directly to "this
-# SHA compiles cleanly, behaves correctly under test, meets its coverage bar,
-# and has no known vulnerabilities." dagger-test/test-integration structurally
-# cannot be, by the same reproducibility requirement that motivates
-# ci-final's existence.
+# set: lint/build/test/coverage/security/provider-go-standalone are the only
+# checks that (a) can run fail-closed with zero external dependencies and
+# (b) map directly to "this SHA compiles cleanly, behaves correctly under
+# test, meets its coverage bar, has no known vulnerabilities, and every
+# independently-published module it contains is actually independent."
+# dagger-test/test-integration structurally cannot be, by the same
+# reproducibility requirement that motivates ci-final's existence.
 .PHONY: ci-final
-ci-final: lint build test coverage-gate security ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
+ci-final: lint build test coverage-gate security provider-go-standalone ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets
