@@ -117,8 +117,13 @@ type ConcurrencySpec struct {
 }
 
 // Environment names a deployment target and its declared approval
-// metadata. Approvals are parsed and readable but never enforced by any
-// layer in this change (design.md D-M: metadata only, not a gate).
+// metadata. Approvals are parsed and readable, and the engine itself never
+// implements blocking, queueing, or wait-for-approval logic for them
+// (design.md D-M: metadata only, not a gate) — but a manifest declaring
+// any approvals block is rejected outright by ValidateExecutable at the
+// execution-only gate, so this metadata never reaches the engine on the
+// normal execution path; see the Policies doc comment for the parallel
+// rejection mechanism.
 type Environment struct {
 	Approvals ApprovalSpec `yaml:"approvals,omitempty"`
 }
@@ -129,15 +134,17 @@ type ApprovalSpec struct {
 	Required []string `yaml:"required,omitempty"`
 }
 
-// Policies declares intent consumed by a later enforcement layer
-// (internal/workflow/interp, internal/workflow/graph,
-// internal/workflow/providers). This schema declares the fields; it does
-// not itself enforce most of them (workflow-manifest spec, "Policies Are
-// Declared As Structured, Enforceable Schema Fields") — the one exception
-// this package DOES enforce is Providers.RequireVersion, because an empty
-// uses.version is unconditionally rejected at stage 3 regardless of this
-// flag's value, mirroring design.md D-J's treatment of
-// Dependencies.ForbidCycles as "no permissive setting in this change."
+// Policies declares intent this schema parses but does not itself enforce
+// as configurable runtime behavior (workflow-manifest spec, "Policies Are
+// Declared As Structured, Enforceable Schema Fields"). ANY non-empty
+// declaration under this struct — including a field whose underlying
+// guarantee already holds unconditionally, like Providers.RequireVersion
+// (an empty uses.version is always rejected at stage 3) or
+// Dependencies.ForbidCycles (acyclicity is always enforced) — is rejected
+// by manifest.ValidateExecutable, a separate, execution-only validation
+// stage NOT run by Parse/ParseFile (see ValidateExecutable's doc comment).
+// A manifest may still declare and read these fields via a read-only
+// command such as --list-steps; only the execution path fails closed.
 type Policies struct {
 	Secrets      SecretsPolicy      `yaml:"secrets,omitempty"`
 	Providers    ProvidersPolicy    `yaml:"providers,omitempty"`
@@ -146,30 +153,36 @@ type Policies struct {
 }
 
 // SecretsPolicy declares whether a secret reference is forbidden in a
-// non-secret-typed field. Enforced at stage 7 (internal/workflow/interp,
-// out of scope for this package).
+// non-secret-typed field. No layer in this repo enforces it today; any
+// declaration is rejected by ValidateExecutable at the execution-only gate
+// — see the Policies doc comment.
 type SecretsPolicy struct {
 	ForbidPlaintext bool `yaml:"forbidPlaintext,omitempty"`
 }
 
 // ProvidersPolicy declares provider-version intent. See the Policies doc
-// comment: RequireVersion's outcome is unconditionally enforced by this
-// package's ValidateStructure, not gated on this flag's value.
+// comment: an empty uses.version is already unconditionally rejected by
+// this package's ValidateStructure regardless of this flag's value, but
+// declaring the flag itself is still rejected by ValidateExecutable at the
+// execution-only gate — the manifest cannot selectively enable a
+// guarantee this schema does not let it turn off.
 type ProvidersPolicy struct {
 	RequireVersion bool `yaml:"requireVersion,omitempty"`
 }
 
-// DependenciesPolicy declares whether cycles are forbidden. Enforced
-// unconditionally at stage 5 (internal/workflow/graph, out of scope for
-// this package) — design.md D-J: acyclicity has no permissive setting in
-// this change; this field records the intent for schema stability only.
+// DependenciesPolicy declares whether cycles are forbidden. Acyclicity is
+// already enforced unconditionally at stage 5 (internal/workflow/graph,
+// out of scope for this package) regardless of this flag's value, but
+// declaring the flag itself is still rejected by ValidateExecutable at the
+// execution-only gate — see the Policies doc comment.
 type DependenciesPolicy struct {
 	ForbidCycles bool `yaml:"forbidCycles,omitempty"`
 }
 
 // ArtifactsPolicy declares whether published artifacts must be immutable.
-// Not enforced by any layer in this change; recorded for schema
-// stability only.
+// Not enforced by any layer in this change; any declaration is rejected by
+// ValidateExecutable at the execution-only gate — see the Policies doc
+// comment.
 type ArtifactsPolicy struct {
 	Immutable bool `yaml:"immutable,omitempty"`
 }

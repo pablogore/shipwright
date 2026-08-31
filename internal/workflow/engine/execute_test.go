@@ -1,16 +1,23 @@
 // Package engine_test exercises the wave-scheduling execution engine
 // (design.md D-K, workflow-execution spec): deterministic wave order
 // (tasks.md 8.1), fail-fast (8.2), per-step timeout (8.3), bounded per-step
-// retry (8.4), maxParallel recorded-not-widened (8.5), approvals never
-// blocking (8.6, absence-of-behavior), and structured `when` predicate
-// matching (8.7). Every test uses hand-rolled fake capability
-// implementations (fakes_test.go) — never a real Dagger container or
-// engine connection, per design.md's own testing strategy table ("Fake
-// capability implementations recording invocation order").
+// retry (8.4), and structured `when` predicate matching (8.7). Every test
+// uses hand-rolled fake capability implementations (fakes_test.go) — never
+// a real Dagger container or engine connection, per design.md's own
+// testing strategy table ("Fake capability implementations recording
+// invocation order").
+//
+// Approvals-never-block and maxParallel-not-widened coverage moved to
+// internal/workflow/manifest's TestValidateExecutable_* tests
+// (shipwright-production-execution-contract S2): both controls are now
+// rejected before execution begins by manifest.ValidateExecutable, so a
+// manifest declaring either one never reaches this package's Execute on
+// the normal path. TestExecute_RunsWavesSequentiallyInDeclarationOrder
+// below still proves the engine's own sequential-scheduling behavior,
+// independent of that validation-layer gate.
 package engine_test
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -145,15 +152,20 @@ func TestExecute_WaveOrderIsManifestDeclarationOrder(t *testing.T) {
 	}
 }
 
-// tasks.md 8.5 (scope note): a manifest-declared maxParallel > 1 must NOT
-// widen execution — the same fixture with MaxParallel: 4 must produce the
-// EXACT same serial, declaration-ordered invocation sequence as the
-// default (MaxParallel: 0) case above.
-func TestExecute_MaxParallelDoesNotWidenExecution(t *testing.T) {
+// tasks.md 8.5/7.2: the engine executes waves strictly sequentially,
+// regardless of concurrency opportunities among independent steps within a
+// wave — the diamond fixture's "unit" and "vuln" steps are both ready in
+// the same wave, yet still run one at a time in declaration order.
+// (Renamed from TestExecute_MaxParallelDoesNotWidenExecution: a manifest
+// declaring maxParallel > 1 is now rejected before execution by
+// manifest.ValidateExecutable — see internal/workflow/manifest/validate.go
+// — so this test's default Options{} no longer needs to assert against a
+// nonzero MaxParallel to prove the same sequential-ordering behavior.)
+func TestExecute_RunsWavesSequentiallyInDeclarationOrder(t *testing.T) {
 	t.Parallel()
 
 	rec := &recorder{}
-	cfg := buildDiamondConfig(t, rec, engine.Options{MaxParallel: 4})
+	cfg := buildDiamondConfig(t, rec, engine.Options{})
 
 	res, err := engine.Execute(context.Background(), cfg)
 	if err != nil {
@@ -375,66 +387,6 @@ func TestExecute_RetriesZeroMeansOneAttempt(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&calls); got != 1 {
 		t.Fatalf("Build() was called %d times, want exactly 1", got)
-	}
-}
-
-// tasks.md 8.6 (absence-of-behavior): a manifest declaring approvals under
-// spec.environments.<name>.approvals never blocks, queues, or gates
-// execution — engine.Config does not even expose an Environments field, so
-// there is structurally no code path for this test to accidentally
-// exercise a blocking implementation through; it proves the engine
-// executes to completion using a manifest parsed with approvals declared.
-func TestExecute_ApprovalsNeverBlockExecution(t *testing.T) {
-	t.Parallel()
-
-	src := []byte(`
-apiVersion: shipwright.dev/v1
-kind: Workflow
-metadata:
-  name: approvals-do-not-block
-spec:
-  source: {path: "."}
-  steps:
-    - id: build
-      capability: build
-      uses: {provider: go, version: "1"}
-  environments:
-    production:
-      approvals:
-        required: [platform-team]
-`)
-	m, err := manifest.Parse(bytes.NewReader(src))
-	if err != nil {
-		t.Fatalf("manifest.Parse() error = %v, want nil", err)
-	}
-	if len(m.Spec.Environments["production"].Approvals.Required) != 1 {
-		t.Fatalf("manifest fixture is wrong: approvals not parsed as expected")
-	}
-
-	rec := &recorder{}
-	reg := providers.NewRegistry()
-	reg.RegisterBuilder(providers.Ref{Name: "go", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Builder {
-		return fakeBuilder{BuildFunc: func(_ context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-			rec.record("build")
-			return source, nil
-		}}
-	})
-
-	g, err := graph.Build(m.Spec.Steps)
-	if err != nil {
-		t.Fatalf("graph.Build() error = %v, want nil", err)
-	}
-	cfg := engine.Config{Steps: m.Spec.Steps, Graph: g, Registry: reg}
-
-	res, err := engine.Execute(context.Background(), cfg)
-	if err != nil {
-		t.Fatalf("Execute() error = %v, want nil — approvals must never block execution", err)
-	}
-	if res.Failed() {
-		t.Fatalf("Execute() Failures = %v, want none", res.Failures)
-	}
-	if got := rec.snapshot(); len(got) != 1 || got[0] != "build" {
-		t.Fatalf("invocation order = %v, want [build] — the step ran normally, with no approval wait", got)
 	}
 }
 
