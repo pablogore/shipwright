@@ -25,9 +25,9 @@ permissions:
   contents: 'write'
   packages: 'write'
   id-token: 'write'
+  checks: 'read'
 
 env:
-  GO_VERSION: '1.26.1'
   BINARY_NAME: 'shipwright'
 
 jobs:
@@ -97,7 +97,7 @@ jobs:
     - name: 'Set up Go'
       uses: 'actions/setup-go@v7'
       with:
-        go-version: '${{ env.GO_VERSION }}'
+        go-version-file: '.go-version'
 
     - name: 'Configure Git'
       run: |
@@ -343,10 +343,43 @@ jobs:
         ref: "${{ github.event_name == 'workflow_dispatch' && (inputs.commit_sha || 'main') || github.sha }}"
         # token: Uses GITHUB_TOKEN by default (automatically provided by GitHub Actions)
 
+    - name: 'Resolve and verify exact release SHA'
+      id: 'provenance'
+      run: |
+        RESOLVED_SHA="$(git rev-parse HEAD)"
+        echo "sha=$RESOLVED_SHA" >> "$GITHUB_OUTPUT"
+        echo "📍 Checked out commit: $RESOLVED_SHA"
+
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          EXPECTED_SHA="${{ github.sha }}"
+        elif [[ -n "${{ inputs.commit_sha }}" ]]; then
+          EXPECTED_SHA="$(git rev-parse "${{ inputs.commit_sha }}")"
+        else
+          EXPECTED_SHA=""
+        fi
+
+        if [[ -n "$EXPECTED_SHA" && "$RESOLVED_SHA" != "$EXPECTED_SHA" ]]; then
+          echo "::error::Checkout resolved to $RESOLVED_SHA but the release was requested for $EXPECTED_SHA. Refusing to build the wrong commit."
+          exit 1
+        fi
+        echo "✅ Checkout matches the requested release commit"
+
+    - name: 'Verify commit passed Final-SHA gate'
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      run: |
+        SHA="${{ steps.provenance.outputs.sha }}"
+        CONCLUSION="$(gh api "repos/${{ github.repository }}/commits/${SHA}/check-runs" --jq '[.check_runs[] | select(.name=="final-sha-gate")] | sort_by(.completed_at) | last | .conclusion // empty')"
+        if [ "$CONCLUSION" != "success" ]; then
+          echo "::error::Commit ${SHA} has no successful final-sha-gate check-run (found: '${CONCLUSION:-none}'). Refusing to release a commit that never passed the production-critical contract."
+          exit 1
+        fi
+        echo "✅ final-sha-gate=success verified for commit ${SHA}"
+
     - name: 'Set up Go'
       uses: 'actions/setup-go@v7'
       with:
-        go-version: '${{ env.GO_VERSION }}'
+        go-version-file: '.go-version'
 
     - name: 'Configure Git'
       run: |
@@ -444,24 +477,23 @@ jobs:
         TAG="${{ needs.validate-release.outputs.tag }}"
         CURRENT_COMMIT=$(git rev-parse HEAD)
 
-        if git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
-          TAG_COMMIT=$(git rev-parse "${TAG}^{commit}")
-          if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
-            echo "❌ Error: Tag ${TAG} points to commit ${TAG_COMMIT} but current commit is ${CURRENT_COMMIT}"
-            echo "   This will cause GoReleaser to fail. Please ensure the tag is updated."
-            exit 1
-          else
-            echo "✅ Tag ${TAG} correctly points to current commit ${CURRENT_COMMIT}"
-          fi
-        else
-          echo "⚠️ Warning: Tag ${TAG} not found locally, but will be validated by GoReleaser"
+        if ! git rev-parse "${TAG}^{commit}" >/dev/null 2>&1; then
+          echo "::error::Tag ${TAG} does not exist. A release must be backed by a real, resolvable tag pointing at the exact intended commit."
+          exit 1
         fi
+
+        TAG_COMMIT=$(git rev-parse "${TAG}^{commit}")
+        if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+          echo "::error::Tag ${TAG} points to commit ${TAG_COMMIT} but current commit is ${CURRENT_COMMIT}"
+          exit 1
+        fi
+        echo "✅ Tag ${TAG} correctly points to current commit ${CURRENT_COMMIT}"
 
     - name: 'Run GoReleaser'
       uses: 'goreleaser/goreleaser-action@v7'
       with:
         distribution: 'goreleaser'
-        version: 'latest'
+        version: '2.18.0'
         args: 'release --clean'
       env:
         GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -516,9 +548,23 @@ jobs:
           fi
         done
 
+        for file in shipwright_*_windows_arm64.zip; do
+          if [ -f "$file" ]; then
+            unzip -q "$file" shipwright.exe
+            mv shipwright.exe ../raw-binaries/shipwright-windows-arm64.exe
+          fi
+        done
+
         cd ..
         echo "✅ Raw binaries prepared:"
         ls -lh raw-binaries/
+
+    - name: 'Merge raw-binary checksums into checksums.txt'
+      run: |
+        echo "🔐 Adding raw-binary SHA-256 checksums to dist/checksums.txt"
+        ( cd raw-binaries && sha256sum -- * ) >> dist/checksums.txt
+        echo "Combined checksums.txt:"
+        cat dist/checksums.txt
 
     - name: 'Setup GitHub CLI'
       run: |
@@ -548,12 +594,26 @@ jobs:
           fi
         done
 
+        echo "Uploading combined checksums.txt..."
+        gh release upload "${{ needs.validate-release.outputs.tag }}" "../dist/checksums.txt" --clobber
+
         echo "✅ Raw binaries uploaded successfully"
         echo ""
         echo "📦 Available binaries for download:"
         ls -lh
       env:
         GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+
+    - name: 'Verify published release (post-publish consumer verification)'
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      run: |
+        chmod +x scripts/verify-release-asset.sh
+        scripts/verify-release-asset.sh \
+          "${{ needs.validate-release.outputs.tag }}" \
+          "shipwright-linux-amd64" \
+          "${{ needs.validate-release.outputs.version }}" \
+          "${{ steps.provenance.outputs.sha }}"
 
     - name: 'Update CHANGELOG.md in repository'
       if: "needs.validate-release.outputs.type == 'automatic'"
@@ -631,3 +691,5 @@ jobs:
         echo "   - shipwright-darwin-amd64"
         echo "   - shipwright-darwin-arm64"
         echo "   - shipwright-windows-amd64.exe"
+        echo "   - shipwright-windows-arm64.exe"
+        echo "✅ Post-publish verification passed: downloaded, checksum-verified, and executed"
