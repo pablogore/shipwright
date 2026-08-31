@@ -16,6 +16,14 @@ import (
 	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
+// pinnedPublishBaseImage mirrors golang.defaultPublishBaseImage
+// (containerpublisher.go, unexported and therefore not reachable from this
+// external test package). Kept as an expected-value literal, the same way
+// this file previously hardcoded "alpine:latest" — TestDefaultPublishBaseImageIsDigestPinned
+// (publishbasepin_test.go, package golang) is what actually guards the
+// production constant's value and format.
+const pinnedPublishBaseImage = "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+
 func TestContainerPublisher_Publish_NilClient(t *testing.T) {
 	publisher := &golang.ContainerPublisher{}
 
@@ -45,7 +53,7 @@ func TestContainerPublisher_Publish_Success(t *testing.T) {
 	const publishedRef = "ghcr.io/acme/api@sha256:abc123"
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "alpine:latest").Return(mockContainer)
+	mockContainer.On("From", pinnedPublishBaseImage).Return(mockContainer)
 	mockContainer.On("WithDirectory", "/app", mock.MatchedBy(func(d daggerkit.DaggerDirectory) bool {
 		return d.GetRealDirectory() == build
 	})).Return(mockContainer)
@@ -81,7 +89,7 @@ func TestContainerPublisher_Publish_BinaryNameMismatch(t *testing.T) {
 	checkErr := errors.New("exit code 1: test: /app/app: no such file or directory")
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "alpine:latest").Return(mockContainer)
+	mockContainer.On("From", pinnedPublishBaseImage).Return(mockContainer)
 	mockContainer.On("WithDirectory", "/app", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithExec", []string{"test", "-f", "/app/app"}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
 	mockContainer.On("Sync", mock.Anything).Return(nil, checkErr)
