@@ -123,13 +123,22 @@ test: ## Run all tests
 
 dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT part of `test`/`check`/`quality`/`all` — see design.md D-B isolation)
 	@echo -e "$(BLUE)Running .dagger module tests...$(NC)"
-	cd .dagger && dagger run $(GOTEST) -race ./...
+	# GOWORK=off: .dagger is not a member of the root go.work, so workspace
+	# auto-detection walking up from here fails with "directory prefix .
+	# does not contain modules listed in go.work" unless workspace mode is
+	# disabled for this invocation.
+	cd .dagger && GOWORK=off dagger run $(GOTEST) -race ./...
 	@echo -e "$(GREEN)✅ .dagger module tests completed$(NC)"
 
 test-integration: ## Run real-Dagger-engine tests under testing/integration/ (requires a running Dagger engine; deliberately NOT part of `test`/`check`/`ci-final` — mock tests cover this logic for the default suite)
 	@echo -e "$(BLUE)Running Dagger integration tests...$(NC)"
 	$(GOTEST) -tags integration -v -race ./testing/...
 	@echo -e "$(GREEN)✅ Integration tests completed$(NC)"
+
+final-sha-gate-check-test: ## Run the final-sha-gate composition logic's own test suite (pure bash, no Dagger required -- included in ci-final)
+	@echo -e "$(BLUE)Running final-sha-gate composition logic tests...$(NC)"
+	./scripts/final-sha-gate-check_test.sh
+	@echo -e "$(GREEN)✅ final-sha-gate composition logic tests completed$(NC)"
 
 deps: ## Download and tidy dependencies
 	@echo -e "$(BLUE)Downloading dependencies...$(NC)"
@@ -339,7 +348,7 @@ provider-go-standalone: ## Validate providers/go builds/tests standalone with GO
 # dagger-test/test-integration structurally cannot be, by the same
 # reproducibility requirement that motivates ci-final's existence.
 .PHONY: ci-final
-ci-final: lint build test coverage-gate security provider-go-standalone ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
+ci-final: lint build test coverage-gate security provider-go-standalone final-sha-gate-check-test ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coverage targets

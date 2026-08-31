@@ -1675,32 +1675,92 @@ jobs:
         echo "🔐 Running 'make ci-final' against $(git rev-parse HEAD)"
         make ci-final
 
+  # Real-engine acceptance counterpart to final-sha-validation above. Runs
+  # independently (not `needs: final-sha-validation`) on the same exact SHA,
+  # so both contracts are exercised in parallel and final-sha-gate composes
+  # their verdicts. Deliberately NOT folded into `make ci-final` -- see the
+  # ci-final composition comment in the Makefile for why dagger-test/
+  # test-integration must stay out of the CI-provider-independent contract.
+  final-sha-dagger-integration:
+    runs-on: 'ubuntu-latest'
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    steps:
+    - name: 'Checkout exact Final SHA'
+      uses: 'actions/checkout@v7'
+      with:
+        ref: '${{ github.sha }}'
+
+    - name: 'Verify checked-out SHA matches the pushed SHA'
+      run: |
+        EXPECTED="${{ github.sha }}"
+        ACTUAL="$(git rev-parse HEAD)"
+        echo "Expected (github.sha): $EXPECTED"
+        echo "Checked out (git rev-parse HEAD): $ACTUAL"
+        if [[ "$EXPECTED" != "$ACTUAL" ]]; then
+          echo "❌ Checkout integrity failure: checked-out SHA does not match the pushed SHA"
+          exit 1
+        fi
+        echo "✅ Checked-out SHA matches the pushed SHA"
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v7'
+      with:
+        go-version: '${{ env.GO_VERSION }}'
+        cache: false  # Disable default cache to use our custom one
+
+    - name: 'Cache Go modules'
+      uses: 'actions/cache@v6'
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
+        restore-keys: |
+          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
+          go-mod-${{ hashFiles('go.sum') }}-
+          go-mod-
+        fail-on-cache-miss: false
+
+    - name: 'Install Dagger CLI'
+      env:
+        DAGGER_VERSION: 'v0.21.8' # keep in sync with dagger.io/dagger in go.mod/providers/*/go.mod
+      run: |
+        mkdir -p "$HOME/.local/bin"
+        curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR="$HOME/.local/bin" sh
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+    - name: 'Verify Dagger CLI is available'
+      run: |
+        dagger version
+
+    - name: 'Run repository-owned real-Dagger-engine integration contract'
+      run: |
+        echo "🔌 Running 'make test-integration' against $(git rev-parse HEAD)"
+        make test-integration
+
   # Single, unambiguous aggregator for the Final-SHA verdict. Fail-closed by
-  # construction: it only reports VALID when final-sha-validation's result is
-  # exactly 'success'. Any other result — failure, cancellation, or an
-  # unexpected skip — falls through to INVALID, because `!= 'success'` is the
-  # only comparison this job makes.
+  # construction: it only reports VALID when BOTH final-sha-validation and
+  # final-sha-dagger-integration succeed for this exact SHA. Any other
+  # result for either job — failure, cancellation, or an unexpected skip —
+  # falls through to INVALID; see scripts/final-sha-gate-check.sh for the
+  # composition logic and its own test suite.
   final-sha-gate:
     runs-on: 'ubuntu-latest'
-    needs: ['final-sha-validation']
+    needs: ['final-sha-validation', 'final-sha-dagger-integration']
     if: |
       always() &&
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
     steps:
+    - name: 'Checkout'
+      uses: 'actions/checkout@v7'
+
     - name: 'Final SHA verdict'
+      env:
+        VALIDATION_RESULT: '${{ needs.final-sha-validation.result }}'
+        DAGGER_INTEGRATION_RESULT: '${{ needs.final-sha-dagger-integration.result }}'
       run: |
-        SHA="${{ github.sha }}"
-        RESULT="${{ needs.final-sha-validation.result }}"
-        echo "SHA: $SHA"
-        echo "final-sha-validation result: $RESULT"
-        if [[ "$RESULT" != "success" ]]; then
-          echo ""
-          echo "❌ FINAL SHA INVALID — $SHA"
-          echo "final-sha-validation did not succeed (result: $RESULT)."
-          echo "This SHA must NOT be considered production-ready."
-          exit 1
-        fi
-        echo ""
-        echo "✅ FINAL SHA VALID — $SHA"
-        echo "All mandatory production-critical guards (build, test, coverage, security) passed for this exact SHA via 'make ci-final'."
+        echo "SHA: ${{ github.sha }}"
+        ./scripts/final-sha-gate-check.sh
