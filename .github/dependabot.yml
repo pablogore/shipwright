@@ -36,6 +36,38 @@ updates:
         update-types:
           - "major"
 
+  # .dagger is its own Go module (intentionally pinned to a different Go
+  # version than root for Dagger toolchain compatibility) and is not
+  # reachable through the root "/" directory above, so its dependencies
+  # (e.g. google.golang.org/grpc, golang.org/x/net, otel exporters) were
+  # never getting security-update PRs despite GitHub flagging them as
+  # vulnerable.
+  - package-ecosystem: "gomod"
+    directory: "/.dagger"
+    target-branch: "develop"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    groups:
+      security-updates:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+          - "minor"
+      minor-patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      major-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+
   # GitHub Actions updates
   - package-ecosystem: "github-actions"
     directory: "/"
