@@ -3,6 +3,7 @@ package manifest
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 // allowedAPIVersions is the schema's apiVersion allowlist (stage 2,
@@ -114,6 +115,99 @@ func validateStep(index int, step Step, seen map[string]bool) error {
 
 	if step.Uses.Version == "" {
 		return fmt.Errorf("manifest: step %q has an empty uses.version", step.ID)
+	}
+
+	return nil
+}
+
+// UnenforceableControlError reports a declared control that is parsed but
+// not enforced at runtime (design.md D2).
+type UnenforceableControlError struct {
+	Field  string
+	Detail string
+}
+
+func (e *UnenforceableControlError) Error() string {
+	return fmt.Sprintf("manifest: %s is declared but not enforced by this engine: %s", e.Field, e.Detail)
+}
+
+// ValidateExecutable is the execution-only fail-close gate (design.md D1).
+// Deliberately NOT called by Parse/ParseFile, so a read-only command (e.g.
+// --list-steps) still parses and displays these controls; the execution
+// path must call this itself before any Dagger connection.
+//
+// Fixed, first-offender order: approvals (sorted names) → policies.* →
+// maxParallel > 1. No override.
+func ValidateExecutable(m *Manifest) error {
+	if err := validateNoApprovals(m); err != nil {
+		return err
+	}
+	if err := validateNoPolicies(m); err != nil {
+		return err
+	}
+	if m.Spec.Execution.Concurrency.MaxParallel > 1 {
+		return &UnenforceableControlError{
+			Field:  "spec.execution.concurrency.maxParallel",
+			Detail: "the engine executes waves strictly sequentially and cannot honor an asserted parallelism greater than 1",
+		}
+	}
+
+	return nil
+}
+
+// validateNoApprovals rejects any environment declaring an approvals
+// block — present at all, regardless of whether Required is populated —
+// visiting names in sorted order (design.md D2).
+func validateNoApprovals(m *Manifest) error {
+	names := make([]string, 0, len(m.Spec.Environments))
+	for name := range m.Spec.Environments {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		if m.Spec.Environments[name].Approvals != nil {
+			return &UnenforceableControlError{
+				Field:  fmt.Sprintf("spec.environments.%s.approvals", name),
+				Detail: "the engine implements no blocking, queueing, or wait-for-approval logic; approvals are metadata only",
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateNoPolicies rejects any declared spec.policies.* flag, in struct
+// order, regardless of its value — an explicit `false` still asserts a
+// control this engine does not implement. forbidCycles/requireVersion are
+// rejected too, even though their guarantee already holds unconditionally
+// — this schema gives no way to selectively enable/disable them.
+func validateNoPolicies(m *Manifest) error {
+	p := m.Spec.Policies
+
+	if p.Secrets.ForbidPlaintext != nil {
+		return &UnenforceableControlError{
+			Field:  "spec.policies.secrets.forbidPlaintext",
+			Detail: "not enforced by any layer; declaring it asserts a guarantee this engine does not provide",
+		}
+	}
+	if p.Providers.RequireVersion != nil {
+		return &UnenforceableControlError{
+			Field:  "spec.policies.providers.requireVersion",
+			Detail: "uses.version is already required unconditionally; this flag has no effect and cannot be selectively enabled",
+		}
+	}
+	if p.Dependencies.ForbidCycles != nil {
+		return &UnenforceableControlError{
+			Field:  "spec.policies.dependencies.forbidCycles",
+			Detail: "acyclicity is already enforced unconditionally; this flag has no effect and cannot be selectively enabled",
+		}
+	}
+	if p.Artifacts.Immutable != nil {
+		return &UnenforceableControlError{
+			Field:  "spec.policies.artifacts.immutable",
+			Detail: "not enforced by any layer; declaring it asserts a guarantee this engine does not provide",
+		}
 	}
 
 	return nil

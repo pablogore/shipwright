@@ -247,6 +247,33 @@ spec:
 	assert.Contains(t, err.Error(), "build")
 }
 
+// TestRunWorkflowCLI_ListStepsSkipsValidateExecutable proves --list-steps
+// bypasses manifest.ValidateExecutable (design.md D1): diamond.yaml
+// declares approvals, policies.*, and maxParallel: 4, yet --list-steps
+// still succeeds because runWorkflowCLI returns before ValidateExecutable
+// is called.
+func TestRunWorkflowCLI_ListStepsSkipsValidateExecutable(t *testing.T) {
+	cli := NewCLI()
+	err := cli.Run([]string{"-workflow", diamondManifestPath, "-list-steps"})
+	require.NoError(t, err, "--list-steps must not be gated by ValidateExecutable")
+}
+
+// TestRunWorkflowCLI_ExecuteRejectsUnenforceableControls proves the execute
+// path fails closed via ValidateExecutable before any Dagger connection:
+// diamond.yaml declares maxParallel: 4, so the run must return an
+// UnenforceableControlError, never a Dagger connection failure.
+func TestRunWorkflowCLI_ExecuteRejectsUnenforceableControls(t *testing.T) {
+	cli := NewCLI()
+	err := cli.Run([]string{"-workflow", diamondManifestPath})
+
+	require.Error(t, err)
+
+	var uce *manifest.UnenforceableControlError
+	require.ErrorAs(t, err, &uce, "error must be a manifest.UnenforceableControlError, not a Dagger connection failure")
+	assert.Equal(t, "spec.environments.production.approvals", uce.Field,
+		"approvals is checked first in ValidateExecutable's fixed order, and diamond.yaml declares it")
+}
+
 // TestSelectWorkflowGraph_FullRunWhenNoStepGiven proves selectWorkflowGraph
 // returns g unchanged for a full workflow run (--step not given) — the
 // exact same *graph.Graph selectWorkflowGraph would filter down for --step.

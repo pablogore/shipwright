@@ -255,6 +255,10 @@ func (c *CLI) runWorkflowCLI(ctx context.Context, flags *Flags) error {
 		return c.listWorkflowSteps(ctx, m)
 	}
 
+	if err := manifest.ValidateExecutable(m); err != nil {
+		return fmt.Errorf("workflow: %w", err)
+	}
+
 	runGraph, err := selectWorkflowGraph(g, flags.step)
 	if err != nil {
 		return err
