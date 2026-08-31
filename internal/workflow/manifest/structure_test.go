@@ -256,7 +256,9 @@ func TestParse_PolicyBlockParsesIntoStructuredValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse() error = %v, want nil", err)
 	}
-	if !m.Spec.Policies.Dependencies.ForbidCycles || !m.Spec.Policies.Providers.RequireVersion {
+	forbidCycles := m.Spec.Policies.Dependencies.ForbidCycles
+	requireVersion := m.Spec.Policies.Providers.RequireVersion
+	if forbidCycles == nil || !*forbidCycles || requireVersion == nil || !*requireVersion {
 		t.Fatalf("Spec.Policies = %+v, want both forbidCycles and requireVersion true", m.Spec.Policies)
 	}
 }
@@ -276,7 +278,11 @@ func TestParse_DeclaredApprovalMetadataIsQueryable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse() error = %v, want nil", err)
 	}
-	approvals := m.Spec.Environments["production"].Approvals.Required
+	env := m.Spec.Environments["production"]
+	if env.Approvals == nil {
+		t.Fatal("Environments[production].Approvals = nil, want a declared approvals block")
+	}
+	approvals := env.Approvals.Required
 	if len(approvals) != 1 || approvals[0] != "platform-team" {
 		t.Fatalf("Environments[production].Approvals.Required = %v, want [platform-team]", approvals)
 	}

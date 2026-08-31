@@ -118,10 +118,14 @@ type ConcurrencySpec struct {
 
 // Environment names a deployment target and its declared approval
 // metadata. The engine never blocks, queues, or waits on approvals
-// (design.md D-M); any declared approvals block is instead rejected
-// outright by ValidateExecutable (see the Policies comment).
+// (design.md D-M); any DECLARED approvals block — even an empty one — is
+// rejected outright by ValidateExecutable (see the Policies comment).
+// Approvals is a pointer so ValidateExecutable can distinguish "omitted"
+// (nil) from "declared but empty" (non-nil, Required == nil): a manifest
+// author writing `approvals: {}` still asserts a control this engine does
+// not implement, and must fail closed the same as a populated block.
 type Environment struct {
-	Approvals ApprovalSpec `yaml:"approvals,omitempty"`
+	Approvals *ApprovalSpec `yaml:"approvals,omitempty"`
 }
 
 // ApprovalSpec is declared, queryable metadata only — see Environment's
@@ -132,10 +136,13 @@ type ApprovalSpec struct {
 
 // Policies declares intent this schema parses but does not itself enforce
 // (workflow-manifest spec, "Policies Are Declared As Structured,
-// Enforceable Schema Fields"). ANY non-empty declaration — even one whose
-// guarantee already holds unconditionally, like Providers.RequireVersion
-// or Dependencies.ForbidCycles — is rejected by ValidateExecutable, an
-// execution-only stage NOT run by Parse/ParseFile.
+// Enforceable Schema Fields"). ANY declaration — even an explicit `false`,
+// and even one whose guarantee already holds unconditionally, like
+// Providers.RequireVersion or Dependencies.ForbidCycles — is rejected by
+// ValidateExecutable, an execution-only stage NOT run by Parse/ParseFile.
+// Each flag below is a pointer so ValidateExecutable can tell "omitted"
+// (nil) apart from "declared" (non-nil, at any value) — see each field's
+// comment.
 type Policies struct {
 	Secrets      SecretsPolicy      `yaml:"secrets,omitempty"`
 	Providers    ProvidersPolicy    `yaml:"providers,omitempty"`
@@ -145,26 +152,31 @@ type Policies struct {
 
 // SecretsPolicy declares whether a secret reference is forbidden in a
 // non-secret-typed field. No layer enforces it; see the Policies comment.
+// ForbidPlaintext is a pointer: declaring it `false` still asserts a
+// guarantee this engine does not provide, and must fail closed too.
 type SecretsPolicy struct {
-	ForbidPlaintext bool `yaml:"forbidPlaintext,omitempty"`
+	ForbidPlaintext *bool `yaml:"forbidPlaintext,omitempty"`
 }
 
 // ProvidersPolicy declares provider-version intent. An empty uses.version
 // is already unconditionally rejected by ValidateStructure regardless of
-// this flag; see the Policies doc comment for why the flag is rejected too.
+// this flag; see the Policies doc comment for why the flag is rejected
+// even when declared `false`.
 type ProvidersPolicy struct {
-	RequireVersion bool `yaml:"requireVersion,omitempty"`
+	RequireVersion *bool `yaml:"requireVersion,omitempty"`
 }
 
 // DependenciesPolicy declares whether cycles are forbidden. Acyclicity is
 // already enforced unconditionally at stage 5; see the Policies comment
-// for why the flag is rejected too.
+// for why the flag is rejected even when declared `false`.
 type DependenciesPolicy struct {
-	ForbidCycles bool `yaml:"forbidCycles,omitempty"`
+	ForbidCycles *bool `yaml:"forbidCycles,omitempty"`
 }
 
 // ArtifactsPolicy declares whether published artifacts must be immutable.
-// No layer enforces it; see the Policies comment.
+// No layer enforces it; see the Policies comment. Immutable is a pointer:
+// declaring it `false` still asserts a guarantee this engine does not
+// provide, and must fail closed too.
 type ArtifactsPolicy struct {
-	Immutable bool `yaml:"immutable,omitempty"`
+	Immutable *bool `yaml:"immutable,omitempty"`
 }

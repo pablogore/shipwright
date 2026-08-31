@@ -155,8 +155,9 @@ func ValidateExecutable(m *Manifest) error {
 	return nil
 }
 
-// validateNoApprovals rejects any environment declaring a non-empty
-// approvals block, visiting names in sorted order (design.md D2).
+// validateNoApprovals rejects any environment declaring an approvals
+// block — present at all, regardless of whether Required is populated —
+// visiting names in sorted order (design.md D2).
 func validateNoApprovals(m *Manifest) error {
 	names := make([]string, 0, len(m.Spec.Environments))
 	for name := range m.Spec.Environments {
@@ -165,7 +166,7 @@ func validateNoApprovals(m *Manifest) error {
 	sort.Strings(names)
 
 	for _, name := range names {
-		if len(m.Spec.Environments[name].Approvals.Required) > 0 {
+		if m.Spec.Environments[name].Approvals != nil {
 			return &UnenforceableControlError{
 				Field:  fmt.Sprintf("spec.environments.%s.approvals", name),
 				Detail: "the engine implements no blocking, queueing, or wait-for-approval logic; approvals are metadata only",
@@ -176,32 +177,33 @@ func validateNoApprovals(m *Manifest) error {
 	return nil
 }
 
-// validateNoPolicies rejects any non-empty spec.policies.* declaration, in
-// struct order. forbidCycles/requireVersion are rejected too, even though
-// their guarantee already holds unconditionally — this schema gives no
-// way to selectively enable/disable them.
+// validateNoPolicies rejects any declared spec.policies.* flag, in struct
+// order, regardless of its value — an explicit `false` still asserts a
+// control this engine does not implement. forbidCycles/requireVersion are
+// rejected too, even though their guarantee already holds unconditionally
+// — this schema gives no way to selectively enable/disable them.
 func validateNoPolicies(m *Manifest) error {
 	p := m.Spec.Policies
 
-	if p.Secrets.ForbidPlaintext {
+	if p.Secrets.ForbidPlaintext != nil {
 		return &UnenforceableControlError{
 			Field:  "spec.policies.secrets.forbidPlaintext",
 			Detail: "not enforced by any layer; declaring it asserts a guarantee this engine does not provide",
 		}
 	}
-	if p.Providers.RequireVersion {
+	if p.Providers.RequireVersion != nil {
 		return &UnenforceableControlError{
 			Field:  "spec.policies.providers.requireVersion",
 			Detail: "uses.version is already required unconditionally; this flag has no effect and cannot be selectively enabled",
 		}
 	}
-	if p.Dependencies.ForbidCycles {
+	if p.Dependencies.ForbidCycles != nil {
 		return &UnenforceableControlError{
 			Field:  "spec.policies.dependencies.forbidCycles",
 			Detail: "acyclicity is already enforced unconditionally; this flag has no effect and cannot be selectively enabled",
 		}
 	}
-	if p.Artifacts.Immutable {
+	if p.Artifacts.Immutable != nil {
 		return &UnenforceableControlError{
 			Field:  "spec.policies.artifacts.immutable",
 			Detail: "not enforced by any layer; declaring it asserts a guarantee this engine does not provide",
