@@ -10,17 +10,30 @@ independent version spaces a consumer needs to reason about.
 Shipwright's stability guarantee covers exactly the following, deliberately
 minimal, surface — nothing else:
 
-- **The five capability interfaces, on both contract layers**:
+- **The five composition capability interfaces, on both contract layers**:
   - Layer 1 (`pkg/shipwright`, plain Go — `Builder`, `Tester`, `Artifactor`,
     `Deployer`, `Runner`)
   - Layer 2 (`.dagger/capabilities.go`, the Dagger projection of the same
     five as Dagger Interfaces)
+- **The two runtime-maintenance capability interfaces, `RuntimeInspector` and
+  `RuntimeUpgrader`** (`pkg/shipwright`, added by the
+  shipwright-runtime-toolchain-upgrade change): guaranteed on Layer 1 and
+  machine-enforced by the same `api.golden` below. Layer 2 also declares
+  both as Dagger Interfaces (`.dagger/capabilities.go`), but they are not
+  yet wired into `Plan`'s `WithBuild`/`WithTest`/.../`Execute` composition
+  chain (design.md D-3) and are not covered by a Layer 2 golden — treat
+  their Layer 2 shape as unguaranteed until that wiring lands.
 - **`Shipwright.{Plan, ContractVersion}`** — the Layer 2 module entrypoint's
   two functions
 - **`Plan.{WithBuild, WithTest, WithArtifact, WithDeploy, WithRun, Execute}`**
   — the composition surface (`.dagger/capabilities.go`)
 - **The `pkg/shipwright` config structs** — `SourceConfig`, `BuildConfig`,
   `TestConfig`, `ArtifactConfig`, `DeployConfig`, `RunConfig`
+- **The `pkg/shipwright` runtime report structs** — `DriftReport` (with its
+  nested `ModuleVersion`/`ConflictState`) and `UpgradeReport` (with its
+  nested `ModuleDrift`), returned by `RuntimeInspector.Inspect`/
+  `RuntimeUpgrader.Upgrade` as JSON, never as a typed return value
+  (design.md D-1)
 - **The `shipwright.dev/v1` manifest schema**, as a *data* contract — the
   YAML document shape accepted by `--workflow`, guarded by its own golden
   (`internal/workflow/manifest/testdata/schema.golden`), independently of
@@ -31,11 +44,13 @@ This exact enumeration is machine-enforced for the Go/Dagger surface by
 (`pkg/shipwright/api_golden_test.go`): any change to the guaranteed surface
 must appear in a reviewed `-update` diff to that golden. `api.golden`
 currently enumerates, in full: `ContractVersion`, the `Artifactor`/
-`Builder`/`Deployer`/`Runner`/`Tester` interfaces, and the
-`ArtifactConfig`/`BuildConfig`/`DeployConfig`/`RunConfig`/`SourceConfig`/
-`TestConfig` structs — i.e. Layer 1 in full. The golden is a **textual
-diff, not a semantic type check**: it forces every exported-surface change
-into a diff a human must read and deliberately accept, never blind-accept.
+`Builder`/`Deployer`/`Runner`/`RuntimeInspector`/`RuntimeUpgrader`/`Tester`
+interfaces, and the `ArtifactConfig`/`BuildConfig`/`ConflictState`/
+`DeployConfig`/`DriftReport`/`ModuleDrift`/`ModuleVersion`/`RunConfig`/
+`SourceConfig`/`TestConfig`/`UpgradeReport` structs — i.e. Layer 1 in full.
+The golden is a **textual diff, not a semantic type check**: it forces
+every exported-surface change into a diff a human must read and
+deliberately accept, never blind-accept.
 It does not, on its own, reject a plaintext credential field; that guarantee
 comes from the credential-typing discipline documented in `design.md`'s
 Threat Matrix (all credential fields are `*dagger.Secret`, never a plain
@@ -83,15 +98,34 @@ and behavior at each of its own versions.
 
 ## Non-Guarantees (Explicit)
 
-- Approval gates (`spec.environments.<name>.approvals`) are metadata-only —
-  parsed and surfaced in logs, never enforced by the scheduler. This is a
-  behavioral property, not a versioned surface, but it is called out here
-  because it is easy to mistake for a guarantee (`design.md` D-M).
-- `maxParallel` is validated and recorded but does not currently widen
-  execution — a manifest declaring `maxParallel: 4` runs correctly but
-  serially (`design.md` D-K). This may change in a future release without
-  a `ContractVersion` bump, since concurrency behavior is not part of the
-  guaranteed surface.
+- Approval gates (`spec.environments.<name>.approvals`), `spec.policies.*`,
+  and `maxParallel > 1` were previously described here as silently
+  accepted/ignored controls. As of PR #202
+  (`manifest.ValidateExecutable`, `internal/workflow/manifest/validate.go`),
+  that is no longer true: a manifest declaring any of them now **fails
+  closed at execute time** with a typed
+  `*manifest.UnenforceableControlError`, instead of running with the
+  control silently unenforced. Specifically, `ValidateExecutable` — called
+  from `main.go` immediately before the execution path connects to Dagger,
+  but deliberately not from `Parse`/`ParseFile`, so a read-only command
+  like `--list-steps` still parses and displays these fields — rejects, in
+  fixed first-offender order:
+  1. any `spec.environments.<name>.approvals` block present at all
+     (visited in sorted environment-name order), regardless of whether
+     `required` is populated;
+  2. any explicitly-set `spec.policies.*` flag — `secrets.forbidPlaintext`,
+     `providers.requireVersion`, `dependencies.forbidCycles`,
+     `artifacts.immutable` — in that struct order, even when set to
+     `false`, since an explicit value still asserts a control this engine
+     does not selectively implement;
+  3. `spec.execution.concurrency.maxParallel > 1`, since the engine
+     executes waves strictly sequentially and cannot honor an asserted
+     parallelism greater than 1.
+
+  This is a behavioral property, not a versioned surface — the exact set of
+  rejected controls can change without a `ContractVersion` bump — but it is
+  called out here because "declares a value this engine cannot enforce" now
+  means "manifest is rejected," not "value is silently ignored."
 - Anything in `internal/**` — the DI container, the plugin loader's
   `LoadFromFile`/`LoadFromConfig` path, the step/hook registries, and the
   legacy `internal/pipelines/options.go` config struct — carries no
