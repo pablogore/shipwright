@@ -208,7 +208,13 @@ func TestContainerPublisher_Publish_BinaryNameMismatch_RealEngine(t *testing.T) 
 // to end, proving daggerkit's real adapter — not the mocks every other
 // runtimeupgrader_test.go case uses — round-trips Entries/File/WithNewFile
 // correctly for the Phase 3 traversal loop (go.work itself, every use'd
-// module's go.mod, and .go-version).
+// module's go.mod, and .go-version). Its post-mutation validation step
+// also pulls a real "golang:"+targetVersion image and runs `go build
+// ./...` (and `go mod tidy` when Tidy is set) inside it, so this test is
+// also the proof that runtime-upgrade is NOT offline/hermetic: it requires
+// a reachable Dagger engine and, through it, network access to a
+// container registry and (when Tidy is set) a module proxy — unlike
+// runtime-inspect, which never needs either.
 func TestGoRuntimeUpgrader_Upgrade_Workspace_RealEngine(t *testing.T) {
 	ctx := context.Background()
 	client, err := dagger.Connect(ctx)
