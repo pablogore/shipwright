@@ -300,10 +300,13 @@ func (e *ValidationError) Unwrap() error { return e.Err }
 
 // classifyValidationFailure names which stage of the single per-module
 // Sync failed: "tidy" for `go mod tidy` (only ever runs when u.Tidy is
-// true), "build" for `go build ./...` (always runs), or "toolchain" for
-// the "golang:"+targetVersion image pull (Container().From, unconditional
-// — the container chain is lazy, so an image that can't be resolved only
-// surfaces here, at Sync, without ever reaching a WithExec).
+// true), "build" for `go build ./...` (always runs), "toolchain" for the
+// image pull naming the exact "golang:"+targetVersion reference being
+// resolved (Container().From, unconditional — the container chain is
+// lazy, so an image that can't be resolved only surfaces here, at Sync,
+// without ever reaching a WithExec), or "unknown" for a Sync failure that
+// matches none of those signals (a Dagger engine, mount, or other internal
+// error unrelated to any of the three stages above).
 //
 // The primary signal is Dagger's own *dagger.ExecError.Cmd field, checked
 // via errors.As: it carries the failing command's argv directly, which is
@@ -313,10 +316,13 @@ func (e *ValidationError) Unwrap() error { return e.Err }
 // *dagger.ExecError (an image-pull failure never reaches a WithExec, so
 // never produces one), the message text is checked instead, matching
 // process-error output that does name the command — the shape both the
-// mocked test fixtures and some Dagger/buildkit versions produce. An error
-// matching neither signal never reached a WithExec, so it's classified as
-// the toolchain stage.
-func classifyValidationFailure(err error) string {
+// mocked test fixtures and some Dagger/buildkit versions produce — or, for
+// the toolchain stage, the exact image reference passed in, since that's
+// the one substring an image-resolution failure is guaranteed to name.
+// Falling back to "toolchain" for any unrecognized error risked mislabeling
+// a genuinely unrelated failure as an image-pull problem, so an error
+// naming none of these three signals is reported as "unknown" instead.
+func classifyValidationFailure(err error, image string) string {
 	var execErr *dagger.ExecError
 	if errors.As(err, &execErr) {
 		switch strings.Join(execErr.Cmd, " ") {
@@ -333,8 +339,10 @@ func classifyValidationFailure(err error) string {
 		return "tidy"
 	case strings.Contains(msg, "go build ./..."):
 		return "build"
-	default:
+	case strings.Contains(msg, image):
 		return "toolchain"
+	default:
+		return "unknown"
 	}
 }
 
@@ -360,7 +368,8 @@ func (u *GoRuntimeUpgrader) validateAndFinalize(ctx context.Context, dir, origin
 		driftByPath[drifts[i].Path] = &drifts[i]
 	}
 
-	container := u.Client.Container().From("golang:"+targetVersion).WithMountedDirectory(runtimeUpgradeContainerRoot, dir)
+	toolchainImage := "golang:" + targetVersion
+	container := u.Client.Container().From(toolchainImage).WithMountedDirectory(runtimeUpgradeContainerRoot, dir)
 
 	succeeded := make([]string, 0, len(modulePaths))
 	for _, modPath := range modulePaths {
@@ -373,7 +382,7 @@ func (u *GoRuntimeUpgrader) validateAndFinalize(ctx context.Context, dir, origin
 
 		synced, err := container.Sync(ctx)
 		if err != nil {
-			return nil, &ValidationError{Validation: classifyValidationFailure(err), Failed: modPath, Succeeded: succeeded, Err: err}
+			return nil, &ValidationError{Validation: classifyValidationFailure(err, toolchainImage), Failed: modPath, Succeeded: succeeded, Err: err}
 		}
 		container = synced
 

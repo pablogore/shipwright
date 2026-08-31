@@ -524,10 +524,11 @@ func TestGoRuntimeUpgrader_Upgrade_TidyFailure_ClassifiesAsTidy(t *testing.T) {
 
 // TestGoRuntimeUpgrader_Upgrade_ToolchainImageFailure_ClassifiesAsToolchain
 // proves ValidationError.Validation names "toolchain", not "build", when
-// the failing Sync's error names neither `go mod tidy` nor `go build
-// ./...` — the shape a "golang:"+targetVersion image that can't be
-// resolved actually takes, since Container().From is lazy and only
-// surfaces its own failure at Sync, before any WithExec ever runs.
+// the failing Sync's error names the exact "golang:"+targetVersion image
+// reference being resolved — the shape a "golang:"+targetVersion image
+// that can't be resolved actually takes, since Container().From is lazy
+// and only surfaces its own failure at Sync, before any WithExec ever
+// runs.
 func TestGoRuntimeUpgrader_Upgrade_ToolchainImageFailure_ClassifiesAsToolchain(t *testing.T) {
 	mockClient := &daggerkit.MockDaggerClient{}
 	mockContainer := &daggerkit.MockDaggerContainer{}
@@ -556,6 +557,44 @@ func TestGoRuntimeUpgrader_Upgrade_ToolchainImageFailure_ClassifiesAsToolchain(t
 	var validationErr *ValidationError
 	require.ErrorAs(t, err, &validationErr)
 	assert.Equal(t, "toolchain", validationErr.Validation)
+	assert.Equal(t, ".", validationErr.Failed)
+}
+
+// TestGoRuntimeUpgrader_Upgrade_UnrecognizedSyncFailure_ClassifiesAsUnknown
+// proves ValidationError.Validation names "unknown", not "toolchain", when
+// the failing Sync's error names neither `go mod tidy`, `go build ./...`,
+// nor the "golang:"+targetVersion image being resolved — the shape a
+// genuinely unrelated Dagger engine/mount/internal error takes, which must
+// not be mislabeled as an image-resolution failure just because no other
+// signal matched.
+func TestGoRuntimeUpgrader_Upgrade_UnrecognizedSyncFailure_ClassifiesAsUnknown(t *testing.T) {
+	mockClient := &daggerkit.MockDaggerClient{}
+	mockContainer := &daggerkit.MockDaggerContainer{}
+	mockDir := mockDirFromFixture(t, "single-module")
+	withMockDirectory(t, mockDir)
+
+	afterMod := &daggerkit.MockDaggerDirectory{}
+	mockDir.On("WithNewFile", "go.mod", mock.AnythingOfType("string")).Return(afterMod)
+
+	execErr := errors.New("rpc error: code = Internal desc = failed to mount buildkit worker")
+
+	mockClient.On("Container").Return(mockContainer)
+	mockContainer.On("From", "golang:1.27.0").Return(mockContainer)
+	mockContainer.On("WithMountedDirectory", "/workspace", afterMod).Return(mockContainer)
+	mockContainer.On("WithWorkdir", "/workspace").Return(mockContainer)
+	mockContainer.On("WithExec", []string{"go", "build", "./..."}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
+	mockContainer.On("Sync", mock.Anything).Return(nil, execErr)
+
+	upgrader := &GoRuntimeUpgrader{Client: mockClient}
+
+	out, err := upgrader.Upgrade(context.Background(), &dagger.Directory{}, "1.27.0")
+
+	require.Error(t, err)
+	assert.Nil(t, out)
+
+	var validationErr *ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "unknown", validationErr.Validation)
 	assert.Equal(t, ".", validationErr.Failed)
 }
 
