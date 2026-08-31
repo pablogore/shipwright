@@ -484,6 +484,81 @@ func TestGoRuntimeUpgrader_Upgrade_ValidationFailure_ReturnsNilDirectory(t *test
 	mockContainer.AssertNotCalled(t, "File", mock.Anything)
 }
 
+// TestGoRuntimeUpgrader_Upgrade_TidyFailure_ClassifiesAsTidy proves
+// ValidationError.Validation names "tidy", not the generic "build", when
+// the failing Sync's error names `go mod tidy` — Dagger's own ExecError
+// (and the buildkit process error it wraps) renders as `process "<argv>"
+// did not complete successfully: ...`, naming the exact failing command,
+// which classifyValidationFailure matches on.
+func TestGoRuntimeUpgrader_Upgrade_TidyFailure_ClassifiesAsTidy(t *testing.T) {
+	mockClient := &daggerkit.MockDaggerClient{}
+	mockContainer := &daggerkit.MockDaggerContainer{}
+	mockDir := mockDirFromFixture(t, "single-module")
+	withMockDirectory(t, mockDir)
+
+	afterMod := &daggerkit.MockDaggerDirectory{}
+	mockDir.On("WithNewFile", "go.mod", mock.AnythingOfType("string")).Return(afterMod)
+
+	execErr := errors.New(`process "go mod tidy" did not complete successfully: exit code 1: stderr: go: example.com/dep@v1.0.0: reading example.com/dep/go.mod at revision v1.0.0: unrecognized import path`)
+
+	mockClient.On("Container").Return(mockContainer)
+	mockContainer.On("From", "golang:1.27.0").Return(mockContainer)
+	mockContainer.On("WithMountedDirectory", "/workspace", afterMod).Return(mockContainer)
+	mockContainer.On("WithWorkdir", "/workspace").Return(mockContainer)
+	mockContainer.On("WithExec", []string{"go", "mod", "tidy"}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
+	mockContainer.On("WithExec", []string{"go", "build", "./..."}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
+	mockContainer.On("Sync", mock.Anything).Return(nil, execErr)
+
+	upgrader := &GoRuntimeUpgrader{Client: mockClient, Tidy: true}
+
+	out, err := upgrader.Upgrade(context.Background(), &dagger.Directory{}, "1.27.0")
+
+	require.Error(t, err)
+	assert.Nil(t, out)
+
+	var validationErr *ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "tidy", validationErr.Validation)
+	assert.Equal(t, ".", validationErr.Failed)
+}
+
+// TestGoRuntimeUpgrader_Upgrade_ToolchainImageFailure_ClassifiesAsToolchain
+// proves ValidationError.Validation names "toolchain", not "build", when
+// the failing Sync's error names neither `go mod tidy` nor `go build
+// ./...` — the shape a "golang:"+targetVersion image that can't be
+// resolved actually takes, since Container().From is lazy and only
+// surfaces its own failure at Sync, before any WithExec ever runs.
+func TestGoRuntimeUpgrader_Upgrade_ToolchainImageFailure_ClassifiesAsToolchain(t *testing.T) {
+	mockClient := &daggerkit.MockDaggerClient{}
+	mockContainer := &daggerkit.MockDaggerContainer{}
+	mockDir := mockDirFromFixture(t, "single-module")
+	withMockDirectory(t, mockDir)
+
+	afterMod := &daggerkit.MockDaggerDirectory{}
+	mockDir.On("WithNewFile", "go.mod", mock.AnythingOfType("string")).Return(afterMod)
+
+	execErr := errors.New(`failed to resolve image reference "docker.io/library/golang:1.27.0": not found`)
+
+	mockClient.On("Container").Return(mockContainer)
+	mockContainer.On("From", "golang:1.27.0").Return(mockContainer)
+	mockContainer.On("WithMountedDirectory", "/workspace", afterMod).Return(mockContainer)
+	mockContainer.On("WithWorkdir", "/workspace").Return(mockContainer)
+	mockContainer.On("WithExec", []string{"go", "build", "./..."}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
+	mockContainer.On("Sync", mock.Anything).Return(nil, execErr)
+
+	upgrader := &GoRuntimeUpgrader{Client: mockClient}
+
+	out, err := upgrader.Upgrade(context.Background(), &dagger.Directory{}, "1.27.0")
+
+	require.Error(t, err)
+	assert.Nil(t, out)
+
+	var validationErr *ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "toolchain", validationErr.Validation)
+	assert.Equal(t, ".", validationErr.Failed)
+}
+
 // TestGoRuntimeUpgrader_Upgrade_OneModuleFailsValidation_FailsWholeOperation
 // is tasks.md 4.2's RED test (spec: "One module's validation failure
 // scenario"): a go.work referencing two-plus modules where one fails

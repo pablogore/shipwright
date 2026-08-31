@@ -29,10 +29,13 @@ const runtimeUpgradeReportPath = ".shipwright/runtime-upgrade-report.json"
 // returned Directory, carrying tidy's go.sum.
 const runtimeUpgradeContainerRoot = "/workspace"
 
-// runtimeValidationKind is recorded in UpgradeReport.Validation (design.md
-// D-6): "go build ./..." is the only claim Upgrade proves, and the report
-// says so explicitly rather than letting a consumer assume `go vet` also
-// ran.
+// runtimeValidationKind is recorded in UpgradeReport.Validation on success
+// (design.md D-6): "go build ./..." is the only claim Upgrade proves, and
+// the report says so explicitly rather than letting a consumer assume `go
+// vet` also ran. A failed validation instead names the specific stage that
+// failed via classifyValidationFailure, since "build" alone doesn't tell a
+// caller whether the toolchain image, `go mod tidy`, or the build itself
+// was the one that needed network access it didn't have.
 const runtimeValidationKind = "build"
 
 // GoRuntimeUpgrader mutates a Go workspace's declarative toolchain-version
@@ -61,12 +64,13 @@ type GoRuntimeUpgrader struct {
 	// non-default WorkspaceRoot is responsible for scoping source to it
 	// before calling Upgrade.
 	WorkspaceRoot string
-	// Tidy controls whether a later phase's container-based `go mod tidy`
-	// + `go build ./...` validation step runs after mutation (design.md
-	// D-7, default true). Bound from `with` at registration now so the
-	// manifest schema is stable across phases; Upgrade does not yet read
-	// it — Phase 2 never drives a container (tasks.md Phase 4 wires the
-	// tidy/build sequencing this field controls).
+	// Tidy controls whether validateAndFinalize's container-based `go mod
+	// tidy` step runs before `go build ./...` for each module (design.md
+	// D-7, default true). `go build ./...` always runs regardless of
+	// Tidy. This is the network-conditional half of validation: `go mod
+	// tidy` (when Tidy is true) may reach the module proxy to resolve
+	// dependency versions, same as `go build ./...` may on a cold module
+	// cache.
 	Tidy bool
 	// AllowDowngrade permits targetVersion to be lower than the
 	// workspace's current version (design.md D-5, A4). Downgrades are
@@ -294,6 +298,46 @@ func (e *ValidationError) Error() string {
 // convention every other capability in this package already uses.
 func (e *ValidationError) Unwrap() error { return e.Err }
 
+// classifyValidationFailure names which stage of the single per-module
+// Sync failed: "tidy" for `go mod tidy` (only ever runs when u.Tidy is
+// true), "build" for `go build ./...` (always runs), or "toolchain" for
+// the "golang:"+targetVersion image pull (Container().From, unconditional
+// — the container chain is lazy, so an image that can't be resolved only
+// surfaces here, at Sync, without ever reaching a WithExec).
+//
+// The primary signal is Dagger's own *dagger.ExecError.Cmd field, checked
+// via errors.As: it carries the failing command's argv directly, which is
+// the only reliable signal against a live engine — this SDK version's own
+// ExecError.Error() can be as bare as "exit code: 1 [traceparent:...]",
+// with no command or output in the message at all. When err isn't a
+// *dagger.ExecError (an image-pull failure never reaches a WithExec, so
+// never produces one), the message text is checked instead, matching
+// process-error output that does name the command — the shape both the
+// mocked test fixtures and some Dagger/buildkit versions produce. An error
+// matching neither signal never reached a WithExec, so it's classified as
+// the toolchain stage.
+func classifyValidationFailure(err error) string {
+	var execErr *dagger.ExecError
+	if errors.As(err, &execErr) {
+		switch strings.Join(execErr.Cmd, " ") {
+		case "go mod tidy":
+			return "tidy"
+		case "go build ./...":
+			return "build"
+		}
+	}
+
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "go mod tidy"):
+		return "tidy"
+	case strings.Contains(msg, "go build ./..."):
+		return "build"
+	default:
+		return "toolchain"
+	}
+}
+
 // validateAndFinalize is design.md D-7 steps 3-6, shared by both the
 // single-module and go.work workspace mutation paths: mount dir (already
 // fully mutated by the caller) into a "golang:"+targetVersion container,
@@ -329,7 +373,7 @@ func (u *GoRuntimeUpgrader) validateAndFinalize(ctx context.Context, dir, origin
 
 		synced, err := container.Sync(ctx)
 		if err != nil {
-			return nil, &ValidationError{Validation: runtimeValidationKind, Failed: modPath, Succeeded: succeeded, Err: err}
+			return nil, &ValidationError{Validation: classifyValidationFailure(err), Failed: modPath, Succeeded: succeeded, Err: err}
 		}
 		container = synced
 

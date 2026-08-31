@@ -33,12 +33,23 @@ var runtimeInspectFiles = []string{
 
 // forbiddenImports maps each disallowed import path to the Threat Matrix
 // row it violates if reachable from either runtimeInspectFiles entry.
+//
+// The net/net-http ban is not a claim that runtime-upgrade never performs
+// network I/O — its validation step (openspec/specs/runtime-toolchain,
+// requirement "Network-Dependent Validation") pulls a "golang:"+
+// targetVersion image and may run `go mod tidy` / `go build ./...`, all of
+// which can reach the network, but only ever through the Dagger SDK's own
+// container boundary (WithExec inside a container Sync), never a direct
+// host-level net/net-http call from this file. That boundary is what's
+// enforced here: a direct import would let this file open a host socket
+// itself, bypassing Dagger entirely, which is what every row below guards
+// against regardless of which capability's implementation it is.
 var forbiddenImports = map[string]string{
 	"os":                          "Arbitrary file write outside returned dir — os.WriteFile/os.Create/os.Remove must never be reachable; all writes go through Directory.WithNewFile on an immutable value",
 	"os/exec":                     "Host subprocess — every command must run in a Dagger container via argv-array WithExec, never exec.Command",
-	"net/http":                    "Credential handling / VCS-SCM automation — neither capability performs network calls",
-	"net":                         "Credential handling / VCS-SCM automation — neither capability performs network calls",
-	"github.com/go-git/go-git/v5": "VCS/PR automation — D2, no SCM code path exists",
+	"net/http":                    "Direct host-level network access bypassing the Dagger container boundary — any network I/O these files perform must go through WithExec inside a container, never a direct HTTP client",
+	"net":                         "Direct host-level network access bypassing the Dagger container boundary — any network I/O these files perform must go through WithExec inside a container, never a direct socket",
+	"github.com/go-git/go-git/v5": "VCS/PR automation — D2, no SCM code path exists in either runtime-inspect or runtime-upgrade, regardless of their network behavior",
 }
 
 // TestRuntimeInspectFiles_NoHostWriteExecNetworkOrGitImports is tasks.md
@@ -72,6 +83,53 @@ func TestRuntimeInspectFiles_NoHostWriteExecNetworkOrGitImports(t *testing.T) {
 	if len(violations) > 0 {
 		sort.Strings(violations)
 		t.Fatalf("runtime-inspect threat-matrix violation(s):\n%s", joinLines(violations))
+	}
+}
+
+// scmSideEffectImports is the subset of forbiddenImports that maps
+// directly to openspec/specs/runtime-toolchain's "No SCM Side Effects"
+// requirement: no code path in either capability may create a branch,
+// push, or call an SCM/PR API. Kept as its own test (rather than folded
+// into the broader host-write/exec/network guard above) so this specific
+// guarantee — the one that stays true regardless of runtime-upgrade's
+// network behavior — has its own single, directly traceable proof.
+var scmSideEffectImports = map[string]string{
+	"os/exec":                     forbiddenImports["os/exec"],
+	"github.com/go-git/go-git/v5": forbiddenImports["github.com/go-git/go-git/v5"],
+}
+
+// TestRuntimeUpgradeFiles_NoSCMSideEffectImports proves runtime-upgrade
+// (and runtime-inspect) reach no git command or SCM/PR API: no
+// github.com/go-git/go-git/v5 import (a git library call) and no os/exec
+// import (a host git binary invocation) in either capability's
+// implementation files. This holds independently of runtime-upgrade's
+// validation step needing network access for its own toolchain/module
+// resolution — "no SCM side effects" and "no network" are separate
+// guarantees, and this test proves only the former.
+func TestRuntimeUpgradeFiles_NoSCMSideEffectImports(t *testing.T) {
+	t.Parallel()
+
+	var violations []string
+
+	for _, file := range runtimeInspectFiles {
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, file, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatalf("failed to parse %s: %v", file, err)
+		}
+
+		for _, imp := range f.Imports {
+			importPath := imp.Path.Value
+			importPath = importPath[1 : len(importPath)-1] // strip quotes
+			if reason, forbidden := scmSideEffectImports[importPath]; forbidden {
+				violations = append(violations, file+" imports "+importPath+": "+reason)
+			}
+		}
+	}
+
+	if len(violations) > 0 {
+		sort.Strings(violations)
+		t.Fatalf("SCM side-effect violation(s):\n%s", joinLines(violations))
 	}
 }
 

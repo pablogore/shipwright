@@ -88,20 +88,62 @@ declarative locations that actually exist in the input workspace
 - AND it MUST NOT return a directory presented as successfully
   upgraded
 
-### Requirement: No Network, Git, Or SCM Side Effects
+### Requirement: No SCM Side Effects
 
-Both `runtime-inspect` and `runtime-upgrade` MUST NOT perform any
-network call, git operation, or SCM/PR side effect (branch creation,
-push, pull-request creation). Their only interaction with the outside
-world is the `*dagger.Directory` input and the
-`*dagger.Directory`/report returned.
+Neither `runtime-inspect` nor `runtime-upgrade` MUST perform any git
+operation or SCM/PR side effect (branch creation, push, pull-request
+creation). Their only interaction with the outside world beyond the
+`*dagger.Directory` input and the `*dagger.Directory`/report returned
+is, for `runtime-upgrade` only, the network access its own validation
+step may require (see "Network-Dependent Validation" below).
 
-#### Scenario: No code path reaches network or SCM operations
+#### Scenario: No code path reaches a git command or SCM/PR API
 
 - GIVEN the implementations of `runtime-inspect` and `runtime-upgrade`
 - WHEN their call graphs are inspected
-- THEN neither reaches an HTTP client, a git command, or an SCM/PR API
-  call
+- THEN neither reaches a git command or an SCM/PR API call
+
+### Requirement: No Network Access For Read-Only Inspection
+
+The `runtime-inspect` capability MUST NOT perform any network call.
+Its only interaction with the outside world is the `*dagger.Directory`
+input and the report returned.
+
+#### Scenario: No code path reaches a network operation
+
+- GIVEN the implementation of `runtime-inspect`
+- WHEN its call graph is inspected
+- THEN it reaches no HTTP client or other network operation
+
+### Requirement: Network-Dependent Validation
+
+`runtime-upgrade`'s own mutation logic (parsing and rewriting the
+declarative version sources) MUST NOT perform any network call. Its
+post-mutation validation step (Requirement "Discovery-Driven,
+Provider-Owned Upgrade"), however, resolves a `"golang:"+targetVersion`
+toolchain image and, when configured, runs `go mod tidy`, both of
+which MAY require network access to a container registry and a module
+proxy. When that access is required and unavailable, `runtime-upgrade`
+MUST fail with an error that identifies validation — not mutation — as
+the failed stage, never a directory presented as successfully
+upgraded.
+
+#### Scenario: Mutation itself never touches the network
+
+- GIVEN the mutation phase of `runtime-upgrade` (rewriting `go.mod`,
+  `go.work`, and `.go-version` content)
+- WHEN its call graph is inspected
+- THEN it reaches no HTTP client or other network operation
+
+#### Scenario: Validation failure due to unavailable network is reported clearly
+
+- GIVEN a target environment with no network access to the container
+  registry or module proxy
+- WHEN `runtime-upgrade` runs and its post-mutation validation step
+  cannot resolve the toolchain image or a module dependency
+- THEN it returns an error naming validation as the failed stage
+- AND it MUST NOT return a directory presented as successfully
+  upgraded
 
 ### Requirement: Multi-Module Workspace Consistency
 
