@@ -41,7 +41,7 @@ func newChangelogBaseContainerMock(t *testing.T, build *dagger.Directory) (*dagg
 	mockContainer := &daggerkit.MockDaggerContainer{}
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "alpine:latest").Return(mockContainer)
+	mockContainer.On("From", "alpine:3.24.1").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/work", mock.MatchedBy(func(d daggerkit.DaggerDirectory) bool {
 		return d.GetRealDirectory() == build
 	})).Return(mockContainer)

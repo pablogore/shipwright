@@ -132,7 +132,7 @@ dagger-test: ## Run .dagger/'s own tests (separate Go module; deliberately NOT p
 
 security-dagger: ## Run govulncheck against .dagger's own Go module via a live engine, so the scan always sees freshly-regenerated bindings (deliberately NOT part of `security`/`ci-final` -- see dagger-test's isolation note). .dagger's generated internal/dagger client and dagger.gen.go are now committed (regenerate and re-commit them after bumping the Dagger engine/SDK), so plain govulncheck/go tooling -- including Dependabot -- can resolve the module without a live engine too; this target still uses `dagger run` to catch drift against the live engine before it reaches CI.
 	@echo -e "$(BLUE)Running .dagger module security scan...$(NC)"
-	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 	cd .dagger && GOWORK=off dagger run govulncheck ./...
 	@echo -e "$(GREEN)✅ .dagger module security scan completed$(NC)"
 
@@ -161,7 +161,7 @@ deps: ## Download and tidy dependencies
 tools-install: ## Install development tools (goreleaser)
 	@echo -e "$(BLUE)Installing development tools...$(NC)"
 	@echo -e "$(YELLOW)Installing goreleaser...$(NC)"
-	@$(GOGET) github.com/goreleaser/goreleaser@latest
+	@$(GOGET) github.com/goreleaser/goreleaser/v2@v2.18.0
 	@echo -e "$(GREEN)✅ Development tools installed$(NC)"
 
 # Run all checks (test only)
@@ -224,7 +224,7 @@ lint: ## Run golangci-lint
 # instead of requiring the clean string to appear anywhere.
 security: ## Run security vulnerability check
 	@echo -e "$(BLUE)Running security vulnerability check...$(NC)"
-	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 	@set -o pipefail; \
 	FAILED=0; \
 	govulncheck ./... | tee vuln_report.txt || FAILED=1; \

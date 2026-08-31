@@ -44,7 +44,7 @@ func TestGoLinter_Test_Success(t *testing.T) {
 	const lintOutput = "0 issues.\n"
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golangci/golangci-lint:latest").Return(mockContainer)
+	mockContainer.On("From", "golangci/golangci-lint:v2.13.2").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/app", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GO111MODULE", "on").Return(mockContainer)
@@ -75,7 +75,7 @@ func TestGoLinter_Test_LintFindings_Fails(t *testing.T) {
 	lintErr := errors.New("exit code 1: main.go:10:2: unused variable x (unused)")
 
 	mockClient.On("Container").Return(mockContainer)
-	mockContainer.On("From", "golangci/golangci-lint:latest").Return(mockContainer)
+	mockContainer.On("From", "golangci/golangci-lint:v2.13.2").Return(mockContainer)
 	mockContainer.On("WithMountedDirectory", "/app", mock.Anything).Return(mockContainer)
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GO111MODULE", "on").Return(mockContainer)

@@ -12,8 +12,10 @@ import (
 )
 
 // defaultLinterImage matches the legacy pipeline's golangci-lint image
-// (internal/pipelines/go-service/pipeline.go's Lint method).
-const defaultLinterImage = "golangci/golangci-lint:latest"
+// (internal/pipelines/go-service/pipeline.go's Lint method). Pinned to a
+// specific release (v2, matching this repo's .golangci.yml `version: "2"`
+// config schema) rather than the mutable "latest" tag.
+const defaultLinterImage = "golangci/golangci-lint:v2.13.2"
 
 // defaultLinterTimeout matches the legacy pipeline's hardcoded lint
 // timeout.

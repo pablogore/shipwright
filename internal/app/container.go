@@ -188,7 +188,7 @@ func (c *Container) registerDaggerComponents() {
 				// Connection successful, but verify daemon is actually ready
 				// by performing a simple operation
 				verifyCtx, verifyCancel := context.WithTimeout(ctx, 10*time.Second)
-				_, verifyErr := client.Container().From("alpine:latest").ID(verifyCtx)
+				_, verifyErr := client.Container().From("alpine:3.24.1").ID(verifyCtx)
 				verifyCancel()
 
 				if verifyErr == nil {

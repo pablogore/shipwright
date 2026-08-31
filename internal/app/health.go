@@ -33,7 +33,7 @@ func CheckDaggerEngine(ctx context.Context, client *dagger.Client) error {
 
 	// Try to get the Dagger version to verify connectivity
 	// This is a lightweight operation that confirms the engine is running
-	_, err := client.Container().From("alpine:latest").ID(ctx)
+	_, err := client.Container().From("alpine:3.24.1").ID(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Dagger engine: %w (ensure Dagger engine is running: 'dagger run echo test')", err)
 	}

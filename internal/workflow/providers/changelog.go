@@ -24,8 +24,9 @@ const changelogFileName = "CHANGELOG.md"
 // bare alpine image (mirroring providers/go's ContainerPublisher default
 // runtime base, providers/go/containerpublisher.go) keeps the image small;
 // git itself is not preinstalled on it, unlike golang:/rust:'s toolchain
-// images, so it is added explicitly via apk.
-const changelogImage = "alpine:latest"
+// images, so it is added explicitly via apk. Pinned to a specific release
+// rather than the mutable "latest" tag.
+const changelogImage = "alpine:3.24.1"
 
 // changelogConventionalCommitPattern extracts the type, optional scope,
 // optional breaking-change bang, and description from a
