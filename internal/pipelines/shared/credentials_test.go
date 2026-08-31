@@ -12,6 +12,11 @@ func TestResolveGitCredentials_CI(t *testing.T) {
 	// Setup
 	t.Setenv("CI", "true")
 	t.Setenv("CI_JOB_TOKEN", "ci-token")
+	// GITHUB_ACTIONS/GITHUB_TOKEN are ambient on real GitHub Actions runners
+	// and must be cleared, or the GitHub-token branch wins before this test
+	// ever reaches the GitLab CI_JOB_TOKEN branch it's meant to exercise.
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITHUB_TOKEN", "")
 
 	// Test
 	creds, err := ResolveGitCredentials()
@@ -29,6 +34,11 @@ func TestResolveGitCredentials_Anonymous(t *testing.T) {
 	t.Setenv("CI_JOB_TOKEN", "")
 	t.Setenv("GITLAB_PAT", "")
 	t.Setenv("SSH_PRIVATE_KEY", "")
+	// GITHUB_ACTIONS/GITHUB_TOKEN are ambient on real GitHub Actions runners
+	// and must be cleared, or the GitHub-token CI branch wins instead of
+	// falling through to anonymous access.
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITHUB_TOKEN", "")
 
 	// Test
 	creds, err := ResolveGitCredentials()

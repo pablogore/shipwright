@@ -60,11 +60,7 @@ func TestHTTPSClonerSource_DoesNotLogCredentials(t *testing.T) {
 // no insecure TLS setting is persisted in the container's global Git config.
 func TestBuildCloneContainer_DoesNotPersistInsecureGitConfig(t *testing.T) {
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	opts := GitCloneOpts{
 		Repo:      "https://github.com/example/private-repo.git",
@@ -116,11 +112,7 @@ func TestBuildCloneContainer_DoesNotPersistInsecureGitConfig(t *testing.T) {
 // configuration at all.
 func TestBuildCloneContainer_AnonymousDoesNotTouchGitConfig(t *testing.T) {
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	opts := GitCloneOpts{
 		Repo:      "https://github.com/example/public-repo.git",
