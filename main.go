@@ -508,6 +508,7 @@ func (c *CLI) runWorkflowEngine(
 		"steps", len(g.Nodes))
 
 	res, err := engine.Execute(ctx, cfg)
+	reportWorkflowOutcomes(ctx, m, res)
 	if err != nil {
 		return fmt.Errorf("workflow: %w", err)
 	}
@@ -517,6 +518,40 @@ func (c *CLI) runWorkflowEngine(
 
 	logger.L().InfoContext(ctx, "Workflow completed successfully", "manifest", m.Metadata.Name)
 	return nil
+}
+
+// reportWorkflowOutcomes logs every executed step's Duration, Provider,
+// Capability, Output, and Diagnostics (design.md D6). Kept distinct from
+// reportWorkflowSteps, which serves the read-only --list-steps path and
+// takes no *engine.Result, so reusing it would couple that path to
+// execution. Output is a structured slog field, never interpolated into
+// the message string.
+func reportWorkflowOutcomes(ctx context.Context, m *manifest.Manifest, res *engine.Result) {
+	logger.L().InfoContext(ctx, "Workflow step outcomes",
+		"manifest", m.Metadata.Name,
+		"steps_count", len(res.Outcomes))
+
+	for i, o := range res.Outcomes {
+		logger.L().InfoContext(ctx, "Step outcome",
+			"index", i+1,
+			"step", o.StepID,
+			"status", o.Status.String(),
+			"attempts", o.Attempts,
+			"duration", o.Duration.String(),
+			"provider", o.Provider.Name,
+			"provider_module", o.Provider.Module,
+			"provider_version", o.Provider.Version,
+			"capability", o.Capability,
+			"output", o.Output)
+
+		for _, d := range o.Diagnostics {
+			logger.L().InfoContext(ctx, "Step diagnostic",
+				"step", o.StepID,
+				"severity", d.Severity.String(),
+				"code", d.Code,
+				"message", d.Message)
+		}
+	}
 }
 
 // workflowDaggerClient acquires the app container's lazily-connected

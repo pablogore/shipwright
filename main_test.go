@@ -6,12 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/pablogore/shipwright/internal/pipelines/shared"
+	"github.com/pablogore/shipwright/internal/workflow/engine"
 	"github.com/pablogore/shipwright/internal/workflow/manifest"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
 	"github.com/pablogore/shipwright/pkg/shipwright"
@@ -574,4 +576,34 @@ func TestCLI_parseFlags_PresetFlagsRemoved(t *testing.T) {
 			assert.Nil(t, flags)
 		})
 	}
+}
+
+// reportWorkflowOutcomes must report every outcome without panicking, across
+// succeeded/failed/skipped statuses and both Output- and diagnostic-bearing
+// outcomes.
+func TestReportWorkflowOutcomes_LogsDurationProviderCapabilityOutput(t *testing.T) {
+	m := &manifest.Manifest{Metadata: manifest.Metadata{Name: "outcomes-example"}}
+	res := &engine.Result{
+		Outcomes: []engine.StepOutcome{
+			{
+				StepID: "build", Status: engine.StatusSucceeded, Attempts: 1,
+				Duration: 2 * time.Second,
+				Provider: providers.Ref{Name: "go", Version: "1"}, Capability: "build",
+				Diagnostics: []engine.Diagnostic{{Severity: engine.SeverityInfo, Code: "output-not-serializable", Message: "handle"}},
+			},
+			{
+				StepID: "publish", Status: engine.StatusSucceeded, Attempts: 1,
+				Duration: 500 * time.Millisecond,
+				Provider: providers.Ref{Name: "container", Version: "1"}, Capability: "artifact",
+				Output: "ghcr.io/acme/api@sha256:deadbeef",
+			},
+			{StepID: "vuln", Status: engine.StatusFailed, Attempts: 2},
+			{StepID: "skipped-step", Status: engine.StatusSkipped},
+		},
+		Failures: []string{"vuln"},
+	}
+
+	require.NotPanics(t, func() {
+		reportWorkflowOutcomes(context.Background(), m, res)
+	})
 }
