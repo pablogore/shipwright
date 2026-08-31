@@ -205,7 +205,7 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	// is otherwise generic, but its defaultPublishBaseImage is not — Rust's
 	// default build output links dynamically against glibc (the official
 	// rust:<version> image's toolchain), which fails to start under
-	// golang.ContainerPublisher's alpine:latest (musl) base with a missing
+	// golang.ContainerPublisher's pinned alpine (musl) base with a missing
 	// ld-linux loader error. rust.ContainerPublisher's own
 	// debian:bookworm-slim base exists specifically to run that binary
 	// (see providers/rust/containerpublisher.go's own doc comment), so

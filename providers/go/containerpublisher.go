@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"dagger.io/dagger"
 
@@ -12,10 +13,60 @@ import (
 	"github.com/pablogore/shipwright/providers/go/daggerkit"
 )
 
-// defaultPublishBaseImage matches the legacy pipeline's minimal runtime
-// image for a compiled Go binary
-// (internal/pipelines/go-service/pipeline.go's Package method).
-const defaultPublishBaseImage = "alpine:latest"
+// defaultPublishBaseImage is the minimal runtime image for a compiled Go
+// binary, matching the legacy pipeline's choice of Alpine
+// (internal/pipelines/go-service/pipeline.go's Package method) but pinned
+// to an immutable digest instead of the mutable "latest" tag: the same
+// Shipwright revision must always publish against the same base image
+// (production-readiness P0, supply-chain reproducibility).
+//
+// This is the single source of truth for the pinned reference — do not
+// duplicate the digest elsewhere. The digest is alpine:3.22's OCI image
+// index (manifest list), not a single-platform manifest, so Dagger/
+// BuildKit still resolves the correct per-platform manifest (amd64,
+// arm64/v8, etc.) from it exactly as it would from a tag; verified via:
+//
+//	docker manifest inspect alpine:3.22
+//	  -> mediaType: application/vnd.oci.image.index.v1+json
+//	  -> includes linux/amd64 and linux/arm64/v8 platform manifests
+//
+// To bump the Alpine version, resolve the new index digest (e.g. `docker
+// pull alpine:<version> && docker inspect --format='{{index .RepoDigests
+// 0}}' alpine:<version>`) and update this constant in one place.
+const defaultPublishBaseImage = "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+
+// validatePinnedImageReference reports whether ref is a digest-pinned OCI
+// image reference (repo[:tag]@sha256:<64-hex-digest>) that does not carry
+// a "latest" tag. It deliberately does not implement a full OCI reference
+// grammar: defaultPublishBaseImage is the only caller today, a repo-owned
+// constant rather than caller-supplied input, so the check only needs to
+// catch the mutable-reference shapes this P0 rules out (a missing digest,
+// or an explicit "latest" tag).
+func validatePinnedImageReference(ref string) bool {
+	repoAndTag, digest, hasDigest := strings.Cut(ref, "@")
+	if !hasDigest || repoAndTag == "" {
+		return false
+	}
+
+	hexDigest, hasSHA256Prefix := strings.CutPrefix(digest, "sha256:")
+	if !hasSHA256Prefix || len(hexDigest) != 64 {
+		return false
+	}
+	for _, r := range hexDigest {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+
+	if lastColon := strings.LastIndex(repoAndTag, ":"); lastColon != -1 {
+		tag := repoAndTag[lastColon+1:]
+		if !strings.Contains(tag, "/") && strings.EqualFold(tag, "latest") {
+			return false
+		}
+	}
+
+	return true
+}
 
 // ContainerPublisher packages a build-output Directory into a minimal
 // container image and publishes it to a registry. Extracted from the
