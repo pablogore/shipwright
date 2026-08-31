@@ -953,6 +953,30 @@ func TestOutcomeOutput_TruncatesOutputAt4KiBWithDiagnostic(t *testing.T) {
 	}
 }
 
+func TestDiagnosticSeverity_String(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		sev  engine.DiagnosticSeverity
+		want string
+	}{
+		{"info", engine.SeverityInfo, "info"},
+		{"warning", engine.SeverityWarning, "warning"},
+		{"unknown", engine.DiagnosticSeverity(99), "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tt.sev.String(); got != tt.want {
+				t.Fatalf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // OptionsFromSpec is where spec.execution.concurrency.maxParallel is
 // "validated and recorded" (tasks.md 8.5) and spec.execution.timeout is
 // parsed into a time.Duration.
