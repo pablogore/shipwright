@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 
 	"dagger.io/dagger"
@@ -489,7 +490,10 @@ func (c *CLI) runWorkflowEngine(
 		return fmt.Errorf("workflow: %w", err)
 	}
 
-	secrets := resolveWorkflowSecrets(client, m.Spec.Secrets)
+	secrets, err := resolveWorkflowSecrets(client, m.Spec.Secrets)
+	if err != nil {
+		return fmt.Errorf("workflow: %w", err)
+	}
 
 	source, err := resolveWorkflowSource(ctx, client, m.Spec.Source, shared.CloneRepo)
 	if err != nil {
@@ -580,21 +584,59 @@ func (c *CLI) workflowDaggerClient() (*dagger.Client, error) {
 // via client.SetSecret, reading each one's plaintext value from its
 // declared FromEnv environment variable (internal/pipelines/shared/
 // docker.go's existing client.SetSecret pattern, reused here per
-// manifest/schema.go's SecretSpec doc comment). The plaintext value never
+// manifest/schema.go's SecretSpec doc comment). Fails closed: every binding
+// is validated with os.LookupEnv, in sorted name order, before any
+// *dagger.Secret is created — an unset or empty-string FromEnv variable is
+// an error, never a silently empty secret. The plaintext value never
 // leaves this function as anything other than the argument to SetSecret —
 // engine.Config.Secrets only ever holds the resulting *dagger.Secret
-// handles (design.md D-L). client.SetSecret itself cannot fail, so this
-// never returns an error.
-func resolveWorkflowSecrets(client *dagger.Client, secrets map[string]manifest.SecretSpec) map[string]*dagger.Secret {
+// handles (design.md D-L).
+func resolveWorkflowSecrets(client *dagger.Client, secrets map[string]manifest.SecretSpec) (map[string]*dagger.Secret, error) {
 	if len(secrets) == 0 {
-		return nil
+		return nil, nil
+	}
+
+	names := make([]string, 0, len(secrets))
+	for name := range secrets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	values := make(map[string]string, len(secrets))
+	var failures []string
+	for _, name := range names {
+		spec := secrets[name]
+		value, ok := os.LookupEnv(spec.FromEnv)
+		switch {
+		case !ok:
+			failures = append(failures, fmt.Sprintf("%s: environment variable %q is not set", name, spec.FromEnv))
+		case value == "":
+			failures = append(failures, fmt.Sprintf("%s: environment variable %q is empty", name, spec.FromEnv))
+		default:
+			values[name] = value
+		}
+	}
+	if len(failures) > 0 {
+		return nil, &SecretResolutionError{Failures: failures}
 	}
 
 	out := make(map[string]*dagger.Secret, len(secrets))
-	for name, spec := range secrets {
-		out[name] = client.SetSecret(name, os.Getenv(spec.FromEnv))
+	for _, name := range names {
+		out[name] = client.SetSecret(name, values[name])
 	}
-	return out
+	return out, nil
+}
+
+// SecretResolutionError reports every spec.secrets binding that failed
+// validation in resolveWorkflowSecrets, one message per Failures entry.
+// Each message names only the secret and its FromEnv variable — never the
+// plaintext value, which this error type must never carry.
+type SecretResolutionError struct {
+	Failures []string
+}
+
+func (e *SecretResolutionError) Error() string {
+	return "secrets: binding failed: " + strings.Join(e.Failures, "; ")
 }
 
 // cloneRepoFunc is the signature shared.CloneRepo satisfies. Accepting
