@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,11 +12,7 @@ import (
 func TestNewGoBuilder(t *testing.T) {
 	// Setup
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	src := client.Directory()
 	version := "1.21"
@@ -37,11 +32,7 @@ func TestNewGoBuilder(t *testing.T) {
 func TestGoBuilder_Build(t *testing.T) {
 	// Setup
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Create a temporary directory for the test
 	tmpDir := t.TempDir()
@@ -90,11 +81,7 @@ go 1.21`
 func TestGoBuilder_Build_Error_InvalidSource(t *testing.T) {
 	// Setup
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Create an empty source directory
 	src := client.Directory()
@@ -114,11 +101,7 @@ func TestGoBuilder_Build_Error_InvalidSource(t *testing.T) {
 func TestGoBuilder_Build_Error_InvalidGoVersion(t *testing.T) {
 	// Setup
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Create a temporary directory for the test
 	tmpDir := t.TempDir()

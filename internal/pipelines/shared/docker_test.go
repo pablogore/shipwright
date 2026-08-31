@@ -5,23 +5,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestMain(_ *testing.M) {
-	// Skip all tests in this package as they require Docker daemon to be running
-	os.Exit(0)
-}
-
 func TestNewDockerDeployer(t *testing.T) {
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Test data
 	imageName := "registry.example.com/test/image"
@@ -46,11 +36,7 @@ func TestNewDockerDeployer(t *testing.T) {
 func TestDockerDeployer_BuildAndPush(t *testing.T) {
 	// Setup
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Create a temporary directory for the test
 	tmpDir := t.TempDir()
@@ -72,18 +58,14 @@ CMD ["echo", "Hello, World!"]`
 	deployer := NewDockerDeployer(client, imageName, src, tag, user, pass)
 
 	// Test
-	err = deployer.BuildAndPush(ctx)
+	err := deployer.BuildAndPush(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error al publicar la imagen")
 }
 
 func TestDockerDeployer_BuildAndPush_Error(t *testing.T) {
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Test data with invalid Dockerfile
 	imageName := "registry.example.com/test/image"
@@ -97,7 +79,7 @@ func TestDockerDeployer_BuildAndPush_Error(t *testing.T) {
 	deployer := NewDockerDeployer(client, imageName, src, tag, user, pass)
 
 	// Test
-	err = deployer.BuildAndPush(ctx)
+	err := deployer.BuildAndPush(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error al publicar la imagen")
 }
