@@ -65,11 +65,12 @@ jobs:
         fi
         echo "Module identity confirmed: $MODULE_LINE"
 
-    - name: 'Build and test providers/go in isolation'
-      run: |
-        cd providers/go
-        GOWORK=off go build ./...
-        GOWORK=off go test -race -short ./...
+    # Delegates to the repo-owned `provider-go-standalone` Makefile target
+    # (also gated on every push to develop via `make ci-final`) so this
+    # workflow and root CI enforce the exact same GOWORK=off, no-replace
+    # standalone-consumability check instead of duplicating it inline.
+    - name: 'Validate providers/go is standalone'
+      run: 'make provider-go-standalone'
 
     - name: 'Generate path-scoped changelog'
       run: |
