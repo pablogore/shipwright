@@ -1231,7 +1231,7 @@ jobs:
         fi
 
         echo "📋 Go version: $(go version)"
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+        go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
         # Run vulnerability check and capture output
         govulncheck ./... > vuln_report.txt 2>&1 || true
@@ -1668,7 +1668,7 @@ jobs:
 
     - name: 'Install govulncheck'
       run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+        go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
     - name: 'Run repository-owned Final-SHA validation contract'
       run: |

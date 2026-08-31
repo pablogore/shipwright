@@ -81,7 +81,7 @@ func (c *SSHCloner) Clone(ctx context.Context, client *dagger.Client, opts GitCl
 	}
 
 	container := client.Container().
-		From("alpine:latest").
+		From("alpine:3.24.1").
 		WithExec([]string{"apk", "add", "--no-cache", "git", "openssh"}).
 		WithMountedFile("/root/.ssh/id_rsa", hostDir.File("id_rsa")).
 		WithExec([]string{"chmod", "600", "/root/.ssh/id_rsa"}).

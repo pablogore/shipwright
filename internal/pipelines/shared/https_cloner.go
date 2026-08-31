@@ -151,7 +151,7 @@ func buildCloneCommand(cloneOpts CloneOptions, opts GitCloneOpts) []string {
 // optional HTTPS credentials, and the git user identity used for commits.
 func buildCloneContainer(client *dagger.Client, opts GitCloneOpts, creds *GitCredentials) (*dagger.Container, error) {
 	container := client.Container().
-		From("alpine:latest").
+		From("alpine:3.24.1").
 		WithExec([]string{"apk", "add", "--no-cache", "git", "ca-certificates"})
 
 	// Configure credentials if not anonymous

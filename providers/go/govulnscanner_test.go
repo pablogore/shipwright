@@ -49,7 +49,7 @@ func TestGoVulnScanner_Test_CleanScan(t *testing.T) {
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GO111MODULE", "on").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "CGO_ENABLED", "0").Return(mockContainer)
-	mockContainer.On("WithExec", []string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@latest"}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
+	mockContainer.On("WithExec", []string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@v1.7.0"}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
 	mockContainer.On("WithExec", []string{"govulncheck", "./..."}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
 	mockContainer.On("Stdout", mock.Anything).Return(cleanOutput, nil)
 	mockContainer.On("WithNewFile", "/tmp/vuln-report.txt", cleanOutput).Return(mockContainer)

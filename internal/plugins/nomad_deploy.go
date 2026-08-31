@@ -267,7 +267,7 @@ func (p *NomadDeployPlugin) stageNomadJob(
 	}
 
 	container := client.Container().
-		From("hashicorp/nomad:latest").
+		From("hashicorp/nomad:2.0.5").
 		WithEnvVariable("NOMAD_ADDR", addr)
 
 	if environment != "" {
