@@ -636,7 +636,7 @@ type SecretResolutionError struct {
 }
 
 func (e *SecretResolutionError) Error() string {
-	return "workflow: secret binding failed: " + strings.Join(e.Failures, "; ")
+	return "secrets: binding failed: " + strings.Join(e.Failures, "; ")
 }
 
 // cloneRepoFunc is the signature shared.CloneRepo satisfies. Accepting

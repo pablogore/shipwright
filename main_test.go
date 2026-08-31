@@ -645,7 +645,7 @@ func TestResolveWorkflowSecrets_MultipleFailuresDeterministicOrder(t *testing.T)
 
 	require.Error(t, err)
 	assert.Nil(t, secrets)
-	wantMsg := `workflow: secret binding failed: aaa-secret: environment variable "SBFC_AAA_UNSET" is not set; ` +
+	wantMsg := `secrets: binding failed: aaa-secret: environment variable "SBFC_AAA_UNSET" is not set; ` +
 		`zzz-secret: environment variable "SBFC_ZZZ_UNSET" is not set`
 	assert.Equal(t, wantMsg, err.Error(),
 		"failures must be sorted by secret name (aaa- before zzz-), independent of map iteration order")
@@ -721,8 +721,9 @@ func TestRunWorkflowEngine_InvalidSecretShortCircuitsBeforeSourceResolution(t *t
 	err = cli.runWorkflowEngine(context.Background(), m, g, &Flags{}, reg, nil)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry")
-	assert.Contains(t, err.Error(), "SBFC_RUN_MISSING")
+	wantMsg := `workflow: secrets: binding failed: registry: environment variable "SBFC_RUN_MISSING" is not set`
+	assert.Equal(t, wantMsg, err.Error(),
+		"runWorkflowEngine's outer \"workflow: %w\" wrap must not duplicate SecretResolutionError's own prefix")
 }
 
 // TestCLI_parseFlags_PresetFlagsRemoved is task 11.2's RED test (design.md
