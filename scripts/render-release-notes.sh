@@ -54,7 +54,7 @@ Or download the full archive:
 
 \`\`\`bash
 # Linux/macOS
-curl -L https://github.com/pablogore/shipwright/releases/download/${TAG}/shipwright_${VERSION}_\$(uname -s)_\$(uname -m).tar.gz | tar xz
+curl -L https://github.com/pablogore/shipwright/releases/download/${TAG}/shipwright_${VERSION}_\$(uname -s | tr '[:upper:]' '[:lower:]')_\$(uname -m | sed 's/x86_64/amd64/').tar.gz | tar xz
 sudo mv shipwright /usr/local/bin/
 
 # Windows
