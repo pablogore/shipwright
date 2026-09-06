@@ -84,6 +84,7 @@ jobs:
       type: '${{ steps.tag.outputs.type }}'
       changelog: '${{ steps.changelog.outputs.changelog }}'
       source_branch: '${{ steps.tag.outputs.source_branch }}'
+      skip_release: '${{ steps.tag.outputs.skip_release }}'
     steps:
     - name: 'Checkout code'
       uses: 'actions/checkout@v7'
@@ -132,8 +133,14 @@ jobs:
           SOURCE_BRANCH=""
           MERGE_COMMIT=$(git log -1 --pretty=%B)
           if echo "$MERGE_COMMIT" | grep -qE "Merge pull request|Merge branch"; then
-            # Extract branch name from merge commit
-            SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed 's/from //' || echo "")
+            # Extract branch name from merge commit. GitHub's default merge
+            # commit says "from <owner>/<branch>", so strip the leading
+            # "<owner>/" segment too -- owner names never contain "/", so
+            # this can't clip a slash out of a real branch name like
+            # hotfix/foo. Matching the raw "from <owner>/<branch>" string
+            # against "develop"/"^develop" (as this used to) never matches,
+            # which silently fell through to skip_release=true.
+            SOURCE_BRANCH=$(echo "$MERGE_COMMIT" | grep -oE "from [^ ]+" | sed -E 's#^from ([^/]+/)?##' || echo "")
             echo "📋 Detected source branch from merge commit: $SOURCE_BRANCH"
           fi
           # Also check recent commits for branch info
@@ -254,6 +261,7 @@ jobs:
         echo "✅ Release information determined: $TAG"
 
     - name: 'Validate release version shape'
+      if: "steps.tag.outputs.skip_release != 'true'"
       run: |
         TAG="${{ steps.tag.outputs.tag }}"
         # internal/releaseguard/tags_test.go extracts this exact assignment
@@ -273,6 +281,7 @@ jobs:
 
     - name: 'Generate changelog'
       id: 'changelog'
+      if: "steps.tag.outputs.skip_release != 'true'"
       run: |
         echo "📝 Generating changelog for release..."
 
@@ -363,6 +372,7 @@ jobs:
     if: |
       always() &&
       needs.validate-release.result == 'success' &&
+      needs.validate-release.outputs.skip_release != 'true' &&
       (
         (github.event_name == 'workflow_dispatch') ||
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
