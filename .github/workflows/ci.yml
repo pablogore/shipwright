@@ -1306,7 +1306,14 @@ jobs:
   # IMPORTANT: Only triggers on main branch after merge, never on PRs, develop, or feature branches
   trigger-release:
     runs-on: 'ubuntu-latest'
-    needs: ['determine-pipeline', 'security']
+    # Depends on final-sha-gate (not just security) so the dispatch to
+    # release.yml can never race ahead of the gate finishing: release.yml's
+    # create-release job independently re-verifies final-sha-gate == success
+    # for this exact SHA, and that check used to fail with "found: none"
+    # because trigger-release fired as soon as `security` passed, while
+    # final-sha-gate (which waits on the longer-running final-sha-validation
+    # and final-sha-dagger-integration jobs) was still in progress.
+    needs: ['determine-pipeline', 'security', 'final-sha-gate']
     if: |
       always() &&
       github.event_name == 'push' &&
@@ -1315,7 +1322,8 @@ jobs:
       needs.determine-pipeline.outputs.is-release == 'true' &&
       (needs.determine-pipeline.outputs.pipeline-type == 'main-hotfix' ||
        needs.determine-pipeline.outputs.pipeline-type == 'main-develop-merge') &&
-      (needs.security.result == 'success' || needs.security.result == 'skipped')
+      (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+      needs.final-sha-gate.result == 'success'
     steps:
     - name: 'Checkout code'
       uses: 'actions/checkout@v7'
