@@ -18,6 +18,7 @@ on:
 permissions:
   contents: 'read'
   actions: 'write'  # Required to trigger workflow_dispatch
+  pull-requests: 'read'  # Required by verify-branch-protection to query commit->PR association
 
 env:
   GO_VERSION: '1.26.7'
@@ -106,12 +107,54 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: 'Verify branch protection'
+    - name: 'Log heuristic signals (informational only)'
       env:
         GITHUB_EVENT_NAME: '${{ github.event_name }}'
         GITHUB_REF_NAME: '${{ github.ref_name }}'
         GITHUB_SHA: '${{ github.sha }}'
         GITHUB_EVENT_COMMITS: '${{ toJSON(github.event.commits) }}'
+      run: |
+        # SECURITY: Using env: block prevents shell injection from GitHub context variables
+        #
+        # These signals (commit message, parent count, push commit count,
+        # author) are printed for human debugging ONLY. None of them gate
+        # this job -- a --rebase merge keeps the original author, the
+        # original non-PR-referencing commit message, and a single parent,
+        # so it is structurally indistinguishable from a direct push under
+        # these heuristics alone (this is exactly what false-flagged PR
+        # #217's legitimate rebase-merge commit 0f2a002). The actual
+        # pass/fail verdict comes from the GitHub API check below.
+        if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+          echo "Not a push event (event: $GITHUB_EVENT_NAME) - no heuristic signals to log"
+          exit 0
+        fi
+
+        BRANCH="$GITHUB_REF_NAME"
+        if [[ "$BRANCH" != "main" ]] && [[ "$BRANCH" != "develop" ]]; then
+          echo "Branch '$BRANCH' is not protected - no heuristic signals to log"
+          exit 0
+        fi
+
+        COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
+        COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
+        PARENT_COUNT=$(git rev-list --count "$GITHUB_SHA^..$GITHUB_SHA" 2>/dev/null || echo "0")
+        COMMIT_COUNT=$(echo "$GITHUB_EVENT_COMMITS" | jq '. | length' 2>/dev/null || echo "0")
+
+        echo "📋 Commit: $GITHUB_SHA"
+        echo "📋 Branch: $BRANCH"
+        echo "📋 Author: $COMMIT_AUTHOR"
+        echo "📋 Message: $(echo "$COMMIT_MSG" | head -1)"
+        echo "📋 Parent count: $PARENT_COUNT"
+        echo "📋 Push commit count: $COMMIT_COUNT"
+        echo "ℹ️  These signals are informational only and do not affect the verdict."
+
+    - name: 'Verify branch protection'
+      env:
+        GITHUB_EVENT_NAME: '${{ github.event_name }}'
+        GITHUB_REF_NAME: '${{ github.ref_name }}'
+        GITHUB_SHA: '${{ github.sha }}'
+        GH_TOKEN: '${{ github.token }}'
+        REPO: '${{ github.repository }}'
       run: |
         # SECURITY: Using env: block prevents shell injection from GitHub context variables
         # Only check for direct pushes, PRs are allowed
@@ -128,111 +171,24 @@ jobs:
           exit 0
         fi
 
-        # Check if this push is from a PR merge (squash/merge/rebase)
-        # When a PR is merged, GitHub creates a commit that may have PR information
-        # We check multiple indicators to determine if this is a merge from a PR
-
-        IS_PR_MERGE=false
-        COMMIT_MSG=$(git log -1 --pretty=%B "$GITHUB_SHA")
-        COMMIT_AUTHOR=$(git log -1 --pretty=%an "$GITHUB_SHA")
-
-        # Method 1: Check if commit message contains PR reference or merge keywords
-        if echo "$COMMIT_MSG" | grep -qiE "(#[0-9]+|Merge pull request|Merge branch|Squash and merge|from [^ ]+ into)"; then
-          echo "📋 Commit message indicates PR merge: $(echo "$COMMIT_MSG" | head -1)"
-          IS_PR_MERGE=true
+        # Source of truth: ask GitHub itself which merged pull request (if
+        # any) introduced this commit, regardless of merge strategy (merge
+        # commit, squash, or rebase all resolve correctly through this
+        # endpoint). This replaces inferring "looks like a merge" from
+        # commit message/parent count/author, which a --rebase merge can't
+        # be reliably distinguished from a direct push under.
+        PULLS_JSON="$(mktemp)"
+        if ! gh api "repos/${REPO}/commits/${GITHUB_SHA}/pulls" > "$PULLS_JSON" 2>/dev/null; then
+          echo "❌ ERROR: Could not query GitHub for pull requests associated with commit ${GITHUB_SHA}."
+          echo "🚫 Failing closed: without API confirmation, a push to a protected branch is not allowed."
+          exit 1
         fi
 
-        # Method 2: Check if commit has multiple parents (merge commit, not squash)
-        PARENT_COUNT=$(git rev-list --count "$GITHUB_SHA^..$GITHUB_SHA" 2>/dev/null || echo "0")
-        if [[ "$PARENT_COUNT" -gt 1 ]]; then
-          echo "📋 Commit has multiple parents (merge commit)"
-          IS_PR_MERGE=true
-        fi
-
-        # Method 3: Check if there are multiple commits in this push (indicates merge)
-        # Note: github.event.commits is a JSON array, we need to pass it via env
-        COMMIT_COUNT=$(echo "$GITHUB_EVENT_COMMITS" | jq '. | length' 2>/dev/null || echo "0")
-        if [[ "$COMMIT_COUNT" -gt 1 ]]; then
-          echo "📋 Multiple commits in push (likely from PR merge)"
-          IS_PR_MERGE=true
-        fi
-
-        # Method 4: Check if author is GitHub (common for automated merges)
-        if [[ "$COMMIT_AUTHOR" == "GitHub" ]] || [[ "$COMMIT_AUTHOR" == *"github"* ]]; then
-          echo "📋 Commit author is GitHub (likely automated merge)"
-          IS_PR_MERGE=true
-        fi
-
-        # Method 5: For squash merge, check if commit is not directly on the branch history
-        # Squash merges create a new commit that's not in the feature branch history
-        # We check if the parent commit is the HEAD of the target branch before the merge
-        PARENT_SHA=$(git rev-parse "$GITHUB_SHA^" 2>/dev/null || echo "")
-        if [[ -n "$PARENT_SHA" ]]; then
-          # Check if parent is in the branch history (if not, it might be a squash merge)
-          # This is a heuristic: if the commit message doesn't match typical direct push patterns
-          # and the commit structure suggests a merge, allow it
-          if ! echo "$COMMIT_MSG" | grep -qE "^[a-z]+(\(.+\))?:"; then
-            # Commit message doesn't follow conventional commit format (common in PR merges)
-            # This is a soft indicator, so we'll be lenient
-            echo "📋 Commit message format suggests PR merge (not conventional commit)"
-            # Don't set IS_PR_MERGE=true here, just log it
-          fi
-        fi
-
-        # Method 6: Most reliable - check if this commit was created via GitHub UI merge
-        # GitHub adds a "Co-authored-by" or specific metadata for PR merges
-        # We'll be lenient: if we can't definitively prove it's a direct push, allow it
-        # This prevents false positives while still catching obvious direct pushes
-
-        # If any indicator suggests PR merge, allow it
-        if [[ "$IS_PR_MERGE" == "true" ]]; then
-          # Additional check: detect direct merge from develop to main (without PR)
-          if [[ "$BRANCH" == "main" ]]; then
-            # Check if this merge is from develop branch directly (not via PR)
-            # PR merges will have PR number in commit message (#123)
-            # Direct merges from develop won't have PR reference
-            if echo "$COMMIT_MSG" | grep -qiE "#[0-9]+"; then
-              # Has PR number - this is a PR merge, allow it
-              echo "✅ Push appears to be from PR merge to main - allowing"
-              echo "   Commit: $GITHUB_SHA"
-              echo "   Branch: $BRANCH"
-              echo "   Author: $COMMIT_AUTHOR"
-              exit 0
-            else
-              # No PR number but detected as merge - check if it's from develop
-              # This could be a direct merge from develop to main (not allowed)
-              if echo "$COMMIT_MSG" | grep -qiE "(develop|from develop)"; then
-                echo "❌ ERROR: Direct merge from develop to main detected!"
-                echo ""
-                echo "🚫 Merges from develop to main must go through a Pull Request"
-                echo ""
-                echo "📋 Correct workflow:"
-                echo "   1. Create a Pull Request from develop to main"
-                echo "   2. Get PR approved"
-                echo "   3. Merge PR using squash merge"
-                echo ""
-                echo "Current commit: $GITHUB_SHA"
-                echo "Commit message: $(echo "$COMMIT_MSG" | head -1)"
-                echo "Author: $COMMIT_AUTHOR"
-                echo "Branch: $BRANCH"
-                echo ""
-                echo "💡 To fix this:"
-                echo "   - Revert this merge"
-                echo "   - Create a Pull Request from develop to main"
-                echo "   - Merge the PR instead"
-                exit 1
-              fi
-            fi
-          fi
-
-          echo "✅ Push appears to be from PR merge - allowing"
-          echo "   Commit: $GITHUB_SHA"
-          echo "   Branch: $BRANCH"
-          echo "   Author: $COMMIT_AUTHOR"
+        chmod +x scripts/branch-protection-check.sh
+        if scripts/branch-protection-check.sh "$BRANCH" "$PULLS_JSON"; then
           exit 0
         fi
 
-        # If we get here, it's likely a direct push
         echo "❌ ERROR: Direct push to protected branch '$BRANCH' detected!"
         echo ""
         echo "🚫 Protected branches (main, develop) can only be updated via Pull Requests"
@@ -244,8 +200,6 @@ jobs:
         echo "   4. Get PR approved and merged"
         echo ""
         echo "Current commit: $GITHUB_SHA"
-        echo "Commit message: $(echo "$COMMIT_MSG" | head -1)"
-        echo "Author: $COMMIT_AUTHOR"
         echo "Branch: $BRANCH"
         echo ""
         echo "💡 To fix this:"
