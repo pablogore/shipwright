@@ -1366,10 +1366,13 @@ jobs:
     - name: 'Trigger release workflow'
       if: "steps.detect-source.outputs.should_trigger == 'true'"
       uses: 'actions/github-script@v9'
-      env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}'
+      # Uses the workflow's own GITHUB_TOKEN (permissions.actions: write,
+      # line 20) instead of a PAT secret -- workflow_dispatch dispatched
+      # explicitly via the API is not subject to the "GITHUB_TOKEN events
+      # don't trigger other workflows" recursion guard (that guard only
+      # covers implicit side-effect events like push/PR), so no PAT is
+      # needed here, and it can't silently go stale like one can.
       with:
-        github-token: '${{ secrets.GITHUB_PAT || secrets.SHIPWRIGHT_TOKEN }}'
         script: |
           // Trigger release workflow with workflow_dispatch to use latest main version
           const currentSha = context.sha;
