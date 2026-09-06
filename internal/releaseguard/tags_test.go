@@ -119,6 +119,42 @@ func TestProviderWorkflow_ShapeRegex(t *testing.T) {
 	}
 }
 
+// (e) the shape regex extracted from root release.yml accepts a valid root
+// version and rejects the shapes RELEASE-DIST-01A names, including a
+// providers/go tag (which must never be mistaken for a root version).
+func TestRootReleaseWorkflow_ShapeRegex(t *testing.T) {
+	pattern, err := ExtractShapeRegex(releaseWorkflowPath(t))
+	if err != nil {
+		t.Fatalf("ExtractShapeRegex() error = %v, want nil", err)
+	}
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		t.Fatalf("regexp.Compile(%q) error = %v, want nil", pattern, err)
+	}
+
+	tests := []struct {
+		name string
+		tag  string
+		want bool
+	}{
+		{name: "valid v1.2.3", tag: "v1.2.3", want: true},
+		{name: "valid v0.5.0", tag: "v0.5.0", want: true},
+		{name: "reject major >= 2 (no /v2 module path yet)", tag: "v2.0.0", want: false},
+		{name: "reject leading zero", tag: "v01.0.0", want: false},
+		{name: "reject missing v prefix", tag: "1.2.3", want: false},
+		{name: "reject providers/go tag leaking into root", tag: "providers/go/v0.1.0", want: false},
+		{name: "reject providers/rust tag leaking into root", tag: "providers/rust/v0.1.0", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := re.MatchString(tt.tag); got != tt.want {
+				t.Fatalf("regex %q MatchString(%q) = %v, want %v", pattern, tt.tag, got, tt.want)
+			}
+		})
+	}
+}
+
 // (c) release-provider-rust.yml's globs don't match v1.2.3 -- mirrors
 // TestProviderWorkflow_TagGlobsExcludeRootNamespace for the Rust provider
 // (design.md D6, applied per-provider).

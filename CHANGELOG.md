@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **Note (2026-09-06, RELEASE-DIST-01A):** the entries below the top four
+> bullets in *Added* (providers/rust wiring, the `ChangelogRunner`
+> provider, the `workspaceguard.ReplaceDirectives()` guard) and the
+> `providers/go` independent-module split in *Changed* accumulated across
+> an unknown span of time without ever being cut into a tagged release.
+> This pass did not attempt to verify each older bullet against a specific
+> commit or PR -- they are kept as historical record, not as a confirmed
+> pending-release list.
+
 ### Added
 - **`providers/rust` wired into the live workflow provider registry** (`internal/workflow/providers/register.go`): `rust` (build), `rust-test` (unit test), `clippy` (lint), `cargo-audit` (vulnerability scan), and `rust-container` (a Rust-specific image publisher, kept separate from `container` because a default Rust build links dynamically against glibc and breaks under `container`'s alpine base)
 - **Changelog generation as a real `Runner` provider** (`internal/workflow/providers/changelog.go`'s `ChangelogRunner`, registered as `changelog`): generates a Keep a Changelog "Unreleased" summary from git history inside a Dagger container and prepends it into `CHANGELOG.md`, replacing the previously dead-code (never executed by the CLI) `internal/app.ChangelogStepHandler`
@@ -43,6 +52,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved merge conflicts in CI/CD workflows
 - Fixed struct field naming conventions
 - **Removed unnecessary connection verification**: Eliminated redundant connection checks and manual reconnection logic that was causing complexity and potential race conditions. Dagger SDK now handles all connection lifecycle management automatically
+
+## [0.5.0] - 2025-09-14
+
+**⚠️ Legacy release — imported from pre-rebrand history, does not meet the current release-integrity contract (RELEASE-DIST-01A).**
+
+- GitHub Release published 2025-09-14 (02:04 UTC), `target_commitish: develop` — a branch name, not a commit SHA.
+- No corresponding Git tag exists in the current repository history; `v0.5.0` cannot be resolved against any commit today.
+- Published under the legacy `syntegrity-dagger-*` binary naming convention (pre-rebrand), not the current `shipwright-*` distribution contract.
+- Contents cannot be verified against current Git history. No feature list is reconstructed here beyond what is stated above — see [Links](#links) for the raw GitHub Release.
+
+## [0.4.1] - 2025-09-14
+
+**⚠️ Legacy release — imported from pre-rebrand history, does not meet the current release-integrity contract (RELEASE-DIST-01A).**
+
+- GitHub Release published 2025-09-14 (01:52 UTC), `target_commitish: develop` — a branch name, not a commit SHA.
+- No corresponding Git tag exists in the current repository history; `v0.4.1` cannot be resolved against any commit today.
+- Published under the legacy `syntegrity-dagger-*` binary naming convention (pre-rebrand), not the current `shipwright-*` distribution contract.
+- Contents cannot be verified against current Git history. No feature list is reconstructed here beyond what is stated above.
+
+## [0.4.0-beta.1] - 2025-09-14
+
+**⚠️ Legacy pre-release — imported from pre-rebrand history, does not meet the current release-integrity contract (RELEASE-DIST-01A).**
+
+- GitHub Release published 2025-09-14 (01:40 UTC) as a pre-release, `target_commitish: develop` — a branch name, not a commit SHA.
+- No corresponding Git tag exists in the current repository history; `v0.4.0-beta.1` cannot be resolved against any commit today.
+- Commit `3119fa5` ("fix(workflow): fix artifact handling in release workflows") is reachable from current `develop`/`main` and lands 1m38s before this release's publish timestamp — a timing correlation, not proof. No tag ever bound this release to that or any other commit, so the Tag↔Commit link cannot be confirmed.
+- Published under the legacy `syntegrity-dagger-*` binary naming convention (pre-rebrand), not the current `shipwright-*` distribution contract.
 
 ## [0.0.2] - 2024-01-15
 
