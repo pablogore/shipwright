@@ -1449,7 +1449,11 @@ jobs:
             repo: context.repo.repo,
             ref: sha,
           });
-          const gate = data.check_runs.find((run) => run.name === 'final-sha-gate');
+          // A push to develop and this PR's own synchronize event both create
+          // a same-named 'final-sha-gate' check-run for this SHA (this job
+          // always skips on pull_request). Match on conclusion==='success',
+          // not just name, or an unrelated skipped run can shadow the real one.
+          const gate = data.check_runs.find((run) => run.name === 'final-sha-gate' && run.conclusion === 'success');
           if (!gate) {
             core.setFailed(
               `No 'final-sha-gate' check-run found for develop HEAD ${sha}. ` +
