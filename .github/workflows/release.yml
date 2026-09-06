@@ -180,9 +180,16 @@ jobs:
           # Continue with automatic release logic (for workflow_dispatch from CI with develop or hotfix merge)
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
-          # Get latest tag (--match excludes providers/go/v* so a provider
-          # release can never be picked up as the root's LATEST_TAG)
-          LATEST_TAG=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Get latest tag by SemVer value, not graph proximity. `git
+          # describe --abbrev=0` returns whichever tag it encounters first
+          # among tags pointing at the same commit, which is ambiguous --
+          # this repo has v0.4.0-beta.1/v0.4.1/v0.5.0 all on one commit, and
+          # describe picking the "wrong" one silently recomputed an already
+          # -published version. Sorting all v* tags by version and taking
+          # the highest is unambiguous. (git tag -l 'v[0-9]*' already
+          # excludes providers/go/v* since those don't start with "v".)
+          LATEST_TAG=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+          LATEST_TAG="${LATEST_TAG:-v0.0.0}"
           echo "Latest tag: $LATEST_TAG"
 
           # Determine version bump based on source branch and commit messages
@@ -239,9 +246,10 @@ jobs:
 
           echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
 
-          # Get latest tag (--match excludes providers/go/v* so a provider
-          # release can never be picked up as the root's LATEST_TAG)
-          LATEST_TAG=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Get latest tag by SemVer value -- see the automatic-release
+          # branch above for why this can't use `git describe --abbrev=0`.
+          LATEST_TAG=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+          LATEST_TAG="${LATEST_TAG:-v0.0.0}"
           echo "Latest tag: $LATEST_TAG"
 
           # For manual releases, default to patch version bump
@@ -278,6 +286,21 @@ jobs:
           exit 1
         fi
         echo "✅ Version shape valid: $TAG"
+
+    - name: 'Verify computed tag is not already published elsewhere'
+      if: "steps.tag.outputs.skip_release != 'true'"
+      run: |
+        TAG="${{ steps.tag.outputs.tag }}"
+        CURRENT_COMMIT="$(git rev-parse HEAD)"
+        if git tag -l | grep -qx "$TAG"; then
+          TAG_COMMIT="$(git rev-parse "${TAG}^{commit}" 2>/dev/null || echo "")"
+          if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+            echo "::error::Computed tag '$TAG' already exists and points to commit ${TAG_COMMIT}, not this release's HEAD (${CURRENT_COMMIT})."
+            echo "::error::The version-bump logic picked an already-published version -- fix the version calculation, this workflow will never move an existing tag."
+            exit 1
+          fi
+        fi
+        echo "✅ Computed tag '$TAG' is free (or already points to this commit)."
 
     - name: 'Generate changelog'
       id: 'changelog'
