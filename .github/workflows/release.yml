@@ -238,6 +238,24 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "✅ Release information determined: $TAG"
 
+    - name: 'Validate release version shape'
+      run: |
+        TAG="${{ steps.tag.outputs.tag }}"
+        # internal/releaseguard/tags_test.go extracts this exact assignment
+        # -- keep it byte-for-byte in sync with design.md D6 and
+        # release-provider-go.yml's SHAPE_REGEX. Major is restricted to 0|1
+        # on purpose: major >= 2 needs a root module path suffix (/v2) that
+        # does not exist yet -- a decision, not a tag typo. The required
+        # leading "v" also guarantees a providers/*/vX.Y.Z tag can never be
+        # mistaken for a root version here.
+        SHAPE_REGEX='^v(0|1)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
+        if ! [[ "$TAG" =~ $SHAPE_REGEX ]]; then
+          echo "::error::Tag '$TAG' does not match the root release's SemVer shape ($SHAPE_REGEX)."
+          echo "::error::A major version >= 2 needs a root module path suffix (/v2) -- this is a decision, not a tag typo."
+          exit 1
+        fi
+        echo "✅ Version shape valid: $TAG"
+
     - name: 'Generate changelog'
       id: 'changelog'
       run: |
@@ -436,41 +454,19 @@ jobs:
         echo "✅ Git and Go configured for private repos"
         echo "GOPRIVATE: $(go env GOPRIVATE)"
 
-    - name: 'Create tag (automatic release only)'
-      if: "needs.validate-release.outputs.type == 'automatic'"
+    - name: 'Create or verify tag'
       run: |
-        echo "🏷️ Creating/updating tag ${{ needs.validate-release.outputs.tag }} for automatic release..."
-
-        TAG="${{ needs.validate-release.outputs.tag }}"
-        CURRENT_COMMIT=$(git rev-parse HEAD)
-
-        # Check if tag exists
-        if git tag -l | grep -q "^${TAG}$"; then
-          TAG_COMMIT=$(git rev-parse ${TAG}^{commit} 2>/dev/null || echo "")
-
-          if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
-            echo "⚠️ Tag ${TAG} exists but points to different commit"
-            echo "   Tag commit: ${TAG_COMMIT}"
-            echo "   Current commit: ${CURRENT_COMMIT}"
-            echo "🔄 Updating tag to point to current commit..."
-
-            # Delete tag locally and remotely
-            git tag -d "${TAG}" || true
-            git push origin ":refs/tags/${TAG}" || true
-
-            # Create new tag pointing to current commit
-            git tag -a "${TAG}" -m "Release ${TAG}"
-            git push origin "${TAG}"
-            echo "✅ Tag updated and pushed: ${TAG}"
-          else
-            echo "✅ Tag ${TAG} already exists and points to current commit"
-          fi
-        else
-          # Create new tag
-          git tag -a "${TAG}" -m "Release ${TAG}"
-          git push origin "${TAG}"
-          echo "✅ Tag created and pushed: ${TAG}"
-        fi
+        echo "🏷️ Resolving tag ${{ needs.validate-release.outputs.tag }} for this release..."
+        # Runs for every release path (tag push, CI-triggered automatic, and
+        # a genuinely manual admin dispatch), not just "automatic" -- a
+        # manual release is still a real release and must satisfy the same
+        # Tag <-> Commit <-> Release invariant. For a tag-push, the tag
+        # already exists at the checked-out commit, so this is a safe
+        # same-commit no-op; for an admin dispatch with no pre-existing tag,
+        # this is what actually creates it (nothing else in this workflow
+        # does). There is no weaker, tag-optional release path.
+        chmod +x scripts/release-tag-guard.sh
+        scripts/release-tag-guard.sh "${{ needs.validate-release.outputs.tag }}"
 
     - name: 'Verify tag points to current commit'
       run: |
@@ -619,57 +615,30 @@ jobs:
       if: "needs.validate-release.outputs.type == 'automatic'"
       run: |
         echo "📝 Updating CHANGELOG.md in repository..."
-
-        # Checkout the repository to update CHANGELOG.md
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
 
-        # Read the generated changelog
-        NEW_CHANGELOG_ENTRY=$(cat CHANGELOG.md)
+        # NEW_CHANGELOG_ENTRY is passed via env (not interpolated into this
+        # script) because it's built from commit messages -- untrusted
+        # text. Splicing it into the script as ${{ }} would let a crafted
+        # commit message break out of the script instead of just being data.
+        printf '%s' "$NEW_CHANGELOG_ENTRY" > /tmp/new-changelog-entry.md
 
-        # Read existing CHANGELOG.md
-        if [ -f CHANGELOG.md ]; then
-          # Create backup
-          cp CHANGELOG.md CHANGELOG.md.backup
+        chmod +x scripts/changelog-prepend-release.sh
+        scripts/changelog-prepend-release.sh CHANGELOG.md /tmp/new-changelog-entry.md "$TAG"
 
-          # Prepend new release to CHANGELOG.md
-          {
-            echo "$NEW_CHANGELOG_ENTRY"
-            echo ""
-            echo "---"
-            echo ""
-            cat CHANGELOG.md.backup | sed '/^## \[Unreleased\]/,$d'
-          } > CHANGELOG.md.new
-
-          # Add Unreleased section back if it existed
-          if grep -q "^## \[Unreleased\]" CHANGELOG.md.backup; then
-            {
-              cat CHANGELOG.md.new
-              echo ""
-              echo "## [Unreleased]"
-              echo ""
-              echo "### Added"
-              echo "- Changes in progress..."
-            } > CHANGELOG.md
-          else
-            mv CHANGELOG.md.new CHANGELOG.md
-          fi
-
-          # Commit and push the updated CHANGELOG.md
-          git add CHANGELOG.md
-          git commit -m "docs: update CHANGELOG.md for ${{ needs.validate-release.outputs.tag }}" || echo "No changes to commit"
-          git push origin main || echo "Push failed or no changes"
-
-          echo "✅ CHANGELOG.md updated in repository"
+        git add CHANGELOG.md
+        if git diff --cached --quiet; then
+          echo "ℹ️ CHANGELOG.md already up to date for ${TAG} -- nothing to commit."
         else
-          echo "⚠️ CHANGELOG.md not found, creating new one"
-          echo "$NEW_CHANGELOG_ENTRY" > CHANGELOG.md
-          git add CHANGELOG.md
-          git commit -m "docs: add CHANGELOG.md for ${{ needs.validate-release.outputs.tag }}"
+          git commit -m "docs: update CHANGELOG.md for ${TAG}"
           git push origin main
+          echo "✅ CHANGELOG.md updated in repository"
         fi
       env:
         GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        TAG: '${{ needs.validate-release.outputs.tag }}'
+        NEW_CHANGELOG_ENTRY: '${{ needs.validate-release.outputs.changelog }}'
 
     - name: 'Upload release artifacts'
       uses: 'actions/upload-artifact@v7'
