@@ -620,7 +620,7 @@ jobs:
 
         # NEW_CHANGELOG_ENTRY is passed via env (not interpolated into this
         # script) because it's built from commit messages -- untrusted
-        # text. Splicing it into the script as ${{ }} would let a crafted
+        # text. Interpolating it directly into the script would let a crafted
         # commit message break out of the script instead of just being data.
         printf '%s' "$NEW_CHANGELOG_ENTRY" > /tmp/new-changelog-entry.md
 
