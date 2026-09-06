@@ -12,7 +12,7 @@ import (
 	"github.com/knadh/koanf/providers/env"
 	koanfv2 "github.com/knadh/koanf/v2"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // Static errors for err113 compliance.
@@ -29,7 +29,7 @@ const (
 	DefaultEnvironment     = "development"
 	DefaultPipelineName    = "go-service"
 	DefaultCoverage        = 90.0
-	DefaultGoVersion       = "1.25.5"
+	DefaultGoVersion       = "1.26.1"
 	DefaultJavaVersion     = "17"
 	DefaultRegistryBaseURL = ""
 	DefaultRegistryUser    = ""
@@ -41,21 +41,22 @@ const (
 	DefaultDaggerTimeout   = 30 * time.Second
 
 	// Environment prefix.
-	EnvPrefix = "SYNTEGRITY_DAGGER_"
+	EnvPrefix = "SHIPWRIGHT_"
 )
 
 // koanfInstance is created fresh for each configuration load to avoid test interference
 
 // Config provides a simplified configuration interface with sane defaults.
 type Config struct {
-	Environment string         `koanf:"environment"`
-	Pipeline    PipelineConfig `koanf:"pipeline"`
-	Registry    RegistryConfig `koanf:"registry"`
-	Git         GitConfig      `koanf:"git"`
-	Security    SecurityConfig `koanf:"security"`
-	Logging     LoggingConfig  `koanf:"logging"`
-	Release     ReleaseConfig  `koanf:"release"`
-	Dagger      DaggerConfig   `koanf:"dagger"`
+	Environment string                    `koanf:"environment"`
+	Pipeline    PipelineConfig            `koanf:"pipeline"`
+	Registry    RegistryConfig            `koanf:"registry"`
+	Git         GitConfig                 `koanf:"git"`
+	Security    SecurityConfig            `koanf:"security"`
+	Logging     LoggingConfig             `koanf:"logging"`
+	Release     ReleaseConfig             `koanf:"release"`
+	Dagger      DaggerConfig              `koanf:"dagger"`
+	Plugins     map[string]map[string]any `koanf:"plugins"`
 }
 
 // PipelineConfig defines pipeline configuration.
@@ -194,7 +195,7 @@ func loadDotEnv() error {
 }
 
 // New creates a new configuration with the following precedence:
-// 1. Environment variables (SYNTEGRITY_DAGGER_*)
+// 1. Environment variables (SHIPWRIGHT_*)
 // 2. Default values.
 func New() (*Config, error) {
 	if err := loadDotEnv(); err != nil {
@@ -310,16 +311,16 @@ func (cw *ConfigurationWrapper) getStringConfigMap() map[string]string {
 		KeyRegistryPass:        cw.Config.Registry.Pass,
 		KeyRegistryImage:       cw.Config.Registry.Image,
 		KeyRegistryTag:         cw.Config.Registry.Tag,
-		KeyGitRepo:             cw.Config.Git.Repo,
-		KeyGitRef:              cw.Config.Git.Ref,
-		KeyGitProtocol:         cw.Config.Git.Protocol,
-		KeyGitUserEmail:        cw.Config.Git.UserEmail,
-		KeyGitUserName:         cw.Config.Git.UserName,
-		KeyGitSSHKey:           cw.Config.Git.SSHKey,
+		KeyGitRepo:             cw.Git.Repo,
+		KeyGitRef:              cw.Git.Ref,
+		KeyGitProtocol:         cw.Git.Protocol,
+		KeyGitUserEmail:        cw.Git.UserEmail,
+		KeyGitUserName:         cw.Git.UserName,
+		KeyGitSSHKey:           cw.Git.SSHKey,
 		KeySecurityLintTimeout: cw.Config.Security.LintTimeout,
 		KeyLogLevel:            cw.Config.Logging.Level,
 		KeyLogFormat:           cw.Config.Logging.Format,
-		KeyDaggerLogOutput:     strconv.FormatBool(cw.Config.Dagger.LogOutput),
+		KeyDaggerLogOutput:     strconv.FormatBool(cw.Dagger.LogOutput),
 	}
 }
 
@@ -356,11 +357,11 @@ func (cw *ConfigurationWrapper) getBoolConfigMap() map[string]bool {
 		KeySecurityEnableVulnCheck: cw.Config.Security.EnableVulnCheck,
 		KeySecurityEnableLinting:   cw.Config.Security.EnableLinting,
 		KeyLogSamplingEnable:       cw.Config.Logging.SamplingEnable,
-		KeyReleaseEnabled:          cw.Config.Release.Enabled,
-		KeyReleaseUseGoreleaser:    cw.Config.Release.UseGoreleaser,
-		KeyReleaseChecksum:         cw.Config.Release.Checksum,
-		KeyReleaseSign:             cw.Config.Release.Sign,
-		KeyDaggerLogOutput:         cw.Config.Dagger.LogOutput,
+		KeyReleaseEnabled:          cw.Release.Enabled,
+		KeyReleaseUseGoreleaser:    cw.Release.UseGoreleaser,
+		KeyReleaseChecksum:         cw.Release.Checksum,
+		KeyReleaseSign:             cw.Release.Sign,
+		KeyDaggerLogOutput:         cw.Dagger.LogOutput,
 	}
 }
 
@@ -377,7 +378,7 @@ func (cw *ConfigurationWrapper) GetBool(key string) bool {
 func (cw *ConfigurationWrapper) getDurationConfigMap() map[string]time.Duration {
 	return map[string]time.Duration{
 		KeyLogSamplingInterval: cw.Config.Logging.SamplingInterval,
-		KeyDaggerTimeout:       cw.Config.Dagger.Timeout,
+		KeyDaggerTimeout:       cw.Dagger.Timeout,
 	}
 }
 
@@ -409,13 +410,21 @@ func (cw *ConfigurationWrapper) GetFloat(key string) float64 {
 
 // Get gets an interface value.
 func (cw *ConfigurationWrapper) Get(key string) any {
-	switch key {
-	case KeySecurityExcludePatterns:
+	switch {
+	case key == KeySecurityExcludePatterns:
 		return cw.Config.Security.ExcludePatterns
-	case KeyReleaseBuildTargets:
-		return cw.Config.Release.BuildTargets
-	case KeyReleaseArchiveFormats:
-		return cw.Config.Release.ArchiveFormats
+	case key == KeyReleaseBuildTargets:
+		return cw.Release.BuildTargets
+	case key == KeyReleaseArchiveFormats:
+		return cw.Release.ArchiveFormats
+	case key == "plugins":
+		return cw.Plugins
+	case strings.HasPrefix(key, "plugins."):
+		pluginName := strings.TrimPrefix(key, "plugins.")
+		if cw.Plugins == nil {
+			return nil
+		}
+		return cw.Plugins[pluginName]
 	default:
 		return nil
 	}
@@ -423,45 +432,78 @@ func (cw *ConfigurationWrapper) Get(key string) any {
 
 // Set sets a value.
 func (cw *ConfigurationWrapper) Set(key string, value any) {
-	// Update the internal configuration based on the key
-	switch key {
-	case "git.protocol":
-		if strValue, ok := value.(string); ok {
-			cw.Config.Git.Protocol = strValue
-		}
-	case "git.ref":
-		if strValue, ok := value.(string); ok {
-			cw.Config.Git.Ref = strValue
-		}
-	case "pipeline.coverage":
+	switch {
+	case key == "pipeline.coverage":
 		if floatValue, ok := value.(float64); ok {
 			cw.Config.Pipeline.Coverage = floatValue
 		}
+	case cw.setStringField(key, value):
+	case cw.setBoolField(key, value):
+	default:
+		cw.setPluginField(key, value)
+	}
+}
+
+// setStringField applies value to the string configuration field identified
+// by key. It reports whether key was recognized, regardless of whether value
+// was assignable (a type mismatch on a recognized key is a silent no-op, to
+// preserve prior behavior).
+func (cw *ConfigurationWrapper) setStringField(key string, value any) bool {
+	var target *string
+	switch key {
+	case "git.protocol":
+		target = &cw.Git.Protocol
+	case "git.ref":
+		target = &cw.Git.Ref
 	case "environment":
-		if strValue, ok := value.(string); ok {
-			cw.Config.Environment = strValue
-		}
-	case "pipeline.skip_push":
-		if boolValue, ok := value.(bool); ok {
-			cw.Config.Pipeline.SkipPush = boolValue
-		}
-	case "pipeline.only_build":
-		if boolValue, ok := value.(bool); ok {
-			cw.Config.Pipeline.OnlyBuild = boolValue
-		}
-	case "pipeline.only_test":
-		if boolValue, ok := value.(bool); ok {
-			cw.Config.Pipeline.OnlyTest = boolValue
-		}
-	case "pipeline.verbose":
-		if boolValue, ok := value.(bool); ok {
-			cw.Config.Pipeline.Verbose = boolValue
-		}
+		target = &cw.Config.Environment
 	case "logging.level":
-		if strValue, ok := value.(string); ok {
-			cw.Config.Logging.Level = strValue
-		}
-		// Add more cases as needed
+		target = &cw.Config.Logging.Level
+	default:
+		return false
+	}
+	if strValue, ok := value.(string); ok {
+		*target = strValue
+	}
+	return true
+}
+
+// setBoolField applies value to the bool configuration field identified by
+// key. It reports whether key was recognized, regardless of whether value
+// was assignable (a type mismatch on a recognized key is a silent no-op, to
+// preserve prior behavior).
+func (cw *ConfigurationWrapper) setBoolField(key string, value any) bool {
+	var target *bool
+	switch key {
+	case "pipeline.skip_push":
+		target = &cw.Config.Pipeline.SkipPush
+	case "pipeline.only_build":
+		target = &cw.Config.Pipeline.OnlyBuild
+	case "pipeline.only_test":
+		target = &cw.Config.Pipeline.OnlyTest
+	case "pipeline.verbose":
+		target = &cw.Config.Pipeline.Verbose
+	default:
+		return false
+	}
+	if boolValue, ok := value.(bool); ok {
+		*target = boolValue
+	}
+	return true
+}
+
+// setPluginField handles "plugins.<name>" keys, storing value under the
+// plugin's configuration map. Keys without the "plugins." prefix are a no-op.
+func (cw *ConfigurationWrapper) setPluginField(key string, value any) {
+	if !strings.HasPrefix(key, "plugins.") {
+		return
+	}
+	pluginName := strings.TrimPrefix(key, "plugins.")
+	if cw.Plugins == nil {
+		cw.Plugins = make(map[string]map[string]any)
+	}
+	if configMap, ok := value.(map[string]any); ok {
+		cw.Plugins[pluginName] = configMap
 	}
 }
 
@@ -484,8 +526,8 @@ func (cw *ConfigurationWrapper) All() map[string]any {
 		KeyPipelineName:      cw.Config.Pipeline.Name,
 		KeyPipelineGoVersion: cw.Config.Pipeline.GoVersion,
 		KeyRegistryBaseURL:   cw.Config.Registry.BaseURL,
-		KeyGitRef:            cw.Config.Git.Ref,
-		KeyGitProtocol:       cw.Config.Git.Protocol,
+		KeyGitRef:            cw.Git.Ref,
+		KeyGitProtocol:       cw.Git.Protocol,
 		KeyLogLevel:          cw.Config.Logging.Level,
 		KeyLogFormat:         cw.Config.Logging.Format,
 	}

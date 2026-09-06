@@ -5,7 +5,7 @@ import (
 	"context"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
+	"github.com/pablogore/shipwright/internal/pipelines/shared"
 )
 
 // MockCloner es un mock del clonador para tests

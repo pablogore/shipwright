@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +30,7 @@ func TestSelector_SelectExecutor_PreferredExecutor(t *testing.T) {
 	ctx := context.Background()
 	selector := NewSelector()
 	mockExecutor := NewMockExecutor()
-	mockExecutor.CanExecuteFunc = func(ctx context.Context) bool {
+	mockExecutor.CanExecuteFunc = func(_ context.Context) bool {
 		return true
 	}
 

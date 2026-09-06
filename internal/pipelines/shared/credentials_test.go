@@ -12,6 +12,11 @@ func TestResolveGitCredentials_CI(t *testing.T) {
 	// Setup
 	t.Setenv("CI", "true")
 	t.Setenv("CI_JOB_TOKEN", "ci-token")
+	// GITHUB_ACTIONS/GITHUB_TOKEN are ambient on real GitHub Actions runners
+	// and must be cleared, or the GitHub-token branch wins before this test
+	// ever reaches the GitLab CI_JOB_TOKEN branch it's meant to exercise.
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITHUB_TOKEN", "")
 
 	// Test
 	creds, err := ResolveGitCredentials()
@@ -29,6 +34,11 @@ func TestResolveGitCredentials_Anonymous(t *testing.T) {
 	t.Setenv("CI_JOB_TOKEN", "")
 	t.Setenv("GITLAB_PAT", "")
 	t.Setenv("SSH_PRIVATE_KEY", "")
+	// GITHUB_ACTIONS/GITHUB_TOKEN are ambient on real GitHub Actions runners
+	// and must be cleared, or the GitHub-token CI branch wins instead of
+	// falling through to anonymous access.
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITHUB_TOKEN", "")
 
 	// Test
 	creds, err := ResolveGitCredentials()
@@ -186,6 +196,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "push operation requires credentials",
 			operation: "push",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				// No credentials set - use empty strings
 				t.Setenv("GITHUB_TOKEN", "")
 				t.Setenv("CI_JOB_TOKEN", "")
@@ -201,6 +212,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "push operation with GitHub token",
 			operation: "push",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				t.Setenv("GITHUB_TOKEN", "test-token")
 			},
 			wantErr: false,
@@ -209,6 +221,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "push operation with GitLab CI token",
 			operation: "push",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				t.Setenv("CI", "true")
 				t.Setenv("CI_JOB_TOKEN", "test-token")
 			},
@@ -218,6 +231,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "clone operation does not require credentials",
 			operation: "clone",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				// No credentials set - use empty strings
 				t.Setenv("GITHUB_TOKEN", "")
 				t.Setenv("CI_JOB_TOKEN", "")
@@ -231,6 +245,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 			name:      "unknown operation does not require credentials",
 			operation: "unknown",
 			setupEnv: func(t *testing.T) {
+				t.Helper()
 				// No credentials set - use empty strings
 				t.Setenv("GITHUB_TOKEN", "")
 				t.Setenv("CI_JOB_TOKEN", "")
@@ -248,7 +263,7 @@ func TestValidateRequiredSecrets(t *testing.T) {
 
 			err := ValidateRequiredSecrets(tt.operation)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), "credentials required")
 			} else {
 				assert.NoError(t, err)

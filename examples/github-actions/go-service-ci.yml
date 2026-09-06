@@ -1,0 +1,58 @@
+name: CI/CD with Shipwright
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  SHIPWRIGHT_VERSION: "latest"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.26.1'
+        
+    # Cache Shipwright binary
+    - name: Cache Shipwright
+      id: cache-dagger
+      uses: actions/cache@v3
+      with:
+        path: shipwright
+        key: shipwright-${{ env.SHIPWRIGHT_VERSION }}-linux-amd64
+        
+    # Download Shipwright if not cached
+    - name: Download Shipwright
+      if: steps.cache-dagger.outputs.cache-hit != 'true'
+      run: |
+        if [ "${{ env.SHIPWRIGHT_VERSION }}" = "latest" ]; then
+          URL="https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64"
+        else
+          URL="https://github.com/pablogore/shipwright/releases/download/${{ env.SHIPWRIGHT_VERSION }}/shipwright-linux-amd64"
+        fi
+        
+        echo "📥 Downloading Shipwright from: $URL"
+        curl -L "$URL" -o shipwright
+        chmod +x shipwright
+        
+        # Verify download
+        ./shipwright --version
+        
+    # Run Shipwright Pipeline for go-service
+    - name: Run Shipwright Pipeline
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+      run: |
+        ./shipwright \
+          -config=.shipwright.yml \
+          -env=production

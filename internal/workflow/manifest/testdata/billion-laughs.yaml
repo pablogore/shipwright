@@ -1,0 +1,29 @@
+# Classic "billion laughs" alias-amplification fixture (tasks.md 4.5,
+# design.md D-H threat matrix item 1), adapted to Shipwright's manifest
+# schema: the anchor tree lives under a step's `with:` block, the one
+# field in the schema that decodes into map[string]any (open shape) rather
+# than a concrete typed field. Nine levels x 10-way fan-out = 10^9 leaf
+# expansion if fully materialized naively. This file is well under
+# MaxManifestBytes (1 MiB) — the point of the attack is that the SOURCE is
+# small while the EXPANDED result is enormous.
+apiVersion: shipwright.dev/v1
+kind: Workflow
+metadata:
+  name: billion-laughs
+spec:
+  source: {path: .}
+  steps:
+    - id: bomb
+      capability: build
+      uses: {provider: go, version: "1"}
+      with:
+        a0: &a0 ["lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol"]
+        a1: &a1 [*a0, *a0, *a0, *a0, *a0, *a0, *a0, *a0, *a0, *a0]
+        a2: &a2 [*a1, *a1, *a1, *a1, *a1, *a1, *a1, *a1, *a1, *a1]
+        a3: &a3 [*a2, *a2, *a2, *a2, *a2, *a2, *a2, *a2, *a2, *a2]
+        a4: &a4 [*a3, *a3, *a3, *a3, *a3, *a3, *a3, *a3, *a3, *a3]
+        a5: &a5 [*a4, *a4, *a4, *a4, *a4, *a4, *a4, *a4, *a4, *a4]
+        a6: &a6 [*a5, *a5, *a5, *a5, *a5, *a5, *a5, *a5, *a5, *a5]
+        a7: &a7 [*a6, *a6, *a6, *a6, *a6, *a6, *a6, *a6, *a6, *a6]
+        a8: &a8 [*a7, *a7, *a7, *a7, *a7, *a7, *a7, *a7, *a7, *a7]
+        bomb: *a8

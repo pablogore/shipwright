@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -484,10 +484,7 @@ func TestSecurityStepHandler_Execute(t *testing.T) {
 
 	// Mock config calls
 	mockConfig.GetBoolFunc = func(key string) bool {
-		if key == "security.enable_vuln_check" {
-			return true
-		}
-		return false
+		return key == "security.enable_vuln_check"
 	}
 
 	err := handler.Execute(t.Context(), "security", config)

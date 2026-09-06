@@ -1,7 +1,7 @@
-# Guía de Prevención de Conflictos - Syntegrity Dagger
+# Guía de Prevención de Conflictos - Shipwright
 
 ## 🎯 Objetivo
-Esta guía proporciona un conjunto completo de herramientas, procesos y mejores prácticas para prevenir conflictos de merge en el proyecto Syntegrity Dagger.
+Esta guía proporciona un conjunto completo de herramientas, procesos y mejores prácticas para prevenir conflictos de merge en el proyecto Shipwright.
 
 ## 📋 Resumen de Implementación
 

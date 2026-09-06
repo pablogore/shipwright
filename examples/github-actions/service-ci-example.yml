@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with Syntegrity Dagger
+name: CI/CD Pipeline with Shipwright
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  SYNTEGRITY_DAGGER_VERSION: "latest"  # or pin to specific version like "v1.0.0"
+  SHIPWRIGHT_VERSION: "latest"  # or pin to specific version like "v1.0.0"
 
 jobs:
   # Stage 1: Setup - Prepare environment and dependencies
@@ -18,13 +18,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run Syntegrity Dagger Setup
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Run Shipwright Setup
+        uses: ./.github/actions/shipwright
         with:
-          version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
+          version: ${{ env.SHIPWRIGHT_VERSION }}
           pipeline: go-service
           stage: setup
-          config: .syntegrity-dagger.yml
+          config: .shipwright.yml
           env: dev
           verbose: true
 
@@ -37,13 +37,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run Syntegrity Dagger Build
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Run Shipwright Build
+        uses: ./.github/actions/shipwright
         with:
-          version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
+          version: ${{ env.SHIPWRIGHT_VERSION }}
           pipeline: go-service
           stage: build
-          config: .syntegrity-dagger.yml
+          config: .shipwright.yml
           env: dev
           verbose: true
       
@@ -66,13 +66,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run Syntegrity Dagger Test
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Run Shipwright Test
+        uses: ./.github/actions/shipwright
         with:
-          version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
+          version: ${{ env.SHIPWRIGHT_VERSION }}
           pipeline: go-service
           stage: test
-          config: .syntegrity-dagger.yml
+          config: .shipwright.yml
           env: dev
           coverage: 90
           verbose: true
@@ -96,13 +96,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run Syntegrity Dagger Security
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Run Shipwright Security
+        uses: ./.github/actions/shipwright
         with:
-          version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
+          version: ${{ env.SHIPWRIGHT_VERSION }}
           pipeline: go-service
           stage: security
-          config: .syntegrity-dagger.yml
+          config: .shipwright.yml
           env: dev
           verbose: true
 
@@ -116,13 +116,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run Syntegrity Dagger Package
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Run Shipwright Package
+        uses: ./.github/actions/shipwright
         with:
-          version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
+          version: ${{ env.SHIPWRIGHT_VERSION }}
           pipeline: go-service
           stage: package
-          config: .syntegrity-dagger.yml
+          config: .shipwright.yml
           env: production
           verbose: true
 
@@ -136,13 +136,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run Syntegrity Dagger Push
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Run Shipwright Push
+        uses: ./.github/actions/shipwright
         with:
-          version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
+          version: ${{ env.SHIPWRIGHT_VERSION }}
           pipeline: go-service
           stage: push
-          config: .syntegrity-dagger.yml
+          config: .shipwright.yml
           env: production
           verbose: true
         env:
@@ -158,13 +158,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Run Full Syntegrity Dagger Pipeline
-        uses: ./.github/actions/syntegrity-dagger
+      - name: Run Full Shipwright Pipeline
+        uses: ./.github/actions/shipwright
         with:
-          version: ${{ env.SYNTEGRITY_DAGGER_VERSION }}
+          version: ${{ env.SHIPWRIGHT_VERSION }}
           pipeline: go-service
           # stage is empty, so full pipeline will run
-          config: .syntegrity-dagger.yml
+          config: .shipwright.yml
           env: dev
           coverage: 90
           verbose: true

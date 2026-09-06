@@ -1,0 +1,203 @@
+const ContractVersion = "1.0.0"
+
+type ArtifactConfig struct {
+	// Registry is the target Docker registry (e.g.
+	// registry.gitlab.com/my-org/my-project/service).
+	Registry	string
+	// RegistryURL is the Docker registry URL used for authentication.
+	RegistryURL	string
+	// RegistryUser is the registry username (e.g. gitlab-ci-token in CI).
+	RegistryUser	string
+	// RegistryPass is the registry password/personal access token,
+	// carried as a Dagger secret so it never surfaces as plaintext.
+	RegistryPass	*dagger.Secret
+	// RegistryToken is the registry authentication token, carried as a
+	// Dagger secret so it never surfaces as plaintext.
+	RegistryToken	*dagger.Secret
+	// ImageName is the published image name.
+	ImageName	string
+	// BinaryName is the name of the compiled binary file inside the
+	// published image, used to compute the container entrypoint
+	// ("/app/"+BinaryName). Left empty, an Artifactor falls back to its own
+	// default binary name (mirroring BuildConfig.BinaryName's own
+	// empty-falls-back-to-default convention) — set it explicitly whenever
+	// the paired Builder was configured with a non-default BuildConfig.
+	// BinaryName, so the two agree on where the binary actually lives.
+	BinaryName	string
+	// ImageTag is the published image tag (e.g. latest, sha, v1.2.3).
+	ImageTag	string
+	// BuildTag is the build tag associated with the artifact.
+	BuildTag	string
+	// CommitSHA is the commit SHA the artifact was built from.
+	CommitSHA	string
+	// BranchName is the Git branch the artifact was built from.
+	BranchName	string
+	// Version is the artifact version.
+	Version	string
+	// Token is a generic authentication token, carried as a Dagger secret
+	// so it never surfaces as plaintext.
+	Token	*dagger.Secret
+}
+
+type Artifactor interface {
+	Publish(ctx context.Context, build *dagger.Directory, ref string, creds *dagger.Secret) (string, error)
+}
+
+type BuildConfig struct {
+	// GoVersion is the Go toolchain version to use (e.g. "1.26.1").
+	GoVersion	string
+	// JavaVersion is the Java toolchain version to use (e.g. "17").
+	JavaVersion	string
+	// BuildMode selects how the Builder produces its output (e.g.
+	// "binary", "docker", "both"). Left as a plain string here; a
+	// concrete Builder implementation owns its own enum.
+	BuildMode	string
+	// BinaryName is the name of the output binary file, when applicable.
+	BinaryName	string
+}
+
+type Builder interface {
+	Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error)
+}
+
+type ConflictState struct {
+	// Ambiguous is true when two or more declarative locations disagree
+	// with no resolvable precedence.
+	Ambiguous	bool	`json:"ambiguous"`
+	// Code is the ambiguity rule that fired (design.md D-5: A1-A6), empty
+	// when Ambiguous is false.
+	Code	string	`json:"code,omitempty"`
+	// Sites names every conflicting source and the version it declares,
+	// empty when Ambiguous is false.
+	Sites	[]string	`json:"sites,omitempty"`
+}
+
+type DeployConfig struct{}
+
+type Deployer interface {
+	Deploy(ctx context.Context, artifactRef, environment string, creds *dagger.Secret) (string, error)
+}
+
+type DriftReport struct {
+	// WorkspaceRoot is the inspected workspace-relative root ("." by
+	// default).
+	WorkspaceRoot	string	`json:"workspaceRoot"`
+	// ExpectedVersion echoes the caller-configured expected version, if
+	// any ("" when not configured). It is informational only: Inspect
+	// does not compare it against the discovered sources itself, leaving
+	// that judgment to the report's consumer.
+	ExpectedVersion	string	`json:"expectedVersion,omitempty"`
+	// Sources maps each present tier-1 declarative location's fixed name
+	// ("go.work", ".go-version") to the version it declares. A location
+	// that does not exist in the workspace has no entry here.
+	Sources	map[string]string	`json:"sources"`
+	// Modules lists every discovered module's own go.mod version
+	// directives. A single-module workspace (no go.work) has exactly one
+	// entry with Path ".".
+	Modules	[]ModuleVersion	`json:"modules,omitempty"`
+	// Conflict is the explicit ambiguity state (spec: "the report marks
+	// the conflict state explicitly, naming both sources and versions").
+	Conflict	ConflictState	`json:"conflict"`
+}
+
+type ModuleDrift struct {
+	// Path is the module's directory relative to the workspace root ("."
+	// for a single go.mod at the workspace root itself).
+	Path	string	`json:"path"`
+	// PreviousGo is the module's go directive value before mutation ("" if
+	// absent).
+	PreviousGo	string	`json:"previousGo,omitempty"`
+	// UpdatedGo is the module's go directive value after mutation.
+	UpdatedGo	string	`json:"updatedGo,omitempty"`
+	// PreviousToolchain is the module's toolchain directive value before
+	// mutation ("" if it had none — a toolchain directive is never added
+	// where none existed before).
+	PreviousToolchain	string	`json:"previousToolchain,omitempty"`
+	// UpdatedToolchain is the module's toolchain directive value after
+	// mutation ("" if it had none before, and therefore was left absent).
+	UpdatedToolchain	string	`json:"updatedToolchain,omitempty"`
+	// GoSumChanged is true when this module's go.sum content actually
+	// changed as a result of post-mutation `go mod tidy` (design.md D-7),
+	// determined by a literal byte comparison of go.sum before and after
+	// tidy ran — never inferred from the go.mod require-list delta, which
+	// misses `go mod tidy` bumping an already-required dependency's
+	// version (the require path stays the same; only its pinned version
+	// and go.sum's hash entries change). It never carries the raw go.sum
+	// diff itself, which can run to thousands of unreviewable lines.
+	GoSumChanged	bool	`json:"goSumChanged"`
+	// AddedModules lists every require module path `go mod tidy` added
+	// that was not present before validation ran.
+	AddedModules	[]string	`json:"addedModules,omitempty"`
+	// RemovedModules lists every require module path `go mod tidy`
+	// dropped that was present before validation ran.
+	RemovedModules	[]string	`json:"removedModules,omitempty"`
+}
+
+type ModuleVersion struct {
+	// Path is the module's directory relative to the workspace root ("."
+	// for a single go.mod at the workspace root itself).
+	Path	string	`json:"path"`
+	// Go is the module's go directive value ("" if absent).
+	Go	string	`json:"go,omitempty"`
+	// Toolchain is the module's toolchain directive value ("" if absent).
+	Toolchain	string	`json:"toolchain,omitempty"`
+}
+
+type RunConfig struct{}
+
+type Runner interface {
+	Run(ctx context.Context, build *dagger.Directory) (*dagger.Container, error)
+}
+
+type RuntimeInspector interface {
+	Inspect(ctx context.Context, source *dagger.Directory) (string, error)
+}
+
+type RuntimeUpgrader interface {
+	Upgrade(ctx context.Context, source *dagger.Directory, targetVersion string) (*dagger.Directory, error)
+}
+
+type SourceConfig struct {
+	// GitRepo is the Git repository URL.
+	GitRepo	string
+	// GitRef is the Git reference (branch or tag) to check out.
+	GitRef	string
+	// GitProtocol is the Git transport protocol ("ssh" or "https").
+	GitProtocol	string
+	// GitUserEmail is the Git user email used for any commits made during
+	// the pipeline.
+	GitUserEmail	string
+	// GitUserName is the Git user name used for any commits made during
+	// the pipeline.
+	GitUserName	string
+	// SSHPrivateKey is the SSH private key used for Git authentication,
+	// carried as a Dagger secret so it never surfaces as plaintext.
+	SSHPrivateKey	*dagger.Secret
+}
+
+type TestConfig struct {
+	// Coverage is the minimum required test coverage percentage.
+	Coverage float64
+}
+
+type Tester interface {
+	Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error)
+}
+
+type UpgradeReport struct {
+	// WorkspaceRoot is the upgraded workspace-relative root ("." by
+	// default).
+	WorkspaceRoot	string	`json:"workspaceRoot"`
+	// TargetVersion is the version every mutated directive was set to.
+	TargetVersion	string	`json:"targetVersion"`
+	// Modules lists every module actually mutated. Phase 2 (single-module
+	// only, no go.work traversal) always reports exactly one entry with
+	// Path ".".
+	Modules	[]ModuleDrift	`json:"modules"`
+	// Validation names the post-mutation validation Upgrade actually ran
+	// (design.md D-6: always "build" — `go build ./...`, never `go vet`)
+	// so no consumer is misled into believing more was proven than a
+	// successful compile.
+	Validation	string	`json:"validation"`
+}
+

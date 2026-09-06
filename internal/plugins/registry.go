@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
+	"github.com/pablogore/kit-logger/pkg/logger"
 )
 
 // registry implements PluginRegistry interface.
@@ -106,7 +106,7 @@ func (r *registry) LoadPluginsFromConfig(ctx context.Context, pluginCtx PluginCo
 
 	pluginsMap, ok := pluginsConfig.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("invalid plugins configuration format")
+		return errors.New("invalid plugins configuration format")
 	}
 
 	var errors []error
@@ -119,6 +119,52 @@ func (r *registry) LoadPluginsFromConfig(ctx context.Context, pluginCtx PluginCo
 
 	if len(errors) > 0 {
 		return fmt.Errorf("failed to load some plugins: %v", errors)
+	}
+
+	return nil
+}
+
+// LoadBuiltinPlugins registers and initializes every compile-time-registered
+// builtin plugin (see the PluginRegistry interface doc comment for the
+// design.md D-I security rationale). It deliberately does NOT read
+// configuration: PluginLoader.LoadFromConfig's `type: file` branch reaches
+// plugin.Open, so keeping this path builtin-only is what proves the
+// --workflow entrypoint can never load native code from a config-supplied
+// path.
+func (r *registry) LoadBuiltinPlugins(ctx context.Context, pluginCtx PluginContext) error {
+	if pluginCtx == nil {
+		return errors.New("plugin context cannot be nil")
+	}
+	if r.loader == nil {
+		return nil
+	}
+
+	var failures []error
+	for _, name := range r.loader.ListBuiltins() {
+		r.mutex.RLock()
+		_, exists := r.plugins[name]
+		r.mutex.RUnlock()
+		if exists {
+			continue
+		}
+
+		plugin, err := r.loader.LoadBuiltin(ctx, name)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("builtin plugin %s: %w", name, err))
+			continue
+		}
+		if plugin == nil {
+			failures = append(failures, fmt.Errorf("builtin plugin %s: factory returned nil", name))
+			continue
+		}
+
+		if err := r.registerAndInitialize(ctx, plugin, pluginCtx); err != nil {
+			failures = append(failures, fmt.Errorf("builtin plugin %s: %w", name, err))
+		}
+	}
+
+	if len(failures) > 0 {
+		return fmt.Errorf("failed to load some builtin plugins: %v", failures)
 	}
 
 	return nil

@@ -1,13 +1,25 @@
 # Changelog
 
-All notable changes to Syntegrity Dagger will be documented in this file.
+All notable changes to Shipwright will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+> **Note (2026-09-06, RELEASE-DIST-01A):** the entries below the top four
+> bullets in *Added* (providers/rust wiring, the `ChangelogRunner`
+> provider, the `workspaceguard.ReplaceDirectives()` guard) and the
+> `providers/go` independent-module split in *Changed* accumulated across
+> an unknown span of time without ever being cut into a tagged release.
+> This pass did not attempt to verify each older bullet against a specific
+> commit or PR -- they are kept as historical record, not as a confirmed
+> pending-release list.
+
 ### Added
+- **`providers/rust` wired into the live workflow provider registry** (`internal/workflow/providers/register.go`): `rust` (build), `rust-test` (unit test), `clippy` (lint), `cargo-audit` (vulnerability scan), and `rust-container` (a Rust-specific image publisher, kept separate from `container` because a default Rust build links dynamically against glibc and breaks under `container`'s alpine base)
+- **Changelog generation as a real `Runner` provider** (`internal/workflow/providers/changelog.go`'s `ChangelogRunner`, registered as `changelog`): generates a Keep a Changelog "Unreleased" summary from git history inside a Dagger container and prepends it into `CHANGELOG.md`, replacing the previously dead-code (never executed by the CLI) `internal/app.ChangelogStepHandler`
+- **`ReplaceDirectives()` guard in `workspaceguard`** for general-purpose `go.mod` inspection, backed by a `TestRootGoModHasNoReplaceDirectives` regression test
 - **Automated release system** with conventional commits support
 - **Pre-release workflow** for develop branch testing
 - **Conventional commits helper script** for consistent commit messages
@@ -21,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributing guidelines
 
 ### Changed
+- **`providers/go` published as an independent module**: removed the temporary `replace github.com/pablogore/shipwright/providers/go => ./providers/go` from the root `go.mod`; `providers/go@v0.1.0` now resolves from `proxy.golang.org` instead of the local path
 - **Release workflow** now triggers automatically on main branch merges
 - **Version determination** now uses conventional commits instead of simple patch increments
 - **CI workflow** now skips tag pushes to avoid conflicts with release workflow
@@ -39,6 +52,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved merge conflicts in CI/CD workflows
 - Fixed struct field naming conventions
 - **Removed unnecessary connection verification**: Eliminated redundant connection checks and manual reconnection logic that was causing complexity and potential race conditions. Dagger SDK now handles all connection lifecycle management automatically
+
+## [0.5.0] - 2025-09-14
+
+**⚠️ Legacy release — imported from pre-rebrand history, does not meet the current release-integrity contract (RELEASE-DIST-01A).**
+
+- GitHub Release published 2025-09-14 (02:04 UTC), `target_commitish: develop` — a branch name, not a commit SHA.
+- No corresponding Git tag exists in the current repository history; `v0.5.0` cannot be resolved against any commit today.
+- Published under the legacy `syntegrity-dagger-*` binary naming convention (pre-rebrand), not the current `shipwright-*` distribution contract.
+- Contents cannot be verified against current Git history. No feature list is reconstructed here beyond what is stated above — see [Links](#links) for the raw GitHub Release.
+
+## [0.4.1] - 2025-09-14
+
+**⚠️ Legacy release — imported from pre-rebrand history, does not meet the current release-integrity contract (RELEASE-DIST-01A).**
+
+- GitHub Release published 2025-09-14 (01:52 UTC), `target_commitish: develop` — a branch name, not a commit SHA.
+- No corresponding Git tag exists in the current repository history; `v0.4.1` cannot be resolved against any commit today.
+- Published under the legacy `syntegrity-dagger-*` binary naming convention (pre-rebrand), not the current `shipwright-*` distribution contract.
+- Contents cannot be verified against current Git history. No feature list is reconstructed here beyond what is stated above.
+
+## [0.4.0-beta.1] - 2025-09-14
+
+**⚠️ Legacy pre-release — imported from pre-rebrand history, does not meet the current release-integrity contract (RELEASE-DIST-01A).**
+
+- GitHub Release published 2025-09-14 (01:40 UTC) as a pre-release, `target_commitish: develop` — a branch name, not a commit SHA.
+- No corresponding Git tag exists in the current repository history; `v0.4.0-beta.1` cannot be resolved against any commit today.
+- Commit `3119fa5` ("fix(workflow): fix artifact handling in release workflows") is reachable from current `develop`/`main` and lands 1m38s before this release's publish timestamp — a timing correlation, not proof. No tag ever bound this release to that or any other commit, so the Tag↔Commit link cannot be confirmed.
+- Published under the legacy `syntegrity-dagger-*` binary naming convention (pre-rebrand), not the current `shipwright-*` distribution contract.
 
 ## [0.0.2] - 2024-01-15
 
@@ -62,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.1] - 2024-01-10
 
 ### Added
-- Initial release of Syntegrity Dagger
+- Initial release of Shipwright
 - Core pipeline architecture with dependency injection
 - Go-Kit pipeline implementation
 - Docker-Go pipeline implementation
@@ -208,8 +248,8 @@ When contributing to the project:
 
 ## Links
 
-- [GitHub Releases](https://github.com/getsyntegrity/syntegrity-dagger/releases)
-- [Documentation](https://github.com/getsyntegrity/syntegrity-dagger/tree/main/docs)
+- [GitHub Releases](https://github.com/pablogore/shipwright/releases)
+- [Documentation](https://github.com/pablogore/shipwright/tree/main/docs)
 - [Contributing Guide](CONTRIBUTING.md)
 - [API Reference](docs/API.md)
 

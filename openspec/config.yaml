@@ -1,0 +1,68 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: Go 1.26.1 CLI wrapping the Dagger CI/CD engine (dagger.io/dagger v0.21.8).
+  Architecture: internal/{app,cache,config,executors,interfaces,pipelines,plugins}; koanf-based
+  config, go-kit-logger, ginkgo/gomega + testify test stacks, goreleaser packaging.
+  Testing: `make test` (go test -race), coverage via `make coverage` (90% local / 70% CI gate).
+  Style: golangci-lint (.golangci.yml), gofmt/go vet, pre-commit hooks (go-fmt, go-vet,
+  go-imports, go-mod-tidy, detect-secrets, yamllint).
+
+strict_tdd: true
+
+language:
+  artifacts_default: en
+  dual_version: true
+  note: >
+    Per explicit user preference for this repo, SDD artifacts (proposal, spec, design,
+    tasks) are maintained as browsable dual-language files: an English canonical version
+    plus a neutral-register Spanish companion (e.g. proposal.md + proposal.es.md). The
+    English version remains the source of truth for conflicts.
+
+testing:
+  test_command: "go test -race ./..."
+  build_command: "go build -o shipwright ."
+  lint_command: "golangci-lint run"
+  vet_command: "go vet ./..."
+  fmt_command: "go fmt ./..."
+  coverage_command: "go test -coverprofile=coverage/coverage.out -covermode=atomic ./..."
+  coverage_threshold: 90
+  coverage_threshold_ci: 70
+  frameworks:
+    - testify (assert/require/mock)
+    - ginkgo/gomega (BDD suites, see tests/pipeline_suite_test.go)
+  mocks: go.uber.org/mock (generated) + tests/mocks (manual)
+  quality_tools:
+    linter: golangci-lint (.golangci.yml)
+    formatter: gofmt / goimports
+    pre_commit: .pre-commit-config.yaml (go-fmt, go-vet, go-imports, go-mod-tidy, go-unit-tests -race -short, yamllint, detect-secrets)
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Note any Dagger SDK version or pipeline-step compatibility impact
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Flag tasks touching internal/executors or internal/pipelines as higher risk
+  apply:
+    guidelines:
+      - Follow existing code patterns (see AGENTS.md at repo root)
+      - Errors must be checked and wrapped; never return nil on error, use zero values
+      - No panic/log.Fatal/os.Exit; use go-kit-logger with context
+      - New packages with interfaces need a mocks.go file
+    tdd: true
+    test_command: "go test -race ./..."
+  verify:
+    test_command: "go test -race ./..."
+    build_command: "go build -o shipwright ."
+    coverage_threshold: 90
+  archive:
+    - Warn before merging destructive deltas

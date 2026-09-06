@@ -1,6 +1,6 @@
 # 🌍 Guía de Entornos de Despliegue
 
-Syntegrity Dagger está diseñado para funcionar en múltiples entornos: **local**, **on-premise**, y **GitHub Actions**. Esta guía explica cómo usar el binario en cada entorno.
+Shipwright está diseñado para funcionar en múltiples entornos: **local**, **on-premise**, y **GitHub Actions**. Esta guía explica cómo usar el binario en cada entorno.
 
 ## 📋 Tabla de Contenidos
 
@@ -55,9 +55,9 @@ func detectEnvironment() Environment {
 
 ```bash
 # Descargar binario
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
+curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o shipwright
+chmod +x shipwright
+sudo mv shipwright /usr/local/bin/
 ```
 
 ### Ejecución Local (Sin Docker)
@@ -66,13 +66,13 @@ Para ejecutar sin Docker, usa el flag `--local`:
 
 ```bash
 # Pipeline completo local
-syntegrity-dagger --pipeline go-kit --local
+shipwright --pipeline go-service --local
 
 # Stage específico local
-syntegrity-dagger --pipeline go-kit --step build --local
+shipwright --pipeline go-service --step build --local
 
 # Con configuración
-syntegrity-dagger --pipeline go-kit --config .syntegrity-dagger.yml --local
+shipwright --pipeline go-service --config .shipwright.yml --local
 ```
 
 ### Ejecución Local (Con Docker/Dagger)
@@ -81,10 +81,10 @@ Si tienes Docker y Dagger instalados, puedes ejecutar sin el flag `--local`:
 
 ```bash
 # Pipeline completo con Dagger
-syntegrity-dagger --pipeline go-kit
+shipwright --pipeline go-service
 
 # Stage específico con Dagger
-syntegrity-dagger --pipeline go-kit --step build
+shipwright --pipeline go-service --step build
 ```
 
 ### Requisitos Local
@@ -110,16 +110,16 @@ set -e
 echo "🏠 Running local CI pipeline"
 
 # Setup
-syntegrity-dagger --pipeline go-kit --step setup --local
+shipwright --pipeline go-service --step setup --local
 
 # Build
-syntegrity-dagger --pipeline go-kit --step build --local
+shipwright --pipeline go-service --step build --local
 
 # Test
-syntegrity-dagger --pipeline go-kit --step test --local --coverage 90
+shipwright --pipeline go-service --step test --local --coverage 90
 
 # Lint
-syntegrity-dagger --pipeline go-kit --step lint --local
+shipwright --pipeline go-service --step lint --local
 
 echo "✅ Local CI completed"
 ```
@@ -136,9 +136,9 @@ En entornos on-premise (servidores propios, CI/CD interno), el binario funciona 
 
 ```bash
 # En el servidor CI/CD
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
+curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+chmod +x shipwright
+sudo mv shipwright /usr/local/bin/
 ```
 
 ### Ejecución On-Premise
@@ -147,10 +147,10 @@ El binario detecta automáticamente que no está en GitHub Actions y usa Dagger 
 
 ```bash
 # Pipeline completo
-syntegrity-dagger --pipeline go-kit --env production
+shipwright --pipeline go-service --env production
 
 # Stage específico
-syntegrity-dagger --pipeline go-kit --step build --env staging
+shipwright --pipeline go-service --step build --env staging
 ```
 
 ### Configuración para On-Premise
@@ -158,9 +158,9 @@ syntegrity-dagger --pipeline go-kit --step build --env staging
 Crea un archivo de configuración específico para on-premise:
 
 ```yaml
-# .syntegrity-dagger.onpremise.yml
+# .shipwright.onpremise.yml
 pipeline:
-  name: go-kit
+  name: go-service
   steps:
     - setup
     - build
@@ -195,7 +195,7 @@ pipeline {
     agent any
     
     environment {
-        SYNTEGRITY_DAGGER_VERSION = 'v1.0.0'
+        SHIPWRIGHT_VERSION = 'v1.0.0'
         REGISTRY_URL = credentials('registry-url')
         REGISTRY_USERNAME = credentials('registry-username')
         REGISTRY_PASSWORD = credentials('registry-password')
@@ -205,10 +205,10 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-                    syntegrity-dagger \
-                        --pipeline go-kit \
+                    shipwright \
+                        --pipeline go-service \
                         --step setup \
-                        --config .syntegrity-dagger.onpremise.yml \
+                        --config .shipwright.onpremise.yml \
                         --env production
                 '''
             }
@@ -217,10 +217,10 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                    syntegrity-dagger \
-                        --pipeline go-kit \
+                    shipwright \
+                        --pipeline go-service \
                         --step build \
-                        --config .syntegrity-dagger.onpremise.yml \
+                        --config .shipwright.onpremise.yml \
                         --env production
                 '''
             }
@@ -229,10 +229,10 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                    syntegrity-dagger \
-                        --pipeline go-kit \
+                    shipwright \
+                        --pipeline go-service \
                         --step test \
-                        --config .syntegrity-dagger.onpremise.yml \
+                        --config .shipwright.onpremise.yml \
                         --env production \
                         --coverage 90
                 '''
@@ -242,10 +242,10 @@ pipeline {
         stage('Push') {
             steps {
                 sh '''
-                    syntegrity-dagger \
-                        --pipeline go-kit \
+                    shipwright \
+                        --pipeline go-service \
                         --step push \
-                        --config .syntegrity-dagger.onpremise.yml \
+                        --config .shipwright.onpremise.yml \
                         --env production
                 '''
             }
@@ -265,37 +265,37 @@ stages:
   - push
 
 variables:
-  SYNTEGRITY_DAGGER_VERSION: "v1.0.0"
+  SHIPWRIGHT_VERSION: "v1.0.0"
 
 before_script:
   - |
-    if ! command -v syntegrity-dagger &> /dev/null; then
-      curl -L "https://github.com/getsyntegrity/syntegrity-dagger/releases/download/${SYNTEGRITY_DAGGER_VERSION}/syntegrity-dagger-linux-amd64" -o syntegrity-dagger
-      chmod +x syntegrity-dagger
-      sudo mv syntegrity-dagger /usr/local/bin/
+    if ! command -v shipwright &> /dev/null; then
+      curl -L "https://github.com/pablogore/shipwright/releases/download/${SHIPWRIGHT_VERSION}/shipwright-linux-amd64" -o shipwright
+      chmod +x shipwright
+      sudo mv shipwright /usr/local/bin/
     fi
 
 setup:
   stage: setup
   script:
-    - syntegrity-dagger --pipeline go-kit --step setup --config .syntegrity-dagger.yml
+    - shipwright --pipeline go-service --step setup --config .shipwright.yml
 
 build:
   stage: build
   script:
-    - syntegrity-dagger --pipeline go-kit --step build --config .syntegrity-dagger.yml
+    - shipwright --pipeline go-service --step build --config .shipwright.yml
 
 test:
   stage: test
   script:
-    - syntegrity-dagger --pipeline go-kit --step test --config .syntegrity-dagger.yml --coverage 90
+    - shipwright --pipeline go-service --step test --config .shipwright.yml --coverage 90
 
 push:
   stage: push
   only:
     - main
   script:
-    - syntegrity-dagger --pipeline go-kit --step push --config .syntegrity-dagger.yml --env production
+    - shipwright --pipeline go-service --step push --config .shipwright.yml --env production
 ```
 
 ---
@@ -314,9 +314,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/syntegrity-dagger
+      - uses: ./.github/actions/shipwright
         with:
-          pipeline: go-kit
+          pipeline: go-service
           stage: build
           version: v1.0.0
 ```
@@ -324,14 +324,14 @@ jobs:
 ### Opción 2: Descarga Manual
 
 ```yaml
-- name: Download Syntegrity Dagger
+- name: Download Shipwright
   run: |
-    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-    chmod +x syntegrity-dagger
+    curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+    chmod +x shipwright
 
 - name: Run Pipeline
   run: |
-    ./syntegrity-dagger --pipeline go-kit --step build
+    ./shipwright --pipeline go-service --step build
 ```
 
 ### Ventajas de GitHub Actions
@@ -367,10 +367,10 @@ Ver [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) para más detalles.
 
 ```bash
 # Forzar modo local
-syntegrity-dagger --pipeline go-kit --local
+shipwright --pipeline go-service --local
 
 # Forzar modo CI (sin --local)
-syntegrity-dagger --pipeline go-kit
+shipwright --pipeline go-service
 ```
 
 ### Problema: Docker no disponible en on-premise
@@ -379,7 +379,7 @@ syntegrity-dagger --pipeline go-kit
 
 ```bash
 # Opción 1: Usar modo local
-syntegrity-dagger --pipeline go-kit --local
+shipwright --pipeline go-service --local
 
 # Opción 2: Instalar Docker
 # (depende de tu distribución)
@@ -391,10 +391,10 @@ syntegrity-dagger --pipeline go-kit --local
 
 ```bash
 # Local (SSH)
-syntegrity-dagger --pipeline go-kit --git-auth ssh
+shipwright --pipeline go-service --git-auth ssh
 
 # CI/On-Premise (HTTPS)
-syntegrity-dagger --pipeline go-kit --git-auth https
+shipwright --pipeline go-service --git-auth https
 ```
 
 ### Problema: Variables de entorno no disponibles
@@ -405,10 +405,10 @@ syntegrity-dagger --pipeline go-kit --git-auth https
 # On-Premise
 export REGISTRY_USERNAME="user"
 export REGISTRY_PASSWORD="pass"
-syntegrity-dagger --pipeline go-kit --step push
+shipwright --pipeline go-service --step push
 
 # O usar archivo de configuración
-syntegrity-dagger --pipeline go-kit --config .syntegrity-dagger.yml
+shipwright --pipeline go-service --config .shipwright.yml
 ```
 
 ---
@@ -421,13 +421,13 @@ Crea archivos de configuración específicos:
 
 ```bash
 # Local
-.syntegrity-dagger.local.yml
+.shipwright.local.yml
 
 # On-Premise
-.syntegrity-dagger.onpremise.yml
+.shipwright.onpremise.yml
 
 # GitHub Actions
-.syntegrity-dagger.yml
+.shipwright.yml
 ```
 
 ### 2. Versionar el Binario
@@ -436,25 +436,25 @@ No uses siempre `latest`:
 
 ```bash
 # Local
-SYNTEGRITY_DAGGER_VERSION="v1.0.0"
+SHIPWRIGHT_VERSION="v1.0.0"
 
 # On-Premise
-export SYNTEGRITY_DAGGER_VERSION="v1.0.0"
+export SHIPWRIGHT_VERSION="v1.0.0"
 
 # GitHub Actions
 env:
-  SYNTEGRITY_DAGGER_VERSION: "v1.0.0"
+  SHIPWRIGHT_VERSION: "v1.0.0"
 ```
 
 ### 3. Manejar Secrets Correctamente
 
 ```bash
 # ❌ No hacer
-syntegrity-dagger --pipeline go-kit --env "password=secret"
+shipwright --pipeline go-service --env "password=secret"
 
 # ✅ Hacer
 export REGISTRY_PASSWORD="secret"
-syntegrity-dagger --pipeline go-kit
+shipwright --pipeline go-service
 ```
 
 ### 4. Usar Caché cuando sea Posible

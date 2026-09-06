@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +57,7 @@ func TestDockerExecutor_ExecuteStep_NilClient(t *testing.T) {
 	err := executor.ExecuteStep(ctx, "build")
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Docker executor requires Dagger client")
+	assert.Contains(t, err.Error(), "docker executor requires dagger client")
 }
 
 func TestDockerExecutor_ExecuteStep_UnsupportedStep(t *testing.T) {

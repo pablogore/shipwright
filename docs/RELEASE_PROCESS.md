@@ -1,60 +1,61 @@
 # 🚀 Proceso de Release
 
-Este documento describe cómo funciona el proceso de release de Syntegrity Dagger y cómo los binarios se publican para que los servicios puedan consumirlos.
+Este documento describe cómo funciona el proceso de release de Shipwright y cómo los binarios se publican para que los servicios puedan consumirlos.
 
 ## 📋 Resumen
 
 Cuando se hace un release, el pipeline:
 
-1. **Compila** binarios para múltiples plataformas (Linux, macOS, Windows)
-2. **Publica** archivos comprimidos (tar.gz, zip) vía GoReleaser
-3. **Extrae y renombra** los binarios con nombres estándar
-4. **Publica** binarios directos (sin comprimir) para descarga directa
+1. **Compila** binarios para múltiples plataformas (Linux, macOS, Windows) vía Dagger
+2. **Empaqueta** archivos comprimidos (tar.gz, zip) y genera `checksums.txt`, también vía Dagger
+3. **Publica** el set completo de artefactos (binarios directos + archivos comprimidos + checksums.txt) al GitHub Release vía GitHub CLI
 
 ## 🎯 Binarios Publicados
 
 Cada release incluye dos tipos de archivos:
 
-### 1. Archivos Comprimidos (via GoReleaser)
-- `syntegrity-dagger_1.0.0_linux_amd64.tar.gz`
-- `syntegrity-dagger_1.0.0_linux_arm64.tar.gz`
-- `syntegrity-dagger_1.0.0_darwin_amd64.tar.gz`
-- `syntegrity-dagger_1.0.0_darwin_arm64.tar.gz`
-- `syntegrity-dagger_1.0.0_windows_amd64.zip`
+### 1. Archivos Comprimidos (empaquetados por Dagger)
+- `shipwright_1.0.0_linux_amd64.tar.gz`
+- `shipwright_1.0.0_linux_arm64.tar.gz`
+- `shipwright_1.0.0_darwin_amd64.tar.gz`
+- `shipwright_1.0.0_darwin_arm64.tar.gz`
+- `shipwright_1.0.0_windows_amd64.zip`
+- `shipwright_1.0.0_windows_arm64.zip`
 
 ### 2. Binarios Directos (para CI/CD y uso local)
-- `syntegrity-dagger-linux-amd64`
-- `syntegrity-dagger-linux-arm64`
-- `syntegrity-dagger-darwin-amd64`
-- `syntegrity-dagger-darwin-arm64`
-- `syntegrity-dagger-windows-amd64.exe`
+- `shipwright-linux-amd64`
+- `shipwright-linux-arm64`
+- `shipwright-darwin-amd64`
+- `shipwright-darwin-arm64`
+- `shipwright-windows-amd64.exe`
+- `shipwright-windows-arm64.exe`
 
 ## 📦 Cómo Consumir los Binarios
 
 ### Desde GitHub Actions
 
 ```yaml
-- name: Download Syntegrity Dagger
+- name: Download Shipwright
   run: |
-    curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/v1.0.0/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-    chmod +x syntegrity-dagger
+    curl -L https://github.com/pablogore/shipwright/releases/download/v1.0.0/shipwright-linux-amd64 -o shipwright
+    chmod +x shipwright
 ```
 
 ### Desde Local
 
 ```bash
 # Descargar binario
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/v1.0.0/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
+curl -L https://github.com/pablogore/shipwright/releases/download/v1.0.0/shipwright-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o shipwright
+chmod +x shipwright
+sudo mv shipwright /usr/local/bin/
 ```
 
 ### Desde On-Premise CI/CD
 
 ```bash
 # En Jenkins, GitLab CI, etc.
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/download/v1.0.0/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-chmod +x syntegrity-dagger
+curl -L https://github.com/pablogore/shipwright/releases/download/v1.0.0/shipwright-linux-amd64 -o shipwright
+chmod +x shipwright
 ```
 
 ### Usando "latest"
@@ -62,8 +63,8 @@ chmod +x syntegrity-dagger
 Para obtener siempre la última versión:
 
 ```bash
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-chmod +x syntegrity-dagger
+curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
+chmod +x shipwright
 ```
 
 ## 🔄 Proceso de Release Automático
@@ -78,10 +79,10 @@ El release se activa cuando:
 ### Workflow de Release
 
 1. **Validación**: Determina la versión y genera changelog
-2. **Build y Test**: Compila y ejecuta tests
-3. **GoReleaser**: Publica archivos comprimidos y Docker images
-4. **Extracción de Binarios**: Extrae binarios de los archivos comprimidos
-5. **Publicación Directa**: Sube binarios directos al release
+2. **Build y Test**: Compila y ejecuta tests (workflow de CI, previo al release)
+3. **Dagger**: Compila la matriz de plataformas, empaqueta archivos comprimidos, genera `checksums.txt` y verifica el contrato de integridad antes de publicar nada
+4. **Publicación**: Crea (o verifica, si ya existe) el GitHub Release y sube el set completo de artefactos vía GitHub CLI
+5. **Verificación Post-Publicación**: Descarga el set completo publicado y valida checksums + ejecución del binario
 6. **Resumen**: Muestra información del release
 
 ## 📝 URLs de Descarga
@@ -89,19 +90,19 @@ El release se activa cuando:
 ### Versión Específica
 
 ```
-https://github.com/getsyntegrity/syntegrity-dagger/releases/download/v1.0.0/syntegrity-dagger-linux-amd64
+https://github.com/pablogore/shipwright/releases/download/v1.0.0/shipwright-linux-amd64
 ```
 
 ### Última Versión
 
 ```
-https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64
+https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64
 ```
 
 ### Patrón de URL
 
 ```
-https://github.com/getsyntegrity/syntegrity-dagger/releases/download/{TAG}/syntegrity-dagger-{OS}-{ARCH}
+https://github.com/pablogore/shipwright/releases/download/{TAG}/shipwright-{OS}-{ARCH}
 ```
 
 Donde:
@@ -115,10 +116,10 @@ Para verificar que un binario se descargó correctamente:
 
 ```bash
 # Verificar que es ejecutable
-./syntegrity-dagger --version
+./shipwright --version
 
 # Verificar checksum (si está disponible)
-sha256sum syntegrity-dagger-linux-amd64
+sha256sum shipwright-linux-amd64
 # Comparar con checksums.txt en el release
 ```
 

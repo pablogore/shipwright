@@ -3,17 +3,12 @@ package shared
 import (
 	"testing"
 
-	"dagger.io/dagger"
 	"github.com/stretchr/testify/require"
 )
 
 func TestHTTPSCloner_Clone(t *testing.T) {
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	cloner := NewHTTPSCloner()
 	opts := GitCloneOpts{
@@ -32,11 +27,7 @@ func TestHTTPSCloner_Clone(t *testing.T) {
 
 func TestHTTPSCloner_Clone_Error(t *testing.T) {
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	cloner := NewHTTPSCloner()
 	opts := GitCloneOpts{
@@ -55,11 +46,7 @@ func TestHTTPSCloner_Clone_Error(t *testing.T) {
 
 func TestHTTPSCloner_Clone_InvalidURL(t *testing.T) {
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	cloner := NewHTTPSCloner()
 	opts := GitCloneOpts{

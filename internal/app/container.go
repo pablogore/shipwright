@@ -12,30 +12,23 @@ import (
 
 	"dagger.io/dagger"
 
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/config"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/executors"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-	goservice "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/go-service"
-	infra "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/infra"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/plugins"
-)
+	"github.com/pablogore/kit-logger/pkg/logger"
 
-const (
-	// MaxStepTimeout is the maximum allowed timeout for a step (2 hours)
-	MaxStepTimeout = 2 * time.Hour
-	// DefaultStepTimeout is the default timeout for steps (5 minutes)
-	DefaultStepTimeout = 5 * time.Minute
-	// DefaultStepRetries is the default number of retries for steps
-	DefaultStepRetries = 0
+	golang "github.com/pablogore/shipwright/providers/go"
+	godaggerkit "github.com/pablogore/shipwright/providers/go/daggerkit"
+
+	"github.com/pablogore/shipwright/internal/config"
+	"github.com/pablogore/shipwright/internal/executors"
+	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/plugins"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
 // Static errors for err113 compliance.
 var (
 	ErrComponentNotFound          = errors.New("component not found")
 	ErrFailedToCreateDaggerClient = errors.New("failed to create Dagger client")
-	ErrPipelineNotFound           = errors.New("pipeline not found")
 	ErrInvalidConfiguration       = errors.New("invalid configuration")
 )
 
@@ -118,7 +111,6 @@ func (c *Container) Validate() error {
 // registerComponents registers all application components.
 func (c *Container) registerComponents() {
 	c.registerDaggerComponents()
-	c.registerPipelineComponents()
 	c.registerSecurityComponents()
 	c.registerLoggingComponents()
 	c.registerExecutorComponents()
@@ -148,7 +140,7 @@ func (c *Container) registerDaggerComponents() {
 		// Dagger requires Docker to be running
 		if err := c.verifyDockerAvailable(ctx); err != nil {
 			return nil, fmt.Errorf("%w: Docker not available: %v. "+
-				"Dagger requires Docker to be running. In GitHub Actions, ensure Docker service is configured.",
+				"Dagger requires Docker to be running. In GitHub Actions, ensure Docker service is configured",
 				ErrFailedToCreateDaggerClient, err)
 		}
 
@@ -196,7 +188,7 @@ func (c *Container) registerDaggerComponents() {
 				// Connection successful, but verify daemon is actually ready
 				// by performing a simple operation
 				verifyCtx, verifyCancel := context.WithTimeout(ctx, 10*time.Second)
-				_, verifyErr := client.Container().From("alpine:latest").ID(verifyCtx)
+				_, verifyErr := client.Container().From("alpine:3.24.1").ID(verifyCtx)
 				verifyCancel()
 
 				if verifyErr == nil {
@@ -223,7 +215,7 @@ func (c *Container) registerDaggerComponents() {
 		return nil, fmt.Errorf("%w: failed after %d attempts: %v. "+
 			"Ensure Dagger engine is running (try 'dagger run echo test' to verify). "+
 			"In GitHub Actions, ensure Docker service is available. "+
-			"The daemon may take up to 60 seconds to start on first run.",
+			"The daemon may take up to 60 seconds to start on first run",
 			ErrFailedToCreateDaggerClient, maxRetries+1, lastErr)
 	})
 }
@@ -246,7 +238,7 @@ func (c *Container) verifyDockerAvailable(ctx context.Context) error {
 	if err != nil {
 		// Docker might not be available or daemon not running
 		// Return a helpful error message
-		return fmt.Errorf("Docker not available or daemon not running: %v (output: %s). "+
+		return fmt.Errorf("docker not available or daemon not running: %v (output: %s). "+
 			"In GitHub Actions, add 'services: docker:' to your workflow",
 			err, string(output))
 	}
@@ -256,21 +248,6 @@ func (c *Container) verifyDockerAvailable(ctx context.Context) error {
 		logger.L().InfoContext(ctx, "Docker is available", "version", strings.TrimSpace(string(output)))
 	}
 	return nil
-}
-
-// registerPipelineComponents registers pipeline-related components.
-func (c *Container) registerPipelineComponents() {
-	// Pipeline Registry
-	c.Register("pipelineRegistry", func() (any, error) {
-		registry := NewPipelineRegistry()
-
-		// Register default pipelines
-		registry.Register("go-service", NewGoServicePipeline)
-		registry.Register("infra", NewInfraPipeline)
-		// docker-go functionality has been merged into go-service
-
-		return registry, nil
-	})
 }
 
 // registerSecurityComponents registers security-related components.
@@ -346,31 +323,7 @@ func (c *Container) registerExecutorComponents() {
 	})
 }
 
-// GetPipelineRegistry implements PipelineProvider interface.
-func (c *Container) GetPipelineRegistry() (interfaces.PipelineRegistry, error) {
-	registry, err := c.Get("pipelineRegistry")
-	if err != nil {
-		return nil, err
-	}
-	return registry.(interfaces.PipelineRegistry), nil
-}
-
-// GetPipeline implements PipelineProvider interface.
-func (c *Container) GetPipeline(name string) (interfaces.Pipeline, error) {
-	registry, err := c.GetPipelineRegistry()
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := c.GetDaggerClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return registry.Get(name, client, c.config)
-}
-
-// GetDaggerClient implements PipelineProvider interface.
+// GetDaggerClient returns the cached Dagger client.
 // Returns the cached Dagger client. Connection management is handled by Dagger internally.
 func (c *Container) GetDaggerClient() (*dagger.Client, error) {
 	client, err := c.Get("daggerClient")
@@ -416,47 +369,12 @@ func (c *Container) GetLinter() (interfaces.Linter, error) {
 // GetLogger is deprecated - use logger.L() directly from go-kit-logger
 // This method is kept for backward compatibility but returns nil
 func (c *Container) GetLogger() (interfaces.Logger, error) {
-	return nil, fmt.Errorf("GetLogger is deprecated - use logger.L() directly from go-kit-logger")
+	return nil, errors.New("GetLogger is deprecated - use logger.L() directly from go-kit-logger")
 }
 
 // GetConfiguration returns the configuration instance.
 func (c *Container) GetConfiguration() interfaces.Configuration {
 	return c.config
-}
-
-// PipelineRegistry implements the pipeline registry.
-type PipelineRegistry struct {
-	pipelines map[string]func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline
-}
-
-// NewPipelineRegistry creates a new pipeline registry.
-func NewPipelineRegistry() *PipelineRegistry {
-	return &PipelineRegistry{
-		pipelines: make(map[string]func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline),
-	}
-}
-
-// Register adds a new pipeline to the registry.
-func (r *PipelineRegistry) Register(name string, factory func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline) {
-	r.pipelines[name] = factory
-}
-
-// Get retrieves a pipeline by its name.
-func (r *PipelineRegistry) Get(name string, client *dagger.Client, cfg interfaces.Configuration) (interfaces.Pipeline, error) {
-	factory, ok := r.pipelines[name]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrPipelineNotFound, name)
-	}
-	return factory(client, cfg), nil
-}
-
-// List returns the names of all registered pipelines.
-func (r *PipelineRegistry) List() []string {
-	names := make([]string, 0, len(r.pipelines))
-	for name := range r.pipelines {
-		names = append(names, name)
-	}
-	return names
 }
 
 // VulnChecker implements vulnerability checking.
@@ -605,9 +523,7 @@ func (c *Container) registerPluginComponents() {
 		loader := plugins.NewLoader()
 
 		// Register built-in plugins
-		loader.RegisterBuiltin("nomad-deploy", func() plugins.Plugin {
-			return plugins.NewNomadDeployPlugin()
-		})
+		loader.RegisterBuiltin("nomad-deploy", plugins.NewNomadDeployPlugin)
 
 		return loader, nil
 	})
@@ -629,123 +545,6 @@ func (c *Container) registerHookComponents() {
 	c.Register("hookManager", func() (any, error) {
 		return NewHookManager(), nil
 	})
-}
-
-// PipelineAdapter adapts pipelines.Pipeline to interfaces.Pipeline
-type PipelineAdapter struct {
-	pipeline pipelines.Pipeline
-	config   interfaces.Configuration
-}
-
-// NewPipelineAdapter creates a new pipeline adapter
-func NewPipelineAdapter(pipeline pipelines.Pipeline) *PipelineAdapter {
-	return &PipelineAdapter{pipeline: pipeline}
-}
-
-// NewPipelineAdapterWithConfig creates a new pipeline adapter with configuration
-func NewPipelineAdapterWithConfig(pipeline pipelines.Pipeline, cfg interfaces.Configuration) *PipelineAdapter {
-	return &PipelineAdapter{
-		pipeline: pipeline,
-		config:   cfg,
-	}
-}
-
-// Name returns the name of the pipeline
-func (p *PipelineAdapter) Name() string {
-	return p.pipeline.Name()
-}
-
-// GetAvailableSteps returns the available steps for the pipeline
-func (p *PipelineAdapter) GetAvailableSteps() []string {
-	return []string{"setup", "build", "test", "package", "tag", "push"}
-}
-
-// ExecuteStep executes a specific step
-func (p *PipelineAdapter) ExecuteStep(ctx context.Context, stepName string) error {
-	switch stepName {
-	case "setup":
-		return p.pipeline.Setup(ctx)
-	case "build":
-		return p.pipeline.Build(ctx)
-	case "test":
-		return p.pipeline.Test(ctx)
-	case "package":
-		return p.pipeline.Package(ctx)
-	case "tag":
-		return p.pipeline.Tag(ctx)
-	case "push":
-		return p.pipeline.Push(ctx)
-	default:
-		return fmt.Errorf("unknown step: %s", stepName)
-	}
-}
-
-// BeforeStep returns a hook function to execute before a step
-func (p *PipelineAdapter) BeforeStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	hook := p.pipeline.BeforeStep(ctx, stepName)
-	if hook == nil {
-		return func(_ context.Context) error { return nil }
-	}
-	// Convert pipelines.HookFunc to interfaces.HookFunc
-	return interfaces.HookFunc(hook)
-}
-
-// AfterStep returns a hook function to execute after a step
-func (p *PipelineAdapter) AfterStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	hook := p.pipeline.AfterStep(ctx, stepName)
-	if hook == nil {
-		return func(_ context.Context) error { return nil }
-	}
-	// Convert pipelines.HookFunc to interfaces.HookFunc
-	return interfaces.HookFunc(hook)
-}
-
-// GetStepConfig returns configuration for a step.
-// It reads timeout and retries from configuration if available, otherwise uses defaults.
-func (p *PipelineAdapter) GetStepConfig(stepName string) interfaces.StepConfig {
-	timeout := DefaultStepTimeout
-	retries := DefaultStepRetries
-
-	// Try to read from configuration if available
-	if p.config != nil {
-		// Read timeout from config (format: "step.<stepName>.timeout")
-		timeoutKey := fmt.Sprintf("step.%s.timeout", stepName)
-		if timeoutStr := p.config.GetString(timeoutKey); timeoutStr != "" {
-			if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
-				// Validate timeout doesn't exceed maximum
-				if parsedTimeout <= MaxStepTimeout {
-					timeout = parsedTimeout
-				} else {
-					timeout = MaxStepTimeout
-				}
-			}
-		}
-
-		// Read retries from config (format: "step.<stepName>.retries")
-		retriesKey := fmt.Sprintf("step.%s.retries", stepName)
-		if retriesInt := p.config.GetInt(retriesKey); retriesInt > 0 {
-			retries = retriesInt
-		}
-	}
-
-	return interfaces.StepConfig{
-		Name:        stepName,
-		Description: fmt.Sprintf("Execute %s step", stepName),
-		Required:    true,
-		Timeout:     timeout,
-		Retries:     retries,
-	}
-}
-
-// ValidateStep validates a step name
-func (p *PipelineAdapter) ValidateStep(stepName string) error {
-	validSteps := p.GetAvailableSteps()
-	for _, step := range validSteps {
-		if step == stepName {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid step: %s", stepName)
 }
 
 // validateConvertedConfig validates URLs and versions in the configuration.
@@ -820,23 +619,76 @@ func ConvertConfigToPipelinesConfig(cfg interfaces.Configuration) pipelines.Conf
 	}
 }
 
-// Pipeline factory functions
-func NewGoServicePipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
-	// Validate configuration before conversion
-	if err := validateConvertedConfig(cfg); err != nil {
-		logger.L().WarnContext(context.Background(), "Configuration validation warning", "error", err)
+// BuildCapabilities constructs the Layer 1 capability bundle
+// (pkg/shipwright: Builder/Tester/Artifactor/Deployer/Runner) backed by the
+// standalone providers/go implementations (originally Phase 3's go-service
+// decomposition, extracted from internal/capabilities into its own module),
+// wired from the same pipelines.Config the DI container
+// already produces for the legacy --pipeline path. This is what
+// PluginContext.GetCapabilities() (replacing the retired GetPipeline(),
+// WU10 tasks.md 10.1/10.2) exposes to plugins.
+//
+// Deployer and Runner are always left nil: no concrete implementation
+// exists yet for either (pkg/shipwright.DeployConfig/RunConfig are empty
+// at this change, per design.md D-D) — Capabilities' fields are
+// independently optional by design, so a partial bundle is correct, not a
+// gap. When client is nil (no Dagger connection, e.g. most non-container
+// CLI paths), an empty Capabilities{} is returned rather than constructing
+// implementations against a nil client.
+func BuildCapabilities(client *dagger.Client, cfg pipelines.Config) plugins.Capabilities {
+	if client == nil {
+		return plugins.Capabilities{}
 	}
-	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
-	pipeline := goservice.New(client, pipelineConfig)
-	return NewPipelineAdapterWithConfig(pipeline, cfg)
-}
 
-func NewInfraPipeline(client *dagger.Client, cfg interfaces.Configuration) interfaces.Pipeline {
-	// Validate configuration before conversion
-	if err := validateConvertedConfig(cfg); err != nil {
-		logger.L().WarnContext(context.Background(), "Configuration validation warning", "error", err)
+	goClient := godaggerkit.NewDaggerAdapter(client)
+
+	builder := &golang.GoBuilder{
+		Client: goClient,
+		Config: shipwright.BuildConfig{
+			GoVersion:   cfg.GoVersion,
+			JavaVersion: cfg.JavaVersion,
+		},
 	}
-	pipelineConfig := ConvertConfigToPipelinesConfig(cfg)
-	pipeline := infra.New(client, pipelineConfig)
-	return NewPipelineAdapterWithConfig(pipeline, cfg)
+
+	testers := []shipwright.Tester{
+		&golang.GoUnitTester{
+			Client:    goClient,
+			Config:    shipwright.TestConfig{Coverage: cfg.Coverage},
+			GoVersion: cfg.GoVersion,
+		},
+		&golang.GoLinter{Client: goClient},
+		&golang.GoVulnScanner{Client: goClient, GoVersion: cfg.GoVersion},
+	}
+
+	artifactConfig := shipwright.ArtifactConfig{
+		Registry:     cfg.Registry,
+		RegistryURL:  cfg.RegistryURL,
+		RegistryUser: cfg.RegistryUser,
+		ImageName:    cfg.ImageName,
+		ImageTag:     cfg.ImageTag,
+		BuildTag:     cfg.BuildTag,
+		CommitSHA:    cfg.CommitSHA,
+		BranchName:   cfg.BranchName,
+		Version:      cfg.Version,
+	}
+	if cfg.RegistryPass != "" {
+		artifactConfig.RegistryPass = client.SetSecret("registry-pass", cfg.RegistryPass)
+	}
+	if cfg.RegistryToken != "" {
+		artifactConfig.RegistryToken = client.SetSecret("registry-token", cfg.RegistryToken)
+	}
+	if cfg.Token != "" {
+		artifactConfig.Token = client.SetSecret("generic-token", cfg.Token)
+	}
+
+	artifactor := &golang.ContainerPublisher{
+		Client: goClient,
+		Config: artifactConfig,
+	}
+
+	return plugins.Capabilities{
+		Builder:    builder,
+		Testers:    testers,
+		Artifactor: artifactor,
+	}
 }

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/interfaces"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,14 +17,14 @@ type StepConfig struct {
 	Retries int    `yaml:"retries,omitempty"`
 }
 
-// YAMLConfig represents the structure of the .syntegrity-dagger.yml file
+// YAMLConfig represents the structure of the .shipwright.yml file
 type YAMLConfig struct {
 	Pipeline struct {
 		Name        string       `yaml:"name"`
 		Environment string       `yaml:"environment"`
 		Coverage    float64      `yaml:"coverage"`
 		GoVersion   string       `yaml:"goVersion"`
-		Steps       interface{}  `yaml:"steps"` // Can be []string or []StepConfig
+		Steps       interface{}  `yaml:"steps"`                 // Can be []string or []StepConfig
 		StepConfigs []StepConfig `yaml:"stepConfigs,omitempty"` // Detailed step configurations
 	} `yaml:"pipeline"`
 
@@ -53,6 +53,8 @@ type YAMLConfig struct {
 	Git struct {
 		Protocol string `yaml:"protocol"`
 	} `yaml:"git"`
+
+	Plugins map[string]map[string]any `yaml:"plugins"`
 }
 
 // YAMLParser handles parsing of YAML configuration files
@@ -131,6 +133,13 @@ func (p *YAMLParser) ApplyToConfiguration(yamlConfig *YAMLConfig, config interfa
 		config.Set("git.protocol", yamlConfig.Git.Protocol)
 	}
 
+	// Apply plugin settings
+	if yamlConfig.Plugins != nil {
+		for pluginName, pluginConfig := range yamlConfig.Plugins {
+			config.Set("plugins."+pluginName, pluginConfig)
+		}
+	}
+
 	return nil
 }
 
@@ -206,12 +215,12 @@ func (p *YAMLParser) ValidateConfig(yamlConfig *YAMLConfig) error {
 func (p *YAMLParser) FindConfigFile() (string, error) {
 	// List of possible config file names and locations
 	configFiles := []string{
-		".syntegrity-dagger.yml",
-		".syntegrity-dagger.yaml",
-		"syntegrity-dagger.yml",
-		"syntegrity-dagger.yaml",
-		".github/syntegrity-dagger.yml",
-		".github/syntegrity-dagger.yaml",
+		".shipwright.yml",
+		".shipwright.yaml",
+		"shipwright.yml",
+		"shipwright.yaml",
+		".github/shipwright.yml",
+		".github/shipwright.yaml",
 	}
 
 	// Check current directory first

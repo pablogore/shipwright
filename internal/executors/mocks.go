@@ -61,7 +61,7 @@ func NewMockExecutor() *MockExecutor {
 // NewMockExecutorWithError creates a MockExecutor that returns an error on ExecuteStep.
 func NewMockExecutorWithError(err error) *MockExecutor {
 	return &MockExecutor{
-		ExecuteStepFunc: func(ctx context.Context, stepName string) error {
+		ExecuteStepFunc: func(_ context.Context, _ string) error {
 			return err
 		},
 	}

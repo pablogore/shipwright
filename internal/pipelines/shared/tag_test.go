@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,11 +14,7 @@ func TestGenerateTag_FromEnv(t *testing.T) {
 	t.Setenv("TAG_NAME", tagName)
 
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	src := client.Directory()
 	src = src.WithNewFile(".git/HEAD", "ref: refs/heads/main\n")
@@ -43,11 +38,7 @@ func TestGenerateTag_FromGit(t *testing.T) {
 	t.Setenv("TAG_NAME", "")
 
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Create a fake git repo
 	src := client.Directory()
@@ -67,11 +58,7 @@ func TestGenerateTag_Error_NoGit(t *testing.T) {
 	t.Setenv("TAG_NAME", "")
 
 	ctx := t.Context()
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		t.Fatalf("failed to connect to dagger: %v", err)
-	}
-	defer client.Close()
+	client := requireDaggerClient(ctx, t)
 
 	// Create a directory without git
 	src := client.Directory()

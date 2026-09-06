@@ -1,4 +1,4 @@
-// Package config contiene la configuración de la aplicación Syntegrity.
+// Package config contiene la configuración de la aplicación Shipwright.
 package config
 
 import (

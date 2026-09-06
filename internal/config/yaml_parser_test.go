@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/getsyntegrity/syntegrity-dagger/mocks"
+	"github.com/pablogore/shipwright/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -255,63 +255,63 @@ func TestYAMLParser_FindConfigFile(t *testing.T) {
 		expectedFile string
 	}{
 		{
-			name: "find .syntegrity-dagger.yml in current directory",
+			name: "find .shipwright.yml in current directory",
 			setup: func() func() {
-				_ = os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
-				return func() { os.Remove(".syntegrity-dagger.yml") }
+				_ = os.WriteFile(".shipwright.yml", []byte("test"), 0644)
+				return func() { os.Remove(".shipwright.yml") }
 			},
 			wantErr:      false,
-			expectedFile: ".syntegrity-dagger.yml",
+			expectedFile: ".shipwright.yml",
 		},
 		{
-			name: "find .syntegrity-dagger.yaml in current directory",
+			name: "find .shipwright.yaml in current directory",
 			setup: func() func() {
-				_ = os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
-				return func() { os.Remove(".syntegrity-dagger.yaml") }
+				_ = os.WriteFile(".shipwright.yaml", []byte("test"), 0644)
+				return func() { os.Remove(".shipwright.yaml") }
 			},
 			wantErr:      false,
-			expectedFile: ".syntegrity-dagger.yaml",
+			expectedFile: ".shipwright.yaml",
 		},
 		{
-			name: "find syntegrity-dagger.yml in current directory",
+			name: "find shipwright.yml in current directory",
 			setup: func() func() {
-				_ = os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
-				return func() { os.Remove("syntegrity-dagger.yml") }
+				_ = os.WriteFile("shipwright.yml", []byte("test"), 0644)
+				return func() { os.Remove("shipwright.yml") }
 			},
 			wantErr:      false,
-			expectedFile: "syntegrity-dagger.yml",
+			expectedFile: "shipwright.yml",
 		},
 		{
-			name: "find syntegrity-dagger.yaml in current directory",
+			name: "find shipwright.yaml in current directory",
 			setup: func() func() {
-				_ = os.WriteFile("syntegrity-dagger.yaml", []byte("test"), 0644)
-				return func() { os.Remove("syntegrity-dagger.yaml") }
+				_ = os.WriteFile("shipwright.yaml", []byte("test"), 0644)
+				return func() { os.Remove("shipwright.yaml") }
 			},
 			wantErr:      false,
-			expectedFile: "syntegrity-dagger.yaml",
+			expectedFile: "shipwright.yaml",
 		},
 		{
 			name: "find config in .github directory",
 			setup: func() func() {
 				_ = os.MkdirAll(".github", 0755)
-				_ = os.WriteFile(".github/syntegrity-dagger.yml", []byte("test"), 0644)
+				_ = os.WriteFile(".github/shipwright.yml", []byte("test"), 0644)
 				return func() {
-					os.Remove(".github/syntegrity-dagger.yml")
+					os.Remove(".github/shipwright.yml")
 					os.Remove(".github")
 				}
 			},
 			wantErr:      false,
-			expectedFile: ".github/syntegrity-dagger.yml",
+			expectedFile: ".github/shipwright.yml",
 		},
 		{
 			name: "no config file found",
 			setup: func() func() {
 				// Remove any existing config files
 				configFiles := []string{
-					".syntegrity-dagger.yml",
-					".syntegrity-dagger.yaml",
-					"syntegrity-dagger.yml",
-					"syntegrity-dagger.yaml",
+					".shipwright.yml",
+					".shipwright.yaml",
+					"shipwright.yml",
+					"shipwright.yaml",
 				}
 				for _, file := range configFiles {
 					os.Remove(file)
@@ -376,7 +376,7 @@ release:
 dagger:
   log_output: false
   timeout: "1m"`
-					_ = os.WriteFile(".syntegrity-dagger.yml", []byte(configContent), 0644)
+					_ = os.WriteFile(".shipwright.yml", []byte(configContent), 0644)
 				}
 			},
 			wantErr:     true,
@@ -414,16 +414,16 @@ func TestYAMLParser_FindConfigFile_Priority(t *testing.T) {
 	parser := NewYAMLParser()
 
 	// Create multiple config files to test priority
-	_ = os.WriteFile(".syntegrity-dagger.yaml", []byte("test"), 0644)
-	defer os.Remove(".syntegrity-dagger.yaml")
+	_ = os.WriteFile(".shipwright.yaml", []byte("test"), 0644)
+	defer os.Remove(".shipwright.yaml")
 
-	_ = os.WriteFile("syntegrity-dagger.yml", []byte("test"), 0644)
-	defer os.Remove("syntegrity-dagger.yml")
+	_ = os.WriteFile("shipwright.yml", []byte("test"), 0644)
+	defer os.Remove("shipwright.yml")
 
 	filePath, err := parser.FindConfigFile()
 	require.NoError(t, err)
-	// Should find .syntegrity-dagger.yaml first (higher priority)
-	assert.Equal(t, ".syntegrity-dagger.yaml", filePath)
+	// Should find .shipwright.yaml first (higher priority)
+	assert.Equal(t, ".shipwright.yaml", filePath)
 }
 
 func TestYAMLParser_FindConfigFile_ParentDirectories(t *testing.T) {
@@ -432,13 +432,13 @@ func TestYAMLParser_FindConfigFile_ParentDirectories(t *testing.T) {
 	parser := NewYAMLParser()
 
 	// Create a config file in current directory
-	err := os.WriteFile(".syntegrity-dagger.yml", []byte("test"), 0644)
+	err := os.WriteFile(".shipwright.yml", []byte("test"), 0644)
 	require.NoError(t, err)
-	defer os.Remove(".syntegrity-dagger.yml")
+	defer os.Remove(".shipwright.yml")
 
 	filePath, err := parser.FindConfigFile()
 	require.NoError(t, err)
-	assert.Equal(t, ".syntegrity-dagger.yml", filePath)
+	assert.Equal(t, ".shipwright.yml", filePath)
 }
 
 func TestYAMLConfig_Structure(t *testing.T) {
@@ -475,4 +475,40 @@ func TestYAMLConfig_Structure(t *testing.T) {
 	assert.False(t, config.Release.CreateGithubRelease)
 	assert.Equal(t, []string{"linux/amd64"}, config.Release.Platforms)
 	assert.Equal(t, "info", config.Logging.Level)
+}
+
+// TestYAMLParser_PluginsRoundTrip verifies the fix for #162: plugin config
+// written in .shipwright.yml must survive the full YAML → ParseFile →
+// ApplyToConfiguration → Get path and arrive at the plugin.
+func TestYAMLParser_PluginsRoundTrip(t *testing.T) {
+	yamlContent := `pipeline:
+  name: test-pipeline
+  steps:
+    - setup
+    - build
+plugins:
+  nomad-deploy:
+    nomad_addr: https://nomad.example.com:4646
+    region: global
+`
+	tmpFile := t.TempDir() + "/shipwright.yml"
+	require.NoError(t, os.WriteFile(tmpFile, []byte(yamlContent), 0o644))
+
+	parser := NewYAMLParser()
+	yamlConfig, err := parser.ParseFile(tmpFile)
+	require.NoError(t, err)
+
+	cfg, err := NewConfigurationWrapper()
+	require.NoError(t, err)
+
+	require.NoError(t, parser.ApplyToConfiguration(yamlConfig, cfg))
+
+	// The full YAML → Get path must return the plugin config map.
+	got := cfg.Get("plugins.nomad-deploy")
+	require.NotNil(t, got, "plugins.nomad-deploy must not be nil after YAML round-trip")
+
+	gotMap, ok := got.(map[string]any)
+	require.True(t, ok, "expected map[string]any, got %T", got)
+	assert.Equal(t, "https://nomad.example.com:4646", gotMap["nomad_addr"])
+	assert.Equal(t, "global", gotMap["region"])
 }

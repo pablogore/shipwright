@@ -1,0 +1,13 @@
+{
+  "name": "crosslang-ts",
+  "engineVersion": "v0.21.8",
+  "sdk": {
+    "source": "typescript"
+  },
+  "dependencies": [
+    {
+      "name": "shipwright",
+      "source": "../.."
+    }
+  ]
+}

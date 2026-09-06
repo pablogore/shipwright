@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/getsyntegrity/go-kit-logger/pkg/logger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+	"github.com/pablogore/kit-logger/pkg/logger"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // LocalExecutor executes pipeline steps locally without Docker

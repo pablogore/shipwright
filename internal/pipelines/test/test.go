@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"dagger.io/dagger"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 // Testable is an interface that defines a contract for running tests.

@@ -1,4 +1,4 @@
-# Reglas de Protección de Ramas - Syntegrity Dagger
+# Reglas de Protección de Ramas - Shipwright
 
 ## 🛡️ Configuración de Protección de Ramas
 

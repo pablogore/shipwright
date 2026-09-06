@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"dagger.io/dagger"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/interfaces"
+	"github.com/pablogore/shipwright/internal/pipelines"
+	"github.com/pablogore/shipwright/pkg/shipwright"
 )
 
 func TestMockPlugin(t *testing.T) {
@@ -50,7 +52,7 @@ func TestMockPlugin(t *testing.T) {
 		// Assert
 		assert.Equal(t, "custom-plugin", name)
 		assert.Equal(t, "2.0.0", version)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Error(t, initErr)
 	})
 }
@@ -65,17 +67,17 @@ func TestMockPluginContext(t *testing.T) {
 		client, clientErr := ctx.GetDaggerClient()
 		hookManager := ctx.GetHookManager()
 		logger := ctx.GetLogger()
-		pipeline := ctx.GetPipeline()
-		pipelineConfig := ctx.GetPipelineConfig()
+		caps := ctx.GetCapabilities()
+		pipelineConfig := ctx.GetConfig()
 		stepRegistry := ctx.GetStepRegistry()
 
 		// Assert
 		assert.Nil(t, cfg)
 		assert.Nil(t, client)
-		assert.NoError(t, clientErr)
+		require.NoError(t, clientErr)
 		assert.Nil(t, hookManager)
 		assert.Nil(t, logger)
-		assert.Nil(t, pipeline)
+		assert.Equal(t, Capabilities{}, caps)
 		assert.Equal(t, pipelines.Config{}, pipelineConfig)
 		assert.Nil(t, stepRegistry)
 	})
@@ -86,7 +88,7 @@ func TestMockPluginContext(t *testing.T) {
 		mockCfg := NewMockConfiguration()
 		mockHookManager := NewMockHookManager()
 		mockStepRegistry := NewMockStepRegistry()
-		mockPipeline := NewMockPipeline()
+		mockCaps := Capabilities{Testers: []shipwright.Tester{}}
 		mockLogger := NewMockLogger()
 		daggerClient := &dagger.Client{}
 
@@ -94,9 +96,9 @@ func TestMockPluginContext(t *testing.T) {
 		ctx.GetDaggerClientFunc = func() (*dagger.Client, error) { return daggerClient, nil }
 		ctx.GetHookManagerFunc = func() interfaces.HookManager { return mockHookManager }
 		ctx.GetStepRegistryFunc = func() interfaces.StepRegistry { return mockStepRegistry }
-		ctx.GetPipelineFunc = func() interfaces.Pipeline { return mockPipeline }
+		ctx.GetCapabilitiesFunc = func() Capabilities { return mockCaps }
 		ctx.GetLoggerFunc = func() interfaces.Logger { return mockLogger }
-		ctx.GetPipelineConfigFunc = func() pipelines.Config {
+		ctx.GetConfigFunc = func() pipelines.Config {
 			return pipelines.Config{Env: "test"}
 		}
 
@@ -105,17 +107,17 @@ func TestMockPluginContext(t *testing.T) {
 		client, clientErr := ctx.GetDaggerClient()
 		hookManager := ctx.GetHookManager()
 		logger := ctx.GetLogger()
-		pipeline := ctx.GetPipeline()
-		pipelineConfig := ctx.GetPipelineConfig()
+		caps := ctx.GetCapabilities()
+		pipelineConfig := ctx.GetConfig()
 		stepRegistry := ctx.GetStepRegistry()
 
 		// Assert
 		assert.Equal(t, mockCfg, cfg)
 		assert.Equal(t, daggerClient, client)
-		assert.NoError(t, clientErr)
+		require.NoError(t, clientErr)
 		assert.Equal(t, mockHookManager, hookManager)
 		assert.Equal(t, mockLogger, logger)
-		assert.Equal(t, mockPipeline, pipeline)
+		assert.Equal(t, mockCaps, caps)
 		assert.Equal(t, "test", pipelineConfig.Env)
 		assert.Equal(t, mockStepRegistry, stepRegistry)
 	})
@@ -133,9 +135,9 @@ func TestMockPluginLoader(t *testing.T) {
 
 		// Assert
 		assert.Nil(t, plugin)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, plugin2)
-		assert.NoError(t, err2)
+		require.NoError(t, err2)
 		assert.Nil(t, plugin3)
 		assert.NoError(t, err3)
 	})
@@ -166,9 +168,9 @@ func TestMockPluginLoader(t *testing.T) {
 
 		// Assert
 		assert.Equal(t, testPlugin, plugin1)
-		assert.NoError(t, err1)
+		require.NoError(t, err1)
 		assert.Equal(t, testPlugin, plugin2)
-		assert.NoError(t, err2)
+		require.NoError(t, err2)
 		assert.Equal(t, testPlugin, plugin3)
 		assert.NoError(t, err3)
 	})

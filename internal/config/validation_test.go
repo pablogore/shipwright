@@ -270,5 +270,3 @@ func TestValidateEnvironment(t *testing.T) {
 		})
 	}
 }
-
-

@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	dagger "dagger.io/dagger"
-	pipelines "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	pipelines "github.com/pablogore/shipwright/internal/pipelines"
 	gomock "go.uber.org/mock/gomock"
 )
 

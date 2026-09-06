@@ -2,12 +2,15 @@ package app
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"strings"
 	"time"
 
 	"dagger.io/dagger"
+	"github.com/stretchr/testify/mock"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // MockConfiguration implements interfaces.Configuration interface for testing.
@@ -178,113 +181,6 @@ func (m *MockConfiguration) Validate() error {
 // NewMockConfiguration creates a new mock configuration.
 func NewMockConfiguration() *MockConfiguration {
 	return &MockConfiguration{}
-}
-
-// MockPipeline implements interfaces.Pipeline interface for testing.
-type MockPipeline struct {
-	AfterStepFunc         func(ctx context.Context, stepName string) interfaces.HookFunc
-	BeforeStepFunc        func(ctx context.Context, stepName string) interfaces.HookFunc
-	ExecuteStepFunc       func(ctx context.Context, stepName string) error
-	GetAvailableStepsFunc func() []string
-	GetStepConfigFunc     func(stepName string) interfaces.StepConfig
-	NameFunc              func() string
-	ValidateStepFunc      func(stepName string) error
-}
-
-// AfterStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) AfterStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	if m.AfterStepFunc != nil {
-		return m.AfterStepFunc(ctx, stepName)
-	}
-	return nil
-}
-
-// BeforeStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) BeforeStep(ctx context.Context, stepName string) interfaces.HookFunc {
-	if m.BeforeStepFunc != nil {
-		return m.BeforeStepFunc(ctx, stepName)
-	}
-	return nil
-}
-
-// ExecuteStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) ExecuteStep(ctx context.Context, stepName string) error {
-	if m.ExecuteStepFunc != nil {
-		return m.ExecuteStepFunc(ctx, stepName)
-	}
-	return nil
-}
-
-// GetAvailableSteps implements interfaces.Pipeline interface.
-func (m *MockPipeline) GetAvailableSteps() []string {
-	if m.GetAvailableStepsFunc != nil {
-		return m.GetAvailableStepsFunc()
-	}
-	return nil
-}
-
-// GetStepConfig implements interfaces.Pipeline interface.
-func (m *MockPipeline) GetStepConfig(stepName string) interfaces.StepConfig {
-	if m.GetStepConfigFunc != nil {
-		return m.GetStepConfigFunc(stepName)
-	}
-	return interfaces.StepConfig{}
-}
-
-// Name implements interfaces.Pipeline interface.
-func (m *MockPipeline) Name() string {
-	if m.NameFunc != nil {
-		return m.NameFunc()
-	}
-	return "mock-pipeline"
-}
-
-// ValidateStep implements interfaces.Pipeline interface.
-func (m *MockPipeline) ValidateStep(stepName string) error {
-	if m.ValidateStepFunc != nil {
-		return m.ValidateStepFunc(stepName)
-	}
-	return nil
-}
-
-// NewMockPipeline creates a new mock pipeline.
-func NewMockPipeline() *MockPipeline {
-	return &MockPipeline{}
-}
-
-// MockPipelineRegistry implements interfaces.PipelineRegistry interface for testing.
-type MockPipelineRegistry struct {
-	GetFunc      func(name string, client *dagger.Client, cfg interfaces.Configuration) (interfaces.Pipeline, error)
-	ListFunc     func() []string
-	RegisterFunc func(name string, factory func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline)
-}
-
-// Get implements interfaces.PipelineRegistry interface.
-func (m *MockPipelineRegistry) Get(name string, client *dagger.Client, cfg interfaces.Configuration) (interfaces.Pipeline, error) {
-	if m.GetFunc != nil {
-		return m.GetFunc(name, client, cfg)
-	}
-	return nil, nil
-}
-
-// List implements interfaces.PipelineRegistry interface.
-func (m *MockPipelineRegistry) List() []string {
-	if m.ListFunc != nil {
-		return m.ListFunc()
-	}
-	return nil
-}
-
-// Register implements interfaces.PipelineRegistry interface.
-func (m *MockPipelineRegistry) Register(name string, factory func(*dagger.Client, interfaces.Configuration) interfaces.Pipeline) {
-	if m.RegisterFunc != nil {
-		m.RegisterFunc(name, factory)
-	}
-}
-
-// NewMockPipelineRegistry creates a new mock pipeline registry.
-func NewMockPipelineRegistry() *MockPipelineRegistry {
-	return &MockPipelineRegistry{}
 }
 
 // MockLogger implements interfaces.Logger interface for testing.
@@ -570,92 +466,29 @@ func NewMockLinter() *MockLinter {
 	return &MockLinter{}
 }
 
-// MockPipelinesPipeline implements pipelines.Pipeline interface for testing.
-type MockPipelinesPipeline struct {
-	AfterStepFunc  func(ctx context.Context, step string) pipelines.HookFunc
-	BeforeStepFunc func(ctx context.Context, step string) pipelines.HookFunc
-	BuildFunc      func(ctx context.Context) error
-	NameFunc       func() string
-	PackageFunc    func(ctx context.Context) error
-	PushFunc       func(ctx context.Context) error
-	SetupFunc      func(ctx context.Context) error
-	TagFunc        func(ctx context.Context) error
-	TestFunc       func(ctx context.Context) error
+// MockHTTPClient implements HTTPClient using testify's mock package, so health
+// check tests can assert on requests and control responses without making
+// real network calls.
+type MockHTTPClient struct {
+	mock.Mock
 }
 
-// AfterStep implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) AfterStep(ctx context.Context, step string) pipelines.HookFunc {
-	if m.AfterStepFunc != nil {
-		return m.AfterStepFunc(ctx, step)
+// Do implements HTTPClient.
+func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	args := m.Called(req)
+	var resp *http.Response
+	if v := args.Get(0); v != nil {
+		resp = v.(*http.Response)
 	}
-	return nil
+	return resp, args.Error(1)
 }
 
-// BeforeStep implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) BeforeStep(ctx context.Context, step string) pipelines.HookFunc {
-	if m.BeforeStepFunc != nil {
-		return m.BeforeStepFunc(ctx, step)
+// NewMockHTTPResponse builds a minimal *http.Response for MockHTTPClient
+// expectations to return.
+func NewMockHTTPResponse(statusCode int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: statusCode,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     make(http.Header),
 	}
-	return nil
-}
-
-// Build implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) Build(ctx context.Context) error {
-	if m.BuildFunc != nil {
-		return m.BuildFunc(ctx)
-	}
-	return nil
-}
-
-// Name implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) Name() string {
-	if m.NameFunc != nil {
-		return m.NameFunc()
-	}
-	return "mock-pipeline"
-}
-
-// Package implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) Package(ctx context.Context) error {
-	if m.PackageFunc != nil {
-		return m.PackageFunc(ctx)
-	}
-	return nil
-}
-
-// Push implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) Push(ctx context.Context) error {
-	if m.PushFunc != nil {
-		return m.PushFunc(ctx)
-	}
-	return nil
-}
-
-// Setup implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) Setup(ctx context.Context) error {
-	if m.SetupFunc != nil {
-		return m.SetupFunc(ctx)
-	}
-	return nil
-}
-
-// Tag implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) Tag(ctx context.Context) error {
-	if m.TagFunc != nil {
-		return m.TagFunc(ctx)
-	}
-	return nil
-}
-
-// Test implements pipelines.Pipeline interface.
-func (m *MockPipelinesPipeline) Test(ctx context.Context) error {
-	if m.TestFunc != nil {
-		return m.TestFunc(ctx)
-	}
-	return nil
-}
-
-// NewMockPipelinesPipeline creates a new mock pipelines pipeline.
-func NewMockPipelinesPipeline() *MockPipelinesPipeline {
-	return &MockPipelinesPipeline{}
 }

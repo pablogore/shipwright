@@ -1,6 +1,6 @@
 # Pipeline Development Guide
 
-This guide explains how to create custom pipelines for Syntegrity Dagger, including pipeline implementation, step development, and integration patterns.
+This guide explains how to create custom pipelines for Shipwright, including pipeline implementation, step development, and integration patterns.
 
 ## Pipeline Architecture Overview
 
@@ -48,8 +48,8 @@ import (
     "fmt"
     
     "dagger.io/dagger"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
+    "github.com/pablogore/shipwright/internal/pipelines"
+    "github.com/pablogore/shipwright/internal/pipelines/shared"
 )
 
 // MyPipeline represents a custom pipeline implementation
@@ -157,8 +157,7 @@ func (c *Container) registerPipelineComponents() {
         registry := NewPipelineRegistry()
 
         // Register default pipelines
-        registry.Register("go-kit", NewGoKitPipeline)
-        registry.Register("docker-go", NewDockerGoPipeline)
+        registry.Register("go-service", NewGoServicePipeline)
         registry.Register("infra", NewInfraPipeline)
         
         // Register your custom pipeline
@@ -181,7 +180,7 @@ import (
     "fmt"
     
     "dagger.io/dagger"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+    "github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // MyCustomStepHandler implements a custom pipeline step
@@ -214,7 +213,7 @@ func (h *MyCustomStepHandler) Execute(ctx context.Context) error {
     if h.client != nil {
         // Use Dagger client for container operations
         container := h.client.Container().
-            From("golang:1.25.1-alpine").
+            From("golang:1.26.1-alpine").
             WithMountedDirectory("/src", h.client.Host().Directory(".")).
             WithWorkdir("/src").
             WithExec([]string{"go", "build", "-o", "myapp", "./cmd/myapp"})
@@ -299,7 +298,7 @@ import (
     "context"
     "fmt"
     
-    "github.com/getsyntegrity/syntegrity-dagger/internal/interfaces"
+    "github.com/pablogore/shipwright/internal/interfaces"
 )
 
 // MyCustomHook implements custom pre/post processing
@@ -401,8 +400,8 @@ import (
     
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/require"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-    "github.com/getsyntegrity/syntegrity-dagger/mocks"
+    "github.com/pablogore/shipwright/internal/pipelines"
+    "github.com/pablogore/shipwright/mocks"
 )
 
 func TestMyPipeline_Name(t *testing.T) {
@@ -546,8 +545,8 @@ import (
     "fmt"
     
     "dagger.io/dagger"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
-    "github.com/getsyntegrity/syntegrity-dagger/internal/pipelines/shared"
+    "github.com/pablogore/shipwright/internal/pipelines"
+    "github.com/pablogore/shipwright/internal/pipelines/shared"
 )
 
 // NodePipeline implements a pipeline for Node.js applications

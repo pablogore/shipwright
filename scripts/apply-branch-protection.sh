@@ -5,7 +5,7 @@
 
 set -e
 
-REPO="getsyntegrity/syntegrity-dagger"
+REPO="pablogore/shipwright"
 RULESET_FILE=".github/rulesets/branch-protection-rules.json"
 
 echo "🛡️  Applying branch protection rules to $REPO"

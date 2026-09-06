@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/getsyntegrity/syntegrity-dagger/internal/pipelines"
+	"github.com/pablogore/shipwright/internal/pipelines"
 )
 
 type GoTester struct {
@@ -38,7 +38,7 @@ func (g *GoTester) RunTests(ctx context.Context) error {
 	}
 
 	base := g.Client.Container().
-		From("golang:" + goVersion + "-alpine").
+		From("golang:"+goVersion+"-alpine").
 		WithMountedDirectory("/app", g.Src).
 		WithMountedCache("/go/pkg/mod", goMod).
 		WithMountedCache("/root/.cache/go-build", goBuild).

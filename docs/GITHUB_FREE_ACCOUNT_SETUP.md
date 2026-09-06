@@ -15,7 +15,7 @@ This guide helps you configure GitHub Actions workflows for free GitHub accounts
 1. **Create a Personal Access Token**:
    - Go to: https://github.com/settings/tokens
    - Click "Generate new token" → "Generate new token (classic)"
-   - Name: `SYNTEGRITY_DAGGER_TOKEN`
+   - Name: `SHIPWRIGHT_TOKEN`
    - Select scope: **`repo`** (full control of private repositories)
    - Click "Generate token"
    - **Copy the token immediately** (you won't see it again)
@@ -23,7 +23,7 @@ This guide helps you configure GitHub Actions workflows for free GitHub accounts
 2. **Add Token as Secret**:
    - Go to your repository: `Settings` → `Secrets and variables` → `Actions`
    - Click "New repository secret"
-   - Name: `SYNTEGRITY_DAGGER_TOKEN`
+   - Name: `SHIPWRIGHT_TOKEN`
    - Value: Paste your PAT
    - Click "Add secret"
 
@@ -70,7 +70,7 @@ This guide helps you configure GitHub Actions workflows for free GitHub accounts
 **Cause**: Token doesn't have access to private repository.
 
 **Solution**:
-1. Verify `SYNTEGRITY_DAGGER_TOKEN` secret is configured
+1. Verify `SHIPWRIGHT_TOKEN` secret is configured
 2. Verify token has `repo` scope
 3. Verify token has access to `github.com/getsyntegrity/go-kit-logger`
 4. Check if repository is private and your account has access
@@ -143,10 +143,10 @@ If this succeeds, your token has access. If it fails, check:
 
 **IMPORTANT**: Dependabot uses **separate secrets** from GitHub Actions!
 
-Even if you've configured `SYNTEGRITY_DAGGER_TOKEN` for Actions, you **must also** configure it for Dependabot:
+Even if you've configured `SHIPWRIGHT_TOKEN` for Actions, you **must also** configure it for Dependabot:
 
 1. Go to: `Settings` → `Secrets and variables` → `Dependabot`
-2. Add the same token as `SYNTEGRITY_DAGGER_TOKEN`
+2. Add the same token as `SHIPWRIGHT_TOKEN`
 3. This allows Dependabot to access private repositories
 
 See `docs/DEPENDABOT_SETUP.md` for detailed instructions.

@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-This guide provides step-by-step instructions for deploying Syntegrity Dagger in production environments.
+This guide provides step-by-step instructions for deploying Shipwright in production environments.
 
 ## Prerequisites
 
@@ -29,12 +29,12 @@ This guide provides step-by-step instructions for deploying Syntegrity Dagger in
 Copy the production template:
 
 ```bash
-cp examples/configs/production.yml .syntegrity-dagger.yml
+cp examples/configs/production.yml .shipwright.yml
 ```
 
 ### 2. Configure Registry
 
-Edit `.syntegrity-dagger.yml`:
+Edit `.shipwright.yml`:
 
 ```yaml
 registry:
@@ -129,7 +129,7 @@ export SSH_PRIVATE_KEY="${SSH_PRIVATE_KEY}"
 
 ```bash
 # Run health checks
-syntegrity-dagger --health
+shipwright --health
 
 # Expected output:
 # ✅ Dagger engine is accessible
@@ -141,20 +141,20 @@ syntegrity-dagger --health
 
 ```bash
 # Run pipeline locally first
-syntegrity-dagger --pipeline go-service --local
+shipwright --pipeline go-service --local
 
 # Or test specific step
-syntegrity-dagger --pipeline go-service --step test --local
+shipwright --pipeline go-service --step test --local
 ```
 
 ### 3. Execute Full Pipeline
 
 ```bash
 # Run complete pipeline
-syntegrity-dagger --pipeline go-service
+shipwright --pipeline go-service
 
 # With specific configuration
-syntegrity-dagger --pipeline go-service --config .syntegrity-dagger.yml
+shipwright --pipeline go-service --config .shipwright.yml
 ```
 
 ## CI/CD Integration
@@ -184,7 +184,7 @@ jobs:
           REGISTRY_USER: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          syntegrity-dagger --pipeline go-service --config .syntegrity-dagger.yml
+          shipwright --pipeline go-service --config .shipwright.yml
 ```
 
 ### GitLab CI
@@ -196,7 +196,7 @@ build:
     - curl -L https://dagger.io/dagger/install.sh | sh
     - export PATH="$PATH:/usr/local/bin"
   script:
-    - syntegrity-dagger --pipeline go-service --config .syntegrity-dagger.yml
+    - shipwright --pipeline go-service --config .shipwright.yml
   variables:
     REGISTRY_USER: $CI_REGISTRY_USER
     REGISTRY_TOKEN: $CI_JOB_TOKEN
@@ -248,7 +248,7 @@ Run health checks regularly:
 
 ```bash
 # Scheduled health check
-syntegrity-dagger --health
+shipwright --health
 ```
 
 ### 2. Logging
@@ -282,13 +282,13 @@ Monitor pipeline failures:
    ```bash
    # Solution: Verify credentials
    echo $REGISTRY_TOKEN
-   syntegrity-dagger --health
+   shipwright --health
    ```
 
 3. **Timeout Errors**
    ```bash
    # Solution: Increase timeout in configuration
-   # Edit .syntegrity-dagger.yml and increase step timeout
+   # Edit .shipwright.yml and increase step timeout
    ```
 
 4. **Coverage Below Threshold**
@@ -304,7 +304,7 @@ If a deployment fails:
 
 1. **Identify the failing step**
    ```bash
-   syntegrity-dagger --pipeline go-service --step <step-name>
+   shipwright --pipeline go-service --step <step-name>
    ```
 
 2. **Check logs** for detailed error messages
@@ -319,7 +319,7 @@ For issues or questions:
 
 1. Check the troubleshooting guide: `docs/TROUBLESHOOTING.md`
 2. Review error messages (they include suggestions)
-3. Run health checks: `syntegrity-dagger --health`
+3. Run health checks: `shipwright --health`
 4. Check Dagger documentation: https://docs.dagger.io
 
 ## Additional Resources

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseStepConfig(t *testing.T) {
@@ -46,7 +47,7 @@ func TestParseStepConfig(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.timeout, duration)
 			}
 		})
@@ -55,28 +56,28 @@ func TestParseStepConfig(t *testing.T) {
 
 func TestValidateStepTimeout(t *testing.T) {
 	tests := []struct {
-		name      string
-		timeout   time.Duration
+		name       string
+		timeout    time.Duration
 		maxTimeout time.Duration
-		wantErr   bool
+		wantErr    bool
 	}{
 		{
-			name:      "valid timeout within limit",
-			timeout:   5 * time.Minute,
+			name:       "valid timeout within limit",
+			timeout:    5 * time.Minute,
 			maxTimeout: 2 * time.Hour,
-			wantErr:   false,
+			wantErr:    false,
 		},
 		{
-			name:      "timeout exceeds maximum",
-			timeout:   3 * time.Hour,
+			name:       "timeout exceeds maximum",
+			timeout:    3 * time.Hour,
 			maxTimeout: 2 * time.Hour,
-			wantErr:   true,
+			wantErr:    true,
 		},
 		{
-			name:      "zero timeout is valid",
-			timeout:   0,
+			name:       "zero timeout is valid",
+			timeout:    0,
 			maxTimeout: 2 * time.Hour,
-			wantErr:   false,
+			wantErr:    false,
 		},
 	}
 
@@ -91,5 +92,3 @@ func TestValidateStepTimeout(t *testing.T) {
 		})
 	}
 }
-
-

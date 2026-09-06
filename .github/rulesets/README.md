@@ -44,7 +44,7 @@ Protege las ramas `main` y `develop` con las siguientes reglas:
 ### Opción 2: GitHub CLI Manual
 
 ```bash
-gh api repos/getsyntegrity/syntegrity-dagger/rulesets \
+gh api repos/pablogore/shipwright/rulesets \
   --method POST \
   --input .github/rulesets/branch-protection-rules.json
 ```
@@ -56,13 +56,13 @@ curl -X POST \
   -H "Authorization: token YOUR_TOKEN" \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/getsyntegrity/syntegrity-dagger/rulesets \
+  https://api.github.com/repos/pablogore/shipwright/rulesets \
   -d @.github/rulesets/branch-protection-rules.json
 ```
 
 ## 🔍 Verificar las Reglas
 
-1. Ve a: https://github.com/getsyntegrity/syntegrity-dagger/settings/rules
+1. Ve a: https://github.com/pablogore/shipwright/settings/rules
 2. Verifica que las reglas estén aplicadas a `main` y `develop`
 
 ## ⚠️ Importante

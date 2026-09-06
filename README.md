@@ -1,373 +1,258 @@
-# Syntegrity Dagger
+# Shipwright
 
-[![Release Pipeline](https://github.com/getsyntegrity/syntegrity-dagger/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/getsyntegrity/syntegrity-dagger/actions/workflows/release.yml)
+[![Release Pipeline](https://github.com/pablogore/shipwright/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/pablogore/shipwright/actions/workflows/release.yml)
 
-A unified CI/CD pipeline library for Go projects, built on top of Dagger SDK. Syntegrity Dagger provides standardized, reusable pipelines that can be easily integrated into any Go project's CI/CD workflow.
+Shipwright is a Dagger-powered software delivery engine: it defines CI/CD
+pipelines as code, once, so they can run the same way on your laptop and in
+any CI provider.
 
-## 🚀 Features
+## Why Shipwright?
 
-- **Unified Pipeline Architecture**: Standardized CI/CD pipelines for different Go project types
-- **Local & Cloud Execution**: Run pipelines locally without Docker or in CI/CD with full container support
-- **Multiple Executors**: Native execution (no Docker) or Docker-based execution via Dagger
-- **Auto-Detection**: Automatically detects local vs CI/CD environment and selects appropriate executor
-- **Multiple Pipeline Types**: Support for go-service (generic), infra, and custom pipelines
-- **Flexible Configuration**: YAML-based configuration with environment variable overrides
-- **Extensible Design**: Plugin architecture for custom steps and hooks
-- **Cross-Platform**: Works on Linux, macOS, and Windows
-- **Security First**: Built-in vulnerability scanning and security checks
-- **Smart Caching**: Multi-level caching for faster execution (modules, build, Docker layers)
+CI/CD logic tends to spread out and drift: provider YAML (GitHub Actions,
+GitLab CI, Jenkins) accumulates business delivery logic, local scripts
+reimplement a looser version of the same thing for developer convenience,
+and every repository re-derives its own version of "lint, test, build,
+scan, package, publish." Shipwright's premise is that this logic should live
+in one place, as code, executed consistently — with CI providers reduced to
+thin triggers instead of the source of truth for delivery behavior.
 
-## 📋 Supported Pipeline Types
+## Status
 
-### Go-Service Pipeline (Generic)
-Generic pipeline for Go microservices with configurable options:
-- **Build Modes**: Binary-only, Docker-only, or both
-- **Framework Support**: Standard Go, go-kit, Gin, Echo
-- **Dependency management**: Automatic Go modules handling
-- **Unit testing**: With configurable coverage thresholds
-- **Linting**: golangci-lint integration
-- **Security scanning**: govulncheck integration
-- **Docker image building**: Optional, configurable
-- **Container registry publishing**: Optional, configurable
+Shipwright is under active architectural evolution. It started as a
+Go-specific pipeline library and is moving toward a provider-neutral,
+polyglot delivery engine built on [Dagger](https://dagger.io). Some of what
+follows already works today; some of it is the direction the project is
+heading. They are marked accordingly — do not assume a "planned" item is
+already usable.
 
-### Infrastructure Pipeline
-For infrastructure and deployment automation:
-- Terraform validation
-- Infrastructure testing
-- Deployment automation
-- Environment management
+**Available today**
+- A compiled Go CLI/binary (`shipwright`) whose sole entrypoint is a
+  declarative workflow manifest engine (`--workflow`, `shipwright.dev/v1`
+  schema) that composes registered providers per step. Providers registered
+  today include five Go providers (setup/test, lint, vulnerability scan,
+  build, container publish) plus a full Rust equivalent set (`rust`,
+  `rust-test`, `rust-integration-test`, `clippy`, `cargo-audit`,
+  `rust-container`) and toolchain-drift `runtime-inspect`/`runtime-upgrade`
+  capabilities.
+- A Docker/Dagger-based execution path for workflow steps.
+- Rust provider support (`providers/rust`): a Go-implemented provider
+  package — builder, unit/integration testers, linter, vulnerability
+  scanner, container publisher — mirroring `providers/go`'s shape and
+  consumed through the workflow manifest engine above. Proven standalone
+  (`GOWORK=off`, no workspace, no `replace` directive) on every push via
+  `make provider-rust-standalone`, and via a dedicated git-tag release
+  workflow.
+- A public, versionable Dagger Module API at the repository root (`dagger
+  call`; see `.dagger/capabilities.go` and `COMPATIBILITY.md`). The five
+  core capabilities (`Builder`/`Tester`/`Artifactor`/`Deployer`/`Runner`)
+  are wired into a chainable `Plan`/`Execute` composition today, versioned
+  via `ContractVersion` (currently `1.0.0`). Two further capabilities,
+  `RuntimeInspector`/`RuntimeUpgrader`, are also declared as Dagger
+  Interfaces but not yet wired into `Plan`'s composition chain.
+- A GitHub Actions composite action that wraps the CLI.
+- A plugin/hook registration system at the infrastructure level.
 
-## 🛠️ Installation
+**Planned / evolving**
+- One unified pipeline/step abstraction (two structurally similar `Pipeline`
+  interfaces exist internally today, bridged by an adapter).
+- Typed artifacts between steps (today steps communicate through struct
+  fields and host paths).
+- Reusable step composition — configuring, disabling, replacing, or
+  inserting steps without forking Shipwright.
+- An additional language toolchain (Java) — not implemented today (Rust
+  ships today, see above).
+- Wiring `RuntimeInspector`/`RuntimeUpgrader` into the Dagger Module API's
+  `Plan`/`Execute` composition chain.
+- Build-once/promote artifact handling and an explicit Git-lifecycle
+  (feature/develop/release/main/hotfix) model.
+- GitLab CI and Jenkins integration with parity to the GitHub Actions path.
 
-### Quick Install
+See [docs/PRD.md](docs/PRD.md) for the full product vision, current-state
+detail, and roadmap.
 
-```bash
-# Install latest version
-curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash
+## How it works today
 
-# Install specific version
-curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash -s -- -v v1.0.0
-
-# Download binary directly
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-linux-amd64 -o syntegrity-dagger
-chmod +x syntegrity-dagger
-```
-### Manual Installation
-
-```bash
-# Download binary for your platform
-PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/')
-VERSION="latest"  # or specific version like "v1.0.0"
-
-curl -L "https://github.com/getsyntegrity/syntegrity-dagger/releases/download/${VERSION}/syntegrity-dagger-${PLATFORM}" -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
-```
-
-## 🚀 Quick Start
-
-### Running Locally in Your Project
-
-**Easiest way - Copy and run:**
-
-```bash
-# 1. Copy the script to your project root
-cp examples/local/run-local.sh .
-chmod +x run-local.sh
-
-# 2. Run the pipeline
-./run-local.sh go-service
-
-# 3. Or run specific steps
-./run-local.sh go-service build
-./run-local.sh go-service test
-```
-
-**Or use directly (auto-detects local execution):**
+Shipwright ships as a single binary whose only entrypoint is a declarative
+workflow manifest (`shipwright.dev/v1` schema). It executes steps against
+a Dagger-provisioned environment.
 
 ```bash
-# Install syntegrity-dagger (one time)
-curl -L https://github.com/getsyntegrity/syntegrity-dagger/releases/latest/download/syntegrity-dagger-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -o syntegrity-dagger
-chmod +x syntegrity-dagger
-sudo mv syntegrity-dagger /usr/local/bin/
+# Build from source
+git clone https://github.com/pablogore/shipwright.git
+cd shipwright
+make build
 
-# Run pipeline locally (auto-detects, no Docker needed)
-syntegrity-dagger --pipeline go-service
+# Run every step in a workflow manifest
+./shipwright --workflow path/to/workflow.yaml
 
-# Or explicitly force local execution
-syntegrity-dagger --local --pipeline go-service
+# Run a single step (and its needs-transitive dependencies)
+./shipwright --workflow path/to/workflow.yaml --step test
 
-# Run specific step
-syntegrity-dagger --pipeline go-service --step test
+# List the steps declared in a manifest instead of executing them
+./shipwright --workflow path/to/workflow.yaml --list-steps
 
-# Use native executor explicitly (fastest, no Docker)
-syntegrity-dagger --executor native --pipeline go-service
+# Select which branch predicate conditional steps evaluate against
+./shipwright --workflow path/to/workflow.yaml --branch main
 ```
 
-**Key Benefits of Local Execution:**
-- ⚡ **Faster**: No Docker overhead
-- 💚 **Lower resource usage**: Uses your local Go installation
-- 🔧 **Same tools**: Uses your local golangci-lint, govulncheck if installed
-- 🏠 **Perfect for development**: Test pipelines before committing
+A missing or invalid manifest fails closed with an explicit error — there is
+no fallback pipeline to run instead. `--workflow`, `--step`, `--list-steps`,
+and `--branch` are the flags that actually affect a workflow run; see
+`shipwright --help` for the full flag set, but note that several flags in
+that list (`--executor`, `--local`, `--env`, `--coverage`, `--git-ref`,
+`--git-auth`, `--config`/`.shipwright.yml`) are parsed but currently have no
+effect on `--workflow` execution — everything a workflow needs (source,
+secrets, variables, per-step options) is declared in the manifest itself.
 
-See [Local Usage Guide](docs/LOCAL_USAGE.md) for detailed instructions.
-
-### Basic Usage (With Docker/Dagger)
+### Building from source
 
 ```bash
-# Run go-service pipeline with Docker (for CI/CD validation)
-syntegrity-dagger --executor docker --pipeline go-service --env dev --coverage 90
-
-# Run infrastructure pipeline
-syntegrity-dagger --pipeline infra --env staging
-
-# Auto-detect executor (native if local, docker if CI/CD)
-syntegrity-dagger --pipeline go-service --env prod
+git clone https://github.com/pablogore/shipwright.git
+cd shipwright
+go mod download
+make build   # builds ./shipwright
+make test    # go test -race ./...
+make lint    # golangci-lint
 ```
 
-### Configuration File
+Requires Go 1.26 (see `go.mod` / `.go-version`) and Docker, since workflow
+steps run via Dagger.
 
-Create a `.syntegrity-dagger.yml` file:
-
-```yaml
-pipeline:
-  name: go-kit
-  coverage: 90
-  skip_push: false
-  only_build: false
-  only_test: false
-  verbose: true
-
-environment: dev
-
-git:
-  ref: main
-  protocol: ssh
-
-registry:
-  url: registry.example.com
-  username: ${REGISTRY_USERNAME}
-  password: ${REGISTRY_PASSWORD}
-
-steps:
-  - name: setup
-    required: true
-    timeout: 5m
-  - name: build
-    required: true
-    timeout: 10m
-  - name: test
-    required: true
-    timeout: 15m
-```
-
-## 🔧 Command Line Interface
-
-### Available Commands
-
-```bash
-# Show help
-syntegrity-dagger --help
-
-# Show version
-syntegrity-dagger --version
-
-# List available pipelines
-syntegrity-dagger --list-pipelines
-
-# List steps for a pipeline
-syntegrity-dagger --list-steps --pipeline go-kit
-
-# Execute specific step
-syntegrity-dagger --pipeline go-kit --step build
-
-# Execute with configuration file
-syntegrity-dagger --config .syntegrity-dagger.yml
-```
-
-### Command Line Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--pipeline` | Pipeline type to execute | Required |
-| `--env` | Environment (dev, staging, prod) | dev |
-| `--coverage` | Minimum test coverage percentage | 80 |
-| `--config` | Path to configuration file | - |
-| `--step` | Execute specific step only | - |
-| `--only-build` | Execute build step only | false |
-| `--only-test` | Execute test step only | false |
-| `--local` | Force local execution without Docker | false |
-| `--executor` | Executor to use: native, docker (empty for auto-detection) | auto |
-| `--verbose` | Enable verbose logging | false |
-
-## 🔄 CI/CD Integration
+Compiled release binaries for Linux/macOS/Windows (amd64/arm64) are
+published on the [GitHub Releases](https://github.com/pablogore/shipwright/releases)
+page.
 
 ### GitHub Actions
 
-```yaml
-name: CI/CD Pipeline
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v5
-    
-    - name: Install Syntegrity Dagger
-      run: |
-        curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash
-    
-    - name: Run Pipeline
-      run: |
-        syntegrity-dagger --pipeline go-kit --env dev --coverage 90
-      env:
-        REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-```
-
-### GitLab CI
+A composite action wraps the CLI so provider YAML stays a thin trigger:
 
 ```yaml
-stages:
-  - build
-  - test
-  - deploy
-
-variables:
-  SYNTERGRITY_VERSION: "latest"
-
-before_script:
-  - curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash -s -- -v $SYNTERGRITY_VERSION
-
-build:
-  stage: build
-  script:
-    - syntegrity-dagger --pipeline go-kit --only-build
+- uses: actions/checkout@v4
+- uses: ./.github/actions/shipwright
+  with:
+    workflow: .shipwright/workflow.yaml
+    step: test
+    branch: develop
 ```
 
-### Jenkins
+See [examples/github-actions](examples/github-actions/) for complete
+workflow examples.
 
-```groovy
-pipeline {
-    agent any
-    
-    stages {
-        stage('Setup') {
-            steps {
-                sh '''
-                    curl -fsSL https://raw.githubusercontent.com/getsyntegrity/syntegrity-dagger/main/install.sh | bash
-                '''
-            }
-        }
-        
-        stage('Build') {
-            steps {
-                sh 'syntegrity-dagger --pipeline go-kit --only-build'
-            }
-        }
-        
-        stage('Test') {
-            steps {
-                sh 'syntegrity-dagger --pipeline go-kit --only-test --coverage 90'
-            }
-        }
-    }
-}
+## Architecture direction
+
+```
+GitHub Actions / GitLab CI / Jenkins / Local
+                    |
+                    v
+                Shipwright
+                    |
+        +-----------+-----------+
+        |           |           |
+    Lifecycle*  Pipeline    Toolchain*
+        |           |           |
+        +-----------+-----------+
+                    |
+                  Dagger
+                    |
+                    v
+          reproducible execution
 ```
 
-## 🏗️ Architecture
+`*` marks target components that do not exist as standalone abstractions
+yet — `Lifecycle` and `Toolchain` are goals of the ongoing architectural
+evolution, not shipped concepts. `Pipeline` exists today but as two
+overlapping internal interfaces rather than one unified model. `Dagger` is
+already the real execution substrate for the workflow manifest engine's
+container-based steps.
 
-Syntegrity Dagger follows a modular architecture with clear separation of concerns:
+## Current capabilities
 
-- **Application Layer**: CLI interface and application lifecycle management
-- **Pipeline Layer**: Pipeline implementations and registry
-- **Step Layer**: Individual pipeline steps (build, test, lint, etc.)
-- **Infrastructure Layer**: Dagger integration and container management
-- **Configuration Layer**: Configuration management and validation
+Verified against the repository:
 
-For detailed architecture documentation, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Declarative workflow manifests (`--workflow`, `shipwright.dev/v1` schema)
+  composing registered Go and Rust providers per step: test with coverage
+  threshold, `golangci-lint`/`clippy` linting, `govulncheck`/`cargo-audit`
+  vulnerability scanning, binary and/or container image build, and
+  toolchain-drift `runtime-inspect`/`runtime-upgrade`.
+- A public, versionable Dagger Module API at the repository root (`dagger
+  call`, `.dagger/capabilities.go`) exposing `Builder`/`Tester`/
+  `Artifactor`/`Deployer`/`Runner` as chainable Dagger Interfaces via
+  `Plan`/`Execute` — see `COMPATIBILITY.md` for the exact guaranteed
+  surface.
+- Dagger-provisioned execution for workflow steps.
+- Plugin registry/loader and a hook manager at the infrastructure layer
+  (one built-in plugin, `nomad-deploy`); pipelines do not yet invoke
+  before/after hooks.
+- GitHub Actions composite action and example workflows.
+- Dagger-based multi-platform release builds, packaging, and checksums, published via GitHub CLI.
 
-## 🔧 Development
+## Legacy / internal historical implementation
 
-### Prerequisites
+`internal/pipelines/` still contains the original `go-service` and `infra`
+pipeline implementations (setup/test/lint/scan/build/package/tag/push logic
+predating the workflow manifest engine). **They are not invocable from the
+current CLI** — the `--pipeline` flag and preset registry that used to
+dispatch to them were removed, and `main.go`'s only entrypoint is
+`--workflow`. The code remains in the tree as history/reference, not as a
+supported delivery path.
 
-- Go 1.25.1 or later
-- Docker (for container-based pipelines)
-- Make (for build automation)
+## Roadmap
 
-### Building from Source
+High-level themes (see [docs/PRD.md](docs/PRD.md) §22 for detail):
+
+- Wire `RuntimeInspector`/`RuntimeUpgrader` into the Dagger Module API's
+  `Plan`/`Execute` composition chain (both capabilities exist today but
+  are not yet chained)
+- Unified pipeline/step model (retire the duplicate `Pipeline` interfaces)
+- Typed artifacts between steps
+- Pipeline composition: configure, disable, add, replace, insert steps
+- Additional polyglot toolchain: Java (Rust ships today via `providers/rust`)
+- Explicit Git-lifecycle engine (feature/develop/release/main/hotfix)
+- Build-once, promote: immutable release artifacts
+- Provider-neutral integrations (GitLab CI, Jenkins) with GitHub Actions
+  parity
+- Reproducibility: eliminate mutable `latest` dependencies, pin toolchain
+  versions
+- Structured, queryable execution observability
+
+## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/getsyntegrity/syntegrity-dagger.git
-cd syntegrity-dagger
-
-# Install dependencies
-go mod download
-
-# Build the binary
-make build
-
-# Run tests
-make test
-
-# Run linting
-make lint
+make build     # build the shipwright binary
+make test      # go test -race ./...
+make lint      # golangci-lint
+make coverage  # coverage report with threshold validation
 ```
 
-### Project Structure
+Project layout:
 
 ```
-syntegrity-dagger/
-├── cmd/                    # CLI commands
+shipwright/
+├── main.go                 # CLI entry point
 ├── internal/
-│   ├── app/               # Application layer
-│   ├── config/            # Configuration management
-│   ├── interfaces/        # Interface definitions
-│   └── pipelines/         # Pipeline implementations
-├── examples/              # Usage examples
-├── docs/                  # Documentation
-└── tests/                 # Integration tests
+│   ├── app/                # DI container, executors, plugin/hook wiring
+│   ├── config/             # configuration loading and validation
+│   ├── executors/          # native and Docker/Dagger execution
+│   ├── interfaces/         # shared interfaces
+│   ├── pipelines/          # legacy pipeline implementations (go-service, infra) -- not invocable from the CLI
+│   └── plugins/            # plugin/hook system
+├── examples/                # usage examples (GitHub Actions, Jenkins, local)
+└── docs/                    # documentation
 ```
 
-## 📚 Documentation
+## Documentation
 
-- [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
-- [Pipeline Development](docs/PIPELINE_DEVELOPMENT.md) - Creating custom pipelines
-- [Configuration Reference](docs/CONFIGURATION.md) - Configuration options
-- [API Reference](docs/API.md) - Programmatic API documentation
-- [Release Process](docs/RELEASE_PROCESS.md) - Automated release system
-- [Examples](examples/) - Usage examples and templates
+- [Product Requirements Document](docs/PRD.md) — canonical product vision,
+  current-state detail, target architecture, and roadmap
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [Local Usage Guide](docs/LOCAL_USAGE.md)
+- [Pipeline Development](docs/PIPELINE_DEVELOPMENT.md)
+- [Configuration Reference](docs/CONFIGURATION.md)
+- [API Reference](docs/API.md)
+- [Release Process](docs/RELEASE_PROCESS.md)
+- [Examples](examples/)
 
-## 🤝 Contributing
+## Support
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-## 🆘 Support
-
-- **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/getsyntegrity/syntegrity-dagger/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/getsyntegrity/syntegrity-dagger/discussions)
-
-## 🗺️ Roadmap
-
-- [ ] Support for additional programming languages
-- [ ] Kubernetes deployment pipelines
-- [ ] Advanced security scanning
-- [ ] Pipeline visualization and monitoring
-- [ ] Plugin marketplace
-
----
-
-**Syntegrity Dagger** - Unified CI/CD pipelines for modern Go applications.
-# Test commit to verify GoReleaser fix
+- [GitHub Issues](https://github.com/pablogore/shipwright/issues)
+- [GitHub Discussions](https://github.com/pablogore/shipwright/discussions)
