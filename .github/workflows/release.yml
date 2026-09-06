@@ -590,7 +590,8 @@ jobs:
         scripts/verify-release-set.sh \
           "${{ needs.validate-release.outputs.tag }}" \
           "${{ needs.validate-release.outputs.version }}" \
-          "${{ steps.provenance.outputs.sha }}"
+          "${{ steps.provenance.outputs.sha }}" \
+          "${{ github.repository }}"
 
     - name: 'Update CHANGELOG.md in repository'
       if: "needs.validate-release.outputs.type == 'automatic'"
