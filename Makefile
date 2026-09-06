@@ -19,9 +19,6 @@ GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 BINARY_NAME=shipwright
 
-# Tools
-GORELEASER=goreleaser
-
 # Coverage threshold
 COVERAGE_THRESHOLD=90
 COVERAGE_THRESHOLD_CI=70
@@ -40,7 +37,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test test-integration deps tools-install release release-snapshot release-dry-run help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone provider-rust-standalone
+.PHONY: all build clean test dagger-test test-integration deps help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone provider-rust-standalone
 
 # Help target
 .PHONY: help
@@ -57,7 +54,6 @@ help: ## Show this help message
 	@echo "  make test               # Run all tests"
 	@echo "  make coverage           # Generate complete coverage report"
 	@echo "  make local-run          # Run pipeline locally"
-	@echo "  make tools-install      # Install development tools"
 	@echo ""
 	@echo "Coverage:"
 	@echo "  make coverage           # Generate comprehensive ASCII coverage report with threshold validation"
@@ -156,13 +152,6 @@ deps: ## Download and tidy dependencies
 	$(GOMOD) download
 	$(GOMOD) tidy
 	@echo -e "$(GREEN)✅ Dependencies updated$(NC)"
-
-# Install development tools
-tools-install: ## Install development tools (goreleaser)
-	@echo -e "$(BLUE)Installing development tools...$(NC)"
-	@echo -e "$(YELLOW)Installing goreleaser...$(NC)"
-	@$(GOGET) github.com/goreleaser/goreleaser/v2@v2.18.0
-	@echo -e "$(GREEN)✅ Development tools installed$(NC)"
 
 # Run all checks (test only)
 check: test ## Run all checks (test)
@@ -631,28 +620,6 @@ logs-analyze: ## Analyze pipeline logs and generate ASCII report
 		echo "Status: Check logs/ directory for detailed information"; \
 	fi
 
-# GoReleaser targets
-release: tools-install ## Create release with goreleaser
-	@echo -e "$(BLUE)Creating release...$(NC)"
-	$(GORELEASER) release --clean
-	@echo -e "$(GREEN)✅ Release created$(NC)"
-
-release-snapshot: tools-install ## Create snapshot release
-	@echo -e "$(BLUE)Creating snapshot release...$(NC)"
-	$(GORELEASER) release --snapshot --clean
-	@echo -e "$(GREEN)✅ Snapshot release created$(NC)"
-
-release-dry-run: tools-install ## Run dry-run release
-	@echo -e "$(BLUE)Running dry-run release...$(NC)"
-	$(GORELEASER) release --snapshot --skip-publish --clean
-	@echo -e "$(GREEN)✅ Dry-run release completed$(NC)"
-
-# Check if goreleaser is installed
-goreleaser-check: ## Check if goreleaser is installed
-	@echo -e "$(BLUE)Checking goreleaser installation...$(NC)"
-	@which $(GORELEASER) > /dev/null || (echo -e "$(RED)goreleaser not found. Run 'make tools-install' to install it.$(NC)" && exit 1)
-	@echo -e "$(GREEN)✅ goreleaser is installed$(NC)"
-
 # CI/CD targets
 ci-build: ## CI build target
 	@echo -e "$(BLUE)Running CI build...$(NC)"
@@ -665,7 +632,6 @@ ci-build: ## CI build target
 # Development workflow targets
 dev-setup: ## Setup development environment
 	@echo -e "$(BLUE)Setting up development environment...$(NC)"
-	@make tools-install
 	@make deps
 	@echo -e "$(GREEN)✅ Development environment setup completed$(NC)"
 
@@ -675,12 +641,6 @@ status: ## Show project status
 	@echo "=================="
 	@echo -n "Go version: "
 	@$(GOCMD) version
-	@echo -n "goreleaser: "
-	@if command -v $(GORELEASER) > /dev/null; then \
-		echo -e "$(GREEN)✅ available$(NC)"; \
-	else \
-		echo -e "$(RED)❌ not available$(NC)"; \
-	fi
 	@echo -n "Docker: "
 	@if command -v docker > /dev/null && docker info > /dev/null 2>&1; then \
 		echo -e "$(GREEN)✅ available$(NC)"; \

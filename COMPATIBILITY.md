@@ -72,7 +72,7 @@ two are ever conflated:
 |---|---|---|---|
 | 1 | **Contract version** | `pkg/shipwright.ContractVersion` (also readable via `dagger call contract-version` on the Layer 2 module) | Stable from first release, covering only the guaranteed surface enumerated above |
 | 2 | **Manifest schema version** | `apiVersion: shipwright.dev/v1` in each workflow document | Evolves independently of `ContractVersion`; additive-only within `v1` — a breaking schema change requires a new `apiVersion` |
-| 3 | **CLI release SemVer** | goreleaser + `CHANGELOG.md` | Ordinary release versioning for the `shipwright` binary itself |
+| 3 | **CLI release SemVer** | `.dagger/release_package.go` + `CHANGELOG.md` | Ordinary release versioning for the `shipwright` binary itself |
 | 4 | **Engine pin** | `dagger.json` `engineVersion` | Must equal the root `go.mod` `dagger.io/dagger` client pin — enforced by a pin-parity unit test (`internal/daggerpin`); the two pins live in separate Go modules (root and `.dagger/`) and never link directly, so drift is the only residual risk, and that risk is a test |
 | 5 | **Provider version (`uses.version`)** | A manifest step's `uses` block, owned by the provider that registers it | **Not covered by any Shipwright guarantee** |
 

@@ -326,8 +326,10 @@ jobs:
           CHANGELOG="$CHANGELOG"$'\n'$'\n'"$ALL_COMMITS"
         fi
 
-        # Save changelog to file for GoReleaser
         echo "$CHANGELOG" > CHANGELOG.md
+        # Exported as this job's output so the create-release job can render
+        # both CHANGELOG.md (changelog-prepend-release.sh) and the GitHub
+        # Release body (render-release-notes.sh) from this single source.
         echo "changelog<<EOF" >> $GITHUB_OUTPUT
         echo "$CHANGELOG" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
@@ -337,7 +339,7 @@ jobs:
         echo "Preview:"
         echo "$CHANGELOG" | head -20
 
-  # Job 2: Create release with GoReleaser
+  # Job 2: Build, package, and publish the release via Dagger + GitHub CLI
   # Note: Build and test are already validated by CI workflow before this release runs
   create-release:
     runs-on: 'ubuntu-latest'  # Changed from [self-hosted,linux,go] for testing
@@ -394,65 +396,10 @@ jobs:
         fi
         echo "✅ final-sha-gate=success verified for commit ${SHA}"
 
-    - name: 'Set up Go'
-      uses: 'actions/setup-go@v7'
-      with:
-        go-version-file: '.go-version'
-
     - name: 'Configure Git'
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-
-    - name: 'Configure Git and Go for private repos'
-      env:
-        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        GIT_TERMINAL_PROMPT: 0
-      run: |
-        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
-          if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
-            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
-            echo ""
-            echo "📋 For FREE GitHub accounts:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
-          else
-            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
-            echo ""
-            echo "📋 For FREE GitHub accounts - Setup Instructions:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            exit 1
-          fi
-        fi
-
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
-        chmod 600 ~/.netrc
-
-        # Configure Git authentication with token
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-
-        # Verify authentication setup
-        echo "✅ Git and Go configured for private repos"
-        echo "GOPRIVATE: $(go env GOPRIVATE)"
 
     - name: 'Create or verify tag'
       run: |
@@ -485,82 +432,62 @@ jobs:
         fi
         echo "✅ Tag ${TAG} correctly points to current commit ${CURRENT_COMMIT}"
 
-    - name: 'Run GoReleaser'
-      uses: 'goreleaser/goreleaser-action@v7'
-      with:
-        distribution: 'goreleaser'
-        version: '2.18.0'
-        args: 'release --clean'
+    - name: 'Install Dagger CLI'
       env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-
-    - name: 'Prepare raw binaries for direct download'
+        DAGGER_VERSION: 'v0.21.8' # keep in sync with dagger.io/dagger in go.mod/providers/*/go.mod
       run: |
-        echo "📦 Preparing raw binaries for direct download..."
-        mkdir -p raw-binaries
+        mkdir -p "$HOME/.local/bin"
+        curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR="$HOME/.local/bin" sh
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-        # Extract binaries from archives and rename them
-        cd dist
-
-        # Process Linux binaries
-        for file in shipwright_*_linux_amd64.tar.gz; do
-          if [ -f "$file" ]; then
-            tar -xzf "$file" shipwright
-            mv shipwright ../raw-binaries/shipwright-linux-amd64
-            chmod +x ../raw-binaries/shipwright-linux-amd64
-          fi
-        done
-
-        for file in shipwright_*_linux_arm64.tar.gz; do
-          if [ -f "$file" ]; then
-            tar -xzf "$file" shipwright
-            mv shipwright ../raw-binaries/shipwright-linux-arm64
-            chmod +x ../raw-binaries/shipwright-linux-arm64
-          fi
-        done
-
-        # Process Darwin (macOS) binaries
-        for file in shipwright_*_darwin_amd64.tar.gz; do
-          if [ -f "$file" ]; then
-            tar -xzf "$file" shipwright
-            mv shipwright ../raw-binaries/shipwright-darwin-amd64
-            chmod +x ../raw-binaries/shipwright-darwin-amd64
-          fi
-        done
-
-        for file in shipwright_*_darwin_arm64.tar.gz; do
-          if [ -f "$file" ]; then
-            tar -xzf "$file" shipwright
-            mv shipwright ../raw-binaries/shipwright-darwin-arm64
-            chmod +x ../raw-binaries/shipwright-darwin-arm64
-          fi
-        done
-
-        # Process Windows binaries
-        for file in shipwright_*_windows_amd64.zip; do
-          if [ -f "$file" ]; then
-            unzip -q "$file" shipwright.exe
-            mv shipwright.exe ../raw-binaries/shipwright-windows-amd64.exe
-          fi
-        done
-
-        for file in shipwright_*_windows_arm64.zip; do
-          if [ -f "$file" ]; then
-            unzip -q "$file" shipwright.exe
-            mv shipwright.exe ../raw-binaries/shipwright-windows-arm64.exe
-          fi
-        done
-
-        cd ..
-        echo "✅ Raw binaries prepared:"
-        ls -lh raw-binaries/
-
-    - name: 'Merge raw-binary checksums into checksums.txt'
+    - name: 'Verify Dagger CLI is available'
       run: |
-        echo "🔐 Adding raw-binary SHA-256 checksums to dist/checksums.txt"
-        ( cd raw-binaries && sha256sum -- * ) >> dist/checksums.txt
-        echo "Combined checksums.txt:"
-        cat dist/checksums.txt
+        dagger version
+
+    - name: 'Set build time'
+      id: 'buildtime'
+      run: |
+        echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+    - name: 'Verify release package (build + package + checksum contract)'
+      # Dagger owns build, packaging, and checksum generation end-to-end; this
+      # gate must pass before any release side effect (tag/release/upload) --
+      # a failure here aborts the job with no GitHub Release created and
+      # nothing published.
+      run: |
+        dagger -m ./.dagger call release-package-verify \
+          --source=. \
+          --version="${{ needs.validate-release.outputs.version }}" \
+          --commit="${{ steps.provenance.outputs.sha }}" \
+          --build-time="${{ steps.buildtime.outputs.value }}"
+
+    - name: 'Export release package'
+      run: |
+        dagger -m ./.dagger call release-package \
+          --source=. \
+          --version="${{ needs.validate-release.outputs.version }}" \
+          --commit="${{ steps.provenance.outputs.sha }}" \
+          --build-time="${{ steps.buildtime.outputs.value }}" \
+          export --path=dist
+        echo "📦 Release package exported to dist/:"
+        ls -lh dist/
+
+    - name: 'Prepare release notes'
+      run: |
+        # NEW_CHANGELOG_ENTRY is passed via env (not interpolated into this
+        # script) because it's built from commit messages -- untrusted text.
+        # Writing it to a file first and having render-release-notes.sh
+        # read it back is what keeps a crafted commit message from ever
+        # reaching a shell command as anything but inert data.
+        printf '%s' "$NEW_CHANGELOG_ENTRY" > /tmp/changelog-entry.md
+
+        chmod +x scripts/render-release-notes.sh
+        scripts/render-release-notes.sh \
+          "${{ needs.validate-release.outputs.tag }}" \
+          /tmp/changelog-entry.md \
+          /tmp/release-body.md
+      env:
+        NEW_CHANGELOG_ENTRY: '${{ needs.validate-release.outputs.changelog }}'
 
     - name: 'Setup GitHub CLI'
       run: |
@@ -577,26 +504,33 @@ jobs:
         fi
         gh --version
 
-    - name: 'Upload raw binaries to GitHub Release'
+    - name: 'Create or verify GitHub Release'
+      # Idempotent, matching scripts/release-tag-guard.sh's create-or-verify
+      # shape: if a Release for this tag already exists (a retried run), this
+      # is a safe no-op rather than a duplicate-creation failure. It is safe
+      # to trust that any existing Release for this tag corresponds to this
+      # exact commit because "Create or verify tag" and "Verify tag points to
+      # current commit" (above, same job) already proved that correspondence
+      # for this run -- a release tag is immutable once published.
       run: |
-        echo "Uploading raw binaries to GitHub Release..."
-        cd raw-binaries
+        TAG="${{ needs.validate-release.outputs.tag }}"
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "Release ${TAG} already exists -- safe retry, no changes needed."
+        else
+          gh release create "$TAG" --title "$TAG" --notes-file /tmp/release-body.md
+          echo "✅ Release ${TAG} created"
+        fi
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
-        # Upload each binary to the release
-        for binary in *; do
-          if [ -f "$binary" ]; then
-            echo "Uploading $binary..."
-            gh release upload "${{ needs.validate-release.outputs.tag }}" "$binary" --clobber
-          fi
-        done
-
-        echo "Uploading combined checksums.txt..."
-        gh release upload "${{ needs.validate-release.outputs.tag }}" "../dist/checksums.txt" --clobber
-
-        echo "✅ Raw binaries uploaded successfully"
-        echo ""
-        echo "📦 Available binaries for download:"
-        ls -lh
+    - name: 'Upload release assets'
+      # --clobber is safe here specifically because the tag/commit
+      # correspondence for this exact release was already verified earlier
+      # in this job -- it is not unconditionally safe, it is safe *because*
+      # of that upstream guarantee.
+      run: |
+        gh release upload "${{ needs.validate-release.outputs.tag }}" dist/* --clobber
+        echo "✅ Release assets uploaded successfully"
       env:
         GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
@@ -604,10 +538,9 @@ jobs:
       env:
         GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
       run: |
-        chmod +x scripts/verify-release-asset.sh
-        scripts/verify-release-asset.sh \
+        chmod +x scripts/verify-release-set.sh
+        scripts/verify-release-set.sh \
           "${{ needs.validate-release.outputs.tag }}" \
-          "shipwright-linux-amd64" \
           "${{ needs.validate-release.outputs.version }}" \
           "${{ steps.provenance.outputs.sha }}"
 
@@ -618,14 +551,13 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
 
-        # NEW_CHANGELOG_ENTRY is passed via env (not interpolated into this
-        # script) because it's built from commit messages -- untrusted
-        # text. Interpolating it directly into the script would let a crafted
-        # commit message break out of the script instead of just being data.
-        printf '%s' "$NEW_CHANGELOG_ENTRY" > /tmp/new-changelog-entry.md
-
+        # /tmp/changelog-entry.md is the same file "Prepare release notes"
+        # (above, same job) wrote from needs.validate-release.outputs.changelog
+        # -- CHANGELOG.md and the GitHub Release body are composed from
+        # exactly one generated changelog, not two independently-generated
+        # ones that could drift apart.
         chmod +x scripts/changelog-prepend-release.sh
-        scripts/changelog-prepend-release.sh CHANGELOG.md /tmp/new-changelog-entry.md "$TAG"
+        scripts/changelog-prepend-release.sh CHANGELOG.md /tmp/changelog-entry.md "$TAG"
 
         git add CHANGELOG.md
         if git diff --cached --quiet; then
@@ -638,15 +570,12 @@ jobs:
       env:
         GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         TAG: '${{ needs.validate-release.outputs.tag }}'
-        NEW_CHANGELOG_ENTRY: '${{ needs.validate-release.outputs.changelog }}'
 
     - name: 'Upload release artifacts'
       uses: 'actions/upload-artifact@v7'
       with:
         name: 'release-artifacts-${{ needs.validate-release.outputs.tag }}'
-        path: |
-          dist/*
-          raw-binaries/*
+        path: 'dist/*'
         retention-days: 30
 
     - name: 'Release summary'

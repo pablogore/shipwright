@@ -28,9 +28,12 @@ GitHub Release**, plus a corresponding `CHANGELOG.md` entry:
   under the same fail-closed rule. For a tag push the tag already exists at
   the checked-out commit, so the guard is a same-commit no-op there; for an
   admin dispatch with no pre-existing tag, the guard is what creates it.
-- The GitHub Release is created by GoReleaser against that exact tag/commit
-  (`scripts/verify-release-asset.sh` re-downloads a real asset post-publish
-  and executes it to confirm the reported version and commit match).
+- The GitHub Release is created via `gh release create` against that exact
+  tag/commit, with build, packaging, and checksums owned by Dagger
+  (`.dagger/release_package.go`) (`scripts/verify-release-set.sh`
+  re-downloads the full published asset set post-publish, validates
+  `checksums.txt` against it, and executes the native binary to confirm the
+  reported version and commit match).
 - `CHANGELOG.md` gets a `## Release <tag>` entry via
   `scripts/changelog-prepend-release.sh`, prepended above prior history.
 

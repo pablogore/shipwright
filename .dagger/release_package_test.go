@@ -5,8 +5,9 @@ import (
 	"testing"
 )
 
-// TestReleasePlatform_ArchiveExt pins .goreleaser.yml's format_overrides:
-// zip on Windows, tar.gz everywhere else.
+// TestReleasePlatform_ArchiveExt pins the archive format (formerly
+// .goreleaser.yml's format_overrides, retired in PR3): zip on Windows,
+// tar.gz everywhere else.
 func TestReleasePlatform_ArchiveExt(t *testing.T) {
 	cases := []struct {
 		p    releasePlatform
@@ -24,11 +25,11 @@ func TestReleasePlatform_ArchiveExt(t *testing.T) {
 	}
 }
 
-// TestReleasePlatform_ArchiveName pins .goreleaser.yml's name_template
-// (shipwright_<version>_<os>_<arch>.<ext>, lowercase os/arch) -- the exact
-// shape release.yml's own extraction step globs for
-// (shipwright_*_linux_amd64.tar.gz etc.), so a mismatch here would silently
-// break PR3's future delegation.
+// TestReleasePlatform_ArchiveName pins the release archive naming (formerly
+// .goreleaser.yml's name_template, retired in PR3):
+// shipwright_<version>_<os>_<arch>.<ext>, lowercase os/arch -- the exact
+// shape docs/RELEASE_INTEGRITY_CONTRACT.md documents as the distribution
+// contract.
 func TestReleasePlatform_ArchiveName(t *testing.T) {
 	cases := []struct {
 		p    releasePlatform
