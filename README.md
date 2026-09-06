@@ -184,7 +184,7 @@ Verified against the repository:
   (one built-in plugin, `nomad-deploy`); pipelines do not yet invoke
   before/after hooks.
 - GitHub Actions composite action and example workflows.
-- GoReleaser-based multi-platform release builds.
+- Dagger-based multi-platform release builds, packaging, and checksums, published via GitHub CLI.
 
 ## Legacy / internal historical implementation
 

@@ -4,9 +4,10 @@
 // platform binaries and produces exactly the distributable set GitHub
 // Release expects today (docs/RELEASE_INTEGRITY_CONTRACT.md) -- the same 6
 // raw binaries, one archive per platform (tar.gz for linux/darwin, zip for
-// windows, matching .goreleaser.yml's archive contents and name_template),
-// and a single combined checksums.txt covering all 12 artifacts. Publishing
-// (uploading any of this to a GitHub Release) is PR3's job, not this one.
+// windows -- formerly matching .goreleaser.yml's archive contents and
+// name_template, retired in PR3), and a single combined checksums.txt
+// covering all 12 artifacts. Publishing (uploading any of this to a GitHub
+// Release) is PR3's job, not this one.
 package main
 
 import (
@@ -22,9 +23,9 @@ import (
 // present by default, installed explicitly) plus sha256sum for checksums.
 const packagingImage = "alpine:3.22"
 
-// archiveExt returns the archive format GoReleaser uses for a platform:
-// .zip on Windows, .tar.gz everywhere else (.goreleaser.yml's
-// format_overrides).
+// archiveExt returns the archive format for a platform: .zip on Windows,
+// .tar.gz everywhere else (formerly .goreleaser.yml's format_overrides,
+// retired in PR3).
 func (p releasePlatform) archiveExt() string {
 	if p.os == "windows" {
 		return "zip"
@@ -32,19 +33,19 @@ func (p releasePlatform) archiveExt() string {
 	return "tar.gz"
 }
 
-// archiveName returns the release archive name for a platform, matching
-// .goreleaser.yml's name_template: shipwright_<version>_<os>_<arch>.<ext>.
-// os/arch are the raw (lowercase) GOOS/GOARCH values -- release.yml's own
-// "Prepare raw binaries" step globs shipwright_*_linux_amd64.tar.gz etc.,
-// confirming GoReleaser does not title-case these.
+// archiveName returns the release archive name for a platform:
+// shipwright_<version>_<os>_<arch>.<ext> (formerly .goreleaser.yml's
+// name_template, retired in PR3), matching the naming documented in
+// docs/RELEASE_INTEGRITY_CONTRACT.md. os/arch are the raw (lowercase)
+// GOOS/GOARCH values.
 func (p releasePlatform) archiveName(version string) string {
 	return fmt.Sprintf("shipwright_%s_%s_%s.%s", version, p.os, p.arch, p.archiveExt())
 }
 
 // packagedFileName is the binary's name *inside* an archive: plain
 // "shipwright" (or "shipwright.exe" on Windows), never the platform-suffixed
-// release asset name -- matching release.yml's extraction step, which pulls
-// a file literally named "shipwright"/"shipwright.exe" out of each archive.
+// release asset name -- so a consumer who extracts the archive gets a
+// binary named the same way regardless of which platform they downloaded.
 func (p releasePlatform) packagedFileName() string {
 	if p.os == "windows" {
 		return "shipwright.exe"
@@ -54,7 +55,8 @@ func (p releasePlatform) packagedFileName() string {
 
 // archiveFor builds the release archive for one platform: the binary
 // (renamed to packagedFileName) plus README.md, LICENSE, and CHANGELOG.md
-// from source, matching .goreleaser.yml's archives.files list.
+// from source (formerly .goreleaser.yml's archives.files list, retired in
+// PR3).
 func archiveFor(source *dagger.Directory, p releasePlatform, binary *dagger.File, version string) *dagger.File {
 	name := p.archiveName(version)
 	staged := dag.Container().

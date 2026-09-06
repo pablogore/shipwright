@@ -6,21 +6,21 @@ Este documento describe cómo funciona el proceso de release de Shipwright y có
 
 Cuando se hace un release, el pipeline:
 
-1. **Compila** binarios para múltiples plataformas (Linux, macOS, Windows)
-2. **Publica** archivos comprimidos (tar.gz, zip) vía GoReleaser
-3. **Extrae y renombra** los binarios con nombres estándar
-4. **Publica** binarios directos (sin comprimir) para descarga directa
+1. **Compila** binarios para múltiples plataformas (Linux, macOS, Windows) vía Dagger
+2. **Empaqueta** archivos comprimidos (tar.gz, zip) y genera `checksums.txt`, también vía Dagger
+3. **Publica** el set completo de artefactos (binarios directos + archivos comprimidos + checksums.txt) al GitHub Release vía GitHub CLI
 
 ## 🎯 Binarios Publicados
 
 Cada release incluye dos tipos de archivos:
 
-### 1. Archivos Comprimidos (via GoReleaser)
+### 1. Archivos Comprimidos (empaquetados por Dagger)
 - `shipwright_1.0.0_linux_amd64.tar.gz`
 - `shipwright_1.0.0_linux_arm64.tar.gz`
 - `shipwright_1.0.0_darwin_amd64.tar.gz`
 - `shipwright_1.0.0_darwin_arm64.tar.gz`
 - `shipwright_1.0.0_windows_amd64.zip`
+- `shipwright_1.0.0_windows_arm64.zip`
 
 ### 2. Binarios Directos (para CI/CD y uso local)
 - `shipwright-linux-amd64`
@@ -28,6 +28,7 @@ Cada release incluye dos tipos de archivos:
 - `shipwright-darwin-amd64`
 - `shipwright-darwin-arm64`
 - `shipwright-windows-amd64.exe`
+- `shipwright-windows-arm64.exe`
 
 ## 📦 Cómo Consumir los Binarios
 
@@ -78,10 +79,10 @@ El release se activa cuando:
 ### Workflow de Release
 
 1. **Validación**: Determina la versión y genera changelog
-2. **Build y Test**: Compila y ejecuta tests
-3. **GoReleaser**: Publica archivos comprimidos y Docker images
-4. **Extracción de Binarios**: Extrae binarios de los archivos comprimidos
-5. **Publicación Directa**: Sube binarios directos al release
+2. **Build y Test**: Compila y ejecuta tests (workflow de CI, previo al release)
+3. **Dagger**: Compila la matriz de plataformas, empaqueta archivos comprimidos, genera `checksums.txt` y verifica el contrato de integridad antes de publicar nada
+4. **Publicación**: Crea (o verifica, si ya existe) el GitHub Release y sube el set completo de artefactos vía GitHub CLI
+5. **Verificación Post-Publicación**: Descarga el set completo publicado y valida checksums + ejecución del binario
 6. **Resumen**: Muestra información del release
 
 ## 📝 URLs de Descarga

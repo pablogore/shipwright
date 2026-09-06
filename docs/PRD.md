@@ -219,8 +219,9 @@ hook manager and plugin context exist.
 
 **CI/release tooling.** GitHub Actions workflows (`ci.yml`, `release.yml`,
 `cleanup-branches.yml`) enforce branch protection, run tests/build, and
-drive a GoReleaser-based release (multi-OS/arch archives plus renamed raw
-binaries uploaded to GitHub Releases). A composite action
+drive a Dagger-based release (multi-OS/arch archives plus raw binaries,
+packaged and checksummed by `.dagger/release_package.go`, published via
+GitHub CLI). A composite action
 (`.github/actions/shipwright/action.yml`) wraps the CLI for GitHub Actions
 consumers — a working, if GitHub-specific, example of "provider triggers
 Shipwright." Its `pipeline` input description still references retired

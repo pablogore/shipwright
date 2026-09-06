@@ -55,9 +55,9 @@ func TestReleasePlatform_BinaryName(t *testing.T) {
 }
 
 // TestReleaseLdflags_InjectsAllThreeFields asserts the -X injection string
-// matches .goreleaser.yml's ldflags template shape, so a binary built here
-// and one built by GoReleaser report identical version metadata for the
-// same tag/commit.
+// carries all three fields (formerly matching .goreleaser.yml's ldflags
+// template, retired in PR3), so a binary built here reports the expected
+// version metadata for its tag/commit.
 func TestReleaseLdflags_InjectsAllThreeFields(t *testing.T) {
 	got := releaseLdflags("v1.2.3", "abc1234", "2026-01-01T00:00:00Z")
 
@@ -70,6 +70,39 @@ func TestReleaseLdflags_InjectsAllThreeFields(t *testing.T) {
 			t.Errorf("releaseLdflags() = %q, want it to contain %q", got, want)
 		}
 	}
+}
+
+// TestResolveGoVersion exercises the .go-version fail-closed contract
+// (RELEASE-DIST-01B PR3): a live Dagger session is required to build a
+// source Directory, so this only runs under `dagger run go test` (see
+// `make dagger-test`), same as every other test in this package.
+func TestResolveGoVersion(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("valid version is trimmed", func(t *testing.T) {
+		src := dag.Directory().WithNewFile(".go-version", "1.26.7\n")
+		got, err := resolveGoVersion(ctx, src)
+		if err != nil {
+			t.Fatalf("resolveGoVersion() error = %v, want nil", err)
+		}
+		if got != "1.26.7" {
+			t.Errorf("resolveGoVersion() = %q, want %q", got, "1.26.7")
+		}
+	})
+
+	t.Run("whitespace-only file fails closed", func(t *testing.T) {
+		src := dag.Directory().WithNewFile(".go-version", "   \n")
+		if _, err := resolveGoVersion(ctx, src); err == nil {
+			t.Fatal("resolveGoVersion() = nil error, want an error for an empty .go-version")
+		}
+	})
+
+	t.Run("missing file fails closed", func(t *testing.T) {
+		src := dag.Directory()
+		if _, err := resolveGoVersion(ctx, src); err == nil {
+			t.Fatal("resolveGoVersion() = nil error, want an error for a missing .go-version")
+		}
+	})
 }
 
 // TestReleaseBuild_RejectsEmptyInputs is a pure control-flow test: the

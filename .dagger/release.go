@@ -10,7 +10,8 @@
 // implementation.
 //
 // Scope (PR1 only): build matrix + metadata injection + verify-only mode.
-// Packaging/checksums are PR2. release.yml/GoReleaser integration is PR3.
+// Packaging/checksums are PR2. release.yml integration, retiring GoReleaser
+// entirely, is PR3.
 package main
 
 import (
@@ -22,11 +23,23 @@ import (
 	"dagger/shipwright/internal/dagger"
 )
 
-// releaseGoVersion pins the toolchain used to cross-compile the release
-// matrix. Kept in sync with GO_VERSION in .github/workflows/ci.yml by hand
-// (this module cannot import root go.mod's version constant -- see
-// capabilities.go's package doc on the Layer 1/Layer 2 module boundary).
-const releaseGoVersion = "1.26.7"
+// resolveGoVersion reads the toolchain version to cross-compile the release
+// matrix with from .go-version in source -- the same file CI's own
+// actions/setup-go steps read (go-version-file: '.go-version') -- so there
+// is exactly one place that pins the Go version, not a hand-synced copy.
+// Fails closed: a missing or empty .go-version aborts the release build
+// rather than silently falling back to a hardcoded version.
+func resolveGoVersion(ctx context.Context, source *dagger.Directory) (string, error) {
+	contents, err := source.File(".go-version").Contents(ctx)
+	if err != nil {
+		return "", fmt.Errorf("could not read .go-version: %w", err)
+	}
+	version := strings.TrimSpace(contents)
+	if version == "" {
+		return "", errors.New(".go-version is empty")
+	}
+	return version, nil
+}
 
 // releasePlatform is one target in shipwright's release build matrix.
 type releasePlatform struct {
@@ -34,8 +47,8 @@ type releasePlatform struct {
 	arch string
 }
 
-// releaseMatrix mirrors .goreleaser.yml's builds.goos/builds.goarch matrix.
-// Any change here must be made in both places until PR3 retires GoReleaser.
+// releaseMatrix is the release build matrix (formerly .goreleaser.yml's
+// builds.goos/builds.goarch, retired in PR3 -- this is now the sole source).
 var releaseMatrix = []releasePlatform{
 	{os: "linux", arch: "amd64"},
 	{os: "linux", arch: "arm64"},
@@ -57,20 +70,20 @@ func (p releasePlatform) binaryName() string {
 }
 
 // ldflags builds the -X main.Version/-X main.GitCommit/-X main.BuildTime
-// injection string, matching .goreleaser.yml's ldflags template exactly so
-// a binary produced here and one produced by GoReleaser report identical
-// version metadata for the same tag/commit.
+// injection string (formerly matching .goreleaser.yml's ldflags template,
+// retired in PR3) so a binary built here reports the expected version
+// metadata for its tag/commit.
 func releaseLdflags(version, commit, buildTime string) string {
 	return fmt.Sprintf("-s -w -X main.Version=%s -X main.GitCommit=%s -X main.BuildTime=%s", version, commit, buildTime)
 }
 
 // buildOne cross-compiles source for a single platform and returns the
 // resulting binary as a File named per binaryName().
-func (m *Shipwright) buildOne(source *dagger.Directory, p releasePlatform, version, commit, buildTime string) *dagger.File {
+func (m *Shipwright) buildOne(source *dagger.Directory, p releasePlatform, goVersion, version, commit, buildTime string) *dagger.File {
 	outPath := "/out/" + p.binaryName()
 
 	ctr := dag.Container().
-		From("golang:"+releaseGoVersion).
+		From("golang:"+goVersion).
 		WithEnvVariable("CGO_ENABLED", "0").
 		WithEnvVariable("GOOS", p.os).
 		WithEnvVariable("GOARCH", p.arch).
@@ -104,9 +117,14 @@ func (m *Shipwright) ReleaseBuild(ctx context.Context, source *dagger.Directory,
 		return nil, errors.New("release build requires a non-empty buildTime")
 	}
 
+	goVersion, err := resolveGoVersion(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+
 	output := dag.Directory()
 	for _, p := range releaseMatrix {
-		bin := m.buildOne(source, p, version, commit, buildTime)
+		bin := m.buildOne(source, p, goVersion, version, commit, buildTime)
 		output = output.WithFile(p.binaryName(), bin)
 	}
 
