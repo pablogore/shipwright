@@ -99,11 +99,19 @@ func (m *Shipwright) ReleasePackage(ctx context.Context, source *dagger.Director
 		return nil, fmt.Errorf("release packaging failed: %w", err)
 	}
 
+	// checksums.txt is generated from expectedPackageFiles (minus its own
+	// trailing "checksums.txt" entry, which does not exist yet), the same
+	// explicit, deterministically-ordered list ReleasePackageVerify checks
+	// against -- not from a shell glob, so generation and verification always
+	// agree on exactly which files belong in the set.
+	expected := expectedPackageFiles(version)
+	artifactFiles := expected[:len(expected)-1]
+	checksumArgs := append([]string{"sha256sum", "--"}, artifactFiles...)
 	checksummed := dag.Container().
 		From(packagingImage).
 		WithMountedDirectory("/artifacts", output).
 		WithWorkdir("/artifacts").
-		WithExec([]string{"sh", "-c", "sha256sum -- * > checksums.txt"}).
+		WithExec([]string{"sh", "-c", strings.Join(checksumArgs, " ") + " > checksums.txt"}).
 		Directory("/artifacts")
 
 	if _, err := checksummed.Sync(ctx); err != nil {
@@ -126,10 +134,11 @@ func expectedPackageFiles(version string) []string {
 // ReleasePackageVerify runs ReleasePackage and validates the SHA256
 // checksums contract without publishing anything: every expected raw
 // binary, archive, and checksums.txt itself must be present, and
-// checksums.txt must correctly describe every artifact it lists (a
-// reproducibility guarantee, not just "the file exists") -- fails closed on
-// a missing artifact, an extra/missing checksum entry, or any hash
-// mismatch.
+// checksums.txt must correctly describe every artifact it lists (an
+// integrity guarantee over this generated set -- not a reproducibility
+// guarantee, since tar/zip can embed filesystem timestamps that vary
+// between runs) -- fails closed on a missing artifact, an extra/missing
+// checksum entry, or any hash mismatch.
 func (m *Shipwright) ReleasePackageVerify(ctx context.Context, source *dagger.Directory, version, commit, buildTime string) (string, error) {
 	pkg, err := m.ReleasePackage(ctx, source, version, commit, buildTime)
 	if err != nil {
