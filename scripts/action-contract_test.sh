@@ -9,7 +9,7 @@
 # --workflow is now the sole entrypoint) while the distributed composite
 # Action kept building command lines against them, breaking the public
 # GitHub Actions integration by contract. No external test framework exists
-# for shell/YAML in this repo, so this is a small self-contained rg-based
+# for shell/YAML in this repo, so this is a small self-contained grep-based
 # harness, mirroring final-sha-gate-check_test.sh's style.
 
 set -u
@@ -28,7 +28,7 @@ assert_absent() {
     local description="$1"
     local pattern="$2"
 
-    if rg -q -- "$pattern" "$ACTION_FILE"; then
+    if grep -qE -- "$pattern" "$ACTION_FILE"; then
         echo -e "${RED}[FAIL]${NC} $description (found forbidden pattern: $pattern)"
         FAILURES=$((FAILURES + 1))
     else
@@ -40,7 +40,7 @@ assert_present() {
     local description="$1"
     local pattern="$2"
 
-    if rg -q -- "$pattern" "$ACTION_FILE"; then
+    if grep -qE -- "$pattern" "$ACTION_FILE"; then
         echo -e "${GREEN}[PASS]${NC} $description"
     else
         echo -e "${RED}[FAIL]${NC} $description (missing expected pattern: $pattern)"
