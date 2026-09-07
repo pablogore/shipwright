@@ -84,7 +84,7 @@ func (t *RustIntegrationTester) Test(ctx context.Context, source *dagger.Directo
 		WithMountedDirectory("/src", sourceDir).
 		WithWorkdir("/src").
 		WithMountedCache("/src/target", t.Client.CacheVolume(rustIntegrationTesterTargetCacheKey))
-	container = withDockerDaemon(t.Client, container)
+	container = withDockerDaemon(ctx, t.Client, container)
 	container = container.WithExec(t.cargoTestArgs())
 
 	testOutput, err := container.Stdout(ctx)

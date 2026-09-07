@@ -191,6 +191,7 @@ func TestRustCommand_Test_MockClient_DockerAttachesDinDWhenConfigured(t *testing
 	container.On("WithExposedPort", 2375).Return(container)
 
 	dindService := &daggerkit.MockDaggerService{}
+	container.On("WithEnvVariable", "SHIPWRIGHT_DIND_INSTANCE", mock.Anything).Return(container)
 	container.On("AsService", []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"}).Return(dindService)
 	container.On("WithServiceBinding", "docker", dindService).Return(container)
 	container.On("WithEnvVariable", "DOCKER_HOST", "tcp://docker:2375").Return(container)
@@ -221,6 +222,7 @@ func TestRustCommand_Test_MockClient_DockerAttachesDinDWhenConfigured(t *testing
 	container.AssertCalled(t, "AsService", []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"})
 	container.AssertCalled(t, "WithServiceBinding", "docker", dindService)
 	container.AssertCalled(t, "WithEnvVariable", "DOCKER_HOST", "tcp://docker:2375")
+	container.AssertCalled(t, "WithEnvVariable", "SHIPWRIGHT_DIND_INSTANCE", mock.Anything)
 }
 
 // TestRustCommand_Test_MockClient_DefaultCacheKey and

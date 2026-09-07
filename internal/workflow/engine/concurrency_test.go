@@ -443,6 +443,109 @@ func TestConcurrency_FailFastTruePreventsFurtherScheduling(t *testing.T) {
 	}
 }
 
+// (8b) failFast: true must preserve the pre-concurrency "when" contract
+// exactly: a step failFast already made ineligible for scheduling must
+// never have its "when" evaluated, and must be entirely ABSENT from
+// Result.Outcomes — not recorded as StatusSkipped. Under MaxParallel: 1
+// this is a hard guarantee (runWave's doc comment): the semaphore forces
+// "laterWhenFalse"'s turn to wait until "fail"'s goroutine has both
+// returned and set aborted, so by the time its eligibility would be
+// checked, the wave has already aborted.
+func TestConcurrency_FailFastAbortSkipsLaterWhenEvaluationEntirely(t *testing.T) {
+	t.Parallel()
+
+	reg := providers.NewRegistry()
+	reg.RegisterTester(providers.Ref{Name: "fail", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
+			return nil, errors.New("boom")
+		}}
+	})
+	var whenEvaluated atomic.Bool
+	reg.RegisterTester(providers.Ref{Name: "laterWhenFalse", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
+			whenEvaluated.Store(true)
+			return nil, nil
+		}}
+	})
+
+	steps := []manifest.Step{
+		independentTestStep("fail"),
+		{
+			ID: "laterWhenFalse", Capability: "test",
+			Uses: manifest.UsesSpec{Provider: "laterWhenFalse", Version: "1"},
+			When: map[string][]string{"branch": {"never-matches"}},
+		},
+	}
+	cfg := buildTestConfig(t, steps, reg, engine.Options{MaxParallel: 1, FailFast: true})
+	cfg.Predicates = map[string]string{"branch": "main"}
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Execute() error = nil, want a *engine.StepFailedError")
+	}
+	var stepFailed *engine.StepFailedError
+	if !errors.As(err, &stepFailed) {
+		t.Fatalf("Execute() error = %v (%T), want *engine.StepFailedError", err, err)
+	}
+	if whenEvaluated.Load() {
+		t.Fatal("\"laterWhenFalse\" was dispatched, want its Tester never invoked")
+	}
+
+	if len(res.Outcomes) != 1 {
+		t.Fatalf("Outcomes = %v, want exactly 1 entry (\"laterWhenFalse\" must be entirely absent, matching pre-concurrency fail-fast behavior)", res.Outcomes)
+	}
+	if res.Outcomes[0].StepID != "fail" || res.Outcomes[0].Status != engine.StatusFailed {
+		t.Fatalf("Outcomes = %+v, want a single StatusFailed \"fail\" entry", res.Outcomes)
+	}
+}
+
+// (8c) A "when"-false step genuinely CONSIDERED before any failure — i.e.
+// reached by the dispatch loop while the wave is still healthy — must still
+// be recorded as StatusSkipped. This is the control case proving (8b)'s fix
+// only closes the fail-fast race, without disturbing ordinary "when"
+// semantics for a step actually evaluated.
+func TestConcurrency_WhenFalseConsideredBeforeFailureStillRecordsSkipped(t *testing.T) {
+	t.Parallel()
+
+	reg := providers.NewRegistry()
+	reg.RegisterTester(providers.Ref{Name: "earlyWhenFalse", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
+			return nil, nil
+		}}
+	})
+	reg.RegisterTester(providers.Ref{Name: "fail", Version: "1"}, providers.WithSchema{}, func(providers.Values) shipwright.Tester {
+		return fakeTester{TestFunc: func(_ context.Context, _ *dagger.Directory) (*dagger.File, error) {
+			return nil, errors.New("boom")
+		}}
+	})
+
+	steps := []manifest.Step{
+		{
+			ID: "earlyWhenFalse", Capability: "test",
+			Uses: manifest.UsesSpec{Provider: "earlyWhenFalse", Version: "1"},
+			When: map[string][]string{"branch": {"never-matches"}},
+		},
+		independentTestStep("fail"),
+	}
+	cfg := buildTestConfig(t, steps, reg, engine.Options{MaxParallel: 1, FailFast: true})
+	cfg.Predicates = map[string]string{"branch": "main"}
+
+	res, err := engine.Execute(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("Execute() error = nil, want a *engine.StepFailedError")
+	}
+
+	if len(res.Outcomes) != 2 {
+		t.Fatalf("Outcomes = %v, want exactly 2 entries", res.Outcomes)
+	}
+	if res.Outcomes[0].StepID != "earlyWhenFalse" || res.Outcomes[0].Status != engine.StatusSkipped {
+		t.Fatalf("Outcomes[0] = %+v, want StatusSkipped \"earlyWhenFalse\" (it was genuinely considered before the failure)", res.Outcomes[0])
+	}
+	if res.Outcomes[1].StepID != "fail" || res.Outcomes[1].Status != engine.StatusFailed {
+		t.Fatalf("Outcomes[1] = %+v, want StatusFailed \"fail\"", res.Outcomes[1])
+	}
+}
+
 // (9) A concurrent timeout does not hang: every step that exceeds
 // Options.Timeout is canceled and reported, never left blocked forever.
 func TestConcurrency_TimeoutDoesNotHang(t *testing.T) {

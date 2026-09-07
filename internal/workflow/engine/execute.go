@@ -54,6 +54,7 @@ import (
 	"github.com/pablogore/shipwright/internal/workflow/interp"
 	"github.com/pablogore/shipwright/internal/workflow/manifest"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
+	"github.com/pablogore/shipwright/pkg/shipwright/invocation"
 )
 
 // Options configures the engine-level execution controls design.md D-K
@@ -492,6 +493,20 @@ type waveSlot struct {
 // recorded — failFast never discards an in-flight result. This governs
 // only whether NEW work starts, never live goroutines: runWave always
 // wg.Wait()s before returning, so no worker outlives this call.
+//
+// A step fail-fast prevents from ever being CONSIDERED — not just
+// dispatched — contributes nothing to Result.Outcomes at all, matching this
+// package's pre-concurrency behavior exactly: the historical sequential
+// loop only ever evaluated step i+1's "when" after step i had fully
+// returned, so a step past an abort never had its "when" evaluated or
+// recorded either. The dispatch loop below reproduces this by acquiring a
+// semaphore slot BEFORE evaluating "when", not after: under MaxParallel<=1
+// this is a hard guarantee (the semaphore is size 1, so slot i+1 cannot be
+// acquired until step i's goroutine has both finished and set aborted, if
+// it is going to); under MaxParallel>1 it is the same best-effort the
+// cancellation itself already is — a step whose slot was already free when
+// the abort fired may still have its "when" evaluated and recorded, since
+// nothing forces it to wait for a sibling it does not depend on.
 func runWave(ctx context.Context, wave []string, stepByID map[string]manifest.Step, outputs map[string]result, cfg Config) (outcomes []StepOutcome, failures []string, newOutputs map[string]result, stop bool) {
 	limit := effectiveConcurrency(cfg.Options.MaxParallel, len(wave))
 
@@ -508,14 +523,14 @@ dispatch:
 		s := stepByID[id]
 		ref := providers.Ref{Name: s.Uses.Provider, Module: s.Uses.Module, Version: s.Uses.Version}
 
-		if !matchesWhen(s.When, cfg.Predicates) {
-			slots[i] = waveSlot{
-				started: true,
-				outcome: StepOutcome{StepID: id, Status: StatusSkipped, Provider: ref, Capability: s.Capability},
-			}
-			continue
-		}
-
+		// Acquire a slot BEFORE evaluating "when" — this is what makes a
+		// step's eligibility check itself wait its turn behind an
+		// already-dispatched sibling, exactly as the pre-concurrency
+		// sequential loop did (it only ever considered step i+1 after step
+		// i had fully returned). Without this, a when-skip is resolved
+		// instantly, letting it race ahead of a same-wave step that is
+		// still running and about to trigger failFast — see runWave's doc
+		// comment, "failFast semantics under concurrency".
 		select {
 		case <-waveCtx.Done():
 			break dispatch
@@ -524,6 +539,15 @@ dispatch:
 		if aborted.Load() {
 			<-sem
 			break dispatch
+		}
+
+		if !matchesWhen(s.When, cfg.Predicates) {
+			<-sem
+			slots[i] = waveSlot{
+				started: true,
+				outcome: StepOutcome{StepID: id, Status: StatusSkipped, Provider: ref, Capability: s.Capability},
+			}
+			continue
 		}
 
 		wg.Add(1)
@@ -902,6 +926,7 @@ func outcomeOutput(capability string, out result) (string, []Diagnostic) {
 // the one place in the engine that must know all five shapes; every other
 // helper in this package is capability-agnostic.
 func dispatch(ctx context.Context, s manifest.Step, input *dagger.Directory, values providers.Values, reg *providers.Registry) (result, error) {
+	ctx = invocation.WithStepID(ctx, s.ID)
 	ref := providers.Ref{Name: s.Uses.Provider, Module: s.Uses.Module, Version: s.Uses.Version}
 
 	switch s.Capability {

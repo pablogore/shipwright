@@ -115,7 +115,7 @@ func (c *RustCommand) Test(ctx context.Context, source *dagger.Directory) (*dagg
 		WithMountedCache("/src/target", c.Client.CacheVolume(resolveCommandCacheKey(c.CacheKey)))
 
 	if c.Docker {
-		container = withDockerDaemon(c.Client, container)
+		container = withDockerDaemon(ctx, c.Client, container)
 	}
 
 	container = container.WithExec(c.cargoCommandArgs())
