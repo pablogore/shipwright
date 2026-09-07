@@ -3,7 +3,7 @@ module github.com/pablogore/shipwright/providers/rust
 go 1.26.7
 
 require (
-	dagger.io/dagger v0.21.8
+	dagger.io/dagger v0.21.9
 	github.com/google/uuid v1.6.0
 	github.com/pablogore/shipwright v0.5.1-0.20260907143633-6a8078fb38e8
 	github.com/stretchr/testify v1.12.1
