@@ -1,0 +1,39 @@
+# Real workflow manifest used by testing/integration/rust/concurrency_test.go
+# (Case A) to validate wave concurrency (design.md D-K) against REAL Rust/
+# Dagger providers sharing one Dagger session — not fakes. Two independent
+# same-wave steps ("cargoBuild" via the general rust-command primitive,
+# "lint" via clippy) both operate on the same source, declared to run with
+# maxParallel: 2. The test parses this file for its steps/execution shape
+# and substitutes a real generated fixture crate as spec.source at run time
+# (this file's own `path: .` is illustrative, not resolved by the test).
+apiVersion: shipwright.dev/v1
+kind: Workflow
+metadata:
+  name: rust-concurrency-validation
+  description: >-
+    Two independent real Rust/Dagger steps (rust-command + clippy) declared
+    to run concurrently — the fixture manifest for the wave-concurrency
+    real-Dagger validation (no needs[] edge between them).
+spec:
+  source:
+    path: .
+
+  steps:
+    - id: cargoBuild
+      capability: test
+      uses:
+        provider: rust-command
+        version: "1"
+      with:
+        command: build
+
+    - id: lint
+      capability: test
+      uses:
+        provider: clippy
+        version: "1"
+
+  execution:
+    concurrency:
+      maxParallel: 2
+    failFast: false

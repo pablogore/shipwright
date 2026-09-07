@@ -1,6 +1,12 @@
 package rust
 
-import "github.com/pablogore/shipwright/providers/rust/daggerkit"
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/pablogore/shipwright/pkg/shipwright/invocation"
+	"github.com/pablogore/shipwright/providers/rust/daggerkit"
+)
 
 // dockerDindImage is the official Docker-in-Docker image used to give a
 // RustCommand/RustIntegrationTester container access to a real, privileged
@@ -56,13 +62,36 @@ const (
 // resolved in ~2s end to end.
 var dockerdCommand = []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"}
 
+// dindInstanceEnv is set on the DinD container purely to differentiate its
+// content hash. Dagger's graph is content-addressed: two containers built
+// from the exact same From/WithExposedPort/AsService chain resolve to the
+// same node, so two concurrent steps requesting docker: true would otherwise
+// be handed the very same live dockerd service. The value itself is inert —
+// dockerd never reads it — its only job is to make the two graphs unequal.
+const dindInstanceEnv = "SHIPWRIGHT_DIND_INSTANCE"
+
 // withDockerDaemon attaches a privileged Docker-in-Docker service to
 // container under dockerServiceAlias and points DOCKER_HOST at it, giving
 // the container a real, network-reachable Docker daemon.
-func withDockerDaemon(client daggerkit.DaggerClient, container daggerkit.DaggerContainer) daggerkit.DaggerContainer {
+//
+// The service is keyed off the current step's identity (invocation.StepID,
+// set by the engine's dispatch()), not a random value: two attempts of the
+// same step get the same daemon, and two different steps always get
+// different ones. Step ids are already required to be unique within a
+// manifest (manifest.Validate), so this is a stable, reproducible identity
+// rather than injected randomness. ctx carrying no step id (e.g. a direct
+// unit-test call into a provider) falls back to a random one so isolation
+// still holds — it just gives up the same reproducibility guarantee.
+func withDockerDaemon(ctx context.Context, client daggerkit.DaggerClient, container daggerkit.DaggerContainer) daggerkit.DaggerContainer {
+	id, ok := invocation.StepID(ctx)
+	if !ok || id == "" {
+		id = uuid.NewString()
+	}
+
 	dind := client.Container().
 		From(dockerDindImage).
 		WithExposedPort(2375).
+		WithEnvVariable(dindInstanceEnv, id).
 		AsService(dockerdCommand)
 
 	return container.
