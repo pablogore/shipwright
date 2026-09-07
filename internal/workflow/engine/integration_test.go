@@ -107,6 +107,15 @@ func TestEndToEnd_DiamondExampleManifest(t *testing.T) {
 		t.Fatalf("engine.Execute() Failures = %v, want none", res.Failures)
 	}
 
+	assertDiamondInvocationAndOutcomeOrder(t, rec, res)
+}
+
+// assertDiamondInvocationAndOutcomeOrder checks both orderings
+// TestEndToEnd_DiamondExampleManifest cares about; split out purely to keep
+// that test's own cyclomatic complexity under the repo's gocyclo budget.
+func assertDiamondInvocationAndOutcomeOrder(t *testing.T, rec *recorder, res *engine.Result) {
+	t.Helper()
+
 	// Invocation order: "build" first, "publish" last, "unit"/"vuln" as a
 	// set (concurrent, unordered relative to each other) in between —
 	// maxParallel: 4 is genuinely honored for wave 2's two independent
