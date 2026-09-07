@@ -189,8 +189,8 @@ func (m *MockDaggerContainer) WithExposedPort(port int) DaggerContainer {
 	return nil
 }
 
-func (m *MockDaggerContainer) AsService() DaggerService {
-	args := m.Called()
+func (m *MockDaggerContainer) AsService(serviceArgs []string) DaggerService {
+	args := m.Called(serviceArgs)
 	if v := args.Get(0); v != nil {
 		return v.(DaggerService)
 	}
@@ -199,14 +199,6 @@ func (m *MockDaggerContainer) AsService() DaggerService {
 
 func (m *MockDaggerContainer) WithServiceBinding(alias string, svc DaggerService) DaggerContainer {
 	args := m.Called(alias, svc)
-	if v := args.Get(0); v != nil {
-		return v.(DaggerContainer)
-	}
-	return nil
-}
-
-func (m *MockDaggerContainer) WithInsecureExec(execArgs []string) DaggerContainer {
-	args := m.Called(execArgs)
 	if v := args.Get(0); v != nil {
 		return v.(DaggerContainer)
 	}

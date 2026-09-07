@@ -73,24 +73,22 @@ type DaggerContainer interface {
 	WithRegistryAuth(string, string, *dagger.Secret) DaggerContainer
 	WithUnixSocket(string, *dagger.Socket) DaggerContainer
 	WithEnvVariable(string, string) DaggerContainer
-	// WithExposedPort, AsService, WithServiceBinding and WithInsecureExec
-	// exist for the Docker-in-Docker sidecar pattern (see
-	// providers/rust/dockerdaemon.go): a privileged dockerd container is
-	// exposed as a DaggerService and bound into the caller's container under
-	// a network alias, giving testcontainers-rs a real, routable Docker
-	// daemon instead of a mounted host socket (which Dagger's own container
-	// sandboxing model makes unreachable for sibling-container networking —
-	// see dockerdaemon.go's doc comment for the full root cause).
+	// WithExposedPort, AsService and WithServiceBinding exist for the
+	// Docker-in-Docker sidecar pattern (see providers/rust/dockerdaemon.go):
+	// a privileged dockerd container is exposed as a DaggerService and bound
+	// into the caller's container under a network alias, giving
+	// testcontainers-rs a real, routable Docker daemon instead of a mounted
+	// host socket (which Dagger's own container sandboxing model makes
+	// unreachable for sibling-container networking — see dockerdaemon.go's
+	// doc comment for the full root cause).
 	WithExposedPort(int) DaggerContainer
-	AsService() DaggerService
+	// AsService runs args as the service's live process, with Dagger's
+	// InsecureRootCapabilities (needed to start dockerd itself). Args must
+	// be passed here rather than via a prior WithExec: WithExec's semantics
+	// are "run to completion and snapshot the result," which a daemon that
+	// runs forever never does — see dockerdaemon.go's dockerdCommand comment.
+	AsService([]string) DaggerService
 	WithServiceBinding(string, DaggerService) DaggerContainer
-	// WithInsecureExec runs args with Dagger's InsecureRootCapabilities,
-	// needed only to start dockerd itself inside the DinD sidecar container.
-	// A separate method rather than a variadic option on WithExec because
-	// every other WithExec call site in this module never needs it, and this
-	// module's own convention (see this file's own doc comment) is to keep
-	// the interface to exactly the methods actually called.
-	WithInsecureExec([]string) DaggerContainer
 	File(string) DaggerFile
 	Directory(string) DaggerDirectory
 	Sync(context.Context) (DaggerContainer, error)
