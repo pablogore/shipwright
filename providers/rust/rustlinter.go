@@ -45,13 +45,36 @@ func (l *RustLinter) Test(ctx context.Context, source *dagger.Directory) (*dagge
 	rustVersion := resolveRustVersion(l.RustVersion)
 	sourceDir := daggerkit.NewDaggerDirectoryAdapter(source)
 
-	container := l.Client.Container().
+	// rustup component add clippy runs against the base image only — before
+	// the source directory is mounted — so its BuildKit cache entry is keyed
+	// solely on the rust:<version> image and the registry cache mount
+	// identity, never on source content. Measured effect: mounting source
+	// first (the original ordering) forced this step to be recomputed on
+	// every source change even though it has zero dependency on source
+	// content, costing on the order of several hundred ms per run for no
+	// reason; this ordering makes the step's cache genuinely stable across
+	// every run of the same Rust version, cold or warm.
+	toolchain := l.Client.Container().
 		From("rust:"+rustVersion).
 		WithMountedCache(cargoRegistryMountPath, l.Client.CacheVolume(cargoRegistryCacheKey)).
+		WithExec([]string{"rustup", "component", "add", "clippy"})
+
+	container := toolchain.
 		WithMountedDirectory("/app", sourceDir).
 		WithWorkdir("/app").
 		WithMountedCache("/app/target", l.Client.CacheVolume(rustLinterTargetCacheKey)).
-		WithExec([]string{"rustup", "component", "add", "clippy"})
+		// cargo fetch splits the network-bound dependency download out of the
+		// clippy exec below. Dagger's progress tree (and `dagger run`'s CLI
+		// output) shows one row per WithExec with its own final duration, but
+		// never streams a running exec's stdout/stderr live — so a single
+		// combined "install clippy + fetch deps + compile + lint" exec looks
+		// identical (silent, no visible progress) whether it's stuck
+		// downloading crates or genuinely still linting a large workspace.
+		// Isolating the fetch here costs nothing (cargo clippy would run it
+		// implicitly anyway) and turns that ambiguity into two distinct,
+		// individually-timed steps, without changing the final clippy
+		// invocation itself.
+		WithExec([]string{"cargo", "fetch"})
 
 	lintContainer := container.WithExec([]string{"cargo", "clippy", "--all-targets", "--", "-D", "warnings"})
 
