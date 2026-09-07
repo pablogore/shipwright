@@ -3,7 +3,7 @@ module github.com/pablogore/shipwright/providers/go
 go 1.26.7
 
 require (
-	dagger.io/dagger v0.21.8
+	dagger.io/dagger v0.21.9
 	github.com/pablogore/shipwright v0.0.0-20260829051118-7dfc85bc7b74
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/mod v0.40.0
