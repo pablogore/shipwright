@@ -1,9 +1,11 @@
 name: 'Setup CI Environment'
 description: >-
-  Checkout, install Go, configure Git/Go for private getsyntegrity modules,
-  and restore the Go module cache. Extracted verbatim from the identical
-  setup shared by ci.yml's setup/build/test/security jobs -- behavior-
-  preserving, not a redesign of caching or private-module auth.
+  Install Go, configure Git/Go for private getsyntegrity modules, and
+  restore the Go module cache. Extracted verbatim from the identical setup
+  shared by ci.yml's build/test/security jobs -- behavior-preserving, not a
+  redesign of caching or private-module auth. Requires the caller to have
+  already run actions/checkout before this action -- a local composite
+  action can't check out the repo it is itself loaded from.
 
 inputs:
   go-version:
