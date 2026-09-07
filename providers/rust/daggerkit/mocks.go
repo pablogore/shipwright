@@ -173,6 +173,46 @@ func (m *MockDaggerContainer) WithUnixSocket(path string, socket *dagger.Socket)
 	return nil
 }
 
+func (m *MockDaggerContainer) WithEnvVariable(name, value string) DaggerContainer {
+	args := m.Called(name, value)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerContainer)
+	}
+	return nil
+}
+
+func (m *MockDaggerContainer) WithExposedPort(port int) DaggerContainer {
+	args := m.Called(port)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerContainer)
+	}
+	return nil
+}
+
+func (m *MockDaggerContainer) AsService() DaggerService {
+	args := m.Called()
+	if v := args.Get(0); v != nil {
+		return v.(DaggerService)
+	}
+	return nil
+}
+
+func (m *MockDaggerContainer) WithServiceBinding(alias string, svc DaggerService) DaggerContainer {
+	args := m.Called(alias, svc)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerContainer)
+	}
+	return nil
+}
+
+func (m *MockDaggerContainer) WithInsecureExec(execArgs []string) DaggerContainer {
+	args := m.Called(execArgs)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerContainer)
+	}
+	return nil
+}
+
 func (m *MockDaggerContainer) File(path string) DaggerFile {
 	args := m.Called(path)
 	if v := args.Get(0); v != nil {
@@ -211,6 +251,13 @@ func (m *MockDaggerContainer) Stderr(ctx context.Context) (string, error) {
 func (m *MockDaggerContainer) Publish(ctx context.Context, address string) (string, error) {
 	args := m.Called(ctx, address)
 	return args.String(0), args.Error(1)
+}
+
+var _ DaggerService = (*MockDaggerService)(nil)
+
+// MockDaggerService implements DaggerService using testify's mock package.
+type MockDaggerService struct {
+	mock.Mock
 }
 
 var _ DaggerFile = (*MockDaggerFile)(nil)

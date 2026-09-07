@@ -10,11 +10,6 @@ import (
 	"github.com/pablogore/shipwright/providers/rust/daggerkit"
 )
 
-// defaultDockerSocketPath is the conventional Unix socket path a Docker
-// daemon listens on, both on a typical CI runner host and inside the
-// container this capability mounts it into.
-const defaultDockerSocketPath = "/var/run/docker.sock"
-
 // RustIntegrationTester runs a Rust workspace's service-dependent
 // integration suite (e.g. ego-rs's integration-tests/Cargo.toml, built on
 // testcontainers + testcontainers-modules against real PostgreSQL) and
@@ -31,16 +26,13 @@ const defaultDockerSocketPath = "/var/run/docker.sock"
 // provider name ("rust-integration-test"), gets the same practical
 // outcome — a separate workflow step — without touching Layer 1.
 //
-// Docker access, compatibility mode: mounts the CI host's own Docker socket
-// into the test container (Docker-outside-of-Docker) rather than running a
-// nested dockerd, so testcontainers-rs (via bollard) talks to a real running
-// daemon with no changes to ego-rs's existing integration-tests suite.
-// Requires the host actually running Dagger to have Docker available at
-// DockerSocketPath — true of GitHub-hosted runners and most self-hosted CI,
-// but a real precondition this capability does not itself provision. A
-// later iteration replacing this with Dagger-native `services:` bindings
-// (Postgres as a service dependency, no Docker socket at all) does not
-// change this Tester's public shape.
+// Docker access is inherent to this capability and always attached: a
+// privileged Docker-in-Docker daemon (see dockerdaemon.go) is bound into the
+// test container so testcontainers-rs talks to a real, network-reachable
+// Docker daemon, with no changes to ego-rs's existing integration-tests
+// suite. A later iteration replacing this with Dagger-native `services:`
+// bindings (Postgres as a service dependency, no Docker daemon at all) does
+// not change this Tester's public shape.
 //nolint:revive // stutters with package rust by design: mirrors providers/go's naming convention (every rust.Rust* type names what it implements, matching its Go-provider counterpart)
 type RustIntegrationTester struct {
 	// Client is the Dagger client used to construct the test container.
@@ -66,9 +58,6 @@ type RustIntegrationTester struct {
 	AllFeatures bool
 	// Locked maps to `--locked`.
 	Locked bool
-	// DockerSocketPath overrides the host Docker socket path. Defaults to
-	// defaultDockerSocketPath when left empty.
-	DockerSocketPath string
 }
 
 // Compile-time conformance assertion: RustIntegrationTester must satisfy
@@ -76,7 +65,7 @@ type RustIntegrationTester struct {
 var _ shipwright.Tester = (*RustIntegrationTester)(nil)
 
 // Test runs the source Directory's integration suite (ManifestPath's
-// workspace) with the host's Docker socket mounted in, and returns the
+// workspace) with a Docker-in-Docker daemon attached, and returns the
 // captured test output as the report File.
 func (t *RustIntegrationTester) Test(ctx context.Context, source *dagger.Directory) (*dagger.File, error) {
 	if t.Client == nil {
@@ -87,8 +76,6 @@ func (t *RustIntegrationTester) Test(ctx context.Context, source *dagger.Directo
 	}
 
 	rustVersion := resolveRustVersion(t.RustVersion)
-	socketPath := resolveDockerSocketPath(t.DockerSocketPath)
-	dockerSocket := t.Client.Host().UnixSocket(socketPath)
 	sourceDir := daggerkit.NewDaggerDirectoryAdapter(source)
 
 	container := t.Client.Container().
@@ -96,9 +83,9 @@ func (t *RustIntegrationTester) Test(ctx context.Context, source *dagger.Directo
 		WithMountedCache(cargoRegistryMountPath, t.Client.CacheVolume(cargoRegistryCacheKey)).
 		WithMountedDirectory("/src", sourceDir).
 		WithWorkdir("/src").
-		WithMountedCache("/src/target", t.Client.CacheVolume(rustIntegrationTesterTargetCacheKey)).
-		WithUnixSocket(socketPath, dockerSocket).
-		WithExec(t.cargoTestArgs())
+		WithMountedCache("/src/target", t.Client.CacheVolume(rustIntegrationTesterTargetCacheKey))
+	container = withDockerDaemon(t.Client, container)
+	container = container.WithExec(t.cargoTestArgs())
 
 	testOutput, err := container.Stdout(ctx)
 	if err != nil {
@@ -113,14 +100,4 @@ func (t *RustIntegrationTester) Test(ctx context.Context, source *dagger.Directo
 // See cargoTestArgsFor (cargotestargs.go) for the shared selection logic.
 func (t *RustIntegrationTester) cargoTestArgs() []string {
 	return cargoTestArgsFor(t.ManifestPath, t.Package, t.Locked, t.AllFeatures, t.Features)
-}
-
-// resolveDockerSocketPath returns cfgPath, or defaultDockerSocketPath when
-// cfgPath is empty. Extracted as a pure helper so it is unit-testable
-// without a Dagger client.
-func resolveDockerSocketPath(cfgPath string) string {
-	if cfgPath == "" {
-		return defaultDockerSocketPath
-	}
-	return cfgPath
 }

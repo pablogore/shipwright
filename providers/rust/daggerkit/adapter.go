@@ -137,6 +137,32 @@ func (a *DaggerContainerAdapter) WithUnixSocket(path string, socket *dagger.Sock
 	return &DaggerContainerAdapter{container: a.container.WithUnixSocket(path, socket)}
 }
 
+func (a *DaggerContainerAdapter) WithEnvVariable(name, value string) DaggerContainer {
+	return &DaggerContainerAdapter{container: a.container.WithEnvVariable(name, value)}
+}
+
+func (a *DaggerContainerAdapter) WithExposedPort(port int) DaggerContainer {
+	return &DaggerContainerAdapter{container: a.container.WithExposedPort(port)}
+}
+
+func (a *DaggerContainerAdapter) AsService() DaggerService {
+	return &DaggerServiceAdapter{service: a.container.AsService()}
+}
+
+func (a *DaggerContainerAdapter) WithServiceBinding(alias string, svc DaggerService) DaggerContainer {
+	adapter, ok := svc.(*DaggerServiceAdapter)
+	if !ok {
+		panic("daggerkit: WithServiceBinding called on DaggerContainerAdapter with a non-adapter DaggerService")
+	}
+	return &DaggerContainerAdapter{container: a.container.WithServiceBinding(alias, adapter.service)}
+}
+
+func (a *DaggerContainerAdapter) WithInsecureExec(args []string) DaggerContainer {
+	return &DaggerContainerAdapter{
+		container: a.container.WithExec(args, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}),
+	}
+}
+
 func (a *DaggerContainerAdapter) File(path string) DaggerFile {
 	return &DaggerFileAdapter{file: a.container.File(path)}
 }
@@ -163,6 +189,13 @@ func (a *DaggerContainerAdapter) Stderr(ctx context.Context) (string, error) {
 
 func (a *DaggerContainerAdapter) Publish(ctx context.Context, address string) (string, error) {
 	return a.container.Publish(ctx, address)
+}
+
+var _ DaggerService = (*DaggerServiceAdapter)(nil)
+
+// DaggerServiceAdapter adapts a real *dagger.Service to DaggerService.
+type DaggerServiceAdapter struct {
+	service *dagger.Service
 }
 
 var _ DaggerFile = (*DaggerFileAdapter)(nil)

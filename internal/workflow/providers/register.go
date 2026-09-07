@@ -162,23 +162,44 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 	// providers/rust/rustintegrationtester.go's own doc comment for why
 	// this is not a distinct "integration-test" capability kind.
 	r.RegisterTester(Ref{Name: "rust-integration-test", Version: "1"}, WithSchema{
-		"rustVersion":      interp.KindString,
-		"manifestPath":     interp.KindString,
-		"package":          interp.KindString,
-		"features":         interp.KindString,
-		"allFeatures":      interp.KindBool,
-		"locked":           interp.KindBool,
-		"dockerSocketPath": interp.KindString,
+		"rustVersion":  interp.KindString,
+		"manifestPath": interp.KindString,
+		"package":      interp.KindString,
+		"features":     interp.KindString,
+		"allFeatures":  interp.KindBool,
+		"locked":       interp.KindBool,
 	}, func(v Values) shipwright.Tester {
 		return &rust.RustIntegrationTester{
-			Client:           rustClient,
-			RustVersion:      stringField(v, "rustVersion"),
-			ManifestPath:     stringField(v, "manifestPath"),
-			Package:          stringField(v, "package"),
-			Features:         splitFeatures(stringField(v, "features")),
-			AllFeatures:      boolField(v, "allFeatures"),
-			Locked:           boolField(v, "locked"),
-			DockerSocketPath: stringField(v, "dockerSocketPath"),
+			Client:       rustClient,
+			RustVersion:  stringField(v, "rustVersion"),
+			ManifestPath: stringField(v, "manifestPath"),
+			Package:      stringField(v, "package"),
+			Features:     splitFeatures(stringField(v, "features")),
+			AllFeatures:  boolField(v, "allFeatures"),
+			Locked:       boolField(v, "locked"),
+		}
+	})
+
+	// "rust-command": the general Cargo-invocation primitive
+	// rust-integration-test/rust-test/clippy/cargo-audit are conveniences
+	// over — see providers/rust/rustcommand.go's own doc comment. Registered
+	// under "test" for the same reason "rust-integration-test" is (a new
+	// Cargo invocation shape is a new provider name, not a new capability
+	// kind).
+	r.RegisterTester(Ref{Name: "rust-command", Version: "1"}, WithSchema{
+		"rustVersion":  interp.KindString,
+		"manifestPath": interp.KindString,
+		"command":      interp.KindString,
+		"docker":       interp.KindBool,
+		"cacheKey":     interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &rust.RustCommand{
+			Client:       rustClient,
+			RustVersion:  stringField(v, "rustVersion"),
+			ManifestPath: stringField(v, "manifestPath"),
+			Command:      stringField(v, "command"),
+			Docker:       boolField(v, "docker"),
+			CacheKey:     stringField(v, "cacheKey"),
 		}
 	})
 
