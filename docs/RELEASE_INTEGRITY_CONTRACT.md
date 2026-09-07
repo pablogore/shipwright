@@ -2,8 +2,9 @@
 
 This document defines the invariants a Shipwright root release (`v*` tag)
 must satisfy, and how they're enforced in `.github/workflows/release.yml`.
-It does not cover Dagger-based build/publish (RELEASE-DIST-01B) or consumer
-bootstrap/install tooling (RELEASE-DIST-01C) — see the roadmap for those.
+It does not cover Dagger-based build/publish (RELEASE-DIST-01B) beyond what
+"Distribution identity" below states; consumer bootstrap is covered in
+"Consumer bootstrap" below (RELEASE-DIST-01C).
 
 ## Release identity
 
@@ -62,6 +63,48 @@ They are not consumable under the current contract and are not treated as
 verified — no tag was recreated and no asset was altered to make them look
 retroactively compliant. The first `vX.Y.Z` release produced under this
 contract is the actual point-zero of the modern distribution line.
+
+## Consumer bootstrap (RELEASE-DIST-01C)
+
+`.github/actions/shipwright/action.yml` is the supported way for an
+external consumer repo (e.g. `ego-rs`, `changefeed`) to download and run
+Shipwright in GitHub Actions. It enforces the same integrity guarantees
+this document requires of the release itself:
+
+- **No `latest`.** The `version` input is required, has no default, and
+  `latest` is explicitly rejected — a workflow always runs the exact
+  `vX.Y.Z` release its author pinned, never whatever happens to be newest
+  on the day it runs.
+- **Fail-closed platform detection.** Only the 6 combinations release.yml
+  actually publishes (linux/darwin/windows × amd64/arm64) resolve to a
+  binary name; anything else fails the step instead of silently falling
+  back to a default platform.
+- **Mandatory checksum verification.** `checksums.txt` is downloaded fresh
+  from the same release as the binary (never cached) and the binary's
+  SHA256 is verified against it before the binary is ever executed —
+  including on a cache hit, which is never trusted blindly.
+- **Version-verified.** After checksum verification, `--version` output is
+  checked against the requested tag using the same stable `version=X`
+  contract `scripts/verify-release-set.sh` already relies on post-publish.
+- **No `eval`.** CLI arguments are built as a bash array and executed
+  directly (`"$BINARY" "${ARGS[@]}"`), so a value containing shell
+  metacharacters reaches the CLI as inert data, never as re-parsed shell
+  input.
+
+Pinned usage example (replace `<pinned-sha-or-tag>` with an immutable
+commit SHA or tag of this repo, and `vX.Y.Z` with the Shipwright release to
+run — no real release under this contract exists yet, so treat both as
+placeholders, not real versions to copy verbatim):
+
+```yaml
+- uses: pablogore/shipwright/.github/actions/shipwright@<pinned-sha-or-tag>
+  with:
+    version: 'vX.Y.Z'
+    workflow: '.shipwright/workflow.yaml'
+```
+
+Integrating this action into any specific consumer repo is a separate,
+later change — this contract only covers the bootstrap mechanism itself.
 
 ## Retry semantics
 

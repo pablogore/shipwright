@@ -6,9 +6,13 @@ branding:
 
 inputs:
   version:
-    description: 'Version of shipwright to use (e.g., "latest", "v1.0.0")'
-    required: false
-    default: 'latest'
+    description: >-
+      Pinned Shipwright release tag to run (e.g. "v1.2.3"). Required --
+      there is no default and "latest" is rejected, so a new Shipwright
+      release can never silently change what a workflow runs. The binary is
+      downloaded from this exact tag's GitHub Release and SHA256-verified
+      against that release's checksums.txt before it is ever executed.
+    required: true
   workflow:
     description: 'Path to the declarative workflow manifest'
     required: false
@@ -75,7 +79,7 @@ outputs:
     description: 'Path to the shipwright binary'
     value: '${{ steps.setup.outputs.binary-path }}'
   version:
-    description: 'Version of shipwright used'
+    description: 'The resolved, checksum- and version-verified release tag that was executed'
     value: '${{ steps.setup.outputs.version }}'
   exit-code:
     description: 'Exit code from shipwright execution'
@@ -97,37 +101,28 @@ runs:
         fi
         echo "✅ Docker is available (version: $(docker --version))"
 
-    - name: 'Determine binary URL'
-      id: 'binary-url'
+    - name: 'Validate version input'
+      id: 'version'
+      shell: 'bash'
+      env:
+        VERSION: '${{ inputs.version }}'
+      run: '${{ github.action_path }}/lib/validate-version.sh "$VERSION"'
+
+    - name: 'Resolve platform'
+      id: 'platform'
       shell: 'bash'
       run: |
-        VERSION="${{ inputs.version }}"
-        OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-        ARCH="$(uname -m)"
+        "${{ github.action_path }}/lib/resolve-platform.sh" "$(uname -s)" "$(uname -m)"
 
-        # Normalize architecture
-        case "$ARCH" in
-          x86_64) ARCH="amd64" ;;
-          aarch64|arm64) ARCH="arm64" ;;
-        esac
-
-        # Normalize OS
-        case "$OS" in
-          darwin) OS="darwin" ;;
-          linux) OS="linux" ;;
-          *) OS="linux" ;;
-        esac
-
-        if [ "$VERSION" = "latest" ]; then
-          URL="https://github.com/pablogore/shipwright/releases/latest/download/shipwright-${OS}-${ARCH}"
-        else
-          URL="https://github.com/pablogore/shipwright/releases/download/${VERSION}/shipwright-${OS}-${ARCH}"
-        fi
-
-        echo "url=$URL" >> $GITHUB_OUTPUT
-        echo "os=$OS" >> $GITHUB_OUTPUT
-        echo "arch=$ARCH" >> $GITHUB_OUTPUT
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+    - name: 'Determine release URLs'
+      id: 'urls'
+      shell: 'bash'
+      env:
+        VERSION: '${{ steps.version.outputs.version }}'
+        BINARY: '${{ steps.platform.outputs.binary }}'
+      run: |
+        echo "url=https://github.com/pablogore/shipwright/releases/download/${VERSION}/${BINARY}" >> "$GITHUB_OUTPUT"
+        echo "checksums-url=https://github.com/pablogore/shipwright/releases/download/${VERSION}/checksums.txt" >> "$GITHUB_OUTPUT"
 
     - name: 'Cache Shipwright binary'
       id: 'cache-binary'
@@ -135,50 +130,51 @@ runs:
       uses: 'actions/cache@v4'
       with:
         path: '${{ runner.tool_cache }}/shipwright'
-        key: 'shipwright-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-${{ steps.binary-url.outputs.arch }}'
-        restore-keys: |
-          shipwright-${{ steps.binary-url.outputs.version }}-${{ steps.binary-url.outputs.os }}-
-          shipwright-${{ steps.binary-url.outputs.version }}-
-          shipwright-
+        # Scoped to (version, os, arch) only -- no restore-keys. A prefix
+        # fallback could hand back a binary for a different version, OS, or
+        # arch than requested; downstream verification (checksum + reported
+        # version) would still catch that, but it's simpler to never offer a
+        # mismatched cache entry in the first place.
+        key: 'shipwright-${{ steps.version.outputs.version }}-${{ steps.platform.outputs.os }}-${{ steps.platform.outputs.arch }}'
 
-    - name: 'Setup Shipwright'
+    - name: 'Download and verify Shipwright'
       id: 'setup'
       shell: 'bash'
+      env:
+        BINARY_NAME: '${{ steps.platform.outputs.binary }}'
+        BINARY_URL: '${{ steps.urls.outputs.url }}'
+        CHECKSUMS_URL: '${{ steps.urls.outputs.checksums-url }}'
+        VERSION: '${{ steps.version.outputs.version }}'
+        SKIP_CACHE: '${{ inputs.skip-cache }}'
+        CACHE_HIT: '${{ steps.cache-binary.outputs.cache-hit }}'
       run: |
-        BINARY_NAME="shipwright"
         CACHE_DIR="${{ runner.tool_cache }}/shipwright"
         BINARY_PATH="./${BINARY_NAME}"
 
-        # Try to use cached binary first
-        if [ "${{ inputs.skip-cache }}" != "true" ] && [ "${{ steps.cache-binary.outputs.cache-hit }}" = "true" ]; then
-          if [ -f "${CACHE_DIR}/${BINARY_NAME}" ]; then
-            echo "✅ Using cached binary"
-            cp "${CACHE_DIR}/${BINARY_NAME}" "${BINARY_PATH}"
-            chmod +x "${BINARY_PATH}"
-          fi
+        if [ "$SKIP_CACHE" != "true" ] && [ "$CACHE_HIT" = "true" ] && [ -f "${CACHE_DIR}/${BINARY_NAME}" ]; then
+          echo "📦 Found cached binary -- verifying its checksum before use (a cache hit is never trusted blindly)"
+          cp "${CACHE_DIR}/${BINARY_NAME}" "${BINARY_PATH}"
+        else
+          echo "📥 Downloading Shipwright ${VERSION} from ${BINARY_URL}"
+          curl -fsSL "${BINARY_URL}" -o "${BINARY_PATH}"
+        fi
+        chmod +x "${BINARY_PATH}"
+
+        echo "📥 Downloading checksums.txt from ${CHECKSUMS_URL}"
+        curl -fsSL "${CHECKSUMS_URL}" -o ./checksums.txt
+
+        "${{ github.action_path }}/lib/verify-checksum.sh" ./checksums.txt "${BINARY_PATH}" "${BINARY_NAME}"
+
+        if [ "$SKIP_CACHE" != "true" ]; then
+          mkdir -p "${CACHE_DIR}"
+          cp "${BINARY_PATH}" "${CACHE_DIR}/${BINARY_NAME}"
         fi
 
-        # Download if not cached or cache disabled
-        if [ ! -f "${BINARY_PATH}" ] || [ ! -x "${BINARY_PATH}" ]; then
-          echo "📥 Downloading Shipwright from ${{ steps.binary-url.outputs.url }}"
-          curl -L "${{ steps.binary-url.outputs.url }}" -o "${BINARY_PATH}" || {
-            echo "❌ Failed to download binary"
-            exit 1
-          }
-          chmod +x "${BINARY_PATH}"
+        "${{ github.action_path }}/lib/verify-cli-version.sh" "${BINARY_PATH}" "${VERSION}"
 
-          # Save to cache if caching is enabled
-          if [ "${{ inputs.skip-cache }}" != "true" ]; then
-            mkdir -p "${CACHE_DIR}"
-            cp "${BINARY_PATH}" "${CACHE_DIR}/${BINARY_NAME}"
-          fi
-        fi
-
-        # Verify binary works
-        INSTALLED_VERSION=$("${BINARY_PATH}" --version 2>&1 | head -n1 | awk '{print $3}' || echo "unknown")
-        echo "✅ Shipwright $INSTALLED_VERSION ready"
-        echo "binary-path=${BINARY_PATH}" >> $GITHUB_OUTPUT
-        echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
+        echo "✅ Shipwright ${VERSION} downloaded, checksum-verified, and version-verified"
+        echo "binary-path=${BINARY_PATH}" >> "$GITHUB_OUTPUT"
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
     - name: 'Ensure Docker and Dagger daemon are ready'
       shell: 'bash'
@@ -203,61 +199,51 @@ runs:
         # safe to always pass through — jobs that don't set inputs.cloud-token
         # keep today's local-engine-only behavior unchanged.
         DAGGER_CLOUD_TOKEN: '${{ inputs.cloud-token }}'
+        BINARY_PATH: '${{ steps.setup.outputs.binary-path }}'
+        WORKFLOW: '${{ inputs.workflow }}'
+        CONFIG: '${{ inputs.config }}'
+        ENV: '${{ inputs.env }}'
+        COVERAGE: '${{ inputs.coverage }}'
+        BRANCH: '${{ inputs.branch }}'
+        LIST_STEPS: '${{ inputs.list-steps }}'
+        STEP: '${{ inputs.step }}'
+        EXECUTOR: '${{ inputs.executor }}'
+        VERBOSE: '${{ inputs.verbose }}'
+        GIT_REF: '${{ inputs.git-ref }}'
+        GIT_AUTH: '${{ inputs.git-auth }}'
+        FALLBACK_GIT_REF: '${{ github.ref_name }}'
       run: |
         set +e  # Don't fail immediately, we want to capture exit code
 
-        echo "::group::Executing workflow: ${{ inputs.workflow }}"
+        echo "::group::Executing workflow: ${WORKFLOW}"
         echo "🌍 Environment: GitHub Actions"
-        echo "📋 Workflow: ${{ inputs.workflow }}"
+        echo "📋 Workflow: ${WORKFLOW}"
 
-        CMD="${{ steps.setup.outputs.binary-path }}"
-        CMD="$CMD --workflow=${{ inputs.workflow }}"
-        CMD="$CMD --config=${{ inputs.config }}"
-        CMD="$CMD --env=${{ inputs.env }}"
-        CMD="$CMD --coverage=${{ inputs.coverage }}"
-        CMD="$CMD --branch=${{ inputs.branch }}"
-
-        # Auto-detect CI environment - don't use --local in CI
-        # The binary will automatically detect CI via environment variables
-
-        if [ "${{ inputs.list-steps }}" = "true" ]; then
-          CMD="$CMD --list-steps"
-        elif [ -n "${{ inputs.step }}" ]; then
-          CMD="$CMD --step=${{ inputs.step }}"
+        # Use GitHub ref if the caller didn't set one explicitly.
+        if [ -z "$GIT_REF" ]; then
+          GIT_REF="$FALLBACK_GIT_REF"
         fi
-
-        if [ -n "${{ inputs.executor }}" ]; then
-          CMD="$CMD --executor=${{ inputs.executor }}"
+        # Default to HTTPS if the caller cleared it (inputs.git-auth already
+        # defaults to 'https', this only guards an explicit empty override).
+        if [ -z "$GIT_AUTH" ]; then
+          GIT_AUTH="https"
         fi
+        export WORKFLOW CONFIG ENV COVERAGE BRANCH LIST_STEPS STEP EXECUTOR VERBOSE GIT_REF GIT_AUTH
 
-        if [ "${{ inputs.verbose }}" = "true" ]; then
-          CMD="$CMD --verbose"
-        fi
+        # build-args.sh prints one argv element per line; mapfile turns that
+        # back into a real bash array, so every value below reaches the CLI
+        # as inert, single-argument data -- never through eval or any other
+        # shell re-parsing step.
+        mapfile -t ARGS < <("${{ github.action_path }}/lib/build-args.sh")
 
-        if [ -n "${{ inputs.git-ref }}" ]; then
-          CMD="$CMD --git-ref=${{ inputs.git-ref }}"
-        else
-          # Use GitHub ref if available
-          if [ -n "${{ github.ref }}" ]; then
-            CMD="$CMD --git-ref=${{ github.ref_name }}"
-          fi
-        fi
-
-        if [ -n "${{ inputs.git-auth }}" ]; then
-          CMD="$CMD --git-auth=${{ inputs.git-auth }}"
-        else
-          # Default to HTTPS in GitHub Actions
-          CMD="$CMD --git-auth=https"
-        fi
-
-        echo "Running: $CMD"
-        eval "$CMD"
+        echo "Running: ${BINARY_PATH} ${ARGS[*]}"
+        "${BINARY_PATH}" "${ARGS[@]}"
         EXIT_CODE=$?
 
         echo "::endgroup::"
-        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+        echo "exit-code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
 
         if [ $EXIT_CODE -ne 0 ]; then
-          echo "::error::Workflow ${{ inputs.workflow }} failed with exit code $EXIT_CODE"
+          echo "::error::Workflow ${WORKFLOW} failed with exit code $EXIT_CODE"
           exit $EXIT_CODE
         fi
