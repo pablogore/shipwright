@@ -40,6 +40,8 @@ func TestGoBuilder_Build_Success(t *testing.T) {
 	mockClient := &daggerkit.MockDaggerClient{}
 	mockContainer := &daggerkit.MockDaggerContainer{}
 	mockOutputDir := &daggerkit.MockDaggerDirectory{}
+	mockModCache := &daggerkit.MockDaggerCacheVolume{}
+	mockBuildCache := &daggerkit.MockDaggerCacheVolume{}
 	src := &dagger.Directory{}
 	realOutputDir := &dagger.Directory{}
 
@@ -51,6 +53,10 @@ func TestGoBuilder_Build_Success(t *testing.T) {
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GOPATH", "/go").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "CGO_ENABLED", "0").Return(mockContainer)
+	mockClient.On("CacheVolume", "shipwright-go-mod-cache").Return(mockModCache)
+	mockClient.On("CacheVolume", "shipwright-go-build-cache").Return(mockBuildCache)
+	mockContainer.On("WithMountedCache", "/go/pkg/mod", mockModCache).Return(mockContainer)
+	mockContainer.On("WithMountedCache", "/root/.cache/go-build", mockBuildCache).Return(mockContainer)
 	mockContainer.On("WithExec", []string{"go", "mod", "tidy"}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
 	mockContainer.On("WithExec", []string{"go", "build", "-ldflags=-s -w", "-o", "/output/app", "."}, daggerkit.DaggerContainerWithExecOpts{}).Return(mockContainer)
 	mockContainer.On("Sync", mock.Anything).Return(mockContainer, nil)
@@ -86,6 +92,8 @@ func TestGoBuilder_Build_Failure_Stderr(t *testing.T) {
 	mockContainer.On("WithWorkdir", "/app").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "GOPATH", "/go").Return(mockContainer)
 	mockContainer.On("WithEnvVariable", "CGO_ENABLED", "0").Return(mockContainer)
+	mockClient.On("CacheVolume", mock.Anything).Return(&daggerkit.MockDaggerCacheVolume{})
+	mockContainer.On("WithMountedCache", mock.Anything, mock.Anything).Return(mockContainer)
 	mockContainer.On("WithExec", mock.Anything, mock.Anything).Return(mockContainer)
 	mockContainer.On("Sync", mock.Anything).Return(nil, execErr)
 

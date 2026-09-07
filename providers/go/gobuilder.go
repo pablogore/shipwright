@@ -95,7 +95,9 @@ func (b *GoBuilder) Build(ctx context.Context, source *dagger.Directory) (*dagge
 		WithMountedDirectory("/app", daggerkit.NewDaggerDirectoryAdapter(source)).
 		WithWorkdir("/app").
 		WithEnvVariable("GOPATH", "/go").
-		WithEnvVariable("CGO_ENABLED", "0").
+		WithEnvVariable("CGO_ENABLED", "0")
+	container = mountGoCaches(b.Client, container)
+	container = container.
 		WithExec([]string{"go", "mod", "tidy"}, daggerkit.DaggerContainerWithExecOpts{}).
 		WithExec([]string{"go", "build", "-ldflags=-s -w", "-o", outPath, "."}, daggerkit.DaggerContainerWithExecOpts{})
 

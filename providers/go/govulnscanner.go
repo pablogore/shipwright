@@ -60,7 +60,9 @@ func (v *GoVulnScanner) Test(ctx context.Context, source *dagger.Directory) (*da
 		WithMountedDirectory("/app", daggerkit.NewDaggerDirectoryAdapter(source)).
 		WithWorkdir("/app").
 		WithEnvVariable("GO111MODULE", "on").
-		WithEnvVariable("CGO_ENABLED", "0").
+		WithEnvVariable("CGO_ENABLED", "0")
+	container = mountGoCaches(v.Client, container)
+	container = container.
 		WithExec([]string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@v1.7.0"}, daggerkit.DaggerContainerWithExecOpts{})
 
 	output, err := container.WithExec([]string{"govulncheck", "./..."}, daggerkit.DaggerContainerWithExecOpts{}).Stdout(ctx)

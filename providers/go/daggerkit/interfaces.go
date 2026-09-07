@@ -8,8 +8,10 @@
 // Scoped down from the root package's full surface to only the methods
 // this module's five capability providers (GoBuilder, GoLinter,
 // GoUnitTester, GoVulnScanner, ContainerPublisher) actually call: no
-// DaggerHost, DaggerCacheVolume, or DaggerClient.CacheVolume/Host, since
-// none of them mount a cache volume or touch the host filesystem.
+// DaggerHost, since none of them touch the host filesystem.
+// DaggerClient.CacheVolume/DaggerCacheVolume were added for gocache.go's
+// shared module/build cache volumes (GoBuilder, GoUnitTester, GoLinter,
+// GoVulnScanner).
 package daggerkit
 
 import (
@@ -21,6 +23,13 @@ import (
 // DaggerClient interface abstracts the dagger.Client to enable mocking.
 type DaggerClient interface {
 	Container() DaggerContainer
+	CacheVolume(string) DaggerCacheVolume
+}
+
+// DaggerCacheVolume interface abstracts the dagger.CacheVolume to enable
+// mocking. No methods: every provider in this module only ever passes a
+// CacheVolume opaquely into WithMountedCache.
+type DaggerCacheVolume interface {
 }
 
 // DaggerDirectory interface abstracts the dagger.Directory to enable
@@ -60,6 +69,7 @@ type DaggerContainerWithExecOpts struct {
 type DaggerContainer interface {
 	From(string) DaggerContainer
 	WithMountedDirectory(string, DaggerDirectory) DaggerContainer
+	WithMountedCache(string, DaggerCacheVolume) DaggerContainer
 	WithWorkdir(string) DaggerContainer
 	WithEnvVariable(string, string) DaggerContainer
 	WithExec([]string, DaggerContainerWithExecOpts) DaggerContainer

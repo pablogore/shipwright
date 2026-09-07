@@ -53,6 +53,13 @@ func (l *GoLinter) Test(ctx context.Context, source *dagger.Directory) (*dagger.
 		WithWorkdir("/app").
 		WithEnvVariable("GO111MODULE", "on").
 		WithEnvVariable("CGO_ENABLED", "0")
+	// golangci-lint drives `go build`/`go vet` internally against the same
+	// module graph GoBuilder/GoUnitTester/GoVulnScanner compile, so it
+	// benefits from the same shared module/build cache (see gocache.go);
+	// golangci-lint's own analysis cache (~/.cache/golangci-lint) is a
+	// separate concern not addressed here — no evidence yet that it is
+	// worth a dedicated volume.
+	container = mountGoCaches(l.Client, container)
 
 	output, err := container.
 		WithExec([]string{"golangci-lint", "run", "--timeout", defaultLinterTimeout, "./..."}, daggerkit.DaggerContainerWithExecOpts{}).

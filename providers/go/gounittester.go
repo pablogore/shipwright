@@ -66,7 +66,9 @@ func (t *GoUnitTester) Test(ctx context.Context, source *dagger.Directory) (*dag
 		// never triggered because the legacy Pipeline.Test path is fully
 		// mocked in its own test suite. Surfaced and fixed here via this
 		// package's real-engine integration test.
-		WithEnvVariable("CGO_ENABLED", "1").
+		WithEnvVariable("CGO_ENABLED", "1")
+	container = mountGoCaches(t.Client, container)
+	container = container.
 		WithExec([]string{"go", "test", "-v", "-race", "-coverprofile=/tmp/coverage.out", "./..."}, daggerkit.DaggerContainerWithExecOpts{})
 
 	ran, err := container.Sync(ctx)
