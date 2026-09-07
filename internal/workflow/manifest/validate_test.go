@@ -1,5 +1,6 @@
 // ValidateExecutable tests (tasks.md 5.1): the execution-only fail-close
-// gate rejecting approvals, policies.*, and maxParallel > 1.
+// gate rejecting approvals and policies.*. maxParallel is no longer
+// rejected here — see TestValidateExecutable_AllowsAnyNonNegativeMaxParallel.
 package manifest_test
 
 import (
@@ -167,19 +168,22 @@ func TestValidateExecutable_AllowsOmittedPolicies(t *testing.T) {
 	}
 }
 
-// TestValidateExecutable_RejectsMaxParallelAboveOne proves maxParallel > 1
-// fails validation while 0/1 (sequential execution) are accepted.
-func TestValidateExecutable_RejectsMaxParallelAboveOne(t *testing.T) {
+// TestValidateExecutable_AllowsAnyNonNegativeMaxParallel proves
+// ValidateExecutable no longer fails closed on maxParallel > 1 — the engine
+// (internal/workflow/engine) now honors it as a real concurrency bound
+// within a wave, so asserting it is no longer an unenforceable control.
+// Negative values are covered separately by ValidateStructure
+// (structure_test.go), which still rejects them at parse time.
+func TestValidateExecutable_AllowsAnyNonNegativeMaxParallel(t *testing.T) {
 	tests := []struct {
 		name        string
 		maxParallel string
-		wantErr     bool
 	}{
-		{name: "omitted", maxParallel: "", wantErr: false},
-		{name: "zero", maxParallel: "0", wantErr: false},
-		{name: "one", maxParallel: "1", wantErr: false},
-		{name: "two", maxParallel: "2", wantErr: true},
-		{name: "four", maxParallel: "4", wantErr: true},
+		{name: "omitted", maxParallel: ""},
+		{name: "zero", maxParallel: "0"},
+		{name: "one", maxParallel: "1"},
+		{name: "two", maxParallel: "2"},
+		{name: "four", maxParallel: "4"},
 	}
 
 	for _, tt := range tests {
@@ -199,21 +203,8 @@ func TestValidateExecutable_RejectsMaxParallelAboveOne(t *testing.T) {
 				t.Fatalf("manifest.Parse() error = %v, want nil", err)
 			}
 
-			err = manifest.ValidateExecutable(m)
-			if tt.wantErr && err == nil {
-				t.Fatalf("ValidateExecutable() with maxParallel=%s must return an error, got nil", tt.maxParallel)
-			}
-			if !tt.wantErr && err != nil {
+			if err := manifest.ValidateExecutable(m); err != nil {
 				t.Fatalf("ValidateExecutable() with maxParallel=%s error = %v, want nil", tt.maxParallel, err)
-			}
-			if tt.wantErr {
-				var uce *manifest.UnenforceableControlError
-				if !errors.As(err, &uce) {
-					t.Fatalf("ValidateExecutable() error = %v, want *manifest.UnenforceableControlError", err)
-				}
-				if uce.Field != "spec.execution.concurrency.maxParallel" {
-					t.Fatalf("UnenforceableControlError.Field = %q, want spec.execution.concurrency.maxParallel", uce.Field)
-				}
 			}
 		})
 	}

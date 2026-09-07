@@ -7,9 +7,10 @@
 // testing strategy table ("Fake capability implementations recording
 // invocation order").
 //
-// Approvals-never-block and maxParallel coverage moved to
-// manifest.TestValidateExecutable_*: both are rejected before execution
-// begins, so they never reach this package's Execute.
+// Approvals-never-block coverage lives in manifest.TestValidateExecutable_*:
+// it is rejected before execution begins, so it never reaches this
+// package's Execute. maxParallel's real concurrency behavior IS covered
+// here — see concurrency_test.go.
 package engine_test
 
 import (
@@ -147,11 +148,12 @@ func TestExecute_WaveOrderIsManifestDeclarationOrder(t *testing.T) {
 	}
 }
 
-// tasks.md 8.5/7.2 (renamed from TestExecute_MaxParallelDoesNotWidenExecution):
-// the engine executes waves strictly sequentially regardless of
-// concurrency opportunities within a wave — the diamond fixture's "unit"
-// and "vuln" steps are both ready in the same wave, yet still run one at a
-// time in declaration order.
+// tasks.md 8.5/7.2: with Options{} — MaxParallel unset/zero — the engine
+// preserves its historical strictly-sequential behavior, regardless of
+// concurrency opportunities within a wave: the diamond fixture's "unit" and
+// "vuln" steps are both ready in the same wave, yet still run one at a time
+// in declaration order. Real concurrent widening for MaxParallel > 1 is
+// covered in concurrency_test.go.
 func TestExecute_RunsWavesSequentiallyInDeclarationOrder(t *testing.T) {
 	t.Parallel()
 

@@ -22,6 +22,16 @@ import (
 // is exactly what makes this fast enough to not strictly need a -short
 // guard; it is guarded anyway per the harness column's explicit
 // instruction.
+//
+// diamond.yaml declares maxParallel: 4 (its own doc comment example), which
+// the engine now genuinely honors: "unit" and "vuln" both belong to wave 2
+// and share no needs[] edge, so they dispatch concurrently and their
+// relative START order is a real goroutine-scheduling race — this test
+// must not assert one over the other. What stays guaranteed, and is what
+// this test actually proves, is Result.Outcomes' order (always
+// wave-then-declaration order, never completion order — runWave's doc
+// comment) and the wave boundary itself: "build" must precede both of them
+// and "publish" must follow both, since those are real needs[] edges.
 func TestEndToEnd_DiamondExampleManifest(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping end-to-end workflow harness in -short mode")
@@ -97,14 +107,35 @@ func TestEndToEnd_DiamondExampleManifest(t *testing.T) {
 		t.Fatalf("engine.Execute() Failures = %v, want none", res.Failures)
 	}
 
-	wantOrder := []string{"build", "unit", "vuln", "publish"}
+	// Invocation order: "build" first, "publish" last, "unit"/"vuln" as a
+	// set (concurrent, unordered relative to each other) in between —
+	// maxParallel: 4 is genuinely honored for wave 2's two independent
+	// steps.
 	got := rec.snapshot()
-	if len(got) != len(wantOrder) {
-		t.Fatalf("invocation order = %v, want %v", got, wantOrder)
+	if len(got) != 4 {
+		t.Fatalf("invocation order = %v, want 4 entries", got)
 	}
-	for i := range wantOrder {
-		if got[i] != wantOrder[i] {
-			t.Fatalf("invocation order = %v, want %v", got, wantOrder)
+	if got[0] != "build" {
+		t.Fatalf("invocation order = %v, want \"build\" first", got)
+	}
+	if got[3] != "publish" {
+		t.Fatalf("invocation order = %v, want \"publish\" last", got)
+	}
+	middle := map[string]bool{got[1]: true, got[2]: true}
+	if !middle["unit"] || !middle["vuln"] {
+		t.Fatalf("invocation order = %v, want {\"unit\", \"vuln\"} concurrently in positions 1-2", got)
+	}
+
+	// Result.Outcomes stays deterministic regardless of goroutine
+	// completion order (runWave's doc comment): wave order, then
+	// manifest-declaration order.
+	wantOutcomeOrder := []string{"build", "unit", "vuln", "publish"}
+	if len(res.Outcomes) != len(wantOutcomeOrder) {
+		t.Fatalf("Outcomes = %v, want %d entries", res.Outcomes, len(wantOutcomeOrder))
+	}
+	for i, wantID := range wantOutcomeOrder {
+		if res.Outcomes[i].StepID != wantID {
+			t.Fatalf("Outcomes[%d].StepID = %q, want %q (Outcomes order = %v)", i, res.Outcomes[i].StepID, wantID, res.Outcomes)
 		}
 	}
 }

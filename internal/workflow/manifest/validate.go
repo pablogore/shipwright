@@ -136,20 +136,20 @@ func (e *UnenforceableControlError) Error() string {
 // --list-steps) still parses and displays these controls; the execution
 // path must call this itself before any Dagger connection.
 //
-// Fixed, first-offender order: approvals (sorted names) → policies.* →
-// maxParallel > 1. No override.
+// Fixed, first-offender order: approvals (sorted names) → policies.*. No
+// override.
+//
+// maxParallel > 1 is NO LONGER rejected here: the engine (internal/workflow/
+// engine, design.md D-K's "worker pool drops into later" seam) now honors
+// it as a real upper bound on concurrent steps within a wave. Negative
+// values are still rejected, at parse time, by ValidateStructure (stage 3)
+// — that check does not move here.
 func ValidateExecutable(m *Manifest) error {
 	if err := validateNoApprovals(m); err != nil {
 		return err
 	}
 	if err := validateNoPolicies(m); err != nil {
 		return err
-	}
-	if m.Spec.Execution.Concurrency.MaxParallel > 1 {
-		return &UnenforceableControlError{
-			Field:  "spec.execution.concurrency.maxParallel",
-			Detail: "the engine executes waves strictly sequentially and cannot honor an asserted parallelism greater than 1",
-		}
 	}
 
 	return nil
