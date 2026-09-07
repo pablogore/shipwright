@@ -145,8 +145,11 @@ func (a *DaggerContainerAdapter) WithExposedPort(port int) DaggerContainer {
 	return &DaggerContainerAdapter{container: a.container.WithExposedPort(port)}
 }
 
-func (a *DaggerContainerAdapter) AsService() DaggerService {
-	return &DaggerServiceAdapter{service: a.container.AsService()}
+func (a *DaggerContainerAdapter) AsService(args []string) DaggerService {
+	return &DaggerServiceAdapter{service: a.container.AsService(dagger.ContainerAsServiceOpts{
+		Args:                     args,
+		InsecureRootCapabilities: true,
+	})}
 }
 
 func (a *DaggerContainerAdapter) WithServiceBinding(alias string, svc DaggerService) DaggerContainer {
@@ -155,12 +158,6 @@ func (a *DaggerContainerAdapter) WithServiceBinding(alias string, svc DaggerServ
 		panic("daggerkit: WithServiceBinding called on DaggerContainerAdapter with a non-adapter DaggerService")
 	}
 	return &DaggerContainerAdapter{container: a.container.WithServiceBinding(alias, adapter.service)}
-}
-
-func (a *DaggerContainerAdapter) WithInsecureExec(args []string) DaggerContainer {
-	return &DaggerContainerAdapter{
-		container: a.container.WithExec(args, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}),
-	}
 }
 
 func (a *DaggerContainerAdapter) File(path string) DaggerFile {

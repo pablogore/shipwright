@@ -43,6 +43,19 @@ const (
 	dockerHostEnv      = "tcp://" + dockerServiceAlias + ":2375"
 )
 
+// dockerdCommand is dockerd's own startup command, passed as AsService's
+// Args rather than a prior WithExec: WithExec's semantics are "run this to
+// completion and snapshot the result," which never happens for a daemon
+// that runs forever — chaining WithExec().AsService() leaves the container
+// permanently pending, and the AsService call itself never resolves.
+// AsService's own Args/InsecureRootCapabilities options run the command as
+// the service's live process instead, exactly like the base dind image's
+// own default entrypoint would. Confirmed against a real, isolated dagger
+// probe: WithExec().AsService() hung indefinitely (30m timeout) even though
+// dockerd itself was up and healthy within 2 seconds; AsService(Args:...)
+// resolved in ~2s end to end.
+var dockerdCommand = []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"}
+
 // withDockerDaemon attaches a privileged Docker-in-Docker service to
 // container under dockerServiceAlias and points DOCKER_HOST at it, giving
 // the container a real, network-reachable Docker daemon.
@@ -50,8 +63,7 @@ func withDockerDaemon(client daggerkit.DaggerClient, container daggerkit.DaggerC
 	dind := client.Container().
 		From(dockerDindImage).
 		WithExposedPort(2375).
-		WithInsecureExec([]string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"}).
-		AsService()
+		AsService(dockerdCommand)
 
 	return container.
 		WithServiceBinding(dockerServiceAlias, dind).
