@@ -320,3 +320,47 @@ func TestRegisterDefaults_ClippyAndCargoAudit_RustVersionFlowsThrough(t *testing
 		t.Fatalf("RustVulnScanner.RustVersion = %q, want %q — the manifest's rustVersion with-field never reached the provider", rustVulnScanner.RustVersion, "1.90.0")
 	}
 }
+
+// TestRegisterDefaults_RustCommand_WithFieldsFlowThrough is the GREEN
+// evidence that "rust-command" is registered under the "test" capability
+// and that every one of its with-fields — including manifestPath and
+// docker, the two fields the ego-rs migration review specifically asked to
+// verify aren't silently dropped — actually reaches the resolved
+// *rust.RustCommand, not just that resolution succeeds.
+func TestRegisterDefaults_RustCommand_WithFieldsFlowThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "rust-command", Version: "1"}, providers.Values{
+		"rustVersion":  interp.NewString("1.90.0"),
+		"manifestPath": interp.NewString("integration-tests/Cargo.toml"),
+		"command":      interp.NewString("run --bin run-suite"),
+		"docker":       interp.NewBool(true),
+		"cacheKey":     interp.NewString("run-suite"),
+	})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(rust-command) = (%v, %v), want (non-nil RustCommand, nil)", tester, err)
+	}
+
+	command, ok := tester.(*rust.RustCommand)
+	if !ok {
+		t.Fatalf("ResolveTester(rust-command) = %T, want *rust.RustCommand", tester)
+	}
+	if command.RustVersion != "1.90.0" {
+		t.Fatalf("RustCommand.RustVersion = %q, want %q", command.RustVersion, "1.90.0")
+	}
+	if command.ManifestPath != "integration-tests/Cargo.toml" {
+		t.Fatalf("RustCommand.ManifestPath = %q, want %q", command.ManifestPath, "integration-tests/Cargo.toml")
+	}
+	if command.Command != "run --bin run-suite" {
+		t.Fatalf("RustCommand.Command = %q, want %q", command.Command, "run --bin run-suite")
+	}
+	if !command.Docker {
+		t.Fatalf("RustCommand.Docker = %v, want true", command.Docker)
+	}
+	if command.CacheKey != "run-suite" {
+		t.Fatalf("RustCommand.CacheKey = %q, want %q", command.CacheKey, "run-suite")
+	}
+}

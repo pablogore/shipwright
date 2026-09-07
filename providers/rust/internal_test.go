@@ -120,26 +120,6 @@ func TestRustBuilder_CargoBuildArgs(t *testing.T) {
 	}
 }
 
-func TestResolveDockerSocketPath(t *testing.T) {
-	tests := []struct {
-		name    string
-		cfgPath string
-		want    string
-	}{
-		{name: "empty falls back to default", cfgPath: "", want: defaultDockerSocketPath},
-		{name: "explicit path is preserved", cfgPath: "/custom/docker.sock", want: "/custom/docker.sock"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := resolveDockerSocketPath(tt.cfgPath)
-			if got != tt.want {
-				t.Fatalf("resolveDockerSocketPath(%q) = %q, want %q", tt.cfgPath, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestRustIntegrationTester_CargoTestArgs(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -526,4 +506,76 @@ func TestAuditCombinedOutput(t *testing.T) {
 			t.Fatalf("auditCombinedOutput() = %q, want it to contain the ExecError's Stderr", got)
 		}
 	})
+}
+
+// TestCargoCommandArgsFor covers RustCommand's argv construction: whitespace
+// tokenization of Command (no shell involved) plus --manifest-path inserted
+// right after the subcommand when manifestPath is set, so a manifest never
+// has to duplicate manifestPath inside Command itself.
+func TestCargoCommandArgsFor(t *testing.T) {
+	tests := []struct {
+		name         string
+		manifestPath string
+		command      string
+		want         []string
+	}{
+		{
+			name:    "xtask invocation, no manifest path",
+			command: "run -p xtask -- verify-layers",
+			want:    []string{"cargo", "run", "-p", "xtask", "--", "verify-layers"},
+		},
+		{
+			name:         "manifest path inserted right after the subcommand",
+			manifestPath: "integration-tests/Cargo.toml",
+			command:      "run --bin run-suite",
+			want:         []string{"cargo", "run", "--manifest-path", "integration-tests/Cargo.toml", "--bin", "run-suite"},
+		},
+		{
+			name:    "extra whitespace between tokens collapses",
+			command: "  run   -p  xtask  ",
+			want:    []string{"cargo", "run", "-p", "xtask"},
+		},
+		{
+			name: "empty command yields a bare cargo argv",
+			want: []string{"cargo"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cargoCommandArgsFor(tt.manifestPath, tt.command)
+			if len(got) != len(tt.want) {
+				t.Fatalf("cargoCommandArgsFor(%q, %q) = %v, want %v", tt.manifestPath, tt.command, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("cargoCommandArgsFor(%q, %q) = %v, want %v", tt.manifestPath, tt.command, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+// TestResolveCommandCacheKey covers RustCommand's target-cache isolation: an
+// unset CacheKey must fall back to the shared default volume, and a set one
+// must be namespaced so two RustCommand steps against different Cargo
+// workspaces never collide.
+func TestResolveCommandCacheKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		cacheKey string
+		want     string
+	}{
+		{name: "empty falls back to shared default", cacheKey: "", want: rustCommandDefaultTargetCacheKey},
+		{name: "explicit key is namespaced", cacheKey: "run-suite", want: "shipwright-rust-command-target-run-suite"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveCommandCacheKey(tt.cacheKey)
+			if got != tt.want {
+				t.Fatalf("resolveCommandCacheKey(%q) = %q, want %q", tt.cacheKey, got, tt.want)
+			}
+		})
+	}
 }

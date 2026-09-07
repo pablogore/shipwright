@@ -38,6 +38,13 @@ type DaggerHost interface {
 type DaggerCacheVolume interface {
 }
 
+// DaggerService interface abstracts the dagger.Service to enable mocking. No
+// methods: every provider in this module only ever passes a Service opaquely
+// into WithServiceBinding (e.g. a Docker-in-Docker daemon container turned
+// into a service via AsService).
+type DaggerService interface {
+}
+
 // DaggerDirectory interface abstracts the dagger.Directory to enable
 // mocking.
 type DaggerDirectory interface {
@@ -65,6 +72,25 @@ type DaggerContainer interface {
 	// DaggerHost.UnixSocket above.
 	WithRegistryAuth(string, string, *dagger.Secret) DaggerContainer
 	WithUnixSocket(string, *dagger.Socket) DaggerContainer
+	WithEnvVariable(string, string) DaggerContainer
+	// WithExposedPort, AsService, WithServiceBinding and WithInsecureExec
+	// exist for the Docker-in-Docker sidecar pattern (see
+	// providers/rust/dockerdaemon.go): a privileged dockerd container is
+	// exposed as a DaggerService and bound into the caller's container under
+	// a network alias, giving testcontainers-rs a real, routable Docker
+	// daemon instead of a mounted host socket (which Dagger's own container
+	// sandboxing model makes unreachable for sibling-container networking —
+	// see dockerdaemon.go's doc comment for the full root cause).
+	WithExposedPort(int) DaggerContainer
+	AsService() DaggerService
+	WithServiceBinding(string, DaggerService) DaggerContainer
+	// WithInsecureExec runs args with Dagger's InsecureRootCapabilities,
+	// needed only to start dockerd itself inside the DinD sidecar container.
+	// A separate method rather than a variadic option on WithExec because
+	// every other WithExec call site in this module never needs it, and this
+	// module's own convention (see this file's own doc comment) is to keep
+	// the interface to exactly the methods actually called.
+	WithInsecureExec([]string) DaggerContainer
 	File(string) DaggerFile
 	Directory(string) DaggerDirectory
 	Sync(context.Context) (DaggerContainer, error)

@@ -183,7 +183,22 @@ func (c *Container) registerDaggerComponents() {
 			// Connect to Dagger engine (which uses Docker)
 			// dagger.Connect() automatically manages the Dagger engine via Docker
 			// It may take time for the daemon to start, especially on first run
-			client, lastErr = dagger.Connect(ctx, dagger.WithLogOutput(nil))
+			//
+			// Deliberately connect with c.ctx, NOT the retry-loop's ctx (the
+			// context.WithTimeout above, whose deferred cancel fires the
+			// instant this factory function returns): dagger.Connect keeps
+			// its underlying `dagger session` child process alive only as
+			// long as the context passed to it stays uncancelled, but the
+			// returned *dagger.Client is cached here and reused for every
+			// query for the rest of the process's life (Container.Stop
+			// closes it on shutdown). Connecting with the short-lived ctx
+			// let the session process die (its stdin closed) the moment
+			// this factory returned, so the very first real query from any
+			// step afterward failed instantly with "connection refused" on
+			// the now-dead session's port — reproduced even for pre-existing
+			// providers (e.g. clippy), confirming this was never specific
+			// to any one provider.
+			client, lastErr = dagger.Connect(c.ctx, dagger.WithLogOutput(nil))
 			if lastErr == nil {
 				// Connection successful, but verify daemon is actually ready
 				// by performing a simple operation

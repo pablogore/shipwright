@@ -31,3 +31,14 @@ const (
 	// incremental-compilation state between the two on every run.
 	rustIntegrationTesterTargetCacheKey = "shipwright-rust-integrationtester-target"
 )
+
+// rustCommandDefaultTargetCacheKey is RustCommand's shared default target
+// cache volume, used when no explicit CacheKey is configured.
+// rustCommandTargetCacheKeyPrefix namespaces an explicit CacheKey into its
+// own isolated volume (resolveCommandCacheKey, rustcommand.go) so two
+// RustCommand steps against different Cargo workspaces never share
+// incompatible incremental-compilation state.
+const (
+	rustCommandDefaultTargetCacheKey = "shipwright-rust-command-target"
+	rustCommandTargetCacheKeyPrefix  = "shipwright-rust-command-target-"
+)
