@@ -675,6 +675,12 @@ jobs:
     needs: ['determine-pipeline', 'setup']
     if: "needs.determine-pipeline.outputs.run-build == 'true'"
     steps:
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v7'
+      with:
+        # For PRs, checkout the PR head commit
+        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+
     - name: 'Setup CI environment'
       uses: './.github/actions/setup-ci'
       with:
@@ -773,6 +779,12 @@ jobs:
     needs: ['determine-pipeline', 'setup']
     if: "needs.determine-pipeline.outputs.run-tests == 'true'"
     steps:
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v7'
+      with:
+        # For PRs, checkout the PR head commit
+        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+
     - name: 'Setup CI environment'
       uses: './.github/actions/setup-ci'
       with:
@@ -869,6 +881,12 @@ jobs:
     needs: ['determine-pipeline', 'build']
     if: "needs.determine-pipeline.outputs.run-security == 'true'"
     steps:
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v7'
+      with:
+        # For PRs, checkout the PR head commit
+        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+
     - name: 'Setup CI environment'
       uses: './.github/actions/setup-ci'
       with:

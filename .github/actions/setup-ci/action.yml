@@ -24,12 +24,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: 'Checkout code'
-      uses: 'actions/checkout@v7'
-      with:
-        # For PRs, checkout the PR head commit
-        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
-
+    # NOTE: no checkout step here on purpose — a local composite action
+    # (`uses: './...'`) is resolved from the runner's checked-out workspace,
+    # so the calling job must check the repo out *before* invoking this
+    # action. Doing checkout as this action's own first step is a
+    # chicken-and-egg failure: GitHub can't find this action.yml to run it.
     - name: 'Set up Go'
       uses: 'actions/setup-go@v7'
       with:
