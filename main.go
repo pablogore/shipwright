@@ -677,7 +677,22 @@ func resolveWorkflowSource(ctx context.Context, client *dagger.Client, spec mani
 	if path == "" {
 		path = "."
 	}
-	return client.Host().Directory(path), nil
+	// Exclude VCS metadata and language build-output directories, same
+	// convention as SetupStepHandler's own Host().Directory call
+	// (internal/app/step_handlers.go). Without this, a repo with a
+	// populated local build directory (e.g. Rust's target/, which can
+	// reach tens of GB and hundreds of thousands of files after running
+	// cargo natively) gets synced whole into every Dagger snapshot on
+	// every workflow run: it's never actually needed, since every
+	// provider that builds/compiles mounts its own Dagger cache volume
+	// at the equivalent in-container path instead of reusing this one,
+	// and syncing it wastes snapshot time at best. On this host, syncing
+	// ego-rs's 42GB/400k-file target/ directory reliably hit a
+	// virtiofs/copy_file_range ENOSPC failure in Dagger's snapshotter
+	// well before disk was actually full.
+	return client.Host().Directory(path, dagger.HostDirectoryOpts{
+		Exclude: []string{"**/.git", "**/node_modules", "**/.dagger-cache", "**/target"},
+	}), nil
 }
 
 // Version and build information - set at build time
