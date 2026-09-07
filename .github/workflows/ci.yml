@@ -675,88 +675,13 @@ jobs:
     needs: ['determine-pipeline', 'setup']
     if: "needs.determine-pipeline.outputs.run-build == 'true'"
     steps:
-    - name: 'Checkout code'
-      uses: 'actions/checkout@v7'
-      with:
-        # For PRs, checkout the PR head commit
-        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
-
-    - name: 'Set up Go'
-      uses: 'actions/setup-go@v7'
+    - name: 'Setup CI environment'
+      uses: './.github/actions/setup-ci'
       with:
         go-version: '${{ env.GO_VERSION }}'
-        cache: false  # Disable default cache to use our custom one
-
-    - name: 'Configure Git and Go for private repos'
-      env:
-        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        GIT_TERMINAL_PROMPT: 0
-      run: |
-        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
-          if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
-            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
-            echo ""
-            echo "📋 For FREE GitHub accounts:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
-          else
-            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
-            echo ""
-            echo "📋 For FREE GitHub accounts - Setup Instructions:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            echo ""
-            echo "💡 Why this is needed:"
-            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
-            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
-            exit 1
-          fi
-        fi
-
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
-        chmod 600 ~/.netrc
-
-        # Configure Git authentication with token (escape special characters)
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-
-        # Verify authentication setup
-        echo "✅ Git and Go configured for private repos"
-        echo "GOPRIVATE: $(go env GOPRIVATE)"
-        echo "Git URL config:"
-        git config --global --get-regexp url || echo "No URL config found"
-
-    - name: 'Cache Go modules'
-      uses: 'actions/cache@v6'
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
-        restore-keys: |
-          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
-          go-mod-${{ hashFiles('go.sum') }}-
-          go-mod-
-        fail-on-cache-miss: false
+        cache-version: '${{ env.CACHE_VERSION }}'
+        shipwright-token: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        github-token: '${{ secrets.GITHUB_TOKEN }}'
 
     - name: 'Build'
       env:
@@ -848,88 +773,13 @@ jobs:
     needs: ['determine-pipeline', 'setup']
     if: "needs.determine-pipeline.outputs.run-tests == 'true'"
     steps:
-    - name: 'Checkout code'
-      uses: 'actions/checkout@v7'
-      with:
-        # For PRs, checkout the PR head commit
-        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
-
-    - name: 'Set up Go'
-      uses: 'actions/setup-go@v7'
+    - name: 'Setup CI environment'
+      uses: './.github/actions/setup-ci'
       with:
         go-version: '${{ env.GO_VERSION }}'
-        cache: false  # Disable default cache to use our custom one
-
-    - name: 'Configure Git and Go for private repos'
-      env:
-        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        GIT_TERMINAL_PROMPT: 0
-      run: |
-        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
-          if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
-            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
-            echo ""
-            echo "📋 For FREE GitHub accounts:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
-          else
-            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
-            echo ""
-            echo "📋 For FREE GitHub accounts - Setup Instructions:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            echo ""
-            echo "💡 Why this is needed:"
-            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
-            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
-            exit 1
-          fi
-        fi
-
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
-        chmod 600 ~/.netrc
-
-        # Configure Git authentication with token (escape special characters)
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-
-        # Verify authentication setup
-        echo "✅ Git and Go configured for private repos"
-        echo "GOPRIVATE: $(go env GOPRIVATE)"
-        echo "Git URL config:"
-        git config --global --get-regexp url || echo "No URL config found"
-
-    - name: 'Cache Go modules'
-      uses: 'actions/cache@v6'
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
-        restore-keys: |
-          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
-          go-mod-${{ hashFiles('go.sum') }}-
-          go-mod-
-        fail-on-cache-miss: false
+        cache-version: '${{ env.CACHE_VERSION }}'
+        shipwright-token: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        github-token: '${{ secrets.GITHUB_TOKEN }}'
 
     - name: 'Run tests'
       env:
@@ -1019,88 +869,13 @@ jobs:
     needs: ['determine-pipeline', 'build']
     if: "needs.determine-pipeline.outputs.run-security == 'true'"
     steps:
-    - name: 'Checkout code'
-      uses: 'actions/checkout@v7'
-      with:
-        # For PRs, checkout the PR head commit
-        ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
-
-    - name: 'Set up Go'
-      uses: 'actions/setup-go@v7'
+    - name: 'Setup CI environment'
+      uses: './.github/actions/setup-ci'
       with:
         go-version: '${{ env.GO_VERSION }}'
-        cache: false  # Disable default cache to use our custom one
-
-    - name: 'Configure Git and Go for private repos'
-      env:
-        SHIPWRIGHT_TOKEN: '${{ secrets.SHIPWRIGHT_TOKEN }}'
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        GIT_TERMINAL_PROMPT: 0
-      run: |
-        # Use SHIPWRIGHT_TOKEN if available, otherwise fall back to GITHUB_TOKEN
-        if [ -z "$SHIPWRIGHT_TOKEN" ]; then
-          if [ -n "$GITHUB_TOKEN" ]; then
-            echo "⚠️ SHIPWRIGHT_TOKEN not set, using GITHUB_TOKEN as fallback"
-            echo "⚠️ Note: GITHUB_TOKEN may not have access to private organization repositories"
-            echo "⚠️ For private repos, configure SHIPWRIGHT_TOKEN secret with a token that has 'repo' scope"
-            echo ""
-            echo "📋 For FREE GitHub accounts:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            export SHIPWRIGHT_TOKEN="$GITHUB_TOKEN"
-          else
-            echo "❌ Error: Neither SHIPWRIGHT_TOKEN nor GITHUB_TOKEN is available"
-            echo ""
-            echo "📋 For FREE GitHub accounts - Setup Instructions:"
-            echo "   1. Create a Personal Access Token (PAT) at: https://github.com/settings/tokens"
-            echo "   2. Select scopes: 'repo' (full control of private repositories)"
-            echo "   3. Add it as secret 'SHIPWRIGHT_TOKEN' in:"
-            echo "      Repository Settings → Secrets and variables → Actions"
-            echo "   4. The token must have access to: github.com/getsyntegrity/go-kit-logger"
-            echo ""
-            echo "💡 Why this is needed:"
-            echo "   - GITHUB_TOKEN (default) does NOT have access to private organization repos"
-            echo "   - Free accounts need a PAT with 'repo' scope for private repo access"
-            exit 1
-          fi
-        fi
-
-        # Configure Go to treat getsyntegrity repos as private
-        go env -w GOPRIVATE=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOPROXY=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-        go env -w GONOSUMDB=github.com/getsyntegrity/*,gitlab.com/syntegrity/*
-
-        # Create .netrc file for authentication
-        echo "machine github.com" > ~/.netrc
-        echo "login x-access-token" >> ~/.netrc
-        echo "password $SHIPWRIGHT_TOKEN" >> ~/.netrc
-        chmod 600 ~/.netrc
-
-        # Configure Git authentication with token (escape special characters)
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global url."https://x-access-token:${SHIPWRIGHT_TOKEN}@github.com/".insteadOf "git@github.com:"
-
-        # Verify authentication setup
-        echo "✅ Git and Go configured for private repos"
-        echo "GOPRIVATE: $(go env GOPRIVATE)"
-        echo "Git URL config:"
-        git config --global --get-regexp url || echo "No URL config found"
-
-    - name: 'Cache Go modules'
-      uses: 'actions/cache@v6'
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: "go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-${{ runner.os }}"
-        restore-keys: |
-          go-mod-${{ hashFiles('go.sum') }}-${{ env.CACHE_VERSION }}-
-          go-mod-${{ hashFiles('go.sum') }}-
-          go-mod-
-        fail-on-cache-miss: false
+        cache-version: '${{ env.CACHE_VERSION }}'
+        shipwright-token: '${{ secrets.SHIPWRIGHT_TOKEN }}'
+        github-token: '${{ secrets.GITHUB_TOKEN }}'
 
     - name: 'Check for vulnerabilities'
       env:
