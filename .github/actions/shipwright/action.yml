@@ -57,6 +57,18 @@ inputs:
     description: 'Git authentication method (ssh or https)'
     required: false
     default: 'https'
+  cloud-token:
+    description: >-
+      Dagger Cloud token (from a Dagger Cloud org's Tokens page). Optional —
+      leave empty to run with a local, per-job Dagger engine (today's
+      default: fast within one job via CacheVolume, but every GitHub-hosted
+      runner starts a fresh Docker daemon, so that engine and its caches
+      never survive between jobs or runners). Setting this connects the job
+      to Dagger Cloud's distributed cache instead, so a registry/target
+      cache warmed by one job is available to the next job even on a
+      different runner. Pass as `cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}`.
+    required: false
+    default: ''
 
 outputs:
   binary-path:
@@ -186,6 +198,11 @@ runs:
     - name: 'Execute Workflow'
       id: 'execute'
       shell: 'bash'
+      env:
+        # Empty string is treated as "unset" by the Dagger CLI, so this is
+        # safe to always pass through — jobs that don't set inputs.cloud-token
+        # keep today's local-engine-only behavior unchanged.
+        DAGGER_CLOUD_TOKEN: '${{ inputs.cloud-token }}'
       run: |
         set +e  # Don't fail immediately, we want to capture exit code
 

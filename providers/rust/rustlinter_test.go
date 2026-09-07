@@ -44,6 +44,7 @@ func TestRustLinter_Test_MockClient_ReportIncludesClippyDiagnostics(t *testing.T
 	container.On("WithMountedDirectory", mock.Anything, mock.Anything).Return(container)
 	container.On("WithWorkdir", mock.Anything).Return(container)
 	container.On("WithExec", []string{"rustup", "component", "add", "clippy"}).Return(container)
+	container.On("WithExec", []string{"cargo", "fetch"}).Return(container)
 
 	lintContainer := &daggerkit.MockDaggerContainer{}
 	lintContainer.On("Stdout", mock.Anything).Return("", nil)
