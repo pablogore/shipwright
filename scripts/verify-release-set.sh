@@ -13,11 +13,12 @@ set -euo pipefail
 # asset -- a partial or corrupted publish could pass that check while still
 # leaving the release incomplete.
 #
-# Usage: scripts/verify-release-set.sh <tag> <expected-version> <expected-commit>
+# Usage: scripts/verify-release-set.sh <tag> <expected-version> <expected-commit> <repo>
 
 TAG="${1:?tag required}"
 EXPECTED_VERSION="${2:?expected version required}"
 EXPECTED_COMMIT="${3:?expected commit required}"
+REPO="${4:?repo (owner/name) required}"
 
 EXPECTED_FILES=(
   shipwright-linux-amd64
@@ -40,7 +41,9 @@ trap 'rm -rf "$WORKDIR"' EXIT
 cd "$WORKDIR"
 
 echo "==> Downloading full release asset set from ${TAG}"
-gh release download "$TAG" --dir .
+# -R is required: we're in a scratch dir with no .git, so gh can't infer
+# the repository from a local git remote the way it would in a checkout.
+gh release download "$TAG" --dir . -R "$REPO"
 
 echo "==> Verifying exactly the expected ${#EXPECTED_FILES[@]}-artifact set is present"
 ACTUAL_COUNT=$(find . -maxdepth 1 -type f | wc -l | tr -d ' ')
