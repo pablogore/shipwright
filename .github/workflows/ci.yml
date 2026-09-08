@@ -1487,7 +1487,7 @@ jobs:
 
     - name: 'Install Dagger CLI'
       env:
-        DAGGER_VERSION: 'v0.21.8' # keep in sync with dagger.io/dagger in go.mod/providers/*/go.mod
+        DAGGER_VERSION: 'v0.21.9' # keep in sync with dagger.io/dagger in go.mod/providers/*/go.mod
       run: |
         mkdir -p "$HOME/.local/bin"
         curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR="$HOME/.local/bin" sh
