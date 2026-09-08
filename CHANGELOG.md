@@ -1,57 +1,35 @@
+## Release v0.12.0
+
+**Release Date:** 2026-09-08
+
+### Changes since v0.11.0
+
+
+#### 🐛 Bug Fixes
+- fix(release): resolve release.yml conflict merging main into develop (#266) (b7d54ff)
+- fix(release): open a small PR for CHANGELOG.md instead of pushing to main (#262) (1a62f95)
+- fix(release): push CHANGELOG commit as HEAD:main, not main (#260) (285f667)
+- Merge pull request #258 from pablogore/fix/ci-dagger-engine-version-0219 (c201424)
+- fix(ci): bump pinned DAGGER_VERSION to v0.21.9 (f07752b)
+
+
+#### 📝 Other Changes
+- Merge pull request #269 from pablogore/develop (98659d8)
+- Merge pull request #268 from pablogore/fix/real-merge-commit-2 (c7dafa3)
+- Merge remote-tracking branch 'origin/main' into fix/real-merge-commit-2 (11048ba)
+- chore(release): real merge commit of main into develop (#267) (e941016)
+- Merge main into develop (attempt 2, real merge commit) (#265) (a11f4aa)
+- Merge main into develop, resolve CHANGELOG-step conflict (#264) (f25875c)
+
+
+---
+
 # Changelog
 
 All notable changes to Shipwright will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
-
-> **Note (2026-09-06, RELEASE-DIST-01A):** the entries below the top four
-> bullets in *Added* (providers/rust wiring, the `ChangelogRunner`
-> provider, the `workspaceguard.ReplaceDirectives()` guard) and the
-> `providers/go` independent-module split in *Changed* accumulated across
-> an unknown span of time without ever being cut into a tagged release.
-> This pass did not attempt to verify each older bullet against a specific
-> commit or PR -- they are kept as historical record, not as a confirmed
-> pending-release list.
-
-### Added
-- **`providers/rust` wired into the live workflow provider registry** (`internal/workflow/providers/register.go`): `rust` (build), `rust-test` (unit test), `clippy` (lint), `cargo-audit` (vulnerability scan), and `rust-container` (a Rust-specific image publisher, kept separate from `container` because a default Rust build links dynamically against glibc and breaks under `container`'s alpine base)
-- **Changelog generation as a real `Runner` provider** (`internal/workflow/providers/changelog.go`'s `ChangelogRunner`, registered as `changelog`): generates a Keep a Changelog "Unreleased" summary from git history inside a Dagger container and prepends it into `CHANGELOG.md`, replacing the previously dead-code (never executed by the CLI) `internal/app.ChangelogStepHandler`
-- **`ReplaceDirectives()` guard in `workspaceguard`** for general-purpose `go.mod` inspection, backed by a `TestRootGoModHasNoReplaceDirectives` regression test
-- **Automated release system** with conventional commits support
-- **Pre-release workflow** for develop branch testing
-- **Conventional commits helper script** for consistent commit messages
-- **Automatic version bumping** based on commit types (feat, fix, breaking changes)
-- **Multi-platform binary builds** for all releases
-- **Release process documentation** with examples and best practices
-- Comprehensive documentation with C4 architecture diagrams
-- API reference documentation
-- Pipeline development guide
-- Configuration reference guide
-- Contributing guidelines
-
-### Changed
-- **`providers/go` published as an independent module**: removed the temporary `replace github.com/pablogore/shipwright/providers/go => ./providers/go` from the root `go.mod`; `providers/go@v0.1.0` now resolves from `proxy.golang.org` instead of the local path
-- **Release workflow** now triggers automatically on main branch merges
-- **Version determination** now uses conventional commits instead of simple patch increments
-- **CI workflow** now skips tag pushes to avoid conflicts with release workflow
-- Updated Go version to 1.25.1
-- Updated Dagger SDK to v0.18.17
-- Migrated from go-kit logger to standard log/slog
-- Updated test assertions from assert to require
-- Improved error handling with structured errors
-- **Simplified Dagger connection management**: Removed manual reconnection logic from `GoBuilder` and `Container.GetDaggerClient()`. Dagger now handles connection management internally, reducing code complexity by ~300 lines and improving reliability
-
-### Fixed
-- **Release automation** now works correctly when merging from develop to main
-- **Version jumping** from v0.0.x to v0.x.0 now supported through conventional commits
-- Resolved Go 1.25.1 compatibility issues
-- Fixed golangci-lint version compatibility
-- Resolved merge conflicts in CI/CD workflows
-- Fixed struct field naming conventions
-- **Removed unnecessary connection verification**: Eliminated redundant connection checks and manual reconnection logic that was causing complexity and potential race conditions. Dagger SDK now handles all connection lifecycle management automatically
 
 ## [0.5.0] - 2025-09-14
 
@@ -254,3 +232,8 @@ When contributing to the project:
 - [API Reference](docs/API.md)
 
 ---
+
+## [Unreleased]
+
+### Added
+- Changes in progress...
