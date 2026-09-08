@@ -46,10 +46,10 @@ func TestRustIntegrationTester_Test_MockClient_DockerAttachesDinDUnconditionally
 	container.On("WithMountedDirectory", mock.Anything, mock.Anything).Return(container)
 	container.On("WithWorkdir", mock.Anything).Return(container)
 	container.On("WithExposedPort", 2375).Return(container)
-	container.On("WithInsecureExec", []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"}).Return(container)
 
 	dindService := &daggerkit.MockDaggerService{}
-	container.On("AsService").Return(dindService)
+	container.On("WithEnvVariable", "SHIPWRIGHT_DIND_INSTANCE", mock.Anything).Return(container)
+	container.On("AsService", []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"}).Return(dindService)
 	container.On("WithServiceBinding", "docker", dindService).Return(container)
 	container.On("WithEnvVariable", "DOCKER_HOST", "tcp://docker:2375").Return(container)
 
@@ -74,7 +74,8 @@ func TestRustIntegrationTester_Test_MockClient_DockerAttachesDinDUnconditionally
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	container.AssertCalled(t, "AsService")
+	container.AssertCalled(t, "AsService", []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"})
 	container.AssertCalled(t, "WithServiceBinding", "docker", dindService)
 	container.AssertCalled(t, "WithEnvVariable", "DOCKER_HOST", "tcp://docker:2375")
+	container.AssertCalled(t, "WithEnvVariable", "SHIPWRIGHT_DIND_INSTANCE", mock.Anything)
 }

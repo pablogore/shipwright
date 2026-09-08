@@ -18,15 +18,18 @@
 // entirely.
 //
 // Scheduling (design.md D-K): Kahn's waves (internal/workflow/graph) are
-// executed in order; within a single wave, steps run SEQUENTIALLY in
-// manifest-declaration order — never map iteration order, never
-// concurrently. Options.MaxParallel is validated/recorded (see
-// OptionsFromSpec) but is NOT used to widen execution in this work unit;
-// sequential execution is a correct schedule for any MaxParallel >= 1.
-// Concurrent widening within a wave is explicitly deferred (design.md D-K).
-// A manifest declaring MaxParallel > 1 is rejected before execution begins by
-// manifest.ValidateExecutable (design.md D1), a validation-layer contract
-// this package does not itself check.
+// executed in order — a later wave never starts before every step of the
+// current wave has settled. WITHIN a wave, steps are independent by
+// construction (Kahn only admits a step into a wave once every entry in its
+// needs[] has already completed in an earlier wave, and
+// graph.validateDataReferences rejects any steps.<id>.output reference not
+// also present in needs[]) — so this package now runs them concurrently,
+// bounded by Options.MaxParallel (the "worker pool drops into later" seam
+// design.md D-K named for exactly this). MaxParallel <= 1 — including the
+// zero-value/unset default — preserves the historical behavior exactly:
+// strict, one-at-a-time, manifest-declaration-order execution. See
+// runWave's doc comment for the full concurrency contract: ordering
+// determinism, failFast semantics, and thread-safety argument.
 //
 // Approval gates (design.md D-M): spec.environments.<name>.approvals is
 // parsed metadata only. This package contains NO blocking, queueing, or
@@ -41,6 +44,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"dagger.io/dagger"
@@ -49,10 +54,12 @@ import (
 	"github.com/pablogore/shipwright/internal/workflow/interp"
 	"github.com/pablogore/shipwright/internal/workflow/manifest"
 	"github.com/pablogore/shipwright/internal/workflow/providers"
+	"github.com/pablogore/shipwright/pkg/shipwright/invocation"
 )
 
 // Options configures the engine-level execution controls design.md D-K
-// implements now: FailFast, per-step Timeout, and bounded per-step Retries.
+// implements now: FailFast, per-step Timeout, bounded per-step Retries, and
+// MaxParallel.
 //
 // Retries is the TOTAL number of attempts made per step (not the count of
 // additional retries after the first) — a value less than 1 is treated as
@@ -65,11 +72,19 @@ import (
 // Timeout is applied per step via context.WithTimeout, using the single
 // workflow-level spec.execution.timeout value as each step's budget (the
 // manifest schema has no PER-STEP timeout field either — see the same gap
-// note above). A zero Timeout means no deadline is applied.
+// note above). A zero Timeout means no deadline is applied. It composes
+// with concurrent execution unchanged: each step still gets its own
+// context.WithTimeout, derived from that wave's (possibly already-canceled,
+// see runWave) context.
 //
-// MaxParallel is recorded from spec.execution.concurrency.maxParallel (see
-// OptionsFromSpec) but is NEVER used to widen execution — see this
-// package's doc comment.
+// MaxParallel is the upper bound on steps of a single wave running at once
+// (recorded from spec.execution.concurrency.maxParallel — see
+// OptionsFromSpec). It is never a cross-wave budget: each wave gets its own
+// fresh bound. A value <= 1 (including the unset zero value) runs a wave
+// strictly sequentially, in manifest-declaration order — identical to this
+// package's pre-concurrency behavior. A value greater than the wave's own
+// step count is harmless — it is clamped to that count, never
+// over-provisioning idle workers.
 type Options struct {
 	FailFast    bool
 	Timeout     time.Duration
@@ -78,16 +93,14 @@ type Options struct {
 }
 
 // OptionsFromSpec derives Options from a manifest's ExecutionSpec. This is
-// the concrete place spec.execution.concurrency.maxParallel is "validated
-// and recorded" (tasks.md 8.5, design.md D-K): it is copied into
-// Options.MaxParallel verbatim and never used to widen execution anywhere
-// in this package. It performs NO additional validation of MaxParallel
-// (for example rejecting <= 0) — design.md D-K states that check belongs to
-// manifest stage 3 (internal/workflow/manifest.ValidateStructure). At the
-// time this package was written, ValidateStructure does NOT enforce
-// maxParallel <= 0 — this is a confirmed gap, flagged for sdd-verify rather
-// than fixed here (fixing it would mean reaching back into WU4's package,
-// which is out of this work unit's scope per its own launch instructions).
+// the concrete place spec.execution.concurrency.maxParallel is validated
+// and recorded (tasks.md 8.5, design.md D-K): it is copied into
+// Options.MaxParallel verbatim, and Execute now uses it to bound concurrent
+// steps within a wave (see Options' and runWave's doc comments). It
+// performs NO additional validation of MaxParallel (for example rejecting
+// negative values) — that check belongs to manifest stage 3
+// (internal/workflow/manifest.ValidateStructure), which already rejects
+// maxParallel < 0 at parse time.
 func OptionsFromSpec(spec manifest.ExecutionSpec) (Options, error) {
 	opts := Options{
 		FailFast:    spec.FailFast,
@@ -387,49 +400,26 @@ func Execute(ctx context.Context, cfg Config) (*Result, error) {
 	for _, s := range cfg.Steps {
 		stepByID[s.ID] = s
 	}
+	for _, wave := range cfg.Graph.Waves {
+		for _, id := range wave {
+			if _, ok := stepByID[id]; !ok {
+				return &Result{}, fmt.Errorf("engine: graph references step %q not present in cfg.Steps", id)
+			}
+		}
+	}
 
 	outputs := make(map[string]result, len(cfg.Steps))
 	res := &Result{}
 
-waveLoop:
 	for _, wave := range cfg.Graph.Waves {
-		for _, id := range wave {
-			s, ok := stepByID[id]
-			if !ok {
-				return res, fmt.Errorf("engine: graph references step %q not present in cfg.Steps", id)
-			}
-			ref := providers.Ref{Name: s.Uses.Provider, Module: s.Uses.Module, Version: s.Uses.Version}
-
-			if !matchesWhen(s.When, cfg.Predicates) {
-				res.Outcomes = append(res.Outcomes, StepOutcome{
-					StepID: id, Status: StatusSkipped,
-					Provider: ref, Capability: s.Capability,
-				})
-				continue
-			}
-
-			start := cfg.now()
-			out, attempts, err := executeStepWithRetry(ctx, s, outputs, cfg)
-			duration := cfg.now().Sub(start)
-			if err != nil {
-				res.Outcomes = append(res.Outcomes, StepOutcome{
-					StepID: id, Status: StatusFailed, Attempts: attempts, Err: err,
-					Duration: duration, Provider: ref, Capability: s.Capability,
-				})
-				res.Failures = append(res.Failures, id)
-				if cfg.Options.FailFast {
-					break waveLoop
-				}
-				continue
-			}
-
+		outcomes, failures, newOutputs, stop := runWave(ctx, wave, stepByID, outputs, cfg)
+		res.Outcomes = append(res.Outcomes, outcomes...)
+		res.Failures = append(res.Failures, failures...)
+		for id, out := range newOutputs {
 			outputs[id] = out
-			output, diagnostics := outcomeOutput(s.Capability, out)
-			res.Outcomes = append(res.Outcomes, StepOutcome{
-				StepID: id, Status: StatusSucceeded, Attempts: attempts,
-				Duration: duration, Provider: ref, Capability: s.Capability,
-				Output: output, Diagnostics: diagnostics,
-			})
+		}
+		if stop {
+			break
 		}
 	}
 
@@ -438,6 +428,199 @@ waveLoop:
 		return res, &StepFailedError{StepID: first, Err: firstFailureErr(res, first)}
 	}
 	return res, nil
+}
+
+// waveSlot is one wave-index's terminal result — populated either
+// synchronously (a "when"-skipped step never dispatches, so it never needs
+// a goroutine) or by that step's own worker goroutine, and never touched by
+// any other goroutine: each worker writes exactly slots[i] for its own
+// index, so concurrent writers never share memory and no lock is needed
+// (runWave's own doc comment expands on this).
+type waveSlot struct {
+	outcome StepOutcome
+	out     result
+	// started is false only for a step fail-fast prevented from ever being
+	// dispatched — such a step contributes NOTHING to Result (no Outcome,
+	// not even StatusSkipped), matching this package's pre-concurrency
+	// fail-fast behavior exactly: a step the sequential loop never reached
+	// never appeared in Result.Outcomes either.
+	started bool
+}
+
+// runWave executes one Graph wave and reports what Execute should fold into
+// Result and outputs before moving to the next wave: outcomes and failures
+// are already in the wave's own manifest-declaration order (never
+// completion order — see below), newOutputs holds only successful steps'
+// results, and stop reports whether Options.FailFast just fired (Execute
+// must not start any later wave when it has).
+//
+// Concurrency model: steps within a wave are independent by construction
+// (this file's package doc comment) and dispatched up to
+// Options.MaxParallel at once via a semaphore-bounded worker pool — a
+// MaxParallel <= 1 (including the unset zero value) collapses this to
+// exactly one in-flight step at a time, in manifest-declaration order,
+// which is byte-for-byte this package's original sequential behavior
+// (dispatch never starts step i+1 until step i's goroutine has released the
+// single semaphore slot it held).
+//
+// Determinism: each step's result is written to its own reserved slots[i]
+// — never appended as goroutines complete — so Result.Outcomes/Failures
+// order is always wave order then manifest-declaration order, regardless
+// of which goroutine actually finished first. This is the same ordering
+// guarantee Kahn's algorithm already gives Graph.Waves; concurrency changes
+// WHEN work happens, never the order it is reported in.
+//
+// Thread safety: outputs is read-only for the entire duration of a wave —
+// Kahn only admits a step into a wave once every needs[] dependency has
+// already completed in a STRICTLY EARLIER wave, and
+// graph.validateDataReferences rejects any steps.<id>.output reference not
+// also present in that step's own needs[]. So no step in this wave can ever
+// reference another step of THIS wave, and concurrent map reads (with zero
+// concurrent writes) are race-free without a mutex. New entries are merged
+// into outputs by Execute, single-threaded, only after this function's
+// wg.Wait() has returned and every worker has exited. providers.Registry is
+// likewise safe unguarded: Resolve* only reads its registration tables,
+// which are populated once at process startup, never mutated during
+// Execute (registry.go's own doc comment).
+//
+// failFast semantics under concurrency: on a step's failure, if
+// Options.FailFast is set, the wave's shared context is canceled (best
+// effort — a step honors this exactly as it already honors Options.Timeout,
+// via ctx.Done(); this package never force-kills a provider call) and no
+// FURTHER step is dispatched, in this wave or any later one. Every step
+// already dispatched before that point keeps running to completion (or
+// until it independently observes the canceled context) and its outcome is
+// recorded — failFast never discards an in-flight result. This governs
+// only whether NEW work starts, never live goroutines: runWave always
+// wg.Wait()s before returning, so no worker outlives this call.
+//
+// A step fail-fast prevents from ever being CONSIDERED — not just
+// dispatched — contributes nothing to Result.Outcomes at all, matching this
+// package's pre-concurrency behavior exactly: the historical sequential
+// loop only ever evaluated step i+1's "when" after step i had fully
+// returned, so a step past an abort never had its "when" evaluated or
+// recorded either. The dispatch loop below reproduces this by acquiring a
+// semaphore slot BEFORE evaluating "when", not after: under MaxParallel<=1
+// this is a hard guarantee (the semaphore is size 1, so slot i+1 cannot be
+// acquired until step i's goroutine has both finished and set aborted, if
+// it is going to); under MaxParallel>1 it is the same best-effort the
+// cancellation itself already is — a step whose slot was already free when
+// the abort fired may still have its "when" evaluated and recorded, since
+// nothing forces it to wait for a sibling it does not depend on.
+func runWave(ctx context.Context, wave []string, stepByID map[string]manifest.Step, outputs map[string]result, cfg Config) (outcomes []StepOutcome, failures []string, newOutputs map[string]result, stop bool) {
+	limit := effectiveConcurrency(cfg.Options.MaxParallel, len(wave))
+
+	slots := make([]waveSlot, len(wave))
+	waveCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var aborted atomic.Bool
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+
+dispatch:
+	for i, id := range wave {
+		s := stepByID[id]
+		ref := providers.Ref{Name: s.Uses.Provider, Module: s.Uses.Module, Version: s.Uses.Version}
+
+		// Acquire a slot BEFORE evaluating "when" — this is what makes a
+		// step's eligibility check itself wait its turn behind an
+		// already-dispatched sibling, exactly as the pre-concurrency
+		// sequential loop did (it only ever considered step i+1 after step
+		// i had fully returned). Without this, a when-skip is resolved
+		// instantly, letting it race ahead of a same-wave step that is
+		// still running and about to trigger failFast — see runWave's doc
+		// comment, "failFast semantics under concurrency".
+		select {
+		case <-waveCtx.Done():
+			break dispatch
+		case sem <- struct{}{}:
+		}
+		if aborted.Load() {
+			<-sem
+			break dispatch
+		}
+
+		if !matchesWhen(s.When, cfg.Predicates) {
+			<-sem
+			slots[i] = waveSlot{
+				started: true,
+				outcome: StepOutcome{StepID: id, Status: StatusSkipped, Provider: ref, Capability: s.Capability},
+			}
+			continue
+		}
+
+		wg.Add(1)
+		go func(i int, id string, s manifest.Step, ref providers.Ref) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			start := cfg.now()
+			out, attempts, err := executeStepWithRetry(waveCtx, s, outputs, cfg)
+			duration := cfg.now().Sub(start)
+
+			if err != nil {
+				slots[i] = waveSlot{
+					started: true,
+					outcome: StepOutcome{
+						StepID: id, Status: StatusFailed, Attempts: attempts, Err: err,
+						Duration: duration, Provider: ref, Capability: s.Capability,
+					},
+				}
+				if cfg.Options.FailFast {
+					aborted.Store(true)
+					cancel()
+				}
+				return
+			}
+
+			output, diagnostics := outcomeOutput(s.Capability, out)
+			slots[i] = waveSlot{
+				started: true,
+				out:     out,
+				outcome: StepOutcome{
+					StepID: id, Status: StatusSucceeded, Attempts: attempts,
+					Duration: duration, Provider: ref, Capability: s.Capability,
+					Output: output, Diagnostics: diagnostics,
+				},
+			}
+		}(i, id, s, ref)
+	}
+
+	wg.Wait()
+
+	newOutputs = make(map[string]result)
+	for i, id := range wave {
+		slot := slots[i]
+		if !slot.started {
+			continue
+		}
+		outcomes = append(outcomes, slot.outcome)
+		switch slot.outcome.Status {
+		case StatusSucceeded:
+			newOutputs[id] = slot.out
+		case StatusFailed:
+			failures = append(failures, id)
+		}
+	}
+
+	stop = cfg.Options.FailFast && len(failures) > 0
+	return outcomes, failures, newOutputs, stop
+}
+
+// effectiveConcurrency clamps Options.MaxParallel into a usable worker-pool
+// size for a wave of waveSize steps: <= 1 (including the unset zero value)
+// means strictly sequential (Options' own doc comment); a value above
+// waveSize is clamped down to it, since provisioning more workers than
+// there is work to hand them can never increase concurrency.
+func effectiveConcurrency(maxParallel, waveSize int) int {
+	if maxParallel <= 1 {
+		return 1
+	}
+	if maxParallel > waveSize {
+		return waveSize
+	}
+	return maxParallel
 }
 
 // firstFailureErr finds the recorded error for the first failing step id,
@@ -743,6 +926,7 @@ func outcomeOutput(capability string, out result) (string, []Diagnostic) {
 // the one place in the engine that must know all five shapes; every other
 // helper in this package is capability-agnostic.
 func dispatch(ctx context.Context, s manifest.Step, input *dagger.Directory, values providers.Values, reg *providers.Registry) (result, error) {
+	ctx = invocation.WithStepID(ctx, s.ID)
 	ref := providers.Ref{Name: s.Uses.Provider, Module: s.Uses.Module, Version: s.Uses.Version}
 
 	switch s.Capability {

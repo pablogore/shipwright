@@ -16,7 +16,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ACTION_FILE="$REPO_ROOT/.github/actions/shipwright/action.yml"
+ACTION_DIR="$REPO_ROOT/.github/actions/shipwright"
+ACTION_FILE="$ACTION_DIR/action.yml"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -24,15 +25,32 @@ NC='\033[0m' # No Color
 
 FAILURES=0
 
-assert_absent() {
+# Flag emission now lives in lib/build-args.sh (RELEASE-DIST-01C extracted
+# it out of an inline eval'd command string in action.yml), so the
+# emit/forbid checks below scan every script under the action's directory,
+# not just action.yml. Input-declaration checks stay scoped to action.yml --
+# that's the only file with an `inputs:` block.
+assert_absent_in_dir() {
     local description="$1"
     local pattern="$2"
 
-    if grep -qE -- "$pattern" "$ACTION_FILE"; then
+    if grep -rqE -- "$pattern" "$ACTION_DIR"; then
         echo -e "${RED}[FAIL]${NC} $description (found forbidden pattern: $pattern)"
         FAILURES=$((FAILURES + 1))
     else
         echo -e "${GREEN}[PASS]${NC} $description"
+    fi
+}
+
+assert_present_in_dir() {
+    local description="$1"
+    local pattern="$2"
+
+    if grep -rqE -- "$pattern" "$ACTION_DIR"; then
+        echo -e "${GREEN}[PASS]${NC} $description"
+    else
+        echo -e "${RED}[FAIL]${NC} $description (missing expected pattern: $pattern)"
+        FAILURES=$((FAILURES + 1))
     fi
 }
 
@@ -48,13 +66,25 @@ assert_present() {
     fi
 }
 
+assert_absent() {
+    local description="$1"
+    local pattern="$2"
+
+    if grep -qE -- "$pattern" "$ACTION_FILE"; then
+        echo -e "${RED}[FAIL]${NC} $description (found forbidden pattern: $pattern)"
+        FAILURES=$((FAILURES + 1))
+    else
+        echo -e "${GREEN}[PASS]${NC} $description"
+    fi
+}
+
 # Flags deleted from the CLI (main.go parseFlags no longer registers them) --
-# the action must never emit or declare these.
-assert_absent "does not emit --pipeline"        "\-\-pipeline"
-assert_absent "does not emit --list-pipelines"  "\-\-list-pipelines"
-assert_absent "does not emit --only-build"      "\-\-only-build"
-assert_absent "does not emit --only-test"       "\-\-only-test"
-assert_absent "does not emit --skip-push"       "\-\-skip-push"
+# the action must never emit or declare these, anywhere in its scripts.
+assert_absent_in_dir "does not emit --pipeline"        "\-\-pipeline"
+assert_absent_in_dir "does not emit --list-pipelines"  "\-\-list-pipelines"
+assert_absent_in_dir "does not emit --only-build"      "\-\-only-build"
+assert_absent_in_dir "does not emit --only-test"       "\-\-only-test"
+assert_absent_in_dir "does not emit --skip-push"       "\-\-skip-push"
 assert_absent "does not declare a 'stage' input" "^  stage:"
 
 # The manifest-driven contract the CLI actually supports today.
@@ -62,8 +92,8 @@ assert_present "declares a 'workflow' input"    "^  workflow:"
 assert_present "declares a 'step' input"        "^  step:"
 assert_present "declares a 'list-steps' input"  "^  list-steps:"
 assert_present "declares a 'branch' input"      "^  branch:"
-assert_present "emits --workflow="              "\-\-workflow="
-assert_present "emits --branch="                "\-\-branch="
+assert_present_in_dir "emits --workflow="       "\-\-workflow="
+assert_present_in_dir "emits --branch="         "\-\-branch="
 
 echo ""
 if [ "$FAILURES" -eq 0 ]; then

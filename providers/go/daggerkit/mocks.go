@@ -22,6 +22,22 @@ func (m *MockDaggerClient) Container() DaggerContainer {
 	return nil
 }
 
+func (m *MockDaggerClient) CacheVolume(name string) DaggerCacheVolume {
+	args := m.Called(name)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerCacheVolume)
+	}
+	return nil
+}
+
+var _ DaggerCacheVolume = (*MockDaggerCacheVolume)(nil)
+
+// MockDaggerCacheVolume implements DaggerCacheVolume using testify's mock
+// package.
+type MockDaggerCacheVolume struct {
+	mock.Mock
+}
+
 var _ DaggerDirectory = (*MockDaggerDirectory)(nil)
 
 // MockDaggerDirectory implements DaggerDirectory using testify's mock package.
@@ -79,6 +95,14 @@ func (m *MockDaggerContainer) From(image string) DaggerContainer {
 
 func (m *MockDaggerContainer) WithMountedDirectory(path string, dir DaggerDirectory) DaggerContainer {
 	args := m.Called(path, dir)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerContainer)
+	}
+	return nil
+}
+
+func (m *MockDaggerContainer) WithMountedCache(path string, cache DaggerCacheVolume) DaggerContainer {
+	args := m.Called(path, cache)
 	if v := args.Get(0); v != nil {
 		return v.(DaggerContainer)
 	}

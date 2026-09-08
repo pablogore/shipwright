@@ -25,6 +25,18 @@ func (a *DaggerAdapter) Container() DaggerContainer {
 	return &DaggerContainerAdapter{container: a.client.Container()}
 }
 
+func (a *DaggerAdapter) CacheVolume(name string) DaggerCacheVolume {
+	return &DaggerCacheVolumeAdapter{cache: a.client.CacheVolume(name)}
+}
+
+var _ DaggerCacheVolume = (*DaggerCacheVolumeAdapter)(nil)
+
+// DaggerCacheVolumeAdapter adapts a real *dagger.CacheVolume to
+// DaggerCacheVolume.
+type DaggerCacheVolumeAdapter struct {
+	cache *dagger.CacheVolume
+}
+
 var _ DaggerDirectory = (*DaggerDirectoryAdapter)(nil)
 
 // DaggerDirectoryAdapter adapts a real *dagger.Directory to DaggerDirectory.
@@ -78,6 +90,14 @@ func (a *DaggerContainerAdapter) WithMountedDirectory(path string, dir DaggerDir
 		panic("daggerkit: WithMountedDirectory called on DaggerContainerAdapter with a non-adapter DaggerDirectory")
 	}
 	return &DaggerContainerAdapter{container: a.container.WithMountedDirectory(path, adapter.directory)}
+}
+
+func (a *DaggerContainerAdapter) WithMountedCache(path string, cache DaggerCacheVolume) DaggerContainer {
+	adapter, ok := cache.(*DaggerCacheVolumeAdapter)
+	if !ok {
+		panic("daggerkit: WithMountedCache called on DaggerContainerAdapter with a non-adapter DaggerCacheVolume")
+	}
+	return &DaggerContainerAdapter{container: a.container.WithMountedCache(path, adapter.cache)}
 }
 
 func (a *DaggerContainerAdapter) WithWorkdir(path string) DaggerContainer {

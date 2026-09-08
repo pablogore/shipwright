@@ -100,12 +100,11 @@ func (f fakeRuntimeUpgrader) Upgrade(ctx context.Context, source *dagger.Directo
 	return source, nil
 }
 
-// recorder records step invocation order, guarded by a mutex so `go test
-// -race` genuinely proves serial access rather than merely assuming it —
-// if wave execution ever became concurrent (it must not, design.md D-K),
-// a data race on an unguarded slice would be a weaker signal than this
-// mutex-guarded recorder's own ability to still produce a deterministic,
-// race-free order under -race.
+// recorder records step invocation order. Wave execution is genuinely
+// concurrent now (design.md D-K's "worker pool" seam, engine.runWave), so
+// this mutex is no longer defensive — concurrent same-wave steps really do
+// call record() from separate goroutines, and `go test -race` would catch
+// an unguarded slice immediately.
 type recorder struct {
 	mu    sync.Mutex
 	order []string

@@ -3,8 +3,9 @@ module github.com/pablogore/shipwright/providers/rust
 go 1.26.7
 
 require (
-	dagger.io/dagger v0.21.8
-	github.com/pablogore/shipwright v0.0.0-20260828024355-6f9962e67091
+	dagger.io/dagger v0.21.9
+	github.com/google/uuid v1.6.0
+	github.com/pablogore/shipwright v0.5.1-0.20260907143633-6a8078fb38e8
 	github.com/stretchr/testify v1.12.1
 )
 
@@ -16,7 +17,6 @@ require (
 	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/sosodev/duration v1.4.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect

@@ -3,14 +3,14 @@ module github.com/pablogore/shipwright
 go 1.26.7
 
 require (
-	dagger.io/dagger v0.21.8
+	dagger.io/dagger v0.21.9
 	github.com/joho/godotenv v1.5.1
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/v2 v2.3.6
 	github.com/onsi/ginkgo/v2 v2.32.1
-	github.com/onsi/gomega v1.42.1
-	github.com/pablogore/shipwright/providers/go v0.1.0
-	github.com/pablogore/shipwright/providers/rust v0.0.0-20260827150246-e85a137e8c37
+	github.com/onsi/gomega v1.43.0
+	github.com/pablogore/shipwright/providers/go v1.0.0
+	github.com/pablogore/shipwright/providers/rust v1.1.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/mock v0.6.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -18,6 +18,7 @@ require (
 
 require (
 	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59 // indirect
+	github.com/stretchr/objx v0.5.3 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )
