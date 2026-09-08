@@ -613,7 +613,13 @@ jobs:
           echo "ℹ️ CHANGELOG.md already up to date for ${TAG} -- nothing to commit."
         else
           git commit -m "docs: update CHANGELOG.md for ${TAG}"
-          git push origin main
+          # Checkout above is detached HEAD (ref: github.sha for a tag push),
+          # not a local 'main' branch -- 'git push origin main' has no local
+          # ref named main to resolve and fails with "src refspec main does
+          # not match any". HEAD:main pushes this detached commit onto the
+          # remote main branch directly, and stays fast-forward-only (no
+          # force), so it still fails closed if main moved in the meantime.
+          git push origin HEAD:main
           echo "✅ CHANGELOG.md updated in repository"
         fi
       env:
