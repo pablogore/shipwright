@@ -70,7 +70,8 @@ inputs:
       never survive between jobs or runners). Setting this connects the job
       to Dagger Cloud's distributed cache instead, so a registry/target
       cache warmed by one job is available to the next job even on a
-      different runner. Pass as `cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}`.
+      different runner. Pass it from the calling workflow's `with:` block,
+      sourcing the value from a secret such as `DAGGER_CLOUD_TOKEN`.
     required: false
     default: ''
 
