@@ -129,7 +129,7 @@ func (e *DockerExecutor) executeTest(ctx context.Context) error {
 	realSrc := srcAdapter.GetRealDirectory()
 	goVersion := e.config.GoVersion
 	if goVersion == "" {
-		goVersion = "1.25.5"
+		goVersion = "1.26.7"
 	}
 
 	return shared.RunTestsWithCoverage(ctx, realClient, realSrc, e.config.Coverage, goVersion)

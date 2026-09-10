@@ -183,7 +183,7 @@ pipeline:
   # ⚠️ NO uses 'steps' aquí si ejecutas en CI/CD
   # En su lugar, ejecuta steps individuales en GitHub Actions
   coverage: 90
-  go_version: "1.26.1"
+  go_version: "1.26.7"
   skip_push: false
 
 service:

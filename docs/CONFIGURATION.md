@@ -85,7 +85,7 @@ docker:
 
 # Build Configuration
 build:
-  go_version: 1.26.1            # Go version to use
+  go_version: 1.26.7            # Go version to use
   cgo_enabled: false            # Enable CGO
   build_flags:                  # Additional build flags
     - -ldflags=-s -w
@@ -216,7 +216,7 @@ cache:
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `SHIPWRIGHT_GO_VERSION` | Go version to use | `1.26.1` | `1.24.0` |
+| `SHIPWRIGHT_GO_VERSION` | Go version to use | `1.26.7` | `1.24.0` |
 | `SHIPWRIGHT_CGO_ENABLED` | Enable CGO | `false` | `true` |
 | `SHIPWRIGHT_BUILD_FLAGS` | Additional build flags | - | `-ldflags=-s -w` |
 | `SHIPWRIGHT_TEST_FLAGS` | Additional test flags | - | `-race -cover` |
@@ -294,7 +294,7 @@ go_service:
   service_name: my-service
   service_version: 1.0.0
   build_mode: both              # binary, docker, or both
-  base_image: golang:1.26.1-alpine
+  base_image: golang:1.26.7-alpine
   final_image: alpine:3.18
   endpoints:
     - name: health
@@ -429,7 +429,7 @@ registry:
   insecure: true
 
 build:
-  go_version: 1.26.1
+  go_version: 1.26.7
   test_flags:
     - -race
     - -short
@@ -466,7 +466,7 @@ registry:
   insecure: false
 
 build:
-  go_version: 1.26.1
+  go_version: 1.26.7
   build_flags:
     - -ldflags=-s -w
     - -trimpath
@@ -507,7 +507,7 @@ registry:
   namespace: ${SHIPWRIGHT_ENV}
 
 build:
-  go_version: 1.26.1
+  go_version: 1.26.7
 
 security:
   enable_scanning: true

@@ -157,7 +157,7 @@ executed through Dagger.
 ## 7. Current State
 
 Verified against the repository (module `github.com/pablogore/shipwright`,
-Go `1.26.1` per `go.mod`/`.go-version`, Dagger SDK `dagger.io/dagger v0.21.8`).
+Go `1.26.7` per `go.mod`/`.go-version`, Dagger SDK `dagger.io/dagger v0.21.8`).
 
 **Entry point.** A single Go binary/CLI (`main.go`, no `cmd/` package)
 providing flags such as `--pipeline`, `--step`, `--env`, `--executor`,

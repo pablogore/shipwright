@@ -143,7 +143,7 @@ func (h *BuildStepHandler) Execute(ctx context.Context, _ string, config interfa
 	// Example build logic
 	goVersion := h.config.GetString("pipeline.go_version")
 	if goVersion == "" {
-		goVersion = "1.25.5"
+		goVersion = "1.26.7"
 	}
 
 	logger.L().InfoContext(ctx, "Building with Go version", "go_version", goVersion)

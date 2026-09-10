@@ -28,7 +28,7 @@ than partway through a run.
            provider: go
            version: "1"
          with:
-           goVersion: "1.26.1"
+           goVersion: "1.26.7"
 
        - id: unit
          capability: test
@@ -98,7 +98,7 @@ Every step has exactly eight fields:
 | `uses` | yes | `uses: {provider: go, version: "1"}` |
 | `needs` | no | `needs: [build]` |
 | `input` | no | `input: ${{ steps.build.output }}` |
-| `with` | no | `with: {goVersion: "1.26.1"}` |
+| `with` | no | `with: {goVersion: "1.26.7"}` |
 | `when` | no | `when: {branch: [main]}` |
 | `attempts` | no | `attempts: 3` |
 

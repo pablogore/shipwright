@@ -213,7 +213,7 @@ func (h *MyCustomStepHandler) Execute(ctx context.Context) error {
     if h.client != nil {
         // Use Dagger client for container operations
         container := h.client.Container().
-            From("golang:1.26.1-alpine").
+            From("golang:1.26.7-alpine").
             WithMountedDirectory("/src", h.client.Host().Directory(".")).
             WithWorkdir("/src").
             WithExec([]string{"go", "build", "-o", "myapp", "./cmd/myapp"})
