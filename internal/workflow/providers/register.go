@@ -96,6 +96,37 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		return &golang.GoVulnScanner{Client: goClient}
 	})
 
+	// "go-build" (issue #273): a compile-only gate for Go modules with no
+	// root main package, registered under "test" rather than reusing "go"
+	// (a Builder — requires a root main package and a binary output). See
+	// golang.GoBuildChecker's own doc comment for why this is not a vet/
+	// lint gate. Unlike "govulncheck" above, goVersion IS wired into the
+	// factory (design.md D-6, TestRegisterDefaults_GoBuild_GoVersionFlowsThrough).
+	r.RegisterTester(Ref{Name: "go-build", Version: "1"}, WithSchema{
+		"goVersion": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &golang.GoBuildChecker{Client: goClient, GoVersion: stringField(v, "goVersion")}
+	})
+
+	// "go-integration-test" (issue #278, testcontainers-dind-dagger-
+	// services): a service-dependent (Docker-in-Docker) suite, registered
+	// under the same "test" capability as "go-test"/"go-build", coexisting
+	// with them and distinguished purely by provider name — see
+	// golang.GoIntegrationTester's own doc comment for why this is not a
+	// distinct "integration-test" capability kind. Both command and
+	// goVersion ARE wired into the factory, mirroring "go-build"'s own
+	// goVersion flow-through (design.md D-11).
+	r.RegisterTester(Ref{Name: "go-integration-test", Version: "1"}, WithSchema{
+		"command":   interp.KindString,
+		"goVersion": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &golang.GoIntegrationTester{
+			Client:    goClient,
+			GoVersion: stringField(v, "goVersion"),
+			Command:   stringField(v, "command"),
+		}
+	})
+
 	r.RegisterArtifactor(Ref{Name: "container", Version: "1"}, WithSchema{
 		"ref":          interp.KindString,
 		"creds":        interp.KindSecret,

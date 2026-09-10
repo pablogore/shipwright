@@ -165,6 +165,30 @@ func (m *MockDaggerContainer) WithRegistryAuth(address, username string, secret 
 	return nil
 }
 
+func (m *MockDaggerContainer) WithExposedPort(port int) DaggerContainer {
+	args := m.Called(port)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerContainer)
+	}
+	return nil
+}
+
+func (m *MockDaggerContainer) AsService(serviceArgs []string) DaggerService {
+	args := m.Called(serviceArgs)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerService)
+	}
+	return nil
+}
+
+func (m *MockDaggerContainer) WithServiceBinding(alias string, svc DaggerService) DaggerContainer {
+	args := m.Called(alias, svc)
+	if v := args.Get(0); v != nil {
+		return v.(DaggerContainer)
+	}
+	return nil
+}
+
 func (m *MockDaggerContainer) File(path string) DaggerFile {
 	args := m.Called(path)
 	if v := args.Get(0); v != nil {
@@ -206,6 +230,13 @@ func (m *MockDaggerContainer) GetRealContainer() *dagger.Container {
 		return v.(*dagger.Container)
 	}
 	return nil
+}
+
+var _ DaggerService = (*MockDaggerService)(nil)
+
+// MockDaggerService implements DaggerService using testify's mock package.
+type MockDaggerService struct {
+	mock.Mock
 }
 
 var _ DaggerFile = (*MockDaggerFile)(nil)

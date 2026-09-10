@@ -1,0 +1,27 @@
+# Test-only example manifest demonstrating the fix for issue #273
+# (go-build-library-compile-check, design.md "Requirement: No Companion
+# Build Step Required"): a library-only Go module has no root `main`
+# package, so it cannot use the "go" Builder (which requires one and
+# produces a binary output). This manifest has no `build` step at all —
+# `go-build` (a Tester, `capability: test`) runs `go build ./...` directly
+# against the workflow's source input. Covered by the examples drift guard
+# (internal/workflow/manifest/examples_test.go), so it cannot silently
+# drift from the schema.
+apiVersion: shipwright.dev/v1
+kind: Workflow
+metadata:
+  name: library-compile-check
+  description: >-
+    Smallest runnable workflow for a library-only Go module: no root main
+    package, no build step — just a compile gate over every package.
+spec:
+  source:
+    path: .
+  steps:
+    - id: compile
+      capability: test
+      uses:
+        provider: go-build
+        version: "1"
+      with:
+        goVersion: "1.26.1"

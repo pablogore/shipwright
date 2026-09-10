@@ -1,8 +1,14 @@
 package daggerkit
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/printer"
+	"go/token"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,4 +70,38 @@ func TestMockDaggerDirectory_WithNewFile(t *testing.T) {
 
 	got := mockDir.WithNewFile("go.mod", "module example.com/x\n\ngo 1.27.0\n")
 	assert.Same(t, mockUpdatedDir, got)
+}
+
+// TestDaggerContainerAdapter_AsService_SetsInsecureRootCapabilities is a
+// static, source-level assertion (design.md's Threat Matrix "Privileged
+// subprocess" row, tasks.md 1.3): no live Dagger engine runs in this
+// module's unit tests, so InsecureRootCapabilities cannot be observed by
+// calling AsService against a real dagger.Container. Instead this parses
+// adapter.go's own source and confirms the literal appears inside
+// AsService's body — a stronger guarantee than a doc comment, since it
+// fails if the option is ever removed or its value ever flipped to false.
+func TestDaggerContainerAdapter_AsService_SetsInsecureRootCapabilities(t *testing.T) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "adapter.go", nil, 0)
+	require.NoError(t, err, "failed to parse adapter.go")
+
+	var body *ast.BlockStmt
+	ast.Inspect(f, func(n ast.Node) bool {
+		fn, ok := n.(*ast.FuncDecl)
+		if ok && fn.Name.Name == "AsService" && fn.Recv != nil {
+			body = fn.Body
+			return false
+		}
+		return true
+	})
+	require.NotNil(t, body, "DaggerContainerAdapter.AsService not found in adapter.go")
+
+	var buf bytes.Buffer
+	require.NoError(t, printer.Fprint(&buf, fset, body))
+	// printer.Fprint renders struct-literal fields with tabs for alignment
+	// (e.g. "InsecureRootCapabilities:\ttrue,"), so whitespace runs are
+	// normalized to a single space before the substring check.
+	normalized := strings.Join(strings.Fields(buf.String()), " ")
+	assert.Contains(t, normalized, "InsecureRootCapabilities: true",
+		"AsService must set InsecureRootCapabilities: true — required to start dockerd (design.md D-6)")
 }

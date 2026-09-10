@@ -1,0 +1,27 @@
+# Test-only example manifest demonstrating the fix for issue #278
+# (testcontainers-dind-dagger-services, design.md "Docker-in-Docker as a
+# Dagger Service"): `go-integration-test` (a Tester, `capability: test`)
+# attaches a real, privileged Docker-in-Docker daemon as a Dagger Service
+# (see providers/go/dockerdaemon.go) so a testcontainers-go-backed suite
+# runs unmodified against a real, network-reachable Docker daemon — no
+# `services:` field, no consumer-repo changes required. Covered by the
+# examples drift guard (internal/workflow/manifest/examples_test.go), so it
+# cannot silently drift from the schema.
+apiVersion: shipwright.dev/v1
+kind: Workflow
+metadata:
+  name: go-integration-test
+  description: >-
+    Smallest runnable workflow exercising a Docker-in-Docker-backed Go
+    integration suite: no `with.command` — the default
+    `go test -tags=integration ./...` invocation runs against the
+    workflow's own source, with a real Docker daemon already attached.
+spec:
+  source:
+    path: .
+  steps:
+    - id: integration
+      capability: test
+      uses:
+        provider: go-integration-test
+        version: "1"

@@ -79,6 +79,26 @@ func TestParseCoveragePercentage(t *testing.T) {
 	}
 }
 
+func TestResolveIntegrationCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  string
+		want string
+	}{
+		{name: "empty falls back to default", cmd: "", want: defaultIntegrationCommand},
+		{name: "explicit command is preserved verbatim", cmd: "go build && ./inttest-runner", want: "go build && ./inttest-runner"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveIntegrationCommand(tt.cmd)
+			if got != tt.want {
+				t.Fatalf("resolveIntegrationCommand(%q) = %q, want %q", tt.cmd, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestVulnerabilitiesReported(t *testing.T) {
 	tests := []struct {
 		name   string
