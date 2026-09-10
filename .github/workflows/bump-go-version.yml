@@ -1,0 +1,54 @@
+name: 'Bump Go version'
+
+# Manual pipeline stage (issue #280, design.md D-10) that runs the
+# coordinated Go SDK/toolchain version bump automatically once triggered:
+# `gh workflow run bump-go-version.yml -f target=x.y.z`, or via the Actions
+# UI. This workflow contains NO bump logic of its own -- it invokes exactly
+# the same `make bump-go-version` target a developer runs locally, so a
+# manual dispatch and a local run always produce the identical outcome
+# (mutate every registered site -> validate with `ci-final` -> deliver as a
+# PR into develop via scripts/bump-go-version-pr.sh, never a direct push).
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target Go version (x.y.z), e.g. 1.26.7'
+        required: true
+        type: 'string'
+
+permissions:
+  contents: 'write'       # push the chore/go-<target> branch
+  pull-requests: 'write'  # gh pr create / gh pr list
+
+jobs:
+  bump:
+    runs-on: 'ubuntu-latest'
+    steps:
+    - name: 'Checkout code'
+      uses: 'actions/checkout@v7'
+
+    - name: 'Set up Go'
+      uses: 'actions/setup-go@v7'
+      with:
+        # Read from .go-version, not hardcoded: this is the version-bump
+        # workflow itself, so a hardcoded pin here would immediately go
+        # stale the moment it bumps every OTHER site in the repo.
+        go-version-file: '.go-version'
+
+    - name: 'Configure Git'
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    # `inputs.target` reaches the shell ONLY through this `env:` block,
+    # never interpolated directly into the `run:` body as `${{ }}` -- that
+    # would be a shell-injection point before the value ever reaches
+    # scripts/gobump/sites's E6 target-format validation
+    # (`^\d+\.\d+\.\d+$`) in Go code. `env:` assignment is not
+    # shell-evaluated, so this is safe regardless of what a caller passes.
+    - name: 'Run the coordinated Go version bump'
+      env:
+        TARGET: '${{ inputs.target }}'
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      run: |
+        make bump-go-version TARGET="$TARGET"

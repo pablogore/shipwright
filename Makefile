@@ -378,11 +378,15 @@ ci-final: lint build test coverage-gate security provider-go-standalone provider
 # provider-go-standalone/provider-rust-standalone are deliberately NOT
 # re-listed here: ci-final (above) already depends on both transitively, so
 # re-listing them would run the GOWORK=off gate twice for no benefit.
+# scripts/bump-go-version-pr.sh runs LAST, only after ci-final has validated
+# the mutated tree in place -- it delivers that already-validated diff as a
+# PR (never a direct push to develop/main).
 .PHONY: bump-go-version
-bump-go-version: ## Bump the Go toolchain across every site and validate (TARGET=x.y.z required)
+bump-go-version: ## Bump the Go toolchain across every site, validate, and open a PR (TARGET=x.y.z required)
 	@test -n "$(TARGET)" || { echo -e "$(RED)❌ TARGET=x.y.z is required, e.g. make bump-go-version TARGET=1.26.7$(NC)"; exit 1; }
 	$(GOCMD) run ./scripts/gobump -target=$(TARGET)
 	$(MAKE) ci-final
+	scripts/bump-go-version-pr.sh $(TARGET)
 
 # Coverage targets
 # NOTE: all `go list ./...`-based package lists below intentionally do NOT
