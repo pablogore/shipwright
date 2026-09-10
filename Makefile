@@ -37,7 +37,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test test-integration deps help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone provider-rust-standalone
+.PHONY: all build clean test dagger-test test-integration deps help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone provider-rust-standalone bump-go-version
 
 # Help target
 .PHONY: help
@@ -373,6 +373,16 @@ provider-rust-standalone: ## Validate providers/rust builds/tests standalone wit
 .PHONY: ci-final
 ci-final: lint build test coverage-gate security provider-go-standalone provider-rust-standalone final-sha-gate-check-test action-contract-test ## Full production-critical validation contract for the Final SHA (repository-owned, CI-provider independent; see comment above)
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
+
+# Coordinated Go SDK/toolchain version bump (issue #280, design.md D-9).
+# provider-go-standalone/provider-rust-standalone are deliberately NOT
+# re-listed here: ci-final (above) already depends on both transitively, so
+# re-listing them would run the GOWORK=off gate twice for no benefit.
+.PHONY: bump-go-version
+bump-go-version: ## Bump the Go toolchain across every site and validate (TARGET=x.y.z required)
+	@test -n "$(TARGET)" || { echo -e "$(RED)❌ TARGET=x.y.z is required, e.g. make bump-go-version TARGET=1.26.7$(NC)"; exit 1; }
+	$(GOCMD) run ./scripts/gobump -target=$(TARGET)
+	$(MAKE) ci-final
 
 # Coverage targets
 # NOTE: all `go list ./...`-based package lists below intentionally do NOT
