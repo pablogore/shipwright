@@ -549,3 +549,7 @@ coverage/*shipwright
 
 # Root binary produced by `go build .`
 /shipwright
+
+# GoRuntimeUpgrader's report artifact (providers/go/runtimeupgrader.go), written
+# relative to whichever working dir it's pointed at (repo root and .dagger/)
+.shipwright/
