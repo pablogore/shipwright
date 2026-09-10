@@ -191,7 +191,7 @@ jobs:
 
 ```yaml
 build:
-  image: golang:1.25
+  image: golang:1.26.7
   before_script:
     - curl -L https://dagger.io/dagger/install.sh | sh
     - export PATH="$PATH:/usr/local/bin"

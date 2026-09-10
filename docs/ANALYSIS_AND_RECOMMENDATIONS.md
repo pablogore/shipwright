@@ -373,7 +373,7 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: '1.25.5'
+  GO_VERSION: '1.26.7'
   COVERAGE_THRESHOLD: 90
 
 jobs:
@@ -547,7 +547,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.25.5'
+          go-version: '1.26.7'
       - name: Install Shipwright
         run: |
           curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
@@ -566,7 +566,7 @@ stages:
 
 test:
   stage: test
-  image: golang:1.25.5
+  image: golang:1.26.7
   before_script:
     - curl -L https://github.com/pablogore/shipwright/releases/latest/download/shipwright-linux-amd64 -o shipwright
     - chmod +x shipwright
@@ -600,7 +600,7 @@ version: 2.1
 jobs:
   test:
     docker:
-      - image: golang:1.25.5
+      - image: golang:1.26.7
     steps:
       - checkout
       - run:
@@ -1003,7 +1003,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.25.5'
+          go-version: '1.26.7'
       
       # ✅ Pre-descargar dependencias comunes
       - name: Warm up Go modules cache
@@ -1574,7 +1574,7 @@ func main() {
 ```
 Pipeline Execution (trace_id: abc123)
 ├── Step: setup (span_id: def456)
-│   ├── Dagger: Container.From (golang:1.25.5)
+│   ├── Dagger: Container.From (golang:1.26.7)
 │   ├── Dagger: Container.WithMountedDirectory
 │   └── Duration: 2.3s
 ├── Step: build (span_id: ghi789)
@@ -1665,7 +1665,7 @@ jobs:
       - name: Build
         run: shipwright --pipeline go-service --step build --executor docker
         env:
-          DOCKER_IMAGE: golang:1.25.5
+          DOCKER_IMAGE: golang:1.26.7
   
   test:
     needs: [setup, build]
@@ -2519,7 +2519,7 @@ on:
     branches: [main, develop]
 
 env:
-  GO_VERSION: '1.25.5'
+  GO_VERSION: '1.26.7'
   COVERAGE_THRESHOLD: 90
 
 jobs:

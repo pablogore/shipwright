@@ -35,7 +35,7 @@ type GoBuilder struct {
 //   - client: The Dagger client used for pipeline operations. Must be a valid,
 //     connected client. Connection management is handled by Dagger internally.
 //   - src: The source directory containing the Go project files.
-//   - version: The Go version to use for the build (e.g., "1.21", "1.25.5").
+//   - version: The Go version to use for the build (e.g., "1.21", "1.26.7").
 //
 // Returns:
 //   - A pointer to a new GoBuilder instance.

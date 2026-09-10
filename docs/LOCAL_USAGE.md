@@ -174,7 +174,7 @@ pipeline:
     - test
     - lint
   coverage: 90.0
-  go_version: "1.25.5"
+  go_version: "1.26.7"
 
 environment: dev
 
@@ -189,7 +189,7 @@ Puedes configurar usando variables de entorno con prefijo `SHIPWRIGHT_`:
 
 ```bash
 export SHIPWRIGHT_PIPELINE_COVERAGE=95.0
-export SHIPWRIGHT_PIPELINE_GO_VERSION=1.25.5
+export SHIPWRIGHT_PIPELINE_GO_VERSION=1.26.7
 export SHIPWRIGHT_ENVIRONMENT=dev
 
 ./shipwright --local --pipeline go-service
