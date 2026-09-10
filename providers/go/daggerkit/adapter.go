@@ -135,6 +135,28 @@ func (a *DaggerContainerAdapter) WithRegistryAuth(address, username string, secr
 	return &DaggerContainerAdapter{container: a.container.WithRegistryAuth(address, username, secret)}
 }
 
+func (a *DaggerContainerAdapter) WithExposedPort(port int) DaggerContainer {
+	return &DaggerContainerAdapter{container: a.container.WithExposedPort(port)}
+}
+
+func (a *DaggerContainerAdapter) AsService(args []string) DaggerService {
+	return &DaggerServiceAdapter{service: a.container.AsService(dagger.ContainerAsServiceOpts{
+		Args:                     args,
+		InsecureRootCapabilities: true, // required to start dockerd
+	})}
+}
+
+func (a *DaggerContainerAdapter) WithServiceBinding(alias string, svc DaggerService) DaggerContainer {
+	// A real adapter only ever receives another real adapter here; a mock
+	// reaching this method body is a test wired to the wrong type — same
+	// pattern as WithMountedDirectory/WithMountedCache/WithDirectory above.
+	adapter, ok := svc.(*DaggerServiceAdapter)
+	if !ok {
+		panic("daggerkit: WithServiceBinding called on DaggerContainerAdapter with a non-adapter DaggerService")
+	}
+	return &DaggerContainerAdapter{container: a.container.WithServiceBinding(alias, adapter.service)}
+}
+
 func (a *DaggerContainerAdapter) File(path string) DaggerFile {
 	return &DaggerFileAdapter{file: a.container.File(path)}
 }
@@ -163,6 +185,13 @@ func (a *DaggerContainerAdapter) Publish(ctx context.Context, address string) (s
 // with shared functions.
 func (a *DaggerContainerAdapter) GetRealContainer() *dagger.Container {
 	return a.container
+}
+
+var _ DaggerService = (*DaggerServiceAdapter)(nil)
+
+// DaggerServiceAdapter adapts a real *dagger.Service to DaggerService.
+type DaggerServiceAdapter struct {
+	service *dagger.Service
 }
 
 var _ DaggerFile = (*DaggerFileAdapter)(nil)

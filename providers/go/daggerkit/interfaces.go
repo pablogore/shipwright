@@ -32,6 +32,13 @@ type DaggerClient interface {
 type DaggerCacheVolume interface {
 }
 
+// DaggerService interface abstracts the dagger.Service to enable mocking.
+// No methods: every provider in this module only ever passes a Service
+// opaquely into WithServiceBinding (e.g. a Docker-in-Docker daemon
+// container turned into a service via AsService — see dockerdaemon.go).
+type DaggerService interface {
+}
+
 // DaggerDirectory interface abstracts the dagger.Directory to enable
 // mocking. File and Entries were added for GoRuntimeInspector (design.md
 // D-9): reading a workspace's go.work/go.mod/.go-version content is the
@@ -81,6 +88,26 @@ type DaggerContainer interface {
 	// opaquely through its own Publish(..., creds *dagger.Secret)
 	// parameter and forwards it untouched, never calling a method on it.
 	WithRegistryAuth(string, string, *dagger.Secret) DaggerContainer
+	// WithExposedPort, AsService and WithServiceBinding exist for the
+	// Docker-in-Docker sidecar pattern (see dockerdaemon.go): a privileged
+	// dockerd container is exposed as a DaggerService and bound into the
+	// caller's container under a network alias, giving testcontainers-go a
+	// real, routable Docker daemon instead of a mounted host socket (which
+	// Dagger's own container sandboxing model makes unreachable for
+	// sibling-container networking — see dockerdaemon.go's doc comment for
+	// the full root cause). Deliberately no WithUnixSocket/DaggerHost
+	// equivalent here: that mechanism is dead, structurally broken
+	// Docker-outside-of-Docker scaffolding from the abandoned Rust attempt
+	// and must not be ported.
+	WithExposedPort(int) DaggerContainer
+	// AsService runs args as the service's live process, with Dagger's
+	// InsecureRootCapabilities (needed to start dockerd itself). Args must
+	// be passed here rather than via a prior WithExec: WithExec's semantics
+	// are "run to completion and snapshot the result," which a daemon that
+	// runs forever never does — see dockerdaemon.go's dockerdCommand
+	// comment for the hang this avoids.
+	AsService([]string) DaggerService
+	WithServiceBinding(string, DaggerService) DaggerContainer
 	File(string) DaggerFile
 	Directory(string) DaggerDirectory
 	Sync(context.Context) (DaggerContainer, error)
