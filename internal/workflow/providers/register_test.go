@@ -107,6 +107,54 @@ func TestRegisterDefaults_RegistersAllFiveWU3Capabilities(t *testing.T) {
 	}
 }
 
+// TestRegisterDefaults_GoBuild_Resolves is the GREEN evidence that
+// "go-build" (issue #273, go-build-library-compile-check) resolves under
+// the "test" capability to a non-nil *golang.GoBuildChecker — distinct
+// from "go" (a Builder, requires a root main package) and "go-test" (runs
+// `go test`, not a compile-only gate).
+func TestRegisterDefaults_GoBuild_Resolves(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "go-build", Version: "1"}, providers.Values{})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(go-build) = (%v, %v), want (non-nil GoBuildChecker, nil)", tester, err)
+	}
+
+	if _, ok := tester.(*golang.GoBuildChecker); !ok {
+		t.Fatalf("ResolveTester(go-build) = %T, want *golang.GoBuildChecker", tester)
+	}
+}
+
+// TestRegisterDefaults_GoBuild_GoVersionFlowsThrough mirrors
+// TestRegisterDefaults_ClippyAndCargoAudit_RustVersionFlowsThrough's own
+// reasoning: "go-build"'s goVersion with-field must actually reach
+// GoBuildChecker.GoVersion (design.md D-6), unlike "govulncheck"'s own
+// unwired GoVersion field.
+func TestRegisterDefaults_GoBuild_GoVersionFlowsThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "go-build", Version: "1"}, providers.Values{
+		"goVersion": interp.NewString("1.25.5"),
+	})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(go-build) = (%v, %v), want (non-nil GoBuildChecker, nil)", tester, err)
+	}
+
+	checker, ok := tester.(*golang.GoBuildChecker)
+	if !ok {
+		t.Fatalf("ResolveTester(go-build) = %T, want *golang.GoBuildChecker", tester)
+	}
+	if checker.GoVersion != "1.25.5" {
+		t.Fatalf("GoBuildChecker.GoVersion = %q, want %q — the manifest's goVersion with-field never reached the provider", checker.GoVersion, "1.25.5")
+	}
+}
+
 // providers/rust mirrors providers/go file-for-file (RustBuilder,
 // RustUnitTester, RustLinter, RustVulnScanner, ContainerPublisher). This is
 // the GREEN evidence that RegisterDefaults wires all five of them into a

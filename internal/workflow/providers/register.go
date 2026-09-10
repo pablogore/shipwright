@@ -96,6 +96,18 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		return &golang.GoVulnScanner{Client: goClient}
 	})
 
+	// "go-build" (issue #273): a compile-only gate for Go modules with no
+	// root main package, registered under "test" rather than reusing "go"
+	// (a Builder — requires a root main package and a binary output). See
+	// golang.GoBuildChecker's own doc comment for why this is not a vet/
+	// lint gate. Unlike "govulncheck" above, goVersion IS wired into the
+	// factory (design.md D-6, TestRegisterDefaults_GoBuild_GoVersionFlowsThrough).
+	r.RegisterTester(Ref{Name: "go-build", Version: "1"}, WithSchema{
+		"goVersion": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &golang.GoBuildChecker{Client: goClient, GoVersion: stringField(v, "goVersion")}
+	})
+
 	r.RegisterArtifactor(Ref{Name: "container", Version: "1"}, WithSchema{
 		"ref":          interp.KindString,
 		"creds":        interp.KindSecret,
