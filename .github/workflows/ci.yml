@@ -1445,16 +1445,9 @@ jobs:
   # test-integration must stay out of the CI-provider-independent contract.
   final-sha-dagger-integration:
     runs-on: 'ubuntu-latest'
-    # TEMPORARY (issue #278 / PR #279): the pull_request clause below lets
-    # this job run for real, pre-merge, against this PR's dind_test.go on a
-    # GitHub Actions runner. MUST BE REVERTED to the push-only condition
-    # before merging to develop -- see the falsifiable-heuristic rationale
-    # above final-sha-validation for why this gate stays push-only normally.
     if: |
-      (github.event_name == 'push' &&
-       (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
-      (github.event_name == 'pull_request' &&
-       github.head_ref == 'fix/resolve-main-develop-conflict-2')
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
     steps:
     - name: 'Checkout exact Final SHA'
       uses: 'actions/checkout@v7'
