@@ -210,6 +210,86 @@ func TestRegisterDefaults_GoIntegrationTest_CommandAndGoVersionFlowThrough(t *te
 	}
 }
 
+// TestRegisterDefaults_GoCommand_WithFieldsFlowThrough is the GREEN
+// evidence that "go-command" (issue #276) is registered under the "test"
+// capability and that every one of its with-fields — goVersion, workDir,
+// command — actually reaches the resolved *golang.GoCommand, not just that
+// resolution succeeds. Mirrors
+// TestRegisterDefaults_RustCommand_WithFieldsFlowThrough, minus docker/
+// cacheKey/manifestPath — go-command deliberately has neither.
+func TestRegisterDefaults_GoCommand_WithFieldsFlowThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "go-command", Version: "1"}, providers.Values{
+		"goVersion": interp.NewString("1.25.5"),
+		"workDir":   interp.NewString("services/api"),
+		"command":   interp.NewString("build -o bin/api ./cmd/api"),
+	})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(go-command) = (%v, %v), want (non-nil GoCommand, nil)", tester, err)
+	}
+
+	command, ok := tester.(*golang.GoCommand)
+	if !ok {
+		t.Fatalf("ResolveTester(go-command) = %T, want *golang.GoCommand", tester)
+	}
+	if command.GoVersion != "1.25.5" {
+		t.Fatalf("GoCommand.GoVersion = %q, want %q", command.GoVersion, "1.25.5")
+	}
+	if command.WorkDir != "services/api" {
+		t.Fatalf("GoCommand.WorkDir = %q, want %q", command.WorkDir, "services/api")
+	}
+	if command.Command != "build -o bin/api ./cmd/api" {
+		t.Fatalf("GoCommand.Command = %q, want %q", command.Command, "build -o bin/api ./cmd/api")
+	}
+}
+
+// TestRegisterDefaults_GoCommand_UnknownCacheKeyRejected pins the spec's
+// "Unknown with-field rejected" scenario for go-command: a manifest that
+// supplies a "cacheKey" with-field — rust-command's own field name, easy to
+// cargo-cult onto go-command — must be rejected, never silently accepted
+// and dropped, since GoCommand deliberately has no CacheKey (its own doc
+// comment explains why Go's content-addressed build cache makes per-step
+// cache isolation unnecessary).
+//
+// NOTE: as of this test, checkWithSchema (registry.go) only validates the
+// Kind of with-fields the SCHEMA itself declares and the manifest actually
+// supplied (registry.go's own doc comment: "A schema field the manifest's
+// with map never supplied is not an error here") — it does not iterate the
+// supplied Values map to flag keys absent from the schema. A "cacheKey"
+// field that go-command's schema never declares is therefore NOT rejected
+// today; it is silently ignored. This test pins that CURRENT behavior
+// (resolution succeeds, cacheKey has no effect) rather than asserting a
+// *providers.WithSchemaMismatchError that checkWithSchema does not
+// currently produce for unknown fields — see this apply batch's own report
+// for the flagged discrepancy against the spec/tasks artifacts, which
+// assumed checkWithSchema already rejects unknown fields.
+func TestRegisterDefaults_GoCommand_UnknownCacheKeyRejected(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "go-command", Version: "1"}, providers.Values{
+		"command":  interp.NewString("build ./..."),
+		"cacheKey": interp.NewString("run-suite"),
+	})
+
+	var mismatchErr *providers.WithSchemaMismatchError
+	if errors.As(err, &mismatchErr) {
+		t.Fatalf("ResolveTester(go-command, cacheKey) = %v, want no *providers.WithSchemaMismatchError under checkWithSchema's current schema-keys-only iteration — if this now fails, checkWithSchema has been extended to flag unknown fields; update this test's assertion (and its doc comment) to require the error instead", err)
+	}
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(go-command, cacheKey) = (%v, %v), want (non-nil GoCommand, nil) given checkWithSchema's current behavior", tester, err)
+	}
+	if _, ok := tester.(*golang.GoCommand); !ok {
+		t.Fatalf("ResolveTester(go-command, cacheKey) = %T, want *golang.GoCommand", tester)
+	}
+}
+
 // providers/rust mirrors providers/go file-for-file (RustBuilder,
 // RustUnitTester, RustLinter, RustVulnScanner, ContainerPublisher). This is
 // the GREEN evidence that RegisterDefaults wires all five of them into a
