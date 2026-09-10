@@ -108,6 +108,25 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		return &golang.GoBuildChecker{Client: goClient, GoVersion: stringField(v, "goVersion")}
 	})
 
+	// "go-integration-test" (issue #278, testcontainers-dind-dagger-
+	// services): a service-dependent (Docker-in-Docker) suite, registered
+	// under the same "test" capability as "go-test"/"go-build", coexisting
+	// with them and distinguished purely by provider name — see
+	// golang.GoIntegrationTester's own doc comment for why this is not a
+	// distinct "integration-test" capability kind. Both command and
+	// goVersion ARE wired into the factory, mirroring "go-build"'s own
+	// goVersion flow-through (design.md D-11).
+	r.RegisterTester(Ref{Name: "go-integration-test", Version: "1"}, WithSchema{
+		"command":   interp.KindString,
+		"goVersion": interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &golang.GoIntegrationTester{
+			Client:    goClient,
+			GoVersion: stringField(v, "goVersion"),
+			Command:   stringField(v, "command"),
+		}
+	})
+
 	r.RegisterArtifactor(Ref{Name: "container", Version: "1"}, WithSchema{
 		"ref":          interp.KindString,
 		"creds":        interp.KindSecret,

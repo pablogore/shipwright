@@ -207,6 +207,7 @@ These are the only providers registered today, all pinned to `version: "1"`:
 | `golangci-lint` | `test` | *(none)* |
 | `govulncheck` | `test` | *(none)* |
 | `go-build` | `test` | `goVersion` (string) |
+| `go-integration-test` | `test` | `command` (string, optional), `goVersion` (string) |
 | `container` | `artifact` | `ref` (string), `creds` (secret), `registryUser` (string) |
 
 No `deploy` or `run` capability provider ships yet. A step declaring

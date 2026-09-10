@@ -155,6 +155,61 @@ func TestRegisterDefaults_GoBuild_GoVersionFlowsThrough(t *testing.T) {
 	}
 }
 
+// TestRegisterDefaults_GoIntegrationTest_Resolves is the GREEN evidence
+// that "go-integration-test" (issue #278, testcontainers-dind-dagger-
+// services) resolves under the "test" capability to a non-nil
+// *golang.GoIntegrationTester — coexisting with "go-test" and "go-build"
+// under the same capability, distinguished only by provider name, mirroring
+// "rust-integration-test"'s own registration alongside "rust-test".
+func TestRegisterDefaults_GoIntegrationTest_Resolves(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "go-integration-test", Version: "1"}, providers.Values{})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(go-integration-test) = (%v, %v), want (non-nil GoIntegrationTester, nil)", tester, err)
+	}
+
+	if _, ok := tester.(*golang.GoIntegrationTester); !ok {
+		t.Fatalf("ResolveTester(go-integration-test) = %T, want *golang.GoIntegrationTester", tester)
+	}
+}
+
+// TestRegisterDefaults_GoIntegrationTest_CommandAndGoVersionFlowThrough
+// mirrors TestRegisterDefaults_GoBuild_GoVersionFlowsThrough's own
+// reasoning: "go-integration-test"'s command and goVersion with-fields must
+// actually reach GoIntegrationTester.Command/GoVersion, not just resolve
+// without error (checkWithSchema's own doc comment: an undeclared/unset
+// with-field is never an error there, so a resolve-without-error assertion
+// alone cannot catch a factory silently dropping the value).
+func TestRegisterDefaults_GoIntegrationTest_CommandAndGoVersionFlowThrough(t *testing.T) {
+	t.Parallel()
+
+	r := providers.NewRegistry()
+	providers.RegisterDefaults(r, nil)
+
+	tester, err := r.ResolveTester(providers.Ref{Name: "go-integration-test", Version: "1"}, providers.Values{
+		"command":   interp.NewString("go build && ./inttest-runner"),
+		"goVersion": interp.NewString("1.25.5"),
+	})
+	if err != nil || tester == nil {
+		t.Fatalf("ResolveTester(go-integration-test) = (%v, %v), want (non-nil GoIntegrationTester, nil)", tester, err)
+	}
+
+	integrationTester, ok := tester.(*golang.GoIntegrationTester)
+	if !ok {
+		t.Fatalf("ResolveTester(go-integration-test) = %T, want *golang.GoIntegrationTester", tester)
+	}
+	if integrationTester.Command != "go build && ./inttest-runner" {
+		t.Fatalf("GoIntegrationTester.Command = %q, want %q — the manifest's command with-field never reached the provider", integrationTester.Command, "go build && ./inttest-runner")
+	}
+	if integrationTester.GoVersion != "1.25.5" {
+		t.Fatalf("GoIntegrationTester.GoVersion = %q, want %q — the manifest's goVersion with-field never reached the provider", integrationTester.GoVersion, "1.25.5")
+	}
+}
+
 // providers/rust mirrors providers/go file-for-file (RustBuilder,
 // RustUnitTester, RustLinter, RustVulnScanner, ContainerPublisher). This is
 // the GREEN evidence that RegisterDefaults wires all five of them into a
