@@ -208,7 +208,17 @@ These are the only providers registered today, all pinned to `version: "1"`:
 | `govulncheck` | `test` | *(none)* |
 | `go-build` | `test` | `goVersion` (string) |
 | `go-integration-test` | `test` | `command` (string, optional), `goVersion` (string) |
+| `go-command` | `test` | `command` (string, required), `goVersion` (string, optional), `workDir` (string, optional) |
 | `container` | `artifact` | `ref` (string), `creds` (secret), `registryUser` (string) |
+
+`go-command` runs an arbitrary `go <command>` invocation, tokenized on
+whitespace and passed as argv (never a shell — shell metacharacters in
+`command` pass through as literal, inert argv tokens). When `workDir` is
+set, it becomes `go -C <workDir>`, inserted immediately before the
+subcommand — `-C` chdirs *before* the command runs, so relative paths named
+inside `command` (e.g. `-o bin/api`) resolve under `workDir`, not under the
+step's own root. This differs from `rust-command`'s `manifestPath`, which
+becomes `--manifest-path` and does NOT chdir.
 
 No `deploy` or `run` capability provider ships yet. A step declaring
 `capability: deploy` or `capability: run` will fail to resolve at run

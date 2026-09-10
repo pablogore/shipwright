@@ -127,6 +127,27 @@ func RegisterDefaults(r *Registry, client *dagger.Client) {
 		}
 	})
 
+	// "go-command" (issue #276): the general go-invocation primitive
+	// go-build/go-test/golangci-lint/govulncheck/go-integration-test are
+	// conveniences over — see golang.GoCommand's own doc comment. Registered
+	// under "test" for the same reason "go-integration-test" is (a new go
+	// invocation shape is a new provider name, not a new capability kind).
+	// No "cacheKey" field: unlike rust-command, GoCommand has no CacheKey —
+	// see golang.GoCommand's own doc comment for why Go's content-addressed
+	// build cache makes per-step isolation unnecessary.
+	r.RegisterTester(Ref{Name: "go-command", Version: "1"}, WithSchema{
+		"goVersion": interp.KindString,
+		"workDir":   interp.KindString,
+		"command":   interp.KindString,
+	}, func(v Values) shipwright.Tester {
+		return &golang.GoCommand{
+			Client:    goClient,
+			GoVersion: stringField(v, "goVersion"),
+			WorkDir:   stringField(v, "workDir"),
+			Command:   stringField(v, "command"),
+		}
+	})
+
 	r.RegisterArtifactor(Ref{Name: "container", Version: "1"}, WithSchema{
 		"ref":          interp.KindString,
 		"creds":        interp.KindSecret,

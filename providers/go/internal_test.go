@@ -99,6 +99,69 @@ func TestResolveIntegrationCommand(t *testing.T) {
 	}
 }
 
+// TestGoCommandArgsFor covers GoCommand's argv construction: whitespace
+// tokenization of command (no shell involved) plus "-C workDir" inserted
+// immediately before the subcommand token when workDir is set — go
+// requires -C to be argv[1], unlike cargoCommandArgsFor's --manifest-path
+// insertion after the subcommand (rust/internal_test.go's own
+// TestCargoCommandArgsFor).
+func TestGoCommandArgsFor(t *testing.T) {
+	tests := []struct {
+		name    string
+		workDir string
+		command string
+		want    []string
+	}{
+		{
+			name:    "no workdir",
+			command: "build -o bin/api ./cmd/api",
+			want:    []string{"go", "build", "-o", "bin/api", "./cmd/api"},
+		},
+		{
+			name:    "workdir inserts -C before the subcommand, multi-token command",
+			workDir: "services/api",
+			command: "build -o bin/api ./cmd/api",
+			want:    []string{"go", "-C", "services/api", "build", "-o", "bin/api", "./cmd/api"},
+		},
+		{
+			name:    "workdir with single-token command",
+			workDir: "cmd/api",
+			command: "vet",
+			want:    []string{"go", "-C", "cmd/api", "vet"},
+		},
+		{
+			name: "empty command yields a bare go argv",
+			want: []string{"go"},
+		},
+		{
+			name:    "whitespace-only command yields a bare go argv even with workdir set",
+			workDir: "cmd/api",
+			command: "   ",
+			want:    []string{"go"},
+		},
+		{
+			name:    "extra whitespace between tokens collapses",
+			workDir: "cmd/api",
+			command: "  build   -o  bin/api  ",
+			want:    []string{"go", "-C", "cmd/api", "build", "-o", "bin/api"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := goCommandArgsFor(tt.workDir, tt.command)
+			if len(got) != len(tt.want) {
+				t.Fatalf("goCommandArgsFor(%q, %q) = %v, want %v", tt.workDir, tt.command, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("goCommandArgsFor(%q, %q) = %v, want %v", tt.workDir, tt.command, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
 func TestVulnerabilitiesReported(t *testing.T) {
 	tests := []struct {
 		name   string
