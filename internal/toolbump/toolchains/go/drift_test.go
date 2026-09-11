@@ -1,4 +1,4 @@
-package sites
+package gotoolchain
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"runtime"
 	"testing"
+
+	"github.com/pablogore/shipwright/internal/toolbump/core"
 )
 
 // goDirectivePattern matches the "go X.Y.Z" directive line in a go.mod
@@ -18,8 +20,8 @@ var goDirectivePattern = regexp.MustCompile(`(?m)^go\s+(\d+\.\d+(?:\.\d+)?)\s*$`
 
 // repoRoot resolves the repository root relative to this test file's own
 // location, since `go test` runs with the package directory as its
-// working directory (scripts/gobump/sites -> repo root is three levels
-// up).
+// working directory (internal/toolbump/toolchains/go -> repo root is four
+// levels up).
 func repoRoot(t *testing.T) string {
 	t.Helper()
 
@@ -27,17 +29,25 @@ func repoRoot(t *testing.T) string {
 	if !ok {
 		t.Fatal("unable to determine the caller's file to resolve the repo root")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", "..", ".."))
+	return filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".."))
 }
 
 // TestSitesMatchGoModDirective is the standing drift guard (design.md
-// D-8): it reads the repository's real, on-disk root go.mod `go`
-// directive and asserts every entry in the real production var Sites
-// currently renders that exact version. A green run here means the
-// literal-replacement registry and the module's own tier-1 pin have not
-// drifted apart; the moment a version bump lands through any path other
-// than this tool (or this registry falls behind a manual go.mod edit),
-// this test goes red and names exactly which registered site disagrees.
+// D-8), re-homed here from scripts/gobump/sites/drift_test.go#280 once
+// tasks.md 4.4 deletes that package: it reads the repository's real,
+// on-disk root go.mod `go` directive and asserts every entry in the Go
+// descriptor's production Sites() currently renders that exact version. A
+// green run here means the literal-replacement registry and the module's
+// own tier-1 pin have not drifted apart; the moment a version bump lands
+// through any path other than this tool (or this registry falls behind a
+// manual go.mod edit), this test goes red and names exactly which
+// registered site disagrees.
+//
+// Deferred from Phase 1 (tasks.md 1.2) and Phase 2 (tasks.md 2.1) because
+// its comparison target -- the production Sites data -- did not have a
+// single home yet while scripts/gobump/sites.Sites and this package's own
+// Sites() coexisted; now that scripts/gobump is gone, toolchains/go's
+// Sites() is the only registry left to compare go.mod's directive against.
 func TestSitesMatchGoModDirective(t *testing.T) {
 	root := repoRoot(t)
 
@@ -51,8 +61,8 @@ func TestSitesMatchGoModDirective(t *testing.T) {
 	}
 	want := string(m[1])
 
-	for _, s := range Sites {
-		re, err := Compile(s)
+	for _, s := range Toolchain.Sites() {
+		re, err := core.Compile(s)
 		if err != nil {
 			t.Errorf("Compile(%s): %v", s.Path, err)
 			continue

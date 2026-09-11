@@ -37,7 +37,7 @@ CYAN := \033[0;36m
 WHITE := \033[1;37m
 NC := \033[0m # No Color
 
-.PHONY: all build clean test dagger-test test-integration deps help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone provider-rust-standalone bump-go-version
+.PHONY: all build clean test dagger-test test-integration deps help coverage coverage-html coverage-report coverage-package coverage-file coverage-summary coverage-threshold coverage-100 local-run pipeline-local build-release build-all-platforms lint ci-final provider-go-standalone provider-rust-standalone bump-toolchain bump-go-version
 
 # Help target
 .PHONY: help
@@ -375,18 +375,28 @@ ci-final: lint build test coverage-gate security provider-go-standalone provider
 	@echo -e "$(GREEN)✅ ci-final: all production-critical guards passed$(NC)"
 
 # Coordinated Go SDK/toolchain version bump (issue #280, design.md D-9).
-# provider-go-standalone/provider-rust-standalone are deliberately NOT
-# re-listed here: ci-final (above) already depends on both transitively, so
-# re-listing them would run the GOWORK=off gate twice for no benefit.
-# scripts/bump-go-version-pr.sh runs LAST, only after ci-final has validated
-# the mutated tree in place -- it delivers that already-validated diff as a
-# PR (never a direct push to develop/main).
-.PHONY: bump-go-version
-bump-go-version: ## Bump the Go toolchain across every site, validate, and open a PR (TARGET=x.y.z required)
-	@test -n "$(TARGET)" || { echo -e "$(RED)❌ TARGET=x.y.z is required, e.g. make bump-go-version TARGET=1.26.7$(NC)"; exit 1; }
-	$(GOCMD) run ./scripts/gobump -target=$(TARGET)
+# Coordinated toolchain version bump (issue #280, generalized in #284,
+# design.md D-1/D-2/D-3). provider-go-standalone/provider-rust-standalone
+# are deliberately NOT re-listed here: ci-final (above) already depends on
+# both transitively, so re-listing them would run the GOWORK=off gate
+# twice for no benefit. scripts/bump-toolchain-pr.sh runs LAST, only after
+# ci-final has validated the mutated tree in place -- it delivers that
+# already-validated diff as a PR (never a direct push to develop/main).
+.PHONY: bump-toolchain
+bump-toolchain: ## Bump any registered toolchain across every site, validate, and open a PR (TOOLCHAIN=<id> TARGET=<version> required)
+	@test -n "$(TOOLCHAIN)" || { echo -e "$(RED)❌ TOOLCHAIN=<id> is required, e.g. make bump-toolchain TOOLCHAIN=go TARGET=1.26.7$(NC)"; exit 1; }
+	@test -n "$(TARGET)" || { echo -e "$(RED)❌ TARGET=<version> is required, e.g. make bump-toolchain TOOLCHAIN=go TARGET=1.26.7$(NC)"; exit 1; }
+	$(GOCMD) run ./scripts/toolbump -toolchain=$(TOOLCHAIN) -target=$(TARGET)
 	$(MAKE) ci-final
-	scripts/bump-go-version-pr.sh $(TARGET)
+	scripts/bump-toolchain-pr.sh $(TOOLCHAIN) $(TARGET)
+
+# `bump-go-version` keeps its #280 name -- .github/workflows/bump-go-version.yml
+# calls it by this exact name and MUST stay a zero-line diff (design.md D-3) --
+# but now delegates to the toolchain-agnostic target above as a TOOLCHAIN=go
+# alias, instead of hardcoding scripts/gobump itself.
+.PHONY: bump-go-version
+bump-go-version: ## Bump the Go toolchain across every site, validate, and open a PR (TARGET=x.y.z required) -- alias for `make bump-toolchain TOOLCHAIN=go`
+	$(MAKE) bump-toolchain TOOLCHAIN=go TARGET=$(TARGET)
 
 # Coverage targets
 # NOTE: all `go list ./...`-based package lists below intentionally do NOT
