@@ -330,3 +330,34 @@ func TestApplyDoesNotAlterUnrelatedFiles(t *testing.T) {
 		t.Fatalf("bystander.go was mutated by an Apply call that never planned it: %q", got)
 	}
 }
+
+// TestApplyPreservesFileMode is the RED test for tasks.md 3.9 (Threat
+// Matrix: documentation-like paths): Apply must never widen or narrow a
+// registered site's existing file mode -- it reads the current mode via
+// os.Stat and reuses it verbatim on write, never hardcoding 0o644 or
+// setting +x on a file that wasn't already executable (design.md's own
+// "Apply preserves mode, never sets +x" response to this boundary).
+func TestApplyPreservesFileMode(t *testing.T) {
+	root := t.TempDir()
+	path := writeFixture(t, root, "hooks/pre-commit", `const defaultGoVersion = "1.26.1"`)
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatalf("chmod fixture to 0o755: %v", err)
+	}
+
+	site := Site{Path: "hooks/pre-commit", Anchor: `const defaultGoVersion = "{{V}}"`, Occurrences: 1}
+	edits, err := Plan(root, []Site{site}, "1.27.0")
+	if err != nil {
+		t.Fatalf("Plan: unexpected error: %v", err)
+	}
+	if err := Apply(root, edits); err != nil {
+		t.Fatalf("Apply: unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat after Apply: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o755 {
+		t.Fatalf("Apply must preserve the pre-existing file mode: got %o, want %o", got, 0o755)
+	}
+}

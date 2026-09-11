@@ -217,7 +217,7 @@ func aggregateErrors(errs []error) error {
 	for _, e := range errs {
 		msgs = append(msgs, e.Error())
 	}
-	return fmt.Errorf("gobump: %d site(s) failed:\n%s", len(errs), strings.Join(msgs, "\n"))
+	return fmt.Errorf("toolbump: %d site(s) failed:\n%s", len(errs), strings.Join(msgs, "\n"))
 }
 
 // Apply writes every Edit's New content to its Path under root, preserving
@@ -236,7 +236,7 @@ func Apply(root string, edits []Edit) error {
 		}
 
 		if err := os.WriteFile(full, e.New, mode); err != nil {
-			return fmt.Errorf("gobump: apply %s: %w", e.Path, err)
+			return fmt.Errorf("toolbump: apply %s: %w", e.Path, err)
 		}
 	}
 	return nil
