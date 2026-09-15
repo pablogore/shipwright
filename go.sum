@@ -77,6 +77,10 @@ github.com/pablogore/kit-logger v0.1.2-0.20260825125644-7125fc80ab54 h1:/pl12UA/
 github.com/pablogore/kit-logger v0.1.2-0.20260825125644-7125fc80ab54/go.mod h1:hhJhPUudpd+M+wOjeWrolumIH2URPWz9RbHSukQe7wI=
 github.com/pablogore/shipwright/providers/go v1.0.0 h1:yRiI84cim9KiKTlIWNRjZxwZXcYz2PnmgXVOr7KFXFQ=
 github.com/pablogore/shipwright/providers/go v1.0.0/go.mod h1:kHMyAqUXImh6N4sDdBNeL0R52vJci4Mew4W8S4AZiP4=
+github.com/pablogore/shipwright/providers/go v1.1.0 h1:nfdiemoXCoTc99ikFNRvEB+TSkfeDAydki1Yyzd9aqQ=
+github.com/pablogore/shipwright/providers/go v1.1.0/go.mod h1:2MHzG9bpZjM8LQStywRuJULwcD8FdN4WbefoKws0XHc=
+github.com/pablogore/shipwright/providers/go v1.2.0 h1:o1uyN9XYkAaWUSg4fsS8+Ok063awwUxr6msOcgx2tbU=
+github.com/pablogore/shipwright/providers/go v1.2.0/go.mod h1:Bb857YaHk9DyUrBgNXe4rKTvmCPLf774rnwWMhJG8Ks=
 github.com/pablogore/shipwright/providers/rust v1.1.0 h1:hUTXIZmLn2FF4T25je4vTpojf/wbY/79ctf/VAZOI3U=
 github.com/pablogore/shipwright/providers/rust v1.1.0/go.mod h1:6hUbAI/VhL0QzXW0/cWxOLU0rccwrU0NZoB5/TEdvYc=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=
