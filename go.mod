@@ -6,9 +6,9 @@ require (
 	dagger.io/dagger v0.21.9
 	github.com/joho/godotenv v1.5.1
 	github.com/knadh/koanf/providers/env v1.1.0
-	github.com/knadh/koanf/v2 v2.3.6
-	github.com/onsi/ginkgo/v2 v2.32.1
-	github.com/onsi/gomega v1.43.0
+	github.com/knadh/koanf/v2 v2.3.7
+	github.com/onsi/ginkgo/v2 v2.33.0
+	github.com/onsi/gomega v1.44.0
 	github.com/pablogore/shipwright/providers/go v1.2.0
 	github.com/pablogore/shipwright/providers/rust v1.1.0
 	github.com/stretchr/testify v1.12.1
