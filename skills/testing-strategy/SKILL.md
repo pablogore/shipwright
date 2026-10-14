@@ -73,11 +73,24 @@ A unit test that reaches a real Dagger container is misclassified — mock the c
 | PR touches `internal/executors`, `internal/plugins`, `internal/config`, or `internal/pipelines` | Coverage gate applies — 90% local (`make coverage`), 70% CI floor (`make coverage-threshold`) |
 | A function crosses gocyclo complexity 15 | Extract functions before merge; verify with `golangci-lint run` |
 
+## Proportional Validation and Closing Race Run (Canonical Rule)
+
+This section is the single source of truth for validation cadence. Other docs reference it; they must not restate or vary it.
+
+1. **During implementation and fixes**, run normal targeted tests (`go test <pkgs>`) for the packages and behaviors you changed. Do NOT run `-race` or full stress after every edit, commit, or agent.
+2. **With the final code**, run one `go test -race` over the affected module before merge. Include affected consumers when a contract change requires it.
+3. **Repeat `-race` only if** (a) relevant code or tests changed since the run, (b) a concrete failure or concurrency suspicion appeared, or (c) a fix must prove it resolved a race. `-race` may be used before closing to investigate a concrete problem.
+4. **Reuse a valid run** when the relevant inputs are identical. Record command, SHA/tree, and scope. A docs-only or registry-only change does not invalidate code evidence by itself.
+5. **Stress and mutation runs** must answer a concrete hypothesis or acceptance criterion. Never repeat full campaigns by routine. When a gate demands fresh evidence, first check which inputs changed and run only what is indispensable.
+6. **During the loop**, show the coordinator summarized results and failure details; keep full logs outside agent context.
+
+Applies from #165 and to all following slices. CI keeps its own gates unchanged.
+
 ## Running Tests
 
 ```bash
-go test ./...                # everything (Dagger calls are mocked, no real engine needed)
-go test -race ./...          # race detector — matches `make test` and CI
+go test ./...                # everything (Dagger calls are mocked, no real engine needed); use targeted packages while iterating
+go test -race ./...          # closing race run per "Proportional Validation" above — matches `make test` and CI; not after every edit
 make test-integration         # real-Dagger-engine tests under testing/integration/ (requires a running engine)
 make coverage                 # coverage report against the 90% local threshold
 make coverage-threshold       # CI-equivalent check against the 70% floor
@@ -96,7 +109,7 @@ golangci-lint run              # gocyclo (15) plus the rest of .golangci.yml —
 
 Report, for every change:
 1. Which level(s) the new tests live at (unit, mocking Dagger via `daggerkit` / `testing/integration/` real-engine), and why.
-2. That `go test -race ./...` passes with 0 failures.
+2. The closing `go test -race` run on the affected module (command, SHA/tree, scope, 0 failures), or the reused earlier run it is covered by — per "Proportional Validation".
 3. Coverage impact if the change touches a package under the coverage gate.
 4. Any function that crossed gocyclo complexity 15 and how it was split.
 

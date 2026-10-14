@@ -29,7 +29,7 @@ This workflow governs **new tests and tests you modify**. The existing suite is 
 | TDD | Test before implementation, always |
 | Coverage | `make coverage` → 90% local floor; `make coverage-threshold` → 70% CI floor |
 | Complexity | gocyclo ≤ 15 (`.golangci.yml`), checked via `golangci-lint run` — not yet CI-enforced |
-| Race detector | `go test -race ./...` — CI-enforced |
+| Race detector | One closing `go test -race` on the final code, not per edit — see `shipwright-testing-strategy` "Proportional Validation"; CI-enforced |
 | Mock framework | `go.uber.org/mock` (mockgen) for generated mocks in `mocks/`; hand-rolled function-field fakes for `internal/executors`, `internal/plugins` |
 | Real infrastructure | Real Dagger containers: mocked by default via each module's own `daggerkit` package; genuine real-engine/external-command coverage lives in `testing/integration/`, guarded by the `integration` build tag |
 
@@ -234,7 +234,7 @@ Before opening a PR:
 - [ ] Every new exported function has a test
 - [ ] Every error path asserts the specific error, not just `err != nil`
 - [ ] Edge cases: empty, zero, nil, cancelled/timed-out context
-- [ ] `go test -race ./...` passes with 0 failures
+- [ ] Closing `go test -race` on the final code passes with 0 failures (or a valid earlier run is reused; see `shipwright-testing-strategy`)
 - [ ] `go test ./...` still passes (real-engine tests under `testing/integration/` are excluded by the `integration` build tag, not skipped at runtime)
 - [ ] No function exceeds gocyclo complexity 15
 - [ ] Golden files, if touched, were reviewed via `-update` diff, not blind-accepted

@@ -19,6 +19,10 @@ Unprefixed skills are portable writing or work-unit skills.
 3. Follow all rules from the loaded skill
 4. Multiple skills may apply simultaneously
 
+## Validation Cadence
+
+Run targeted tests while iterating; run `go test -race` once on the final code before merge, and repeat only when inputs change or a concrete race suspicion exists. Canonical rule: [`skills/testing-strategy/SKILL.md`](skills/testing-strategy/SKILL.md) § "Proportional Validation and Closing Race Run". Do not restate it elsewhere.
+
 ## Skills
 
 | Skill | Trigger | Path |
