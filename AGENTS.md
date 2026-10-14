@@ -21,7 +21,7 @@ Unprefixed skills are portable writing or work-unit skills.
 
 ## Validation Cadence
 
-Run targeted tests while iterating; run `go test -race` once on the final code before merge, and repeat only when inputs change or a concrete race suspicion exists. Canonical rule: [`skills/testing-strategy/SKILL.md`](skills/testing-strategy/SKILL.md) § "Proportional Validation and Closing Race Run". Do not restate it elsewhere.
+Validation cadence (targeted tests while iterating, closing `-race`, reuse of evidence) is defined only in [`skills/testing-strategy/SKILL.md`](skills/testing-strategy/SKILL.md) § "Proportional Validation and Closing Race Run".
 
 ## Skills
 

@@ -80,7 +80,7 @@ This section is the single source of truth for validation cadence. Other docs re
 1. **During implementation and fixes**, run normal targeted tests (`go test <pkgs>`) for the packages and behaviors you changed. Do NOT run `-race` or full stress after every edit, commit, or agent.
 2. **With the final code**, run one `go test -race` over the affected module before merge. Include affected consumers when a contract change requires it.
 3. **Repeat `-race` only if** (a) relevant code or tests changed since the run, (b) a concrete failure or concurrency suspicion appeared, or (c) a fix must prove it resolved a race. `-race` may be used before closing to investigate a concrete problem.
-4. **Reuse a valid run** when the relevant inputs are identical. Record command, SHA/tree, and scope. A docs-only or registry-only change does not invalidate code evidence by itself.
+4. **Reuse a valid run** when the relevant inputs are identical. Record command, SHA/tree, and scope. A change limited to documentation and execution records that do not alter build inputs, tests, or gates does not invalidate code evidence by itself. Reuse requires demonstrating equality of the relevant inputs, including non-Go files (e.g. `go.mod`, `go.sum`, `go.work`, embedded assets, golden files, `Makefile`, CI config).
 5. **Stress and mutation runs** must answer a concrete hypothesis or acceptance criterion. Never repeat full campaigns by routine. When a gate demands fresh evidence, first check which inputs changed and run only what is indispensable.
 6. **During the loop**, show the coordinator summarized results and failure details; keep full logs outside agent context.
 
